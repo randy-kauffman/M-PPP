@@ -284,45 +284,14 @@ Sanic.Mppp.Comandos = (function () {
      * `null` si no se pudo averiguar (otra vista, la grilla todavia cargando, una
      * version distinta del control). Quien llama decide, y decide MOSTRAR.
      */
-    /*
-     * DIAGNOSTICO TEMPORAL (2026-09-23). Se saca cuando sepamos por que las reglas
-     * no ocultan los botones en la grilla principal. Tres intentos a ciegas ya
-     * costaron tres pruebas al usuario; esto imprime lo que la funcion VE, que es
-     * lo unico que no estabamos mirando.
-     */
-    function traza(etapa, dato) {
-        try {
-            console.log("[MPPP reglas] " + etapa + ":", dato);
-        } catch (e) {
-            // una consola que no existe no puede romper un comando
-        }
-    }
-
-    /* Los nombres que expone un objeto, funciones marcadas con (). Es lo unico que
-     * distingue "el metodo no existe" de "el metodo existe y devuelve vacio", y esa
-     * diferencia es justamente la que no teniamos. */
-    function claves(objeto) {
-        var nombres = [];
-        try {
-            for (var n in objeto) {
-                nombres.push(n + (typeof objeto[n] === "function" ? "()" : ""));
-            }
-        } catch (e) {
-            return "(no se pudo inspeccionar: " + (e && e.message) + ")";
-        }
-        return nombres.join(", ");
-    }
-
     /* `getSelectedRows()` devuelve una Collection, no un array. `forEach` es suyo y
      * no siempre recorre; `getAll()` e indices son los otros dos caminos. Se prueban
      * los tres porque cual funciona depende del tipo de grilla. */
     function filasDeLaGrilla(grid) {
         var coleccion = grid.getSelectedRows();
-        traza("coleccion de seleccionadas", claves(coleccion));
 
         if (coleccion && typeof coleccion.getAll === "function") {
             var todas = coleccion.getAll();
-            traza("getAll() devolvio", todas && todas.length);
             if (todas && todas.length) { return todas; }
         }
 
@@ -332,24 +301,14 @@ Sanic.Mppp.Comandos = (function () {
         for (var i = 0; i < cuantas; i++) {
             filas.push(coleccion.get(i));
         }
-        traza("por indice se armaron", filas.length);
         return filas;
     }
 
-    /* El estado de UNA fila. Cada paso se traza por separado para que, si devuelve
-     * `undefined`, se vea EN CUAL paso se cortó y no haya que adivinarlo. */
+    /* El estado de UNA fila. Cada paso devuelve `undefined` en cuanto algo falta, en
+     * vez de reventar: quien llama ya trata `undefined` como "no se pudo leer". */
     function estadoDeLaFila(fila) {
-        traza("fila", claves(fila));
-
         var datos = fila && (fila.data || (typeof fila.getData === "function" ? fila.getData() : null));
-        traza("data", claves(datos));
-
         var registro = datos && (datos.entity || (typeof datos.getEntity === "function" ? datos.getEntity() : null));
-        traza("entity", claves(registro));
-
-        if (registro && typeof registro.getId === "function") {
-            traza("id de la fila", registro.getId());
-        }
 
         /* Tres nombres para la misma coleccion segun version y tipo de grilla. La
          * documentacion solo bendice `columns`, y solo en grillas editables. */
@@ -357,45 +316,30 @@ Sanic.Mppp.Comandos = (function () {
         if (registro) {
             if (typeof registro.getAttributes === "function") {
                 columnas = registro.getAttributes();
-                traza("via getAttributes()", claves(columnas));
             } else if (registro.attributes) {
                 columnas = registro.attributes;
-                traza("via .attributes", claves(columnas));
             } else if (registro.columns) {
                 columnas = registro.columns;
-                traza("via .columns", claves(columnas));
-            } else {
-                traza("NO HAY coleccion de columnas en la fila", FILA.columna);
             }
         }
 
         if (!columnas || typeof columnas.get !== "function") { return undefined; }
 
-        var nombres = [];
-        if (typeof columnas.forEach === "function") {
-            columnas.forEach(function (c) { nombres.push(c && c.getName && c.getName()); });
-        }
-        traza("columnas disponibles", nombres.join(", "));
-
         var columna = columnas.get(FILA.columna);
-        traza("columna " + FILA.columna, claves(columna));
         return (columna && typeof columna.getValue === "function") ? columna.getValue() : undefined;
     }
 
     function estadosSeleccionados(control) {
         try {
-            traza("control recibido", claves(control));
-            var grid = control.getGrid();
-            var filas = filasDeLaGrilla(grid);
+            var filas = filasDeLaGrilla(control.getGrid());
             var estados = [];
             for (var i = 0; i < filas.length; i++) {
                 var estado = estadoDeLaFila(filas[i]);
                 if (estado !== undefined && estado !== null) { estados.push(estado); }
             }
-            traza("estados leidos", estados);
             return estados.length ? estados : null;
         } catch (e) {
-            traza("EXCEPCION", e && e.message);
+            // No poder leer la grilla no es motivo para ocultar un boton: ver `algunaAdmite`.
             return null;
         }
     }
@@ -412,16 +356,10 @@ Sanic.Mppp.Comandos = (function () {
      * necesita es peor que mostrarle uno que el servidor va a rechazar.
      */
     function algunaAdmite(accion, control) {
-        traza("evaluando la regla de", accion);
         var estados = estadosSeleccionados(control);
-        if (estados === null) {
-            traza("sin estados → MUESTRA el boton de", accion);
-            return true;
-        }
+        if (estados === null) { return true; }
         var validos = TRANSICIONES_VALIDAS[accion] || [];
-        var resultado = estados.some(function (estado) { return validos.indexOf(estado) >= 0; });
-        traza("accion " + accion + " · validos " + validos + " · estados " + estados + " → ", resultado);
-        return resultado;
+        return estados.some(function (estado) { return validos.indexOf(estado) >= 0; });
     }
 
     function cambioDe(config, valor) {
