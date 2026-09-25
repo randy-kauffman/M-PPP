@@ -115,7 +115,8 @@ El bot **consulta**; la solución nunca lo llama a él (los bots de Automation A
 | Parámetro | Dirección | Tipo | Nota |
 |---|---|---|---|
 | `maximo` | entrada | Integer | **Cuántas filas entregar como máximo en esta llamada.** El bot pide lo que puede procesar: `maximo = 10` devuelve 10, no 100. Defecto 100; **tope 500** (un valor mayor se recorta al tope, sin error); 0 o negativo se rechaza. |
-| `filas` | salida | String (JSON) | Arreglo de filas en estado **Validada**, y de filas **Digitada** cuyo `digitadapor` es el propio bot (las que le falta aprobar). |
+| `claimminutos` | entrada | Integer | **Por cuánto tiempo el bot reserva las filas que se lleva.** Entero **mayor que 0**; mayor que `rpa.minutos.claimmaximo` se recorta al tope, igual que `maximo`. Ver "El claim" más abajo. |
+| `filas` | salida | String (JSON) | Arreglo de filas en estado **Validada**, y de filas **Digitada** cuyo `digitadapor` es **exactamente el usuario que llama** (las que le falta aprobar). Ver "Qué filas entran" más abajo. |
 | `entregadas` | salida | Integer | Cuántas filas trae **este** lote. Evita que el bot tenga que parsear para contar, y hace evidente en el log si el lote vino corto. |
 | `pendientes` | salida | Integer | Cuántas quedan sin entregar **después** de este lote. Con esto el bot decide si vuelve a llamar enseguida o espera su próxima corrida; sin esto, 2.500 filas podrían esperar horas sin que nadie lo sepa. |
 
@@ -130,7 +131,51 @@ Por cada fila: `filaid`, solicitud, número de fila, estado, plan, **tipo de for
 
 **Orden: FIFO estricto** (decisión del aprobador, 2026-09-25), por `sanic_fechavalidada` y, a igualdad, por `sanic_numerofila`. **Por qué se fija en el contrato y no se deja al motor**: sin orden determinístico, un lote de 500 sobre 3.000 pendientes puede devolver siempre las mismas y **las del fondo no se digitan nunca** — la solicitud de un cliente queda esperando para siempre sin que falle nada ni nadie se entere. Lo primero que entró es lo primero que sale.
 
-El bot no necesita conocer reglas de referencia ni códigos de banco: todo le llega resuelto. **No hay reserva de filas** (ver "Concurrencia" en §3).
+El bot no necesita conocer reglas de referencia ni códigos de banco: todo le llega resuelto.
+
+### El claim: reserva con vencimiento
+
+**Revierte "sin reserva de filas"** (decisión del aprobador, 2026-09-25). La decisión anterior aceptaba el riesgo de colisión con un ejecutivo porque *"la ventana es de minutos"*. **Esa premisa era falsa**: a 10 segundos por fila, 3.000 filas son **8,33 horas** de bot trabajando. En esa ventana un ejecutivo toma una fila y la graba en AS400 sí o sí.
+
+Una columna nueva en Fila, y nada más:
+
+```
+sanic_claimhasta   (DateTime)   el instante en que la reserva VENCE
+```
+
+Se guarda el vencimiento, no el inicio: así "¿está tomada?" es `sanic_claimhasta > ahora`, sin cuentas, y la MDA muestra la columna tal cual (§4 de esta sección). La escribe **solo SYSTEM**, desde esta API; por eso **no entra a la lista blanca** de `04` §1 y ninguna persona la toca.
+
+`obtenerfilaspendientes` **pone o refresca el claim** sobre cada fila que entrega, en la misma llamada: tomar y marcar, juntos.
+
+**El claim NO excluye filas de futuras entregas al bot** (razón del aprobador, 2026-09-25, y corrige la propuesta inicial). El claim es **un candado contra las personas, no contra el bot**: nunca tuvo que impedirle al bot volver a tomar lo suyo. Si el bot pide más sin haber reportado lo que tiene, por algo es — y el caso que lo vuelve decisivo es que **el bot se caiga y reinicie**: perdió su lista en memoria, vuelve a pedir, y con exclusión recibiría **cero filas** (están todas tomadas por él mismo) y quedaría trabado hasta el vencimiento. Sin exclusión, pide, recupera lo suyo y sigue.
+
+> **Limitación conocida, aceptada**: la columna no guarda **quién** tomó la fila. Con un solo bot no hace falta. Si algún día hubiera dos, B podría tomar lo de A: ese día se agrega el dueño, y no antes.
+
+**Qué frena el claim.** Mientras `sanic_claimhasta` esté en el futuro, **una persona no puede transicionar esa fila**: el step de transición la rechaza nombrando la causa y la hora en que se libera. Es exactamente el problema que venimos a resolver.
+
+**Qué NO frena, y esto es lo importante**: el claim **no frena al bot cuando reporta**. El claim protege **tomar**, no **reportar**. Si el bot tardó 12 minutos con un claim de 10 y le rechazáramos el reporte, pasaría esto:
+
+```
+el bot digitó la fila EN AS400  →  el claim venció  →  rechazamos el reporte
+                                                         ↓
+                    AS400 dice "digitada"  ·  Dataverse dice "validada"
+```
+
+**Divergencia con el core bancario**, y después alguien la digita de nuevo porque para Dataverse sigue pendiente. Lo que ya pasó en AS400 se registra siempre; si mientras tanto una persona la atendió, ya está la red de §3: gana el que llegó primero y `estadofila` dice la verdad.
+
+**Cuándo se libera.** Al vencer, y al llegar la fila a un estado terminal (Aprobada, Rechazada en AS400, Anulada) o al marcarse para atención manual. **En `Validada → Digitada` el claim NO se libera**: al bot le queda trabajo sobre esa fila, aprobarla.
+
+**Sin botón "Liberar" por ahora** (decisión del aprobador, 2026-09-25): el tope `rpa.minutos.claimmaximo` acota el daño de un bot colgado, y agregar el botón después es barato. Meter una columna más en la lista blanca sin necesitarla, no.
+
+### Qué filas entran, y por qué
+
+**Para aprobar, solo las que digitó ÉL MISMO** (razón del aprobador, 2026-09-25). No es una regla de permisos: es una regla de responsabilidad. El bot aprueba en AS400 porque **le consta** que la digitación se hizo bien — la hizo él, sabe exactamente qué tecleó y sabe que no modificó nada más. **De lo que hizo un ejecutivo no le consta nada**, y aprobarlo sería firmar un trabajo que no vio. Quien aprueba lo que digitó una persona es otra persona: ahí los cuatro ojos son dos humanos, como siempre.
+
+La comparación es contra **el usuario que llama**, no contra "cualquiera con el rol del RPA": si el día de mañana hubiera dos bots, ninguno aprueba lo del otro, por el mismo motivo. `sanic_digitadapor == InitiatingUserId`, exacto.
+
+**No se entrega nada que esté marcado para atención manual** (`sanic_requiereatencionmanual`): esa fila ya es de un ejecutivo.
+
+**Y si `rpa.puedeaprobar` vale `no`, no se devuelve ninguna Digitada: solo Validadas.** Con el aval de C-03 pendiente, esas filas son de un supervisor, no del bot. Entregárselas sería darle trabajo que le vamos a prohibir: intentaría aprobar, fallaría, y volvería a intentarlo en cada corrida **durante meses**, llenando el log de errores normales hasta enterrar el primer error de verdad. El día que llegue el aval se cambia **un parámetro** y las filas aparecen solas. Cero código condicional del lado del bot.
 
 **El usuario de aplicación del RPA NO entra al column security profile** (decisión del aprobador, 2026-09-25; corrige lo que decía este párrafo). El motivo por el que lo decía era falso: el plugin de la Custom API lee y arma el JSON **con SYSTEM** (`04` §1), y `04` §4 dice textual que *"SYSTEM (la Custom API) no necesita estar en ningún perfil"*. **El bot nunca lee esas columnas: lee un JSON.** Meterlo en el perfil le daría un privilegio permanente de leer cuenta e identificación **por cualquier vía**, para algo que no necesita — y encima traería una incógnita que no hace falta comerse: a ese perfil se entra **por equipo desde un grupo de Entra** (D-8), y si un service principal sincroniza a un equipo de grupo está sin verificar.
 
@@ -142,16 +187,18 @@ En AS400 el bot **digita y después aprueba**: son dos eventos distintos, separa
 |---|---|---|---|---|
 | `filaid` | entrada | Guid | sí | El que recibió de `obtenerfilaspendientes`. |
 | `resultado` | entrada | String | sí | `digitada` · `aprobada` · `rechazada`. Texto y no número: el contrato se lee solo desde el lado del bot. |
-| `mensaje` | entrada | String | si `rechazada` | **El texto de la condición tal cual lo mostró AS400**, sin interpretar. Va a **`sanic_notainterna`**, que lee el ejecutivo y **nunca sale del banco** (decisión del aprobador, 2026-09-25 — ver abajo). |
+| `mensaje` | entrada | String | si `rechazada` | **El texto de la condición tal cual lo mostró AS400**, sin interpretar. Va a **`sanic_notainterna`**, que lee el ejecutivo y **nunca sale del banco**. |
+| `codigo` | entrada | String | sí | **La clasificación de lo que pasó, según el bot.** No es texto libre: es una clave del catálogo `rpa.codigos`, y de ahí sale —traducido por nosotros— lo que lee el cliente. Ver "Los dos textos" más abajo. |
 | `fechaproceso` | entrada | DateTime | sí | Cuándo ocurrió en AS400. **Con offset explícito** (`2026-10-05T15:04:12Z` o `...-06:00`); una fecha sin offset se rechaza. Se valida contra una ventana de tolerancia (ver abajo). |
-| `estadofila` | salida | Integer | | Estado en que quedó la fila. |
-| `yaregistrado` | salida | Boolean | | `true` si la llamada no cambió nada (ver idempotencia). |
+| `estadofila` | salida | **String** | | Estado en que quedó la fila, **como texto** (`digitada`, `aprobada`, `rechazadaas400`, `anulada`…). **Es el campo que manda**: dice la verdad sobre la fila, la haya cambiado esta llamada o no. |
+| `yaregistrado` | salida | Boolean | | `true` si la llamada no cambió nada. **Es informativo, no decisorio** (ver idempotencia). |
 
 | `resultado` | Desde | Hacia | Efecto |
 |---|---|---|---|
 | `digitada` | Validada | **Digitada** | `sanic_digitadapor` = usuario de aplicación del RPA, `sanic_fechadigitada` = `fechaproceso` |
 | `aprobada` | Digitada, digitada por el propio bot | **Aprobada** | `sanic_aprobadapor` = el mismo usuario, `sanic_fechaaprobada` = `fechaproceso`. Solo si `rpa.puedeaprobar` vale `si`; si vale `no` (sin el aval de C-03) devuelve error, la fila queda Digitada y la aprueba un supervisor |
 | `rechazada` | Validada **o** Digitada | **Rechazada en AS400** | AS400 no aceptó la operación por una condición suya, al digitar o al aprobar. La API sabe en qué paso fue por el estado en que estaba la fila, y lo anota en la Bitácora |
+| `atencionmanual` | Validada | **Validada** (no cambia) | El bot se topó con algo que no sabe resolver. Prende `sanic_requiereatencionmanual`, deja el porqué en `sanic_notainterna` y **libera el claim**. La fila pasa a ser de un ejecutivo |
 
 **Cómo lo llama el bot.** Una llamada HTTP al Web API de Dataverse, con un token de Entra ID obtenido con las credenciales de su aplicación (flujo de credenciales de cliente):
 
@@ -182,16 +229,91 @@ Respuesta: `{ "estadofila": 159460004, "yaregistrado": false }`.
 - **Solo se reporta lo que pasó en AS400.** `rechazada` es un motivo de negocio (cuenta inexistente o inactiva, titular que no se parece, moneda que no coincide, plan inactivo, referencia repetida o inexistente). Si AS400 está caído o el bot se rompe, el bot **no llama**: la fila sigue como estaba y se reintenta en la próxima corrida (acordado con el aprobador).
 - **El bot nunca anula.** Anular es la decisión de una persona (DD-14).
 - **Idempotente** (BP-PP-055): repetir un resultado sobre una fila que ya está en ese estado devuelve `yaregistrado = true` sin cambiar nada. Si la fila ya no está en el estado de partida porque una persona la atendió antes, tampoco cambia nada ni da error: devuelve el estado actual. El que llegó primero gana.
+- **El bot decide por `estadofila`, NUNCA por `yaregistrado`.** `yaregistrado = true` tapa dos situaciones opuestas: *"ya me lo dijiste, seguí adelante"* y *"una persona llegó antes y la fila está en otro estado, no la toques más"*. Con el mismo booleano para las dos, un bot que reporta `digitada` sobre una fila que un ejecutivo **anuló** creería que puede aprobarla, y se pondría a pelear contra una persona. `estadofila` viene siempre y dice la verdad: si no es lo que el bot esperaba, el bot suelta esa fila. Por eso viaja como texto legible y no como número.
 - Aplica las mismas transiciones del plugin de §4, en nombre del usuario de aplicación del RPA.
 
 **El texto de AS400 NO sale al cliente** (decisión del aprobador, 2026-09-25). El contrato decía que `mensaje` era *"de donde sale lo que se le dice al cliente"*. Eso abre un caño directo desde el core bancario hasta la bandeja de un cliente, sin que lo lea nadie: si AS400 contesta algo como `CUENTA PERTENECE A OTRO TITULAR: <nombre>`, ese nombre saldría. Y rompe la premisa sobre la que está construida toda la defensa de `ArmadorRespuesta.DefenderMensaje`, que dice textual: *"`sanic_mensaje` lo redacta el catálogo (D-19, marcador `{valor}`) y hoy nunca cita la cuenta ni la identificación completas"* — la máscara solo tapa la cuenta y la identificación **de esa misma fila**, si aparecen literales. En fase 2 el texto deja de redactarlo el catálogo.
 
-| Dónde va | Qué lleva |
-|---|---|
-| `sanic_notainterna` | el texto de AS400 **tal cual**, sin interpretar. Lo lee el ejecutivo; no sale del banco |
-| `sanic_mensaje` (lo lee el cliente) | texto **nuestro**, del catálogo, para "rechazada en AS400" |
+### Atención manual: una MARCA, no un estado
 
-Es la misma separación de columnas que se construyó el 2026-09-24 para la nota del supervisor al devolver (`04` §1). Si el negocio quiere que el cliente vea motivos específicos de AS400, eso es un **catálogo de condiciones mapeadas a texto nuestro**, con alguien que lo aprueba — una decisión deliberada, nunca un reenvío automático.
+El bot se topa con algo que no tiene mapeado y lo manda a un humano. Se resolvió con **una marca sobre la fila, no con un estado nuevo** (decisión del aprobador, 2026-09-25):
+
+```
+sanic_requiereatencionmanual  (sí/no)   la prende SOLO el bot
+sanic_notainterna                        el porqué, con el texto crudo de AS400
+```
+
+**Por qué no un estado.** Primero, porque **la fila sigue siendo Validada**: lo que le falta es exactamente lo que le falta a cualquier Validada, que alguien la digite; un estado nuevo obligaría a redeclararle **todas** las transiciones de Validada sin agregar un solo camino. Segundo, y pesa más: un estado nuevo entra a `EstadoParaElCliente`, que es **el lugar exacto donde el 2026-09-24 se cerró la fuga de información** colapsando estados — más superficie ahí, y sin aportarle nada al cliente, para quien la fila sigue en curso. Tercero: **este patrón ya existe y funciona** — `sanic_requiererevision` en Solicitud es lo mismo, con su vista *Para revisar* y su botón *Revisado*.
+
+**Se apaga sola.** La marca la limpia **cualquier transición exitosa de la fila** (aprobador, 2026-09-25): si un ejecutivo o un supervisor la digita, la aprueba, la anula o la lleva a cualquier estado terminal, la marca se va sin que nadie tenga que acordarse. Y además hay botón **"Atendida"** para el ejecutivo que la resolvió sin cambiarla de estado — por eso esta columna **sí entra a la lista blanca** de `04` §1, como ya entró `sanic_requiererevision` en Solicitud.
+
+### Los dos textos: el bot manda uno y clasifica; nosotros traducimos
+
+Son **dos campos distintos con dos destinos distintos** (decisión del aprobador, 2026-09-25):
+
+| Campo que manda el bot | Dónde va | Quién lo lee |
+|---|---|---|
+| `mensaje` — el texto de AS400 **tal cual** | `sanic_notainterna` | el ejecutivo. **No sale del banco** |
+| `codigo` — la **clasificación** de lo que pasó | se traduce con `rpa.codigos` → `sanic_mensaje` | **el cliente** |
+
+**El bot nunca redacta lo que lee un cliente.** Manda una clave; el texto lo pone el catálogo, que es nuestro y lo aprueba alguien. Es la misma separación de columnas que se construyó el 2026-09-24 para la nota del supervisor al devolver (`04` §1).
+
+**El catálogo crece de a poco.** El parámetro `rpa.codigos` arranca con lo mínimo —un código de OK y uno de rechazo genérico— y se le agregan condiciones de AS400 a medida que el negocio las mapee y apruebe su texto. Forma:
+
+```json
+{
+  "OK":       { "cliente": null, "nota": "AS400 aceptó la operación" },
+  "RECH-GEN": { "cliente": "<la frase única para el cliente>",
+                "nota": "Rechazo de AS400 sin clasificar todavía" }
+}
+```
+
+**Un código que no está en el catálogo es un fallo NO reintentable** (`MPPP-RPA-005`): la fila no se mueve y el bot no debe volver a intentarlo hasta que alguien agregue el mapeo. Falla cerrado a propósito: **una fila trabada que alguien nota es infinitamente mejor que un texto equivocado en la bandeja de un cliente.** Y como la fila queda en su estado anterior, la Solicitud no avanza y termina cayendo en la vigilancia de `MPPP-VIG`, que es la red que ya existe.
+
+**Todos los rechazos de AS400 que no tengan un código propio aprobado comparten el MISMO texto al cliente.** Eso no es pereza: es lo que se decidió el 2026-09-24 al cerrar la fuga de información. Un texto que distingue casos es un oráculo, y un oráculo se explota. Si el negocio quiere que el cliente vea motivos específicos, cada motivo entra al catálogo **uno por uno, con alguien que lo aprueba** — nunca por reenvío automático.
+
+### Los errores llevan código, para que el bot sepa si reintentar
+
+Hoy todo lo que falla sale como excepción con prosa, y el bot no puede distinguir *"reintentá"* de *"esto está roto"*: o reintenta para siempre, o abandona para siempre. Cada error empieza con una clave de una lista cerrada, y el bot decide por el prefijo:
+
+| Código | Qué pasó | ¿Reintentar? |
+|---|---|---|
+| `MPPP-RPA-001` | `filaid` no existe | **no** |
+| `MPPP-RPA-002` | `resultado` no es `digitada`, `aprobada` ni `rechazada` | **no** |
+| `MPPP-RPA-003` | `fechaproceso` sin offset, en el futuro, o fuera de `rpa.horas.tolerancia` | **no** — está mal el reloj del bot |
+| `MPPP-RPA-004` | falta `mensaje` en un `rechazada` | **no** |
+| `MPPP-RPA-005` | `codigo` no está en `rpa.codigos` | **no** — falta mapearlo |
+| `MPPP-RPA-006` | el que llama no es el bot autorizado (D-9) | **no** |
+| `MPPP-RPA-007` | el rol `SR - MPPP - RPA` no existe en el entorno (D-44) | **no** — falta instalarlo |
+| *(sin código)* | cualquier otra cosa: plataforma, tiempo de espera | **sí** |
+
+### Se reporta por lote
+
+**Por qué** (aprobador, 2026-09-25): a una llamada por hecho, 3.000 filas son 6.000 llamadas —digitar y aprobar— más las de consulta. Consume cuota y hace lento al bot. El lote acepta **de 1 a `rpa.lote.maximo`** resultados en una llamada, cada uno con la misma forma de arriba.
+
+**Falla parcial: NUNCA todo o nada.** Si el ítem 23 de 50 trae un código sin mapear y rechazáramos el lote entero, **perderíamos 49 hechos reales de AS400**. La respuesta es **por ítem**, y la llamada devuelve **200**:
+
+```json
+{ "resultados": [
+    { "filaid": "5f0c…", "estadofila": "digitada", "yaregistrado": false },
+    { "filaid": "a1b2…", "estadofila": "validada", "yaregistrado": true,
+      "error": "MPPP-RPA-005: el código RECH-XYZ no está en rpa.codigos" }
+  ],
+  "procesadas": 49, "conerror": 1 }
+```
+
+Los códigos `MPPP-RPA-001` a `007` son **por ítem**, no de la llamada. El error HTTP queda para lo que rompe la llamada entera:
+
+| Código | Qué pasó | ¿Reintentar? |
+|---|---|---|
+| `MPPP-RPA-008` | el lote trae **más de `rpa.lote.maximo`** ítems: **se rechaza entero** | **no** — que lo parta el bot |
+| `MPPP-RPA-009` | el lote viene vacío | **no** |
+
+**El lote grande se rechaza entero, y `maximo` en §2 se recorta al tope. La asimetría es a propósito**: `maximo` pide trabajo, y darle menos no pierde nada; un lote son **hechos que ya ocurrieron en AS400**, y procesar solo los primeros X **perdería el resto en silencio**. Quien "unifique" estos dos comportamientos más adelante va a romper esto.
+
+**El plugin no puede tirar excepción por un ítem.** Un plugin corre **dentro de una transacción**: si tira en el ítem 23, revierte los 22 anteriores. Atrapa por ítem y anota; nunca deja subir.
+
+**El tope no lo manda la cuota, lo manda el reloj.** Toda operación de Dataverse tiene **2 minutos** (BP-PP-053). `rpa.lote.maximo` se calibra contra ese presupuesto, midiendo, no estimando.
 
 **`fechaproceso`: ventana de tolerancia parametrizable** (decisión del aprobador, 2026-09-25). `sanic_fechadigitada` y `sanic_fechaaprobada` son el rastro de los cuatro ojos: un bot con el reloj o la zona horaria mal los envenena en silencio. Se rechaza toda fecha **en el futuro** o más vieja que la tolerancia, con un error que nombra la causa. La ventana la declara el parámetro **`rpa.horas.tolerancia`**, con un **fallback quemado en el código** para que la ausencia del parámetro no tumbe al bot (mismo criterio que `EsCodigoDeServidor` con `servicio.cuenta`: un dato de configuración que falta degrada, no rompe). **Todas las fechas, de entrada y de salida, llevan offset explícito.**
 
