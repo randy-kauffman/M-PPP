@@ -130,7 +130,11 @@ class AgregarColumnas(tt.Base):
     def test_el_flag_pasa_por_la_linea_de_comandos(self):
         fuente = open(tb.__file__, encoding="utf-8").read()
         self.assertIn('"--agregar-columnas" in argv', fuente)
-        self.assertIn("[--agregar-columnas]", fuente)
+        # El mensaje de uso se calcula desde BANDERAS (D-56, 2026-09-25), así que ya no se puede
+        # buscar el literal en el fuente: se comprueba el valor, que es lo que el usuario lee.
+        # De paso, esto ya no puede quedar desactualizado respecto de la lista real de banderas.
+        self.assertIn("--agregar-columnas", tb.BANDERAS)
+        self.assertIn("[--agregar-columnas]", tb.USO)
 
 
 if __name__ == "__main__":

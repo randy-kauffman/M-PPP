@@ -783,11 +783,25 @@ def construir(ruta_playbook, solo_verificar, fabrica_cliente, verificadas=VERIFI
         return "error", componente, f"fallo inesperado hablando con Dataverse, durante {rastro.en_curso}: {type(e).__name__}: {e}"
 
 
+BANDERAS = ("--solo-verificar", "--permitir-no-verificadas", "--corregir-primaria", "--publicar",
+            "--corregir-nombres", "--agregar-columnas")
+USO = "uso incorrecto: tabla.py <playbook.md> [" + "] [".join(BANDERAS) + "]"
+
+
 def main():
     argv = sys.argv[1:]
     rutas = [a for a in argv if not a.startswith("--")]
+    # Una bandera que la herramienta no conoce es un ERROR, no un encogimiento de hombros.
+    # El 2026-09-25 se le pasó `--completar` —que existe en rol.py y en datos.py, no acá— y siguió
+    # como si nada, devolviendo `difiere`: parecía que se negaba a agregar columnas cuando en
+    # realidad estaba ignorando la instrucción. Misma familia que el `ya_existia` mentiroso del
+    # ribbon: una herramienta que calla lo que no entendió es una herramienta en la que no se
+    # puede confiar, y todo el método de este proyecto se apoya en confiar en ellas (D-56).
+    desconocidas = sorted({a for a in argv if a.startswith("--")} - set(BANDERAS))
+    if desconocidas:
+        return salida("error", "desconocido", f"bandera(s) que esta herramienta no conoce: {desconocidas}. " + USO)
     if len(rutas) != 1:
-        return salida("error", "desconocido", "uso incorrecto: tabla.py <playbook.md> [--solo-verificar] [--permitir-no-verificadas] [--corregir-primaria] [--publicar] [--corregir-nombres] [--agregar-columnas]")
+        return salida("error", "desconocido", USO)
     from dataverse_api import Dataverse
 
     estado, componente, detalle = construir(rutas[0], "--solo-verificar" in argv, Dataverse,
