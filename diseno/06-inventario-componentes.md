@@ -205,9 +205,52 @@ Desaparece el Flow B de la definición (`07` DF-01). Los hijos se construyen ant
 | 13.2 | Cuenta de servicio licenciada, con su rol 6.6 y acceso exclusivo al buzón (C-04) | Administrador de Power Platform | 1 |
 | 13.3 | Asignación de roles a ejecutivos, supervisores y administradores | Administrador de Power Platform | 1 |
 | 13.4 | Auditoría sobre asignación de roles activada (D-38) | Administrador de Power Platform | 1 |
-| 13.7 | Grupo de seguridad de Entra ID para quienes leen datos sensibles, su equipo de grupo en el entorno, y la asociación de ese equipo al perfil 6.1 (D-8, `04` §4) | Administrador de Azure y de Power Platform | 1 |
+| 13.7 | Grupo de seguridad de Entra ID para quienes leen datos sensibles, su equipo de grupo en el entorno, y la asociación de ese equipo al perfil 6.1 (D-8, `04` §4). **Ver 13.7.1: la prueba del mecanismo es parte de la tarea, no un extra** | Administrador de Azure y de Power Platform | 1 |
 | 13.5 | Usuario de aplicación del RPA | | 2 |
 | 13.6 | Usuario de aplicación del histórico e infraestructura Azure | Administrador de Azure | 3 |
+
+### 13.7.1 Prerrequisito de migración: ejercitar el mecanismo de D-8 antes de depender de él
+
+En **Desarrollo, 13.7 no hace falta**: nadie necesita leer `sanic_numeroidentificacion` ni
+`sanic_numerocuenta` ahí, y durante la fase 1 se trabajó con `User1` y `User2` asignados **directo**
+al perfil, que es lo correcto para un entorno de pruebas (decisión del aprobador, 2026-09-23 y
+2026-09-25). Donde **sí** hace falta es en Producción.
+
+El riesgo no es la asignación: es que **la cadena Entra → equipo de grupo → perfil nunca se ejecutó
+ni una sola vez**, en ningún entorno. Si su estreno es el día de la migración, un fallo se descubre
+ese día, con la gente esperando. Por eso la prueba de punta a punta es parte de 13.7:
+
+1. Crear el grupo de seguridad en Entra ID y su equipo de grupo en el entorno.
+2. Asociar ese equipo al perfil `CSP - MPPP - Datos sensibles`.
+3. **Meter a una persona en el grupo de Entra** → entra a la app y **lee** el número de cuenta.
+4. **Sacarla del grupo** → deja de leerlo.
+5. Si en ese entorno quedaron usuarios asignados directo al perfil, **quitarlos**: mientras estén,
+   tapan si el mecanismo real funciona o no.
+
+Los pasos 3 y 4 son la tarea. Los dos primeros son clics.
+
+### 13.8 Instalación en un entorno nuevo — el procedimiento completo
+
+**La solución lleva las TABLAS, no sus filas.** Instalarla y no hacer el resto deja un entorno que
+importa sin un solo error y no funciona. Cada paso de abajo se agregó porque su ausencia rompió algo
+real en el entorno de prueba el 2026-09-24; el §13 anterior no nombraba ninguno de los cuatro
+primeros.
+
+| Paso | Qué | Por qué está acá |
+|---|---|---|
+| 1 | **Verificar la capacidad de almacenamiento del entorno** antes de importar | Una importación —y sobre todo la publicación del paso 3— falla, a veces en silencio, cuando el entorno está lleno |
+| 2 | Importar la solución (`herramientas/construir/importar_solucion.py`, o a mano el zip de `solution/`) | |
+| 3 | **Publicar todas las personalizaciones** (Soluciones → *Publicar todas las personalizaciones*) | **Obligatorio.** Learn: *"After you successfully import your solution, you must publish customizations before you can see the changes"*. Sin esto no se aplican **Application Ribbon**, **Form** ni **Web Resource**: los comandos propios (12.5) no aparecen, los 1364 `HideCustomAction` (12.6) no ocultan nada, los formularios fallan al abrir y el web resource HTML de 12.x da "Name not found". La publicación puede tardar; no cerrar la pestaña |
+| 4 | **Sembrar los catálogos**: `datos.py playbooks/datos/parametros.md` (13 parámetros, 9.1) y `datos.py playbooks/datos/reglas.md` (15 reglas, 9.2/9.3) | Son filas, no metadatos: no viajan en la solución. Sin las reglas no se clasifica ni se valida nada; sin los parámetros el motor no arranca. **El bloque de identidad de cada playbook trae `entorno_url` apuntando a Dev: hay que cambiarlo al entorno destino** |
+| 5 | **Ajustar `servicio.cuenta` al UPN real del entorno** | El valor que viaja en el playbook es el de Dev. Ese parámetro es lo único que exime a la cuenta de servicio de la lista blanca de columnas (`04` §1, `BaseDeStep.EsCodigoDeServidor`): con el UPN equivocado, los cinco flujos son tratados como personas y no pueden escribir ni sus propias marcas de envío. **El rol 6.6 no alcanza: son dos puertas distintas** |
+| 6 | Cargar los valores de las 2 environment variables y crear las 2 connections de las connection references (11) | Las **definiciones** viajan; los **valores** y las **conexiones**, no |
+| 7 | Hacer las tareas 13.1–13.4 y 13.7 de la tabla de arriba | El grupo de Entra, su equipo y la asociación equipo ↔ perfil 6.1 nunca viajan |
+| 8 | Cargar los catálogos de negocio (Cliente, Plan, Autorizado, AutorizacionPlan) | 9.4. Los playbooks `humo_*.md` son datos de prueba, **no** datos del cliente |
+
+**Cómo se verifica que quedó bien**, en este orden: (a) abrir un formulario de cada tabla sin error;
+(b) ver los comandos propios en la grilla de Filas y que los genéricos sigan ocultos; (c) correr
+`herramientas/pruebas/verificar_accesos.py`; (d) mandar un correo de prueba al buzón y seguirlo hasta
+que la Solicitud quede Procesada.
 
 ## Orden de construcción de la fase 1
 
