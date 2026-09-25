@@ -58,13 +58,16 @@ MENSAJE_FALLO_CLIENTE = (
 )
 
 CLAVES = {"tipo": str, "nombre": str, "descripcion": str, "base": str, "tablas": dict, "otros_privilegios": dict}
+# Opcional, y solo tiene sentido con "tablas" y "otros_privilegios" vacíos: la razón escrita de por
+# qué este rol no otorga nada. Ver la guarda del final de _validar_estructura.
+CLAVES_OPCIONALES = {"sin_privilegios_propios": str}
 
 
 # ---------------------------------------------------------------------------
 # Validación sin red
 # ---------------------------------------------------------------------------
 def _validar_estructura(datos, identidad):
-    faltan, sobran = sorted(set(CLAVES) - set(datos)), sorted(set(datos) - set(CLAVES))
+    faltan, sobran = sorted(set(CLAVES) - set(datos)), sorted(set(datos) - set(CLAVES) - set(CLAVES_OPCIONALES))
     if faltan or sobran:
         raise ErrorPlaybook(f"claves del rol inválidas: faltan {faltan or 'ninguna'}, sobran {sobran or 'ninguna'}")
     for clave, tipo in CLAVES.items():
@@ -99,8 +102,20 @@ def _validar_estructura(datos, identidad):
             raise ErrorPlaybook(f"otros_privilegios: {nombre!r} es de una tabla de la solución: va en 'tablas'")
         if alcance not in ALCANCES:
             raise ErrorPlaybook(f"otros_privilegios.{nombre}: el alcance {alcance!r} no existe; son {sorted(ALCANCES)}")
+    # Un rol sin privilegios propios es, nueve de cada diez veces, un playbook a medio escribir:
+    # queda un clon del rol base con nombre nuevo que no habilita nada. La décima es legítima y
+    # existe en este proyecto: `SR - MPPP - RPA` no da ACCESO, da IDENTIDAD — la puerta de las dos
+    # Custom API de fase 2 (diseno/03, D-9) es TENER el rol, no lo que el rol permite. Para esos
+    # casos el playbook lo declara y JUSTIFICA, y la justificación queda en el artefacto, no en un
+    # flag de línea de comandos que nadie vuelve a leer. Sin el campo, la guarda frena como siempre.
     if not datos["tablas"] and not datos["otros_privilegios"]:
-        raise ErrorPlaybook("el rol no declara ningún privilegio propio ('tablas' y 'otros_privilegios' vacíos): sería una copia del rol base")
+        justificacion = datos.get("sin_privilegios_propios")
+        if not isinstance(justificacion, str) or len(justificacion.strip()) < 40:
+            raise ErrorPlaybook(
+                "el rol no declara ningún privilegio propio ('tablas' y 'otros_privilegios' vacíos): "
+                "sería una copia del rol base. Si es a propósito —un rol de identidad, no de acceso— "
+                "agregá al playbook el campo 'sin_privilegios_propios' con la razón, de 40 caracteres "
+                "o más")
 
 
 def validar_playbook(datos, identidad):

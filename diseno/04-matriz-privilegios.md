@@ -14,7 +14,7 @@ User-owned es una decisión por BP-PP-013 (irreversibilidad de la propiedad), **
 
 El hueco que esto deja: el Ejecutivo y el Supervisor **necesitan `W` sobre Fila** para cambiar el estado, y `W` en Dataverse es sobre la fila entera: con ese privilegio podrían editar el número de cuenta. Se cierra con un control técnico, no con el formulario:
 
-> **Lista blanca de columnas** (step PreOperation en `Update` de Fila, sin filtro de atributos): si quien llama no es SYSTEM ni una identidad de aplicación de la solución, el `Target` solo puede traer `sanic_estado`, `sanic_mensaje`, `sanic_notainterna` y —desde la fase 2— `sanic_requiereatencionmanual` (la apaga el botón *Atendida*, igual que *Revisado* apaga `sanic_requiererevision` en Solicitud). **`sanic_claimhasta` NO entra**: la reserva del bot la escribe solo SYSTEM y ninguna persona la toca; mientras esté vigente, el step de transición rechaza el cambio nombrando la hora en que se libera (`03` §2) (esta última desde el 2026-09-24: es la nota del supervisor al ejecutivo al devolver, y nunca sale en el correo al cliente). Cualquier otra columna → error. Un formulario de solo lectura es cosmética; esto es el control. Ya no existe `sanic_usuarioas400aprobador`: el usuario que marca Aprobada es el aprobador de AS400 (`03-contratos-custom-api.md` §4), así que no hace falta una columna extra en la lista blanca.
+> **Lista blanca de columnas** (step PreOperation en `Update` de Fila, sin filtro de atributos): si quien llama no es SYSTEM ni una identidad de aplicación de la solución, el `Target` solo puede traer `sanic_estado`, `sanic_mensaje`, `sanic_notainterna` y —desde la fase 2— `sanic_requiereatencionmanual` (la apaga el botón *Atendida*, igual que *Revisado* apaga `sanic_requiererevision` en Solicitud). **`sanic_claimhasta` NO entra**: la reserva del bot la escribe solo SYSTEM y ninguna persona la toca; mientras esté vigente, el step de transición rechaza el cambio nombrando la hora en que se libera (`03` §2). `sanic_notainterna` está desde el 2026-09-24: es la nota del supervisor al ejecutivo al devolver, y nunca sale en el correo al cliente. Cualquier otra columna → error. Un formulario de solo lectura es cosmética; esto es el control. Ya no existe `sanic_usuarioas400aprobador`: el usuario que marca Aprobada es el aprobador de AS400 (`03-contratos-custom-api.md` §4), así que no hace falta una columna extra en la lista blanca.
 
 Mismo criterio en Solicitud para los humanos: solo `sanic_requiererevision` (el botón "Revisado", `05` §5) y `sanic_estadoprocesamiento` (No reconocida → Cerrada/Descartada).
 
@@ -48,19 +48,19 @@ Mismo criterio en Solicitud para los humanos: solo `sanic_requiererevision` (el 
 
 | Tabla | SR - MPPP - Servicio de ingesta (cuenta de servicio, los cinco flujos) | SR - MPPP - RPA (application user, fase 2) | SR - MPPP - Historico (application user, fase 3) |
 |---|---|---|---|
-| Solicitud | C R W Ap At : O | R:O | C R W **D** Ap At : O |
-| Fila | — | R:O | C R **D** Ap : O |
+| Solicitud | C R W Ap At : O | — | C R W **D** Ap At : O |
+| Fila | — | — | C R **D** Ap : O |
 | ResultadoRegla | — | — | C R **D** Ap : O |
 | Bitacora | C Ap : O | — | C R **D** Ap : O |
 | Parametro | R:O (los `vigilancia.*` que lee `MPPP-VIG`) | — | R:O |
 | Regla | — | — | R:O |
-| Cliente, Plan | — | R:O | R:O |
+| Cliente, Plan | — | — | R:O |
 | Autorizado, AutorizacionPlan | — | — | R:O |
 | CorridaHistorico (fase 3) | — | — | C R W : O |
 | Privilegios varios | Ejecutar flujos (ya viene en App Opener: `prvFlow`, `prvWorkflowExecution`). Leer environment variables: `prvReadEnvironmentVariableDefinition` : O. Leer connection references: `prvReadconnectionreference` : O (nombres exactos leídos de Dev y aprobados el 2026-09-21) | — | `prvBulkDelete` · `prvOverrideCreatedOnCreatedBy` (para `overriddencreatedon`, D-36) |
 | Custom API | `sanic_mppp_capi_clasificarcorreo`, `sanic_mppp_capi_validarsolicitud` | `sanic_mppp_capi_obtenerfilaspendientes`, `sanic_mppp_capi_registrarresultadorpa` | — |
 
-- El **RPA no escribe ninguna tabla**: todo pasa por su Custom API, que graba como SYSTEM. Rol mínimo de verdad (D-14, RNF-07).
+- El **RPA no escribe NI LEE ninguna tabla**: todo pasa por sus dos Custom API, que leen y graban como SYSTEM. Rol mínimo de verdad (D-14, RNF-07). **Corregido el 2026-09-25**: hasta esa fecha esta columna le daba `R:O` sobre Solicitud, Fila, Cliente y Plan. El bot no usa ninguno — solo llama a sus API, que leen con SYSTEM, y `ExecutePrivilegeName` quedó vacío (D-9), así que tampoco necesita un privilegio para invocarlas. Mismo criterio que lo sacó del perfil de columna (§4): no se otorga un privilegio para algo que nunca se va a hacer por esa vía. **Su rol es `App Opener` y nada más: no da acceso, da identidad.** Si la credencial del bot se filtrara, quien la tenga no puede leer un solo número de cuenta.
 - **Histórico es la única identidad con `D`** sobre la unidad histórica, y el código solo lo ejerce enviando el job nativo sobre Solicitudes marcadas y vencidas (D-35). `C` es para la reactivación.
 - **La cuenta de servicio tiene su propio rol, `SR - MPPP - Servicio de ingesta`**, y es mínimo a propósito: crea y actualiza la Solicitud (alta, archivos, marcas de envío), escribe eventos en la Bitácora, lee los parámetros de vigilancia y ejecuta la Custom API de validación. **No lee filas, clientes, planes ni autorizados**: todo eso lo lee y lo escribe el plugin de la Custom API con el servicio de SYSTEM, no con los privilegios de quien la llama, y el contenido de los correos al cliente ya viene armado en la Solicitud. Si la credencial de la cuenta de servicio se filtrara, quien la tenga no podría leer un solo número de cuenta por esa vía. Además del rol, la cuenta necesita sus licencias de Power Apps y Power Automate (C-04) y los privilegios básicos para ejecutar flujos y leer environment variables y connection references.
 
