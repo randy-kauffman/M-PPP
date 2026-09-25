@@ -1,4 +1,4 @@
-# Playbook: datos · parametros (los 13)
+# Playbook: datos · parametros (los 17)
 
 **`servicio.cuenta` se agrego el 2026-09-23 y hoy tiene un valor PROVISORIO.** Declara el UPN de la
 cuenta con la que los cinco flujos escriben en Dataverse; `BaseDeStep.EsCodigoDeServidor` lo usa
@@ -185,6 +185,46 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "{\"gestion\": [{\"valor\": \"Inclusion\", \"variantes\": []}, {\"valor\": \"Exclusion\", \"variantes\": []}, {\"valor\": \"Modificacion\", \"variantes\": []}], \"clasificacion\": [{\"valor\": \"BAC\", \"variantes\": []}, {\"valor\": \"ACH\", \"variantes\": []}, {\"valor\": \"CK\", \"variantes\": []}], \"tipoIdentificacion\": [{\"valor\": \"CNA\", \"variantes\": []}, {\"valor\": \"CRE\", \"variantes\": []}, {\"valor\": \"PAS\", \"variantes\": []}, {\"valor\": \"PEX\", \"variantes\": []}, {\"valor\": \"RUC\", \"variantes\": []}], \"moneda\": [{\"valor\": \"COR\", \"variantes\": []}, {\"valor\": \"USD\", \"variantes\": []}], \"banco\": [{\"valor\": \"LAFISE\", \"variantes\": [], \"codigo\": \"006\"}, {\"valor\": \"BAC\", \"variantes\": [], \"codigo\": \"007\"}, {\"valor\": \"BANPRO\", \"variantes\": [], \"codigo\": \"008\"}, {\"valor\": \"FICOHSA\", \"variantes\": [], \"codigo\": \"009\"}, {\"valor\": \"BDF\", \"variantes\": [], \"codigo\": \"012\"}, {\"valor\": \"AVANZ\", \"variantes\": [], \"codigo\": \"019\"}, {\"valor\": \"PRODUZCAMOS\", \"variantes\": [], \"codigo\": \"023\"}, {\"valor\": \"ATLANTIDA\", \"variantes\": [], \"codigo\": \"037\"}]}",
       "sanic_descripcion": "Valores aceptados de cada lista, con el codigo de 3 digitos del banco (DD-10). Codigos leidos de la plantilla real del cliente."
+    },
+    {
+      "sanic_nombre": "rpa.codigos",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"OK\": {\"cliente\": null, \"nota\": \"AS400 acepto la operacion. No genera texto al cliente.\"}, \"RECH-GEN\": {\"cliente\": \"Su solicitud no pudo ser aplicada. Por favor comuniquese con su ejecutivo de cuenta.\", \"nota\": \"Rechazo de AS400 sin clasificar todavia. Texto PROVISIONAL: lo aprueba el negocio (D-54).\"}}",
+      "sanic_descripcion": "Traduce el codigo que manda el bot al texto que lee el cliente (03 \u00a73). Arranca con OK y un rechazo generico y crece de a poco. Un codigo que no esta aca es MPPP-RPA-005, fallo NO reintentable: la fila no se mueve. El texto de RECH-GEN es PROVISIONAL, lo aprueba el negocio (D-54)."
+    },
+    {
+      "sanic_nombre": "rpa.horas.tolerancia",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "24",
+      "sanic_descripcion": "Ventana dentro de la cual se acepta fechaproceso (03 \u00a73). Fuera de ella, o en el futuro, se rechaza. Valor PROVISIONAL elegido por el constructor (D-54). El codigo lleva su propio fallback quemado: que falte este parametro degrada el control, no tumba al bot."
+    },
+    {
+      "sanic_nombre": "rpa.minutos.claimmaximo",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "60",
+      "sanic_descripcion": "Tope de minutos que puede durar una reserva del bot sobre una fila (03 \u00a72). El bot pide claimminutos; si pide mas, se recorta a este tope. Es lo que acota el dano de un bot colgado, y por eso no hay boton Liberar. Valor PROVISIONAL (D-54)."
+    },
+    {
+      "sanic_nombre": "rpa.lote.maximo",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "50",
+      "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 \u00a73). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion, no la cuota. Valor PROVISIONAL: hay que MEDIRLO, no estimarlo (D-54)."
     }
   ]
 }
