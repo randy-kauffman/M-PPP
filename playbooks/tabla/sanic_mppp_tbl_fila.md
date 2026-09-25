@@ -222,6 +222,27 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
       "requerida": false,
       "protegida": false,
       "auditoria": false
+    },
+    {
+      "nombre": "sanic_claimhasta",
+      "displayname": "Tomada por el bot hasta",
+      "descripcion": "Instante en que VENCE la reserva del bot sobre esta fila. Se guarda el vencimiento y no el inicio: asi saber si esta tomada es comparar contra ahora, sin cuentas. La escribe SOLO SYSTEM desde obtenerfilaspendientes; no esta en la lista blanca y ninguna persona la toca. Mientras este vigente, una persona no puede transicionar esta fila.",
+      "tipo": "fechahora",
+      "requerida": false,
+      "protegida": false,
+      "auditoria": false
+    },
+    {
+      "nombre": "sanic_requiereatencionmanual",
+      "displayname": "Requiere atencion manual",
+      "descripcion": "La prende SOLO el bot cuando se topa con algo que no sabe resolver; el porque queda en sanic_notainterna. La fila SIGUE siendo Validada: es una marca, no un estado. La limpia cualquier transicion exitosa de la fila, y tambien el boton Atendida; por eso esta en la lista blanca.",
+      "tipo": "sino",
+      "requerida": false,
+      "protegida": false,
+      "auditoria": false,
+      "etiqueta_si": "Si",
+      "etiqueta_no": "No",
+      "defecto": false
     }
   ]
 }
@@ -270,7 +291,7 @@ python3 herramientas/construir/muestra_tabla.py playbooks/tabla/sanic_mppp_tbl_f
 |---|---|---|
 | 1 | `GET EntityDefinitions(LogicalName='sanic_mppp_tbl_fila')` | 200 · `OwnershipType = UserOwned` · `IsManaged = false` · `IsCustomEntity = true` · `HasNotes = false` · `HasActivities = false` · `IsAuditEnabled = false` · `PrimaryNameAttribute = sanic_nombre` |
 | 2 | Nombre, plural y descripción en 1033 | los de la sección 2; ninguna etiqueta en otro idioma |
-| 3 | Columnas (18): tipo, requerida, protegida, auditoría, nombre visible, descripción y lo propio de su tipo | `sanic_nombre` texto 120 requerida · `sanic_numerofila` entero 1–100000 requerida · `sanic_gestion` choice `sanic_mppp_ch_gestion` opcional · `sanic_clasificacion` choice `sanic_mppp_ch_clasificacion` opcional · `sanic_moneda` choice `sanic_mppp_ch_moneda` opcional · `sanic_tipoidentificacion` choice `sanic_mppp_ch_tipoidentificacion` opcional · `sanic_banco` choice `sanic_mppp_ch_banco` opcional · `sanic_numeroplan` texto 4 opcional · `sanic_nombrebeneficiario` texto 200 opcional · `sanic_numeroidentificacion` texto 100 opcional **protegida** · `sanic_numerocuenta` texto 100 opcional **protegida** · `sanic_referencia` texto 100 opcional · `sanic_referenciarecibida` texto 100 opcional · `sanic_estado` choice `sanic_mppp_ch_estadofila` requerida · `sanic_mensaje` multilínea 4000 opcional · `sanic_fechavalidada` fecha y hora (usuario local) opcional · `sanic_fechadigitada` fecha y hora (usuario local) opcional · `sanic_fechaaprobada` fecha y hora (usuario local) opcional; ninguna auditada |
+| 3 | Columnas (21): tipo, requerida, protegida, auditoría, nombre visible, descripción y lo propio de su tipo | `sanic_nombre` texto 120 requerida · `sanic_numerofila` entero 1–100000 requerida · `sanic_gestion` choice `sanic_mppp_ch_gestion` opcional · `sanic_clasificacion` choice `sanic_mppp_ch_clasificacion` opcional · `sanic_moneda` choice `sanic_mppp_ch_moneda` opcional · `sanic_tipoidentificacion` choice `sanic_mppp_ch_tipoidentificacion` opcional · `sanic_banco` choice `sanic_mppp_ch_banco` opcional · `sanic_numeroplan` texto 4 opcional · `sanic_nombrebeneficiario` texto 200 opcional · `sanic_numeroidentificacion` texto 100 opcional **protegida** · `sanic_numerocuenta` texto 100 opcional **protegida** · `sanic_referencia` texto 100 opcional · `sanic_referenciarecibida` texto 100 opcional · `sanic_estado` choice `sanic_mppp_ch_estadofila` requerida · `sanic_mensaje` multilínea 4000 opcional · `sanic_fechavalidada` fecha y hora (usuario local) opcional · `sanic_fechadigitada` fecha y hora (usuario local) opcional · `sanic_fechaaprobada` fecha y hora (usuario local) opcional; ninguna auditada |
 | 4 | Ninguna columna propia de más | salvo lookups, que nacen con su relación |
 | 5 | Pertenece a la solución de la sección 1 | una fila en `solutioncomponents` (tipo de componente 1) |
 | 6 | Segunda ejecución sin `--solo-verificar` | estado `ya_existia`, código de salida 0 |
