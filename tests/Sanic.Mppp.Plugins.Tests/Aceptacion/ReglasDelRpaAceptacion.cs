@@ -33,6 +33,20 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Throws<ArgumentException>(() => ReglasDelRpa.MinutosDeClaim(pedidos, 60));
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-5)]
+        public void Un_TOPE_mal_cargado_cae_al_fallback_en_vez_de_dar_una_reserva_vencida(int tope)
+        {
+            // `rpa.minutos.claimmaximo` lo carga una persona, y con tope 0 el recorte devolveria 0: una reserva
+            // que nace vencida, o sea NINGUNA reserva, y el bot colisionando con los ejecutivos sin que falle nada.
+            // Mismo criterio que la tolerancia de ExigirFechaCreible: un dato de configuracion mal cargado DEGRADA
+            // el control, nunca lo apaga en silencio.
+            Assert.Equal(10, ReglasDelRpa.MinutosDeClaim(10, tope));
+            Assert.Equal(ReglasDelRpa.ClaimMaximoMinutosPorDefecto,
+                         ReglasDelRpa.MinutosDeClaim(99999, tope));
+        }
+
         // ---------- ClaimVigente ----------
 
         [Fact]
