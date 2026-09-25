@@ -54,6 +54,21 @@ Columnas pensadas para digitar sin abrir el registro. Las protegidas (identifica
 | Solicitudes (Solicitud) | todas | Número, Recibido el, Remitente, Estado, Filas totales / válidas / rechazadas, Cerrada el | más recientes primero |
 | Catálogos y configuración | activos | las de negocio de cada tabla | |
 
+### Fase 2: dos vistas y un comando más (2026-09-25)
+
+Las entra el RPA y no existen hasta la fase 2, así que **no cuentan en las 17 de abajo**:
+
+| Vista | Tabla | Filtro | Columnas | Para qué |
+|---|---|---|---|---|
+| Para atención manual | Fila | `sanic_requiereatencionmanual` = sí | Solicitud, N.º fila, Plan, Beneficiario, **Nota interna** | El bot se topó con algo que no sabe resolver y la fila pasó a ser de un ejecutivo. Mismo patrón que *Para revisar* en Solicitud |
+| Tomadas por el bot | Fila | `sanic_claimhasta` en el futuro | Solicitud, N.º fila, Estado, **Tomada por el bot hasta** | Saber qué está en manos del bot y hasta qué hora, sin preguntarle a nadie (`03` §2) |
+
+**Comando nuevo: "Atendida"** sobre Fila, que apaga `sanic_requiereatencionmanual` — igual que *Revisado* apaga `sanic_requiererevision` en Solicitud, y sin pedir texto por el mismo motivo. La marca además **se apaga sola con cualquier transición exitosa** de la fila, así que el botón es para el ejecutivo que la resolvió **sin** cambiarla de estado.
+
+**La columna "Tomada por el bot hasta" se agrega también a la grilla de Filas**, para que la reserva se vea sin cambiar de vista.
+
+> Detalle de implementación a verificar antes de construir: filtrar *"claim vigente ahora"* en una vista guardada necesita un operador de fecha relativa de FetchXML (familia `next-x-hours`). **Se confirma en Learn al construir la vista**; si no diera, se muestra la columna y el ejecutivo lee la hora, que resuelve lo mismo.
+
 ### Lista cerrada de las 17 vistas (inventario 12.2)
 
 Cerrada el 2026-09-22 con el aprobador. Antes el inventario decía "~19" y la fórmula del párrafo de abajo daba 16: ninguno de los dos números se podía reconstruir. **Cada tabla de catálogo lleva UNA sola vista, "Activos".** La vista de búsqueda rápida (Quick Find) no se cuenta: toda tabla la trae y no hay nada que diseñar en ella.

@@ -12,17 +12,17 @@ Mecanismo de creación: **Web API de Dataverse**, con una herramienta versionada
 |---|---|---|---|---|
 | P-01 Solución | 1 (`hecho`) | | | nombre |
 | P-02 Choice global | 14 | | 1 | nombre; los valores no se renumeran |
-| P-03 Tabla con sus columnas | 10 tablas, 84 columnas propias (sin lookups: esos nacen con las relaciones) | | 1 tabla | nombre, propiedad, tipo de cada columna |
+| P-03 Tabla con sus columnas | 10 tablas, 84 columnas propias (sin lookups: esos nacen con las relaciones) | **+2 columnas en Fila**: `sanic_claimhasta`, `sanic_requiereatencionmanual` | 1 tabla | nombre, propiedad, tipo de cada columna |
 | P-04 Relación | 11 | | | nombre, tipo |
 | P-05 Clave alternativa | 10 | | 1 | nombre |
 | P-06 Column security profile | 1 (2 columnas) | | | |
 | P-07 Security role | 5 | 1 | 1 | |
 | P-08 Código de plugins (C#, TDD) | 1 paquete, ~10 clases | +2 clases | | namespace y nombre de clase |
 | P-09 Registro de Custom API y steps | 2 API (11 parámetros), **20** steps | 2 API | | nombre de API y de parámetros |
-| P-10 Datos semilla | 12 parámetros, 15 reglas | 1 parámetro | 2 parámetros | |
+| P-10 Datos semilla | 13 parámetros, 15 reglas | **4 parámetros**: `rpa.codigos`, `rpa.horas.tolerancia`, `rpa.minutos.claimmaximo`, `rpa.lote.maximo` (`rpa.puedeaprobar` ya se siembra en fase 1) | 2 parámetros | |
 | P-11 Environment variable y connection reference | 2 + 2 | | +2 | nombre |
 | P-12 Cloud flow | 5 (3 con disparador, 2 hijos) | | | |
-| P-13 App model-driven: app, sitemap, **17** vistas, **8** formularios, 8 comandos (clásicos, por `ImportSolution`), **22** íconos | ver §12 | | página custom de la bandeja (v1.1) | |
+| P-13 App model-driven: app, sitemap, **17** vistas, **8** formularios, 8 comandos (clásicos, por `ImportSolution`), **22** íconos | ver §12 | **+2 vistas** (*Para atención manual*, *Tomadas por el bot*), **+1 comando** (*Atendida*), y la columna del claim en la grilla de Filas | página custom de la bandeja (v1.1) | |
 | P-15 Página custom (canvas, **no la construye un agente solo**) | 1: diálogo de motivo | | | |
 | P-14 Identidades y puesta en marcha | cuenta de servicio, buzón | usuario de aplicación del RPA | usuario de aplicación e infraestructura Azure | |
 
@@ -67,7 +67,7 @@ Todas user-owned. El orden respeta los lookups: una tabla se crea después de la
 | 3.5 | `sanic_mppp_tbl_parametro` | 5 | | | choice 2.14 | 1 |
 | 3.6 | `sanic_mppp_tbl_regla` | 7 | | | choices 2.9, 2.10 | 1 |
 | 3.7 | `sanic_mppp_tbl_solicitud` | 29 | 2 | | choice 2.7 | 1 |
-| 3.8 | `sanic_mppp_tbl_fila` | 18 | | 2 | choices 2.1–2.3, 2.5, 2.6, 2.8 | 1 |
+| 3.8 | `sanic_mppp_tbl_fila` | 18 (+2 en fase 2: `sanic_claimhasta`, `sanic_requiereatencionmanual`) | | 2 | choices 2.1–2.3, 2.5, 2.6, 2.8 | 1 |
 | 3.9 | `sanic_mppp_tbl_resultadoregla` | 7 | | | choices 2.9, 2.11 | 1 |
 | 3.10 | `sanic_mppp_tbl_bitacora` | 7 | | | choices 2.12, 2.13 | 1 |
 | 3.11 | `sanic_mppp_tbl_corridahistorico` | por definir | | | | 3 |
