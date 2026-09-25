@@ -6,7 +6,19 @@ Reglas citadas: BP-PP-051, 052, 053, 055, 057, 060. Todas las Custom API: **unbo
 
 *(Corregido el 2026-09-22: decía `IsPrivate = true`, y eso **impide activar los flujos que llaman a la API**. `IsPrivate` bloquea que la Custom API aparezca en el documento `$metadata`, y de ahí la lee el conector de Dataverse para resolver una unbound action: con `true`, Power Automate falla con `GetMetadataForUnboundActionInput ... NotFound`. Además **no es una medida de seguridad**: Learn dice textual que "setting this property doesn't mean that other developers can't use your message if they know about it" — la seguridad real es `ExecutePrivilegeName`, que en las dos API es `prvCreatesanic_mppp_tbl_solicitud`. Microsoft recomienda dejarlo en `false` en desarrollo y ponerlo en `true` recién antes de shippear una solución managed. Ver [Create and use custom APIs](https://learn.microsoft.com/power-apps/developer/data-platform/custom-api#when-to-make-your-custom-api-private).)*
 
-**Quién puede ejecutarlas** (D-9, decisión del aprobador del 2026-09-21). La plataforma gobierna la ejecución de una Custom API con `ExecutePrivilegeName`, que tiene que nombrar un privilegio **que ya exista**: no se puede crear uno a medida. Las dos de fase 1 (`clasificarcorreo` y `validarsolicitud`) llevan `ExecutePrivilegeName = prvCreatesanic_mppp_tbl_solicitud`: en fase 1 el único rol con `C` sobre Solicitud es `SR - MPPP - Servicio de ingesta` (`04` §3), y quien puede dar de alta una solicitud puede clasificarla y validarla. En fase 3 el rol Histórico también tendrá ese privilegio: se acepta o se revisa al diseñar esa fase. Las dos de fase 2 (RPA) quedan por decidir: el RPA solo tiene lecturas que comparte con el Ejecutivo, así que hará falta una comprobación dentro del plugin o una tabla marcadora.
+**Quién puede ejecutarlas** (D-9, decisión del aprobador del 2026-09-21). La plataforma gobierna la ejecución de una Custom API con `ExecutePrivilegeName`, que tiene que nombrar un privilegio **que ya exista**: no se puede crear uno a medida. Las dos de fase 1 (`clasificarcorreo` y `validarsolicitud`) llevan `ExecutePrivilegeName = prvCreatesanic_mppp_tbl_solicitud`: en fase 1 el único rol con `C` sobre Solicitud es `SR - MPPP - Servicio de ingesta` (`04` §3), y quien puede dar de alta una solicitud puede clasificarla y validarla. En fase 3 el rol Histórico también tendrá ese privilegio: se acepta o se revisa al diseñar esa fase. **Las dos de fase 2 (RPA) van con `ExecutePrivilegeName` VACÍO a propósito, y la puerta es el plugin** (D-9, decisión del aprobador del 2026-09-25). El motivo: el RPA **no tiene un solo privilegio propio** — todo lo que tiene lo tiene también el Ejecutivo (`04` §3), así que cualquier privilegio existente le abriría la API a los ejecutivos, y `registrarresultadorpa` transiciona filas a Digitada y a Aprobada: sería romper los cuatro ojos. Y elegir un privilegio de los que el Ejecutivo **no** tiene es peor: el único candidato es sobre Parámetro, que daría al bot escritura sobre `servicio.cuenta` y `rpa.puedeaprobar`, o sea la capacidad de auto-autorizarse a aprobar.
+
+Se evaluó y se descartó la **tabla marcadora** que Learn recomienda para estos casos (*"Create a custom entity and use one of the privileges created for that entity"*; Microsoft la usa en `msdyn_ocagentassignedcustomapiprivilege`). No hace falta: **un humano no tiene `applicationid`**, nunca, así que un chequeo en el plugin cierra el hueco sin agregar un componente irreversible.
+
+> **La puerta de las dos API de fase 2**: el que llama tiene que ser una **identidad de aplicación** (`systemuser.applicationid` con valor) **y** tener el rol **`SR - MPPP - RPA`**. Las dos condiciones, y falla cerrado. Se reusa `DeterminarRoles` (`StepsDeFila`), que ya resuelve los roles por `name` sin distinguir caja y grita si la solución está mal instalada.
+>
+> **Antes de evaluar nada, las dos API verifican que el rol `SR - MPPP - RPA` EXISTA en el entorno** (D-44, decisión del aprobador del 2026-09-25). Si no existe, el error dice eso y no otra cosa: *"el rol del RPA no está creado en este entorno (inventario 6.7); sin él ninguna llamada del bot puede autorizarse"*. **Por qué se paga esa consulta**: `DeterminarRoles` solo grita cuando faltan los TRES roles; si están Ejecutivo y Supervisor y falta únicamente el del RPA —el estado de todos los entornos hasta que se construya la fase 2— el bot recibiría un genérico "no autorizado" y quien lo lea saldría a revisar permisos, cuando el problema es que nadie creó un rol. Esta semana esa confusión costó horas dos veces: el `Name not found` que era falta de publicar (inventario §13.8) y el rechazo de la lista blanca que era falta del parámetro `servicio.cuenta`. **Un hueco de instalación disfrazado de problema de permisos se paga en horas de diagnóstico.**
+>
+> El rol se identifica por **`name`**, no por `roleid`: el nombre viaja con la solución, el id es de cada entorno (verificado el 2026-09-25: los cinco roles de MPPP tienen `roletemplateid = None` e id propios de Dev). La constante ya existe y ya sigue la convención: `TablasNativas.RolRpa = "SR - MPPP - RPA"` (`Datos/Avisos.cs`).
+
+**Por qué el rol y no un parámetro.** Declarar la identidad del bot en la tabla de Parámetro era la alternativa, y es más barata todavía. Se descartó porque esa tabla ya gobierna `servicio.cuenta` (quién se salta la lista blanca) y `rpa.puedeaprobar` (si los cuatro ojos se pueden romper): sumarle la identidad del bot concentraría **tres decisiones de seguridad** bajo `prvWritesanic_mppp_tbl_parametro`, que tiene el **Administrador técnico** — el rol que justamente **no ve datos de negocio** (`04` §2). El rol que menos ve no puede ser el que más decide. Con el rol como puerta, la autorización queda donde vive la autorización.
+
+**Lo que esto cuesta, dicho de frente**: la plataforma deja de frenar antes del plugin. Una tercera API del RPA que nazca sin el chequeo nace abierta. Se cubre con **una prueba de aceptación por API** que verifique el rechazo de un llamador no autorizado; sin esa prueba, esta decisión no está completa.
 
 ## 0. `sanic_mppp_capi_clasificarcorreo` — fase 1 (Action) · el plugin liviano
 
@@ -102,15 +114,25 @@ El bot **consulta**; la solución nunca lo llama a él (los bots de Automation A
 
 | Parámetro | Dirección | Tipo | Nota |
 |---|---|---|---|
-| `maximo` | entrada | Integer | Tope por llamada (defecto 100, máximo 500). |
+| `maximo` | entrada | Integer | **Cuántas filas entregar como máximo en esta llamada.** El bot pide lo que puede procesar: `maximo = 10` devuelve 10, no 100. Defecto 100; **tope 500** (un valor mayor se recorta al tope, sin error); 0 o negativo se rechaza. |
 | `filas` | salida | String (JSON) | Arreglo de filas en estado **Validada**, y de filas **Digitada** cuyo `digitadapor` es el propio bot (las que le falta aprobar). |
+| `entregadas` | salida | Integer | Cuántas filas trae **este** lote. Evita que el bot tenga que parsear para contar, y hace evidente en el log si el lote vino corto. |
+| `pendientes` | salida | Integer | Cuántas quedan sin entregar **después** de este lote. Con esto el bot decide si vuelve a llamar enseguida o espera su próxima corrida; sin esto, 2.500 filas podrían esperar horas sin que nadie lo sepa. |
 
-Por cada fila: `filaid`, solicitud, número de fila, estado, plan, **tipo de formato del plan**, gestión, clasificación, nombre, tipo y número de identificación, número de cuenta, moneda, banco **con su código de 3 dígitos**, y **dos referencias**:
+Por cada fila: `filaid`, solicitud, número de fila, estado, plan, **tipo de formato del plan**, gestión, clasificación, nombre, tipo y número de identificación, número de cuenta, moneda, banco **con su código de 3 dígitos**, `fechavalidada`, y **dos referencias**:
 
 - `referencia`: la que rige. En planes formato 11 es la construida (DD-10); en los demás, la recibida.
 - `referenciarecibida`: **tal cual vino en el Excel; si vino vacía, va vacía.** Siempre se entrega, también en formato 11.
 
-El bot no necesita conocer reglas de referencia ni códigos de banco: todo le llega resuelto. Devuelve identificación y cuenta completas porque el usuario de aplicación del RPA está en el column security profile. **No hay reserva de filas** (ver "Concurrencia" en §3).
+**Los choices viajan como TEXTO, no como valor numérico** (`Inclusion`, `ACH`, `RUC`, `COR`, `BANPRO`, `validada`…): son los valores canónicos que ya declara `plantilla.listas` y los que el bot tipea en AS400. Un `159460001` no le dice nada a un bot de Automation Anywhere. Mismo criterio que `resultado` en §3. Y el **banco viaja partido en dos**, `banco` y `bancocodigo`: el bot no tiene por qué saber que BANPRO es 008.
+
+**Todas las fechas llevan offset explícito** (`2026-10-05T14:52:07Z`).
+
+**Orden: FIFO estricto** (decisión del aprobador, 2026-09-25), por `sanic_fechavalidada` y, a igualdad, por `sanic_numerofila`. **Por qué se fija en el contrato y no se deja al motor**: sin orden determinístico, un lote de 500 sobre 3.000 pendientes puede devolver siempre las mismas y **las del fondo no se digitan nunca** — la solicitud de un cliente queda esperando para siempre sin que falle nada ni nadie se entere. Lo primero que entró es lo primero que sale.
+
+El bot no necesita conocer reglas de referencia ni códigos de banco: todo le llega resuelto. **No hay reserva de filas** (ver "Concurrencia" en §3).
+
+**El usuario de aplicación del RPA NO entra al column security profile** (decisión del aprobador, 2026-09-25; corrige lo que decía este párrafo). El motivo por el que lo decía era falso: el plugin de la Custom API lee y arma el JSON **con SYSTEM** (`04` §1), y `04` §4 dice textual que *"SYSTEM (la Custom API) no necesita estar en ningún perfil"*. **El bot nunca lee esas columnas: lee un JSON.** Meterlo en el perfil le daría un privilegio permanente de leer cuenta e identificación **por cualquier vía**, para algo que no necesita — y encima traería una incógnita que no hace falta comerse: a ese perfil se entra **por equipo desde un grupo de Entra** (D-8), y si un service principal sincroniza a un equipo de grupo está sin verificar.
 
 ## 3. `sanic_mppp_capi_registrarresultadorpa` — fase 2 (Action, D-14)
 
@@ -120,8 +142,8 @@ En AS400 el bot **digita y después aprueba**: son dos eventos distintos, separa
 |---|---|---|---|---|
 | `filaid` | entrada | Guid | sí | El que recibió de `obtenerfilaspendientes`. |
 | `resultado` | entrada | String | sí | `digitada` · `aprobada` · `rechazada`. Texto y no número: el contrato se lee solo desde el lado del bot. |
-| `mensaje` | entrada | String | si `rechazada` | **El texto de la condición tal cual lo mostró AS400**, sin interpretar. Es lo que verá el ejecutivo y de donde sale lo que se le dice al cliente. |
-| `fechaproceso` | entrada | DateTime | sí | Cuándo ocurrió en AS400, en UTC. |
+| `mensaje` | entrada | String | si `rechazada` | **El texto de la condición tal cual lo mostró AS400**, sin interpretar. Va a **`sanic_notainterna`**, que lee el ejecutivo y **nunca sale del banco** (decisión del aprobador, 2026-09-25 — ver abajo). |
+| `fechaproceso` | entrada | DateTime | sí | Cuándo ocurrió en AS400. **Con offset explícito** (`2026-10-05T15:04:12Z` o `...-06:00`); una fecha sin offset se rechaza. Se valida contra una ventana de tolerancia (ver abajo). |
 | `estadofila` | salida | Integer | | Estado en que quedó la fila. |
 | `yaregistrado` | salida | Boolean | | `true` si la llamada no cambió nada (ver idempotencia). |
 
@@ -161,6 +183,17 @@ Respuesta: `{ "estadofila": 159460004, "yaregistrado": false }`.
 - **El bot nunca anula.** Anular es la decisión de una persona (DD-14).
 - **Idempotente** (BP-PP-055): repetir un resultado sobre una fila que ya está en ese estado devuelve `yaregistrado = true` sin cambiar nada. Si la fila ya no está en el estado de partida porque una persona la atendió antes, tampoco cambia nada ni da error: devuelve el estado actual. El que llegó primero gana.
 - Aplica las mismas transiciones del plugin de §4, en nombre del usuario de aplicación del RPA.
+
+**El texto de AS400 NO sale al cliente** (decisión del aprobador, 2026-09-25). El contrato decía que `mensaje` era *"de donde sale lo que se le dice al cliente"*. Eso abre un caño directo desde el core bancario hasta la bandeja de un cliente, sin que lo lea nadie: si AS400 contesta algo como `CUENTA PERTENECE A OTRO TITULAR: <nombre>`, ese nombre saldría. Y rompe la premisa sobre la que está construida toda la defensa de `ArmadorRespuesta.DefenderMensaje`, que dice textual: *"`sanic_mensaje` lo redacta el catálogo (D-19, marcador `{valor}`) y hoy nunca cita la cuenta ni la identificación completas"* — la máscara solo tapa la cuenta y la identificación **de esa misma fila**, si aparecen literales. En fase 2 el texto deja de redactarlo el catálogo.
+
+| Dónde va | Qué lleva |
+|---|---|
+| `sanic_notainterna` | el texto de AS400 **tal cual**, sin interpretar. Lo lee el ejecutivo; no sale del banco |
+| `sanic_mensaje` (lo lee el cliente) | texto **nuestro**, del catálogo, para "rechazada en AS400" |
+
+Es la misma separación de columnas que se construyó el 2026-09-24 para la nota del supervisor al devolver (`04` §1). Si el negocio quiere que el cliente vea motivos específicos de AS400, eso es un **catálogo de condiciones mapeadas a texto nuestro**, con alguien que lo aprueba — una decisión deliberada, nunca un reenvío automático.
+
+**`fechaproceso`: ventana de tolerancia parametrizable** (decisión del aprobador, 2026-09-25). `sanic_fechadigitada` y `sanic_fechaaprobada` son el rastro de los cuatro ojos: un bot con el reloj o la zona horaria mal los envenena en silencio. Se rechaza toda fecha **en el futuro** o más vieja que la tolerancia, con un error que nombra la causa. La ventana la declara el parámetro **`rpa.horas.tolerancia`**, con un **fallback quemado en el código** para que la ausencia del parámetro no tumbe al bot (mismo criterio que `EsCodigoDeServidor` con `servicio.cuenta`: un dato de configuración que falta degrada, no rompe). **Todas las fechas, de entrada y de salida, llevan offset explícito.**
 
 **Concurrencia: sin reserva de filas.** Decisión del aprobador: el control de concurrencia lo tiene AS400, que rechaza la segunda operación sobre la misma referencia. Riesgo residual aceptado: si un ejecutivo ya digitó una fila en AS400 pero todavía no la marcó en la app, y en ese momento el bot la intenta, AS400 la rechaza por repetida y el bot la reportaría como rechazada. Se mitiga por operación —con el bot activo, las personas digitan solo lo que el bot dejó— y porque la ventana es de minutos.
 

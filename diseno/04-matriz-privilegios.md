@@ -72,7 +72,7 @@ Columnas: `sanic_mppp_tbl_fila.sanic_numeroidentificacion` y `sanic_mppp_tbl_fil
 
 | Perfil | Leer | Crear | Actualizar | Quién necesita estar | Fase |
 |---|---|---|---|---|---|
-| `CSP - MPPP - Datos sensibles` | sí | no | no | Ejecutivos y Supervisores. El usuario de aplicación del RPA, en fase 2 | 1 |
+| `CSP - MPPP - Datos sensibles` | sí | no | no | Ejecutivos y Supervisores. **El RPA NO** (ver abajo) | 1 |
 | Un segundo perfil, de lectura **y creación** (se nombra al diseñar la fase 3) | sí | sí | no | El usuario de aplicación del Histórico | 3 |
 
 Nadie más: ni la cuenta de servicio de ingesta, ni el Administrador de planes, ni el Administrador técnico.
@@ -82,6 +82,7 @@ Nadie más: ni la cuenta de servicio de ingesta, ni el Administrador de planes, 
 - El Ejecutivo **tiene** que leerlas: son lo que digita en AS400. La protección es contra todos los demás y contra exportaciones.
 - Histórico las lee para que el paquete no llegue con columnas vacías (RNF-09), y las crea al reactivar.
 - SYSTEM (la Custom API) no necesita estar en ningún perfil.
+- **El usuario de aplicación del RPA tampoco** (decisión del aprobador del 2026-09-25; hasta esa fecha esta tabla lo listaba para la fase 2, y era un privilegio de más). El bot **nunca lee esas columnas**: recibe un JSON que arma el plugin de `sanic_mppp_capi_obtenerfilaspendientes` con SYSTEM (`03` §2). Darle el perfil le habilitaría leer cuenta e identificación **por cualquier vía**, no solo por su API, y además exigiría resolver si un service principal sincroniza a un equipo de grupo de Entra (D-8), que está sin verificar. Menos privilegio y una incógnita menos.
 - El `.eml` y el Excel originales contienen los mismos datos en crudo y **no** los cubre la seguridad de columna: los protege el registro padre. Por eso el Administrador de planes **no tiene lectura de Solicitud**: no la necesita para administrar catálogos y le daría el Excel crudo con cuentas e identificaciones. El Administrador técnico tampoco, por el mismo motivo.
 
 ## 5. Cómo se verifica
