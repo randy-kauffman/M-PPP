@@ -107,6 +107,15 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.False(Entra(fila));
         }
 
+        [Fact]
+        public void Una_Digitada_SIN_AUTOR_no_entra()
+        {
+            // No deberia existir —el plugin siempre escribe `digitadapor`— pero una fila corrupta, una
+            // migracion o una edicion a mano podrian producirla. Sin autor no se puede afirmar que la digito
+            // el bot, y afirmarlo por omision seria dejar que apruebe trabajo ajeno. Falla cerrado.
+            Assert.False(Entra(new FilaCandidata { Estado = EstadoDeLaFila.Digitada, DigitadaPor = null }));
+        }
+
         [Theory]
         [InlineData(EstadoDeLaFila.Aprobada)]
         [InlineData(EstadoDeLaFila.Anulada)]

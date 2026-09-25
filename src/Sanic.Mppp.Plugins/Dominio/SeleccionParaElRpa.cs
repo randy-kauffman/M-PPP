@@ -30,7 +30,33 @@ namespace Sanic.Mppp.Plugins.Dominio
         /// <param name="puedeAprobar">`rpa.puedeaprobar`. En `false` no se entrega ninguna Digitada.</param>
         public static bool EntraEnElLote(FilaCandidata fila, Guid quienLlama, bool puedeAprobar, DateTime ahora)
         {
-            throw new NotImplementedException("8.x: lo implementa el constructor contra SeleccionParaElRpaAceptacion.");
+            // La atencion manual la saca del circuito automatico entero: gana incluso sobre una Digitada
+            // propia, porque ya es trabajo de un ejecutivo, no del bot.
+            if (fila.RequiereAtencionManual)
+            {
+                return false;
+            }
+
+            if (fila.Estado == EstadoDeLaFila.Validada)
+            {
+                // El claim NO excluye: es un candado contra personas, no contra el bot que la pide de nuevo.
+                return true;
+            }
+
+            if (fila.Estado == EstadoDeLaFila.Digitada)
+            {
+                if (!puedeAprobar)
+                {
+                    return false;
+                }
+
+                // Solo entra si LE CONSTA que la digitacion se hizo bien: la hizo el mismo que llama ahora.
+                return fila.DigitadaPor == quienLlama;
+            }
+
+            // Cualquier otro estado (Aprobada, Anulada, RechazadaEnAS400, RechazadaEnValidacion,
+            // SinAutorizacion) es terminal: ya salio del circuito del RPA.
+            return false;
         }
     }
 }
