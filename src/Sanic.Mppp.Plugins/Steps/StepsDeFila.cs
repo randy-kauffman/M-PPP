@@ -259,7 +259,10 @@ namespace Sanic.Mppp.Plugins.Steps
     ///  - `rpa.puedeaprobar` se lee del parámetro (`si` habilita la excepción; ausente o cualquier otra cosa = no);
     ///  - los efectos se escriben en el `Target`: Digitada pone `sanic_digitadapor`/`sanic_fechadigitada`; Aprobada pone
     ///    `sanic_aprobadapor`/`sanic_fechaaprobada`; Devolver limpia `sanic_digitadapor`/`sanic_fechadigitada`;
-    ///  - un `Update` que no cambia el estado (el `Target` no trae `sanic_estado`) no hace nada.
+    ///  - un `Update` que no cambia el estado (el `Target` no trae `sanic_estado`) no hace nada;
+    ///  - si la transición aterriza en un estado que ya NO es "abierto" (<see cref="Dominio.TransicionesDeFila.EstaAbierta"/>:
+    ///    hoy Aprobada, Rechazada en AS400 o Anulada), se libera `sanic_claimhasta` (diseno/03 §2, "Cuándo se libera"); en
+    ///    Validada → Digitada, que sigue "abierta", el claim NO se toca.
     /// </summary>
     public sealed class TransicionDeFilaStep : IPlugin
     {
@@ -320,6 +323,18 @@ namespace Sanic.Mppp.Plugins.Steps
             // CUALQUIER transición exitosa de la fila". Sin enumerar casos: no importa el Efecto, el Hacia, ni
             // quién hizo la transición (persona o bot) — si llegamos acá, se permitió, y se apaga.
             target["sanic_requiereatencionmanual"] = false;
+
+            // diseno/03 §2, "Cuándo se libera": "Al vencer, y al llegar la fila a un estado terminal (Aprobada,
+            // Rechazada en AS400, Anulada) ... En Validada → Digitada el claim NO se libera". Se reusa
+            // `EstaAbierta` (Validada y Digitada son los únicos estados "abiertos" hoy) en vez de enumerar los
+            // terminales a mano: la lista de terminales de hoy es la de hoy, y en fase 3 puede crecer sin que
+            // haga falta tocar esta línea. Por qué Validada → Digitada NO libera aunque el destino sea distinto
+            // del origen: al bot le queda trabajo sobre esa fila —aprobarla—, y soltarle la reserva ahí lo
+            // dejaría peleando contra un ejecutivo justo en el medio de su propio trabajo.
+            if (!TransicionesDeFila.EstaAbierta(hacia))
+            {
+                target["sanic_claimhasta"] = null;
+            }
         }
 
         /// <summary>Escribe quién y cuándo según el efecto (03 §4). A una persona nunca se le cree lo que mandó; al código de servidor se le confía lo que ya trae, y se completa solo lo que falte.</summary>
