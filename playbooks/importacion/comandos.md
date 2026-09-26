@@ -18,6 +18,14 @@ El id del boton si lleva la tabla. Verificado con `RetrieveEntityRibbon` el 2026
 Los sufijos declarados en `ocultar` son candidatos: la herramienta oculta solo los que existen
 de verdad en el ribbon de cada tabla, y nunca los de la pestaña de graficos.
 
+**Botón "Atendida" agregado el 2026-09-25 (fase 2, `05-app-model-driven.md` §"Fase 2: dos vistas
+y un comando más").** Va en el MISMO cambio `ribbon` de `sanic_mppp_tbl_fila` que los cinco de
+fase 1: la herramienta reemplaza el `RibbonDiffXml` ENTERO de esa tabla, así que un cambio
+separado para "Atendida" habría borrado los otros cinco. Apaga `sanic_requiereatencionmanual`
+(no cambia `sanic_estado`); no pide texto, mismo motivo que "revisado" más abajo (no lleva
+`regla`: no es una transición de estado, es un botón de "ya lo resolví", igual que "revisado",
+"atendido" y "descartar").
+
 ## 1. Identidad
 
 ```json
@@ -146,6 +154,24 @@ de verdad en el ribbon de cada tabla, y nunca los de la pestaña de graficos.
             "SubGrid"
           ],
           "secuencia": 50
+        },
+        {
+          "id": "atendida",
+          "funcion": "Sanic.Mppp.Comandos.atendida",
+          "icono": "sanic_mppp_wr_svg_cmdatendida",
+          "etiqueta": {
+            "1033": "Mark attended",
+            "3082": "Atendida"
+          },
+          "tooltip": {
+            "1033": "Clears the manual-attention flag on the selected rows, without changing their state.",
+            "3082": "Apaga la marca de atencion manual de las filas seleccionadas, sin cambiarles el estado."
+          },
+          "ubicaciones": [
+            "HomepageGrid",
+            "SubGrid"
+          ],
+          "secuencia": 60
         }
       ],
       "ocultar": [

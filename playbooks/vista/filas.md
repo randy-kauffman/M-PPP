@@ -5,6 +5,12 @@ formularios se vio que el sitemap tiene la entrada "Filas -> Todas las Filas" y 
 Solicitud lleva una subgrilla con TODAS sus filas, y ninguna de las 17 anteriores las muestra
 (las cinco de Fila filtran por estado).
 
+**Columna `sanic_claimhasta` agregada el 2026-09-25 (fase 2, `05-app-model-driven.md`
+§"Fase 2: dos vistas y un comando más").** "La columna del claim se agrega también a la grilla
+de Filas, para que la reserva se vea sin cambiar de vista": esta es esa grilla (la que respalda
+el sitemap "Filas" y la subgrilla de la Solicitud), así que la columna va acá y no en una vista
+nueva.
+
 ## 1. Identidad
 
 ```json
@@ -78,6 +84,10 @@ Solicitud lleva una subgrilla con TODAS sus filas, y ninguna de las 17 anteriore
     {
       "nombre": "sanic_mensaje",
       "ancho": 260
+    },
+    {
+      "nombre": "sanic_claimhasta",
+      "ancho": 130
     }
   ],
   "orden": [

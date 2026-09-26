@@ -519,6 +519,23 @@ Sanic.Mppp.Comandos = (function () {
             return ejecutar("Revisado", SOLICITUD.tabla,
                 { sanic_requiererevision: false }, ids, control);
         },
+        atendida: function (ids, control) {
+            /*
+             * Fase 2 (05, "Fase 2: dos vistas y un comando mas"). Apaga
+             * sanic_requiereatencionmanual. NO pide texto, mismo motivo que
+             * Revisado: es un boton de "ya lo resolvi", no una transicion de
+             * FILA.columna (sanic_estado no se toca).
+             *
+             * La marca tambien se apaga sola con CUALQUIER transicion exitosa
+             * de la fila (step de servidor, fuera de este archivo); este boton
+             * es para el ejecutivo que resolvio el caso SIN cambiar el estado.
+             *
+             * No confundir con "atendido" (arriba): ese cierra la Solicitud.
+             * Este apaga una marca de la Fila. Son dos botones, dos tablas.
+             */
+            return ejecutar("Atendida", FILA.tabla,
+                { sanic_requiereatencionmanual: false }, ids, control);
+        },
 
         /*
          * --- las reglas del ribbon (EnableRule / CustomRule) ---
