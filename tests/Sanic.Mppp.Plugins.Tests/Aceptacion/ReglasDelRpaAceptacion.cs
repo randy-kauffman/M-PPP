@@ -143,5 +143,53 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             // El bot ramifica por el codigo: "partilo" y "mandame algo" no son la misma instruccion.
             Assert.NotEqual(ReglasDelRpa.CodigoLoteVacio, ReglasDelRpa.CodigoLoteGrande);
         }
+
+        // ---------- CantidadAEntregar: el bot pide, el tope (500) manda ----------
+
+        [Theory]
+        [InlineData(10, 10)]
+        [InlineData(100, 100)]
+        [InlineData(500, 500)]
+        [InlineData(999, 500)] // pide de mas: se RECORTA, no es un error del bot
+        public void La_cantidad_a_entregar_se_recorta_al_tope_fijo_de_500(int pedido, int esperado)
+        {
+            Assert.Equal(esperado, ReglasDelRpa.CantidadAEntregar(pedido));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        public void Pedir_cero_o_menos_filas_es_un_error(int pedido)
+        {
+            Assert.Throws<ArgumentException>(() => ReglasDelRpa.CantidadAEntregar(pedido));
+        }
+
+        // ---------- ParsearFechaConOffset ----------
+
+        [Fact]
+        public void Una_fecha_con_Z_se_interpreta_como_UTC()
+        {
+            var fecha = ReglasDelRpa.ParsearFechaConOffset("2026-10-05T15:04:12Z");
+            Assert.Equal(new DateTime(2026, 10, 5, 15, 4, 12, DateTimeKind.Utc), fecha);
+            Assert.Equal(DateTimeKind.Utc, fecha.Kind);
+        }
+
+        [Fact]
+        public void Una_fecha_con_offset_negativo_se_convierte_a_UTC()
+        {
+            var fecha = ReglasDelRpa.ParsearFechaConOffset("2026-10-05T09:04:12-06:00");
+            Assert.Equal(new DateTime(2026, 10, 5, 15, 4, 12, DateTimeKind.Utc), fecha);
+        }
+
+        [Theory]
+        [InlineData("2026-10-05T15:04:12")] // sin offset: se rechaza, no se asume la hora local del servidor
+        [InlineData("")]
+        [InlineData(null)]
+        [InlineData("no es una fecha")]
+        public void Una_fecha_sin_offset_explicito_o_ilegible_se_rechaza(string texto)
+        {
+            var e = Assert.Throws<ArgumentException>(() => ReglasDelRpa.ParsearFechaConOffset(texto));
+            Assert.Contains(ReglasDelRpa.CodigoFecha, e.Message);
+        }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Sanic.Mppp.Plugins.Dominio
 {
@@ -24,6 +25,15 @@ namespace Sanic.Mppp.Plugins.Dominio
         public const string CodigoLoteGrande = "MPPP-RPA-008";
         public const string CodigoLoteVacio = "MPPP-RPA-009";
 
+        /// <summary>Defecto de `maximo` en `obtenerfilaspendientes` (diseno/03 §2): cuando el bot no lo manda.</summary>
+        public const int MaximoPorDefecto = 100;
+
+        /// <summary>
+        /// Tope DURO de `maximo` en `obtenerfilaspendientes` (diseno/03 §2): "tope 500". A diferencia del tope del
+        /// claim (`rpa.minutos.claimmaximo`) esto NO es un parámetro de Dataverse: el contrato lo fija en el código.
+        /// </summary>
+        public const int MaximoTope = 500;
+
         /// <summary>
         /// Minutos que va a durar la reserva. El bot pide; el tope manda.
         ///
@@ -44,6 +54,73 @@ namespace Sanic.Mppp.Plugins.Dominio
             var topeEfectivo = tope > 0 ? tope : ClaimMaximoMinutosPorDefecto;
 
             return pedidos > topeEfectivo ? topeEfectivo : pedidos;
+        }
+
+        /// <summary>
+        /// Cuántas filas entregar en esta llamada de `obtenerfilaspendientes` (diseno/03 §2): "el bot pide lo que
+        /// puede procesar ... se recorta al tope, sin error". Mismo criterio que <see cref="MinutosDeClaim"/>: pedir
+        /// de más no es un error, nace SIN pedir sí lo es (cero o negativo no pide nada).
+        /// </summary>
+        public static int CantidadAEntregar(int pedido)
+        {
+            if (pedido <= 0)
+            {
+                throw new ArgumentException("Pedir cero o menos filas no tiene sentido: no se entregaría nada.", nameof(pedido));
+            }
+
+            return pedido > MaximoTope ? MaximoTope : pedido;
+        }
+
+        /// <summary>
+        /// Interpreta `fechaproceso` tal como llega en el JSON del lote de `registrarresultadorpa` (diseno/03 §3):
+        /// texto ISO-8601 CON offset explícito (`2026-10-05T15:04:12Z` o `...-06:00`). Sin offset, Dataverse (y
+        /// .NET) asumirían la hora local del servidor en silencio, exactamente lo que el contrato prohíbe. Lanza
+        /// <see cref="ArgumentException"/> con <see cref="CodigoFecha"/> si el texto está vacío, no trae offset, o
+        /// no se puede interpretar. Devuelve la fecha en UTC (<see cref="DateTimeKind.Utc"/>).
+        /// </summary>
+        public static DateTime ParsearFechaConOffset(string texto)
+        {
+            if (string.IsNullOrWhiteSpace(texto))
+            {
+                throw new ArgumentException(CodigoFecha + ": falta 'fechaproceso'.", nameof(texto));
+            }
+
+            if (!TieneOffsetExplicito(texto))
+            {
+                throw new ArgumentException(CodigoFecha + ": la fecha de proceso no trae offset explícito (se exige 'Z' o '+HH:mm'/'-HH:mm').", nameof(texto));
+            }
+
+            if (!DateTimeOffset.TryParse(texto, CultureInfo.InvariantCulture, DateTimeStyles.None, out var conOffset))
+            {
+                throw new ArgumentException(CodigoFecha + ": la fecha de proceso no se pudo interpretar.", nameof(texto));
+            }
+
+            return DateTime.SpecifyKind(conOffset.UtcDateTime, DateTimeKind.Utc);
+        }
+
+        /// <summary>
+        /// `true` si el texto termina con un offset ISO-8601 explícito: `Z` (sin distinguir mayúsculas) o
+        /// `+HH:mm`/`-HH:mm`. Chequeo TEXTUAL a propósito: `DateTimeOffset.Parse` sin offset en el texto no lanza,
+        /// completa con la zona horaria LOCAL del servidor, que es justo lo que hay que detectar y rechazar.
+        /// </summary>
+        private static bool TieneOffsetExplicito(string texto)
+        {
+            var recortado = texto.Trim();
+            if (recortado.EndsWith("Z", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (recortado.Length < 6)
+            {
+                return false;
+            }
+
+            var cola = recortado.Substring(recortado.Length - 6);
+            return (cola[0] == '+' || cola[0] == '-')
+                && char.IsDigit(cola[1]) && char.IsDigit(cola[2])
+                && cola[3] == ':'
+                && char.IsDigit(cola[4]) && char.IsDigit(cola[5]);
         }
 
         /// <summary>`true` si la reserva sigue en pie. Sin valor = nunca se reservó = libre.</summary>
