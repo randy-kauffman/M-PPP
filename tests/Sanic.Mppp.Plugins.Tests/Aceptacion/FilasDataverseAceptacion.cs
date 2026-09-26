@@ -157,12 +157,28 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.True(leida.RequiereAtencionManual);
         }
 
+        /// <summary>
+        /// Semántica cambiada el 2026-09-25 — NO la revirtás pensando que "antes andaba". Hasta esta fecha esta
+        /// prueba fijaba lo contrario (`Assert.Throws&lt;FaultException&lt;OrganizationServiceFault&gt;&gt;`), porque
+        /// `LeerParaRegistro` usaba `Retrieve` por id. Eso nunca fue una decisión de diseño: era un ACCIDENTE de la
+        /// API de `Retrieve` (tira si no encuentra el id), que la prueba se limitó a describir.
+        ///
+        /// Ese mismo día, `herramientas/pruebas/probar_rpa.py --confirmar` contra el ENTORNO REAL (no las pruebas)
+        /// mandó un lote de 3 ítems con uno de `filaid` inexistente, y la plataforma tumbó LA LLAMADA ENTERA con
+        /// "ISV code reduced the open transaction count. Custom plug-ins should not catch exceptions from
+        /// OrganizationService calls and continue processing.": `RegistrarResultadoRpa` atrapaba la `FaultException`
+        /// de este método para seguir con el resto del lote, y ese `try/catch` alrededor de una llamada a
+        /// `OrganizationService` es justo lo que corrompe el contador de transacción de Dataverse.
+        ///
+        /// Un `filaid` que no existe es un DATO MALO del bot — no una condición excepcional de plataforma — y se
+        /// decide con una lectura que puede no encontrar nada, nunca con una excepción atrapada. Por eso
+        /// `LeerParaRegistro` pasó a `RetrieveMultiple` y esta prueba fija la semántica nueva.
+        /// </summary>
         [Fact]
-        public void LeerParaRegistro_de_una_fila_inexistente_propaga_la_falla_del_servicio()
+        public void LeerParaRegistro_de_una_fila_inexistente_devuelve_null_no_propaga_ninguna_falla_del_servicio()
         {
             var svc = new OrganizationServiceEnMemoria();
-            Assert.Throws<System.ServiceModel.FaultException<OrganizationServiceFault>>(
-                () => new FilasDataverse(svc).LeerParaRegistro(Guid.NewGuid()));
+            Assert.Null(new FilasDataverse(svc).LeerParaRegistro(Guid.NewGuid()));
         }
 
         [Fact]

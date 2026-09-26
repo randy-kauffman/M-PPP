@@ -163,7 +163,7 @@ namespace Sanic.Mppp.Plugins.Api
         /// (diseno/03 §3, "Se reporta por lote").
         ///
         /// NUNCA agregues acá un `catch (Exception)` genérico, ni un `try/catch` alrededor de NINGUNA llamada a
-        /// `OrganizationService` (`_filas.Registrar*`, `_filas.BuscarParaRegistro`, etc.), aunque parezca "más
+        /// `OrganizationService` (`_filas.Registrar*`, `_filas.LeerParaRegistro`, etc.), aunque parezca "más
         /// robusto". El 2026-09-25, `herramientas/pruebas/probar_rpa.py --confirmar` contra el ENTORNO REAL (no las
         /// pruebas: el doble no simula el modelo transaccional de Dataverse) mandó un lote de 3 ítems y la
         /// plataforma rechazó LA LLAMADA ENTERA con:
@@ -243,15 +243,13 @@ namespace Sanic.Mppp.Plugins.Api
         }
 
         /// <summary>
-        /// `filaid` inexistente es un DATO MALO del bot, no una falla del servicio: por eso usa
-        /// <see cref="FilasDataverse.BuscarParaRegistro"/> (una lectura que devuelve `null` cuando no encuentra
-        /// nada) en vez de <see cref="FilasDataverse.LeerParaRegistro"/> (que propaga la falla del servicio tal
-        /// cual). Acá NO hay ningún `try/catch` alrededor de la llamada a `OrganizationService` — ver el porqué en
-        /// el comentario grande de <see cref="ProcesarItem"/>.
+        /// `filaid` inexistente es un DATO MALO del bot, no una falla del servicio: <see cref="FilasDataverse.LeerParaRegistro"/>
+        /// devuelve `null` cuando no encuentra nada (nunca tira). Acá NO hay ningún `try/catch` alrededor de la
+        /// llamada a `OrganizationService` — ver el porqué en el comentario grande de <see cref="ProcesarItem"/>.
         /// </summary>
         private FilaParaRegistro ExigirFilaExistente(Guid filaId)
         {
-            var actual = _filas.BuscarParaRegistro(filaId);
+            var actual = _filas.LeerParaRegistro(filaId);
             if (actual == null)
             {
                 throw new ResultadoRpaException(CodigoFilaInexistente, "La fila no existe.");

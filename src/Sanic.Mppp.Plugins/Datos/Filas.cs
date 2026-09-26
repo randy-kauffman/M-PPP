@@ -169,31 +169,26 @@ namespace Sanic.Mppp.Plugins.Datos
 
         private static readonly string[] ColumnasParaRegistro = { "sanic_estado", "sanic_digitadapor", "sanic_requiereatencionmanual" };
 
-        /// <summary>Lo mínimo de la Fila para decidir un resultado de `registrarresultadorpa`. Un `filaId` que no existe
-        /// propaga la falla del servicio tal cual (`Retrieve` por id). Sigue así porque <see cref="FilasDataverseAceptacion"/>
-        /// ya fija ese contrato; quien necesita resolver la ausencia SIN excepción (`registrarresultadorpa`, desde el
-        /// defecto real de 2026-09-25) usa <see cref="BuscarParaRegistro"/>, no este método.</summary>
-        public FilaParaRegistro LeerParaRegistro(Guid filaId)
-        {
-            ValidarFilaId(filaId);
-
-            var registro = _servicio.Retrieve(TablasHistorico.Fila, filaId, new ColumnSet(ColumnasParaRegistro));
-            return ConvertirParaRegistro(registro);
-        }
-
         /// <summary>
-        /// Lo mismo que <see cref="LeerParaRegistro"/>, pero un `filaId` que no existe devuelve `null` en vez de
-        /// propagar la falla del servicio: usa `RetrieveMultiple` (una consulta que no encuentra nada devuelve
-        /// vacío, NUNCA tira) en vez de `Retrieve` por id.
+        /// Lo mínimo de la Fila para decidir un resultado de `registrarresultadorpa`. Un `filaId` que no existe
+        /// devuelve `null`, NUNCA propaga una falla del servicio: usa `RetrieveMultiple` con `QueryExpression`
+        /// filtrando por id (una consulta que no encuentra nada devuelve vacío) en vez de `Retrieve` por id (que
+        /// TIRA `FaultException` si el id no existe).
         ///
-        /// Por qué existe un método aparte. El defecto real de 2026-09-25 (ver el comentario grande en
-        /// <c>RegistrarResultadoRpa.ProcesarItem</c>) fue justamente un `try/catch` alrededor de una llamada a
-        /// `OrganizationService` que sí puede fallar (`Retrieve` por id). La regla nueva es que ESE plugin nunca
-        /// atrape una excepción del servicio — así que necesita una lectura que, ante una Fila inexistente, no
-        /// tenga nada que atrapar. `LeerParaRegistro` sigue existiendo tal cual (con su propio contrato y sus
-        /// propias pruebas) para quien sí quiera que una Fila inexistente sea una falla dura.
+        /// Hasta el 2026-09-25 este método usaba `Retrieve` por id y SÍ propagaba esa excepción — era una decisión
+        /// implícita, no explícita: era simplemente lo que hacía `Retrieve`. Ese día, `herramientas/pruebas/probar_rpa.py
+        /// --confirmar` contra el ENTORNO REAL (no las pruebas: <see cref="OrganizationServiceEnMemoria"/> no simula
+        /// el modelo transaccional de Dataverse) mandó un lote de 3 ítems con uno de `filaid` inexistente y la
+        /// plataforma tumbó LA LLAMADA ENTERA con "ISV code reduced the open transaction count. Custom plug-ins
+        /// should not catch exceptions from OrganizationService calls and continue processing." — porque
+        /// `RegistrarResultadoRpa` atrapaba esa excepción para seguir con el resto del lote, y atrapar una excepción
+        /// de `OrganizationService` DENTRO de la transacción del plugin corrompe el contador que la plataforma ya
+        /// decrementó. Un `filaid` que no existe es un DATO MALO del bot, no una condición excepcional de
+        /// plataforma: se decide con una lectura que puede no encontrar nada, no con una excepción que hay que
+        /// atrapar. Por eso cambió a `RetrieveMultiple` — que NUNCA tira por esto — y NUNCA debería volver a
+        /// `Retrieve` por id así quede "más simple": eso reabriría el mismo defecto.
         /// </summary>
-        public FilaParaRegistro BuscarParaRegistro(Guid filaId)
+        public FilaParaRegistro LeerParaRegistro(Guid filaId)
         {
             ValidarFilaId(filaId);
 
