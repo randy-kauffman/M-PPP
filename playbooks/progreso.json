@@ -1,7 +1,7 @@
 {
-  "proyecto": "MPPP · fase 1",
+  "proyecto": "MPPP · fases 1 y 2",
   "criterio_hecho": "ciclo cerrado: construido, verificado en Dev y muestra exportada; si el ciclo enseñó algo nuevo, además el reporte aprobado por el aprobador",
-  "en_curso": "Fase 1 construida y los 5 flujos activos. En curso: pruebas funcionales (pruebas/, 82 casos). Pendiente: el 403 del buzon compartido (propagacion de permisos) y agregar Send As a la cuenta de la conexion, sin lo cual MPPP-ENV no va a poder responder",
+  "en_curso": "Fase 1 CERRADA y desplegada en dos ambientes. Fase 2 CONSTRUIDA, PROBADA de punta a punta contra el entorno real con la identidad del bot (herramientas/pruebas/probar_rpa.py) y MEDIDA (rpa.lote.maximo: 0,33 s/item, subido a 100). 981 pruebas de plugins y 600 de herramientas en verde. Pendiente: la migracion a Test y Produccion (06 §13.8 + §13.7.1), y las dos acciones de D-53 (subir la retencion de auditoria, y acordar que los parametros se cambian por playbook).",
   "grupos": {
     "P-01": "Solución",
     "P-02": "Choices globales",
@@ -672,5 +672,15 @@
       "total": 1,
       "hechos": 1
     }
-  ]
+  ],
+  "fase2": {
+    "rol": "SR - MPPP - RPA (6.7) — App Opener y NADA mas: no da acceso, da identidad",
+    "identidad": "app user '# MPP-RPA' con el rol, verificado desde afuera",
+    "columnas": "sanic_claimhasta, sanic_requiereatencionmanual en Fila (3.8)",
+    "parametros": "rpa.codigos, rpa.horas.tolerancia, rpa.minutos.claimmaximo, rpa.lote.maximo (9.1)",
+    "dominio": "PuertaDelRpa, ReglasDelRpa, SeleccionParaElRpa, ArmadorJsonDelRpa",
+    "custom_api": "obtenerfilaspendientes (Function) y registrarresultadorpa (Action), registradas y verificadas parametro a parametro",
+    "app": "vistas 'Para atencion manual' y 'Tomadas por el bot', comando 'Atendida', columna del claim en la grilla",
+    "probado_contra_el_entorno": "los 5 pasos del ciclo, mas el RECHAZO de la puerta de D-9 (MPPP-RPA-006) y el gate del claim ('se libera en N minutos')"
+  }
 }
