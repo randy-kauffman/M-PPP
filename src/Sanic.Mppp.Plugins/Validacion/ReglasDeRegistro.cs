@@ -10,12 +10,13 @@ namespace Sanic.Mppp.Plugins.Validacion
     /// <summary>Un plan ACTIVO del maestro (`sanic_mppp_tbl_plan`), tal como lo entrega la capa de datos. Sin SDK.</summary>
     public sealed class PlanDelCatalogo
     {
-        public PlanDelCatalogo(Guid id, string codigo, TipoDeFormatoDelPlan tipoFormato, Moneda moneda)
+        public PlanDelCatalogo(Guid id, string codigo, TipoDeFormatoDelPlan tipoFormato, Moneda moneda, Guid? clienteId = null)
         {
             Id = id;
             Codigo = codigo;
             TipoFormato = tipoFormato;
             Moneda = moneda;
+            ClienteId = clienteId;
         }
 
         public Guid Id { get; }
@@ -26,6 +27,60 @@ namespace Sanic.Mppp.Plugins.Validacion
         public TipoDeFormatoDelPlan TipoFormato { get; }
 
         public Moneda Moneda { get; }
+
+        /// <summary>
+        /// DN-01 (aprobador, 2026-09-26): el cliente dueño de este plan (`sanic_clienteid` del Plan). Nulo cuando quien
+        /// arma el catálogo no lo cargó (el modo Plan no lo necesita). En modo Cliente, un plan sin dueño conocido
+        /// NUNCA se da por autorizado: no se inventa un cliente (mismo criterio de "nunca se adivina" de esta clase).
+        /// </summary>
+        public Guid? ClienteId { get; }
+    }
+
+    /// <summary>
+    /// DN-01 (aprobador, 2026-09-26): la vía que consulta `AUTORIZACION_CORREO_PLAN`. Las dos conviven en el modelo
+    /// (`AutorizacionPlan`, la de hoy, y `AutorizacionCliente`, la nueva); el parámetro `autorizacion.modo` decide
+    /// cuál mira. El código de la regla, su orden, su nivel y su efecto NO cambian: lo único que cambia es DÓNDE
+    /// busca la autorización (diseno/DIRECTRICES-NUEVAS.md, "Diseño resuelto · DN-01 · Modelo").
+    /// </summary>
+    public enum ModoDeAutorizacion
+    {
+        /// <summary>El comportamiento de hoy, y el FALLBACK QUEMADO cuando el parámetro falta o trae basura: mira
+        /// `AutorizacionPlan(correo, plan)`.</summary>
+        Plan,
+
+        /// <summary>Mira `AutorizacionCliente(correo, cliente dueño del plan)`.</summary>
+        Cliente,
+    }
+
+    /// <summary>
+    /// Resuelve el parámetro `autorizacion.modo` (DN-01). Función pura: no lee Dataverse, no lanza — un parámetro
+    /// ausente o con basura DEGRADA al fallback quemado (<see cref="ModoDeAutorizacion.Plan"/>), nunca tumba la
+    /// validación (mismo criterio que `servicio.cuenta` y `rpa.horas.tolerancia`, diseno/02 §2.5).
+    /// </summary>
+    public static class ModoDeAutorizacionParametro
+    {
+        /// <summary>`sanic_nombre` del parámetro en `sanic_mppp_tbl_parametro`.</summary>
+        public const string Nombre = "autorizacion.modo";
+
+        private const string ValorCliente = "cliente";
+
+        /// <summary>
+        /// 'cliente' (sin distinguir mayúsculas, recortado a los lados) → <see cref="ModoDeAutorizacion.Cliente"/>.
+        /// Cualquier otro valor —nulo, vacío, espacios, "plan", o basura como "clienteX"— DEGRADA al fallback quemado:
+        /// <see cref="ModoDeAutorizacion.Plan"/>, el comportamiento de hoy. Un valor mal cargado NO es un error de
+        /// programación acá: ya es un patrón del proyecto. Sus hermanos: `servicio.cuenta`
+        /// (<see cref="Sanic.Mppp.Plugins.Steps.BaseDeStep.ParametroCuentaDeServicio"/>) y `rpa.horas.tolerancia`
+        /// (<see cref="Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi.ParametroToleranciaHoras"/>) hacen lo mismo: un
+        /// parámetro de configuración que falta o viene con basura degrada al control conocido, nunca tumba la
+        /// validación. Nunca lanza.
+        /// </summary>
+        public static ModoDeAutorizacion Resolver(string valorCrudo)
+        {
+            var recortado = (valorCrudo ?? string.Empty).Trim();
+            return string.Equals(recortado, ValorCliente, StringComparison.OrdinalIgnoreCase)
+                ? ModoDeAutorizacion.Cliente
+                : ModoDeAutorizacion.Plan;
+        }
     }
 
     /// <summary>
@@ -40,17 +95,32 @@ namespace Sanic.Mppp.Plugins.Validacion
         private readonly IDictionary<string, CampoPlantilla> _camposPorNombre;
         private readonly IDictionary<string, PlanDelCatalogo> _planesPorCodigo;
         private readonly HashSet<Guid> _planesAutorizados;
+        private readonly ModoDeAutorizacion _modo;
+        private readonly IDictionary<Guid, Guid?> _clienteDelPlanPorId;
+        private readonly HashSet<Guid> _clientesAutorizados;
 
         /// <param name="planesAutorizadosDelRemitente">
         /// Los ids de plan sobre los que el remitente tiene una autorización ACTIVA (Autorizado, Plan, Cliente y la propia
         /// AutorizacionPlan activos; diseno/02 §2.4). La evidencia NO cuenta (D-42, aprobador 2026-09-21): es informativa. Se copia.
+        /// Solo se mira en modo <see cref="ModoDeAutorizacion.Plan"/> (DN-01).
+        /// </param>
+        /// <param name="modo">
+        /// DN-01 (aprobador, 2026-09-26): qué vía consulta <c>EstaAutorizado</c>. Ausente = <see cref="ModoDeAutorizacion.Plan"/>
+        /// (el comportamiento de hoy, y el fallback quemado de <see cref="ModoDeAutorizacionParametro"/>).
+        /// </param>
+        /// <param name="clientesAutorizadosDelRemitente">
+        /// DN-01: los ids de CLIENTE sobre los que el remitente tiene una autorización ACTIVA (AutorizacionCliente). Solo se
+        /// mira en modo <see cref="ModoDeAutorizacion.Cliente"/>; nulo se trata como vacío (nunca lanza: mismo criterio de
+        /// "nunca tumba la validación" que el resto de esta clase).
         /// </param>
         public CatalogosDeValidacion(
             ConfiguracionPlantilla estructura,
             ListasPlantilla listas,
             ObligatoriedadPlantilla obligatoriedad,
             IEnumerable<PlanDelCatalogo> planesActivos,
-            IEnumerable<Guid> planesAutorizadosDelRemitente)
+            IEnumerable<Guid> planesAutorizadosDelRemitente,
+            ModoDeAutorizacion modo = ModoDeAutorizacion.Plan,
+            IEnumerable<Guid> clientesAutorizadosDelRemitente = null)
         {
             if (estructura == null)
             {
@@ -112,6 +182,7 @@ namespace Sanic.Mppp.Plugins.Validacion
             // Un plan nulo, con código sin normalizar (^[A-Z0-9]{4}$), o repetido: es el catálogo el que está mal armado,
             // no una fila (diseno/02 §2.2).
             var planesPorCodigo = new Dictionary<string, PlanDelCatalogo>(StringComparer.Ordinal);
+            var clienteDelPlanPorId = new Dictionary<Guid, Guid?>();
             foreach (var plan in planesActivos)
             {
                 if (plan == null)
@@ -130,16 +201,25 @@ namespace Sanic.Mppp.Plugins.Validacion
                 }
 
                 planesPorCodigo[plan.Codigo] = plan;
+                // DN-01: indexado por Id (no por código) para que EstaAutorizado() resuelva el modo Cliente sin
+                // recorrer la colección en cada llamada. ClienteId nulo se guarda tal cual: en modo Cliente un plan
+                // sin dueño conocido nunca se da por autorizado (no se inventa un cliente).
+                clienteDelPlanPorId[plan.Id] = plan.ClienteId;
             }
 
             Listas = listas;
             Obligatoriedad = obligatoriedad;
             _camposPorNombre = camposPorNombre;
             _planesPorCodigo = planesPorCodigo;
+            _clienteDelPlanPorId = clienteDelPlanPorId;
             // Copia: cambiar la colección después de construir el catálogo no lo cambia (revisión de código, 2026-09-21).
             // D-42 (aprobador, 2026-09-21): la evidencia no cuenta, así que basta con el SET de planes autorizados (sin el
             // tercer estado "sin evidencia" que tenía la versión anterior).
             _planesAutorizados = new HashSet<Guid>(planesAutorizadosDelRemitente);
+            _modo = modo;
+            // DN-01: nulo se trata como vacío (nunca lanza, mismo criterio de "nunca tumba la validación" que el resto
+            // de esta clase); solo se mira en modo Cliente.
+            _clientesAutorizados = new HashSet<Guid>(clientesAutorizadosDelRemitente ?? new Guid[0]);
         }
 
         public ListasPlantilla Listas { get; }
@@ -185,10 +265,24 @@ namespace Sanic.Mppp.Plugins.Validacion
             return _planesPorCodigo.TryGetValue(codigoNormalizado, out var plan) ? plan : null;
         }
 
-        /// <summary>True si el remitente tiene una autorización ACTIVA sobre ese plan (D-42: la evidencia no cuenta,
-        /// así que esto es un simple "está o no está" en el set que se copió en el constructor).</summary>
+        /// <summary>
+        /// True si el remitente tiene una autorización ACTIVA sobre ese plan (D-42: la evidencia no cuenta). DN-01: en modo
+        /// <see cref="ModoDeAutorizacion.Plan"/> (el fallback quemado) es un simple "está o no está" en el set que se copió
+        /// en el constructor; en modo <see cref="ModoDeAutorizacion.Cliente"/> mira el cliente dueño del plan.
+        /// </summary>
         public bool EstaAutorizado(Guid planId)
         {
+            if (_modo == ModoDeAutorizacion.Cliente)
+            {
+                // DN-01: en modo Cliente la vía AutorizacionPlan (_planesAutorizados) NO SE MIRA — se conserva, pero
+                // queda muda. Un plan que no está entre los activos, o que no trae ClienteId (dueño desconocido),
+                // nunca se da por autorizado: no se inventa un cliente (mismo criterio de "nunca se adivina" que el
+                // resto del catálogo).
+                return _clienteDelPlanPorId.TryGetValue(planId, out var clienteId)
+                    && clienteId.HasValue
+                    && _clientesAutorizados.Contains(clienteId.Value);
+            }
+
             return _planesAutorizados.Contains(planId);
         }
 
