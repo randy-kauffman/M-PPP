@@ -198,7 +198,7 @@ En AS400 el bot **digita y después aprueba**: son dos eventos distintos, separa
 | `digitada` | Validada | **Digitada** | `sanic_digitadapor` = usuario de aplicación del RPA, `sanic_fechadigitada` = `fechaproceso` |
 | `aprobada` | Digitada, digitada por el propio bot | **Aprobada** | `sanic_aprobadapor` = el mismo usuario, `sanic_fechaaprobada` = `fechaproceso`. Solo si `rpa.puedeaprobar` vale `si`; si vale `no` (sin el aval de C-03) devuelve error, la fila queda Digitada y la aprueba un supervisor |
 | `rechazada` | Validada **o** Digitada | **Rechazada en AS400** | AS400 no aceptó la operación por una condición suya, al digitar o al aprobar. La API sabe en qué paso fue por el estado en que estaba la fila, y lo anota en la Bitácora |
-| `atencionmanual` | Validada | **Validada** (no cambia) | El bot se topó con algo que no sabe resolver. Prende `sanic_requiereatencionmanual`, deja el porqué en `sanic_notainterna` y **libera el claim**. La fila pasa a ser de un ejecutivo |
+| `atencionmanual` | Validada **o Digitada** | **no cambia** | El bot se topó con algo que no sabe resolver. Prende `sanic_requiereatencionmanual`, deja el porqué en `sanic_notainterna` y **libera el claim**. La fila pasa a ser de un ejecutivo. **Vale también sobre una Digitada** (corregido el 2026-09-25): restringirlo a Validada dejaría al bot sin forma de reportar un problema no clasificable **mientras está aprobando**, que es justo cuando AS400 le puede contestar algo raro |
 
 **Cómo lo llama el bot.** Una llamada HTTP al Web API de Dataverse, con un token de Entra ID obtenido con las credenciales de su aplicación (flujo de credenciales de cliente):
 
@@ -279,9 +279,9 @@ Hoy todo lo que falla sale como excepción con prosa, y el bot no puede distingu
 | Código | Qué pasó | ¿Reintentar? |
 |---|---|---|
 | `MPPP-RPA-001` | `filaid` no existe | **no** |
-| `MPPP-RPA-002` | `resultado` no es `digitada`, `aprobada` ni `rechazada` | **no** |
+| `MPPP-RPA-002` | `resultado` no es `digitada`, `aprobada`, `rechazada` ni `atencionmanual` | **no** |
 | `MPPP-RPA-003` | `fechaproceso` sin offset, en el futuro, o fuera de `rpa.horas.tolerancia` | **no** — está mal el reloj del bot |
-| `MPPP-RPA-004` | falta `mensaje` en un `rechazada` | **no** |
+| `MPPP-RPA-004` | falta `mensaje` en un `rechazada` **o en un `atencionmanual`** | **no** — los dos escriben `sanic_notainterna`, y sin texto no explican nada |
 | `MPPP-RPA-005` | `codigo` no está en `rpa.codigos` | **no** — falta mapearlo |
 | `MPPP-RPA-006` | el que llama no es el bot autorizado (D-9) | **no** |
 | `MPPP-RPA-007` | el rol `SR - MPPP - RPA` no existe en el entorno (D-44) | **no** — falta instalarlo |
