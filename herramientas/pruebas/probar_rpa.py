@@ -215,13 +215,17 @@ def main(argv):
     print("   Esperado: rechazo que diga 'se libera en N minutos'. NO 'no autorizado'.")
 
     print("\n3. registrarresultadorpa — lote con una buena, una rechazada y un código inexistente")
-    lote = [
-        {"filaid": uno["filaid"], "resultado": "digitada", "codigo": "OK", "fechaproceso": ahora_utc()},
-        {"filaid": uno["filaid"], "resultado": "rechazada", "codigo": "NO-EXISTE-ESTE-CODIGO",
-         "mensaje": "PRUEBA: condicion inventada", "fechaproceso": ahora_utc()},
-    ]
+    # UNA operación por fila, y filas DISTINTAS. Dos transiciones sobre la MISMA fila dentro del mismo
+    # lote no es un caso real —el bot digita y después aprueba en llamadas separadas, `03` §3— y encima
+    # rompe la llamada entera. Hasta el 2026-09-26 esta prueba lo hacía, y el fallo se leyó tres veces
+    # como un defecto del sistema cuando era del andamio.
+    lote = [{"filaid": uno["filaid"], "resultado": "digitada", "codigo": "OK", "fechaproceso": ahora_utc()}]
     if len(validadas) > 1:
-        lote.append({"filaid": validadas[1]["filaid"], "resultado": "rechazada", "codigo": "RECH-GEN",
+        lote.append({"filaid": validadas[1]["filaid"], "resultado": "rechazada",
+                     "codigo": "NO-EXISTE-ESTE-CODIGO", "mensaje": "PRUEBA: condicion inventada",
+                     "fechaproceso": ahora_utc()})
+    if len(validadas) > 2:
+        lote.append({"filaid": validadas[2]["filaid"], "resultado": "rechazada", "codigo": "RECH-GEN",
                      "mensaje": "PRUEBA: AS400 no acepto", "fechaproceso": ahora_utc()})
     registrar(bot, lote)
     print("   Esperado: la del código inexistente da MPPP-RPA-005 y NO arrastra a las otras.")
