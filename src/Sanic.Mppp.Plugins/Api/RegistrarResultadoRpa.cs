@@ -71,8 +71,13 @@ namespace Sanic.Mppp.Plugins.Api
     ///  - el lote es de 1 a `rpa.lote.maximo` ítems (<see cref="ReglasDelRpa.ExigirLoteAceptable"/>); fuera de ese
     ///    rango se rechaza LA LLAMADA ENTERA (no es un ítem, es <see cref="ArgumentException"/> con
     ///    <see cref="ReglasDelRpa.CodigoLoteGrande"/> o <see cref="ReglasDelRpa.CodigoLoteVacio"/>);
-    ///  - CADA ítem se procesa en su propio `try`: un fallo de un ítem NUNCA sale de acá como excepción (correría en
-    ///    la transacción de la Custom API y revertiría los ítems anteriores). Se atrapa y se anota en su `error`;
+    ///  - CADA ítem se procesa en su propio `try`, pero SOLO para un dato MAL CLASIFICADO por el bot (filaid
+    ///    inexistente, resultado desconocido, fecha inválida, código no mapeado, transición no permitida): eso NUNCA
+    ///    sale de acá como excepción, se atrapa y se anota en su `error` (<see cref="ResultadoRpaException"/>). Una
+    ///    escritura que falla por un motivo REAL de plataforma (concurrencia, otro plugin, un límite) es harina de
+    ///    otro costal: SÍ sale como excepción y tumba la llamada entera — nunca se atrapa un `catch (Exception)`
+    ///    genérico ni un `try/catch` alrededor de una llamada a `OrganizationService` (defecto real, 2026-09-25:
+    ///    ver el comentario grande en <c>ProcesarItem</c>);
     ///  - por ítem: `filaid` tiene que resolver a una Fila real (si no, `MPPP-RPA-001`); `resultado` tiene que ser
     ///    `digitada`, `aprobada`, `rechazada` o `atencionmanual` (si no, `MPPP-RPA-002` — el catálogo de errores del
     ///    contrato no lista `atencionmanual` entre los tres valores válidos de `resultado`, pero la tabla de
@@ -149,7 +154,34 @@ namespace Sanic.Mppp.Plugins.Api
             return new ResultadoDeRegistroRpa(json, items.Count - conError, conError);
         }
 
-        /// <summary>Procesa UN ítem. Nunca deja subir una excepción: cualquier fallo se atrapa y queda en `Error`.</summary>
+        /// <summary>
+        /// Procesa UN ítem. Un dato MAL CLASIFICADO por el bot (filaid inexistente, resultado desconocido, fecha
+        /// sin offset o fuera de tolerancia, código no mapeado, transición no permitida) se decide con funciones
+        /// PURAS antes de escribir nada — <see cref="ReglasDelRpa"/>, <see cref="CatalogoDeCodigosRpa"/>,
+        /// <see cref="TransicionesDeFila.Evaluar"/> — y ACÁ se atrapa, pero SOLO como
+        /// <see cref="ResultadoRpaException"/>: nunca tumba el lote, se reporta en el `error` de ese ítem
+        /// (diseno/03 §3, "Se reporta por lote").
+        ///
+        /// NUNCA agregues acá un `catch (Exception)` genérico, ni un `try/catch` alrededor de NINGUNA llamada a
+        /// `OrganizationService` (`_filas.Registrar*`, `_filas.BuscarParaRegistro`, etc.), aunque parezca "más
+        /// robusto". El 2026-09-25, `herramientas/pruebas/probar_rpa.py --confirmar` contra el ENTORNO REAL (no las
+        /// pruebas: el doble no simula el modelo transaccional de Dataverse) mandó un lote de 3 ítems y la
+        /// plataforma rechazó LA LLAMADA ENTERA con:
+        ///
+        ///   "ISV code reduced the open transaction count. Custom plug-ins should not catch exceptions from
+        ///   OrganizationService calls and continue processing."
+        ///
+        /// Causa: cuando una llamada a `OrganizationService` falla DENTRO de la transacción del plugin, la
+        /// plataforma YA decrementó el contador de transacción; atraparla y seguir corrompe ese estado y voltea la
+        /// llamada completa. Antes de este arreglo, este mismo método tenía un `catch (Exception)` que hacía
+        /// exactamente eso.
+        ///
+        /// La asimetría es a propósito, no una inconsistencia: un ítem mal clasificado es un DATO MALO del bot y se
+        /// responde por ítem; una escritura que FALLA de verdad (concurrencia, otro plugin, un límite de la
+        /// plataforma) es una condición EXCEPCIONAL de verdad y tiene que tumbar la llamada entera — taparla
+        /// dejaría a Dataverse mintiendo sobre lo que en realidad pasó en AS400. Por eso esta excepción se deja
+        /// propagar tal cual, sin atraparla.
+        /// </summary>
         private ItemRegistrado ProcesarItem(ItemCrudoDto crudo, CatalogoDeCodigosRpa codigos, Guid quienLlama, DateTime ahoraUtc, int toleranciaHoras, bool rpaPuedeAprobar)
         {
             Guid? filaId = null;
@@ -158,7 +190,7 @@ namespace Sanic.Mppp.Plugins.Api
             try
             {
                 filaId = LeerFilaId(crudo);
-                actual = LeerFilaActual(filaId.Value);
+                actual = ExigirFilaExistente(filaId.Value);
 
                 var resultado = LeerResultado(crudo);
                 var fechaProcesoUtc = LeerFechaProceso(crudo, ahoraUtc, toleranciaHoras);
@@ -180,14 +212,6 @@ namespace Sanic.Mppp.Plugins.Api
             catch (ResultadoRpaException ex)
             {
                 return new ItemRegistrado(filaId, actual != null ? TextoDeEstado(actual.Estado) : null, true, ex.Message);
-            }
-            catch (Exception)
-            {
-                // Cualquier otra cosa (una falla de plataforma, un bug) NO puede tumbar el lote entero (diseno/03
-                // §3: "el plugin no puede tirar excepción por un ítem"). Sin código: es lo único de la tabla de
-                // errores marcado "sí, reintentar".
-                return new ItemRegistrado(filaId, actual != null ? TextoDeEstado(actual.Estado) : null, true,
-                    "Error interno al procesar este ítem. El equipo técnico ya tiene el detalle.");
             }
         }
 
@@ -218,16 +242,22 @@ namespace Sanic.Mppp.Plugins.Api
             return filaId;
         }
 
-        private FilaParaRegistro LeerFilaActual(Guid filaId)
+        /// <summary>
+        /// `filaid` inexistente es un DATO MALO del bot, no una falla del servicio: por eso usa
+        /// <see cref="FilasDataverse.BuscarParaRegistro"/> (una lectura que devuelve `null` cuando no encuentra
+        /// nada) en vez de <see cref="FilasDataverse.LeerParaRegistro"/> (que propaga la falla del servicio tal
+        /// cual). Acá NO hay ningún `try/catch` alrededor de la llamada a `OrganizationService` — ver el porqué en
+        /// el comentario grande de <see cref="ProcesarItem"/>.
+        /// </summary>
+        private FilaParaRegistro ExigirFilaExistente(Guid filaId)
         {
-            try
-            {
-                return _filas.LeerParaRegistro(filaId);
-            }
-            catch (System.ServiceModel.FaultException<Microsoft.Xrm.Sdk.OrganizationServiceFault>)
+            var actual = _filas.BuscarParaRegistro(filaId);
+            if (actual == null)
             {
                 throw new ResultadoRpaException(CodigoFilaInexistente, "La fila no existe.");
             }
+
+            return actual;
         }
 
         private static string LeerResultado(ItemCrudoDto crudo)

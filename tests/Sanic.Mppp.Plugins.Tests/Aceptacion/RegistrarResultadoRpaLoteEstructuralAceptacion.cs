@@ -231,6 +231,35 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             // FALLA para un filaid inexistente y esa falla se atrapa adentro del plugin.
             Assert.Equal(0, svc.RetrievesQueFallaron);
         }
+
+        /// <summary>
+        /// La asimetría que pidió el aprobador, 2026-09-25: un ítem MAL CLASIFICADO por el bot (los 6 casos de
+        /// arriba) es un dato malo y se responde por ítem; una ESCRITURA que falla por un motivo real de
+        /// plataforma (concurrencia, otro plugin, un límite) es una condición excepcional DE VERDAD y tiene que
+        /// TUMBAR LA LLAMADA ENTERA — nunca convertirse en un "error interno" más, disfrazado de error por ítem.
+        ///
+        /// <see cref="ServicioQueFallaEnEscritura"/> simula esa falla real (un `Update` que tira, como cualquier
+        /// conflicto de concurrencia de Dataverse) sobre el ítem del medio. Hoy el `catch (Exception)` genérico de
+        /// `ProcesarItem` se la traga: por eso este assert está ROJO.
+        /// </summary>
+        [Fact]
+        public void Una_escritura_que_falla_por_un_motivo_real_de_plataforma_tumba_la_llamada_entera_y_no_se_disfraza_de_error_por_item()
+        {
+            var interno = ArmarServicioBase();
+            var buena1 = SembrarFila(interno, EstadoDeLaFila.Validada);
+            var fallaAlEscribir = SembrarFila(interno, EstadoDeLaFila.Validada);
+            var buena2 = SembrarFila(interno, EstadoDeLaFila.Validada);
+            var svc = new ServicioQueFallaEnEscritura(interno, fallaAlEscribir);
+
+            Assert.Throws<FaultException<OrganizationServiceFault>>(() => Core(svc).Ejecutar(
+                Lote(Item(buena1, "digitada"), Item(fallaAlEscribir, "digitada"), Item(buena2, "digitada")),
+                ElBot, Ahora, 24, false));
+
+            // buena1 se procesó (y escribió) ANTES de la falla: eso queda. buena2 nunca se llegó a procesar,
+            // porque la falla tumbó la llamada entera en vez de dejar que el lote "siguiera de largo".
+            Assert.Equal((int)EstadoDeLaFila.Digitada, EstadoDe(interno, buena1));
+            Assert.Equal((int)EstadoDeLaFila.Validada, EstadoDe(interno, buena2));
+        }
     }
 
     /// <summary>
@@ -296,5 +325,51 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Interno.Disassociate(entityName, entityId, relationship, relatedEntities);
 
         public EntityCollection RetrieveMultiple(QueryBase query) => Interno.RetrieveMultiple(query);
+    }
+
+    /// <summary>
+    /// Simula una escritura que falla por un motivo REAL de plataforma (concurrencia, otro plugin, un límite) sobre
+    /// UN filaid puntual: un `Update` que tira <see cref="FaultException{OrganizationServiceFault}"/>, como
+    /// cualquier conflicto real de Dataverse. Todo lo demás lo delega sin tocar, igual que
+    /// <see cref="ServicioEspiaDeEscrituras"/>.
+    /// </summary>
+    internal sealed class ServicioQueFallaEnEscritura : IOrganizationService
+    {
+        private readonly OrganizationServiceEnMemoria _interno;
+        private readonly Guid _filaIdQueFalla;
+
+        internal ServicioQueFallaEnEscritura(OrganizationServiceEnMemoria interno, Guid filaIdQueFalla)
+        {
+            _interno = interno ?? throw new ArgumentNullException(nameof(interno));
+            _filaIdQueFalla = filaIdQueFalla;
+        }
+
+        public Guid Create(Entity entity) => _interno.Create(entity);
+
+        public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _interno.Retrieve(entityName, id, columnSet);
+
+        public void Update(Entity entity)
+        {
+            if (entity.Id == _filaIdQueFalla)
+            {
+                throw new FaultException<OrganizationServiceFault>(
+                    new OrganizationServiceFault { Message = "Simulación de prueba: conflicto real de concurrencia en Dataverse." },
+                    new FaultReason("Simulación de prueba: conflicto real de concurrencia en Dataverse."));
+            }
+
+            _interno.Update(entity);
+        }
+
+        public void Delete(string entityName, Guid id) => _interno.Delete(entityName, id);
+
+        public OrganizationResponse Execute(OrganizationRequest request) => _interno.Execute(request);
+
+        public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) =>
+            _interno.Associate(entityName, entityId, relationship, relatedEntities);
+
+        public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) =>
+            _interno.Disassociate(entityName, entityId, relationship, relatedEntities);
+
+        public EntityCollection RetrieveMultiple(QueryBase query) => _interno.RetrieveMultiple(query);
     }
 }

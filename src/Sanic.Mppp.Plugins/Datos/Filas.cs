@@ -167,15 +167,45 @@ namespace Sanic.Mppp.Plugins.Datos
             _servicio.Update(new Entity(TablasHistorico.Fila, filaId) { ["sanic_claimhasta"] = claimHasta });
         }
 
+        private static readonly string[] ColumnasParaRegistro = { "sanic_estado", "sanic_digitadapor", "sanic_requiereatencionmanual" };
+
         /// <summary>Lo mínimo de la Fila para decidir un resultado de `registrarresultadorpa`. Un `filaId` que no existe
-        /// propaga la falla del servicio tal cual (quien llama la traduce a `MPPP-RPA-001`).</summary>
+        /// propaga la falla del servicio tal cual (`Retrieve` por id). Sigue así porque <see cref="FilasDataverseAceptacion"/>
+        /// ya fija ese contrato; quien necesita resolver la ausencia SIN excepción (`registrarresultadorpa`, desde el
+        /// defecto real de 2026-09-25) usa <see cref="BuscarParaRegistro"/>, no este método.</summary>
         public FilaParaRegistro LeerParaRegistro(Guid filaId)
         {
             ValidarFilaId(filaId);
 
-            var registro = _servicio.Retrieve(TablasHistorico.Fila, filaId,
-                new ColumnSet("sanic_estado", "sanic_digitadapor", "sanic_requiereatencionmanual"));
+            var registro = _servicio.Retrieve(TablasHistorico.Fila, filaId, new ColumnSet(ColumnasParaRegistro));
+            return ConvertirParaRegistro(registro);
+        }
 
+        /// <summary>
+        /// Lo mismo que <see cref="LeerParaRegistro"/>, pero un `filaId` que no existe devuelve `null` en vez de
+        /// propagar la falla del servicio: usa `RetrieveMultiple` (una consulta que no encuentra nada devuelve
+        /// vacío, NUNCA tira) en vez de `Retrieve` por id.
+        ///
+        /// Por qué existe un método aparte. El defecto real de 2026-09-25 (ver el comentario grande en
+        /// <c>RegistrarResultadoRpa.ProcesarItem</c>) fue justamente un `try/catch` alrededor de una llamada a
+        /// `OrganizationService` que sí puede fallar (`Retrieve` por id). La regla nueva es que ESE plugin nunca
+        /// atrape una excepción del servicio — así que necesita una lectura que, ante una Fila inexistente, no
+        /// tenga nada que atrapar. `LeerParaRegistro` sigue existiendo tal cual (con su propio contrato y sus
+        /// propias pruebas) para quien sí quiera que una Fila inexistente sea una falla dura.
+        /// </summary>
+        public FilaParaRegistro BuscarParaRegistro(Guid filaId)
+        {
+            ValidarFilaId(filaId);
+
+            var consulta = new QueryExpression(TablasHistorico.Fila) { ColumnSet = new ColumnSet(ColumnasParaRegistro) };
+            consulta.Criteria.AddCondition(TablasHistorico.Fila + "id", ConditionOperator.Equal, filaId);
+
+            var registro = _servicio.RetrieveMultiple(consulta).Entities.FirstOrDefault();
+            return registro == null ? null : ConvertirParaRegistro(registro);
+        }
+
+        private static FilaParaRegistro ConvertirParaRegistro(Entity registro)
+        {
             return new FilaParaRegistro
             {
                 Estado = (EstadoDeLaFila)registro.GetAttributeValue<OptionSetValue>("sanic_estado").Value,
