@@ -128,6 +128,22 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void Un_campo_de_texto_NULO_viaja_como_cadena_vacia_y_no_como_null()
+        {
+            // Una columna opcional de Dataverse llega nula con toda naturalidad (DD-01: si el valor recibido
+            // no era valido, la columna queda VACIA). El bot tiene que recibir siempre la misma forma: un
+            // `null` de JSON lo obligaria a ramificar por cada campo, y el dia que se olvide de uno revienta
+            // del otro lado, en un proceso que mantiene otro equipo.
+            var fila = Fila();
+            fila.NombreBeneficiario = null;
+            fila.ReferenciaRecibida = null;
+            var json = Uno(fila).Replace(" ", "");
+            Assert.Contains("\"nombrebeneficiario\":\"\"", json);
+            Assert.Contains("\"referenciarecibida\":\"\"", json);
+            Assert.DoesNotContain("null", json);
+        }
+
+        [Fact]
         public void Dos_filas_son_dos_elementos()
         {
             var json = ArmadorJsonDelRpa.Serializar(new[] { Fila(), Fila() });
