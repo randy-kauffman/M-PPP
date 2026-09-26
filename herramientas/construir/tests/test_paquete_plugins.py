@@ -4,11 +4,13 @@ mentira en un directorio temporal.
 """
 import base64
 import copy
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+import zipfile
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _AQUI)
@@ -40,7 +42,43 @@ COMPONENTE = {
 
 PAQUETE_ID = "33333333-3333-3333-3333-333333333333"
 ASM_ID = "44444444-4444-4444-4444-444444444444"
-BYTES_NUPKG = b"PK\x03\x04 esto hace de .nupkg"
+
+
+def _dll_de_mentira(tipos):
+    """Bytes de un ".dll" de juguete que "trae" esos tipos: el nombre de clase
+    (el último tramo del tipo completo) aparece como cadena terminada en NUL,
+    igual que el heap #Strings de la metadata .NET — sin necesidad de un
+    ensamblado real para probar la verificación por contenido (D-57 b)."""
+    cuerpo = b"esto hace de cabecera de un PE de mentira"
+    for t in tipos:
+        clase = t.rsplit(".", 1)[-1]
+        cuerpo += clase.encode("utf-8") + b"\x00"
+    return cuerpo
+
+
+def _nupkg_de_mentira(tipos, nombre_dll="Sanic.Mppp.Plugins.dll", con_dll=True):
+    """Un .nupkg de verdad (es un .zip) con un .dll de mentira adentro, para
+    poder probar que la verificación abre el paquete y mira el contenido del
+    ensamblado en vez de confiar en la fecha del archivo."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        if con_dll:
+            z.writestr(f"lib/net462/{nombre_dll}", _dll_de_mentira(tipos))
+        z.writestr("SanicMpppPlugins.nuspec", "<package></package>")
+    return buf.getvalue()
+
+
+# Hasta el 2026-09-25 esto era `b"PK\x03\x04 esto hace de .nupkg"`: un relleno
+# que alcanzaba porque NADIE lo leía. D-57(b) (2026-09-26) hizo que
+# `paquete_plugins.py` abra el .nupkg como el .zip que es y mire el contenido
+# del .dll de adentro, así que el relleno dejó de alcanzar. Ahora es un .zip
+# VÁLIDO de verdad, con un `lib/net462/Sanic.Mppp.Plugins.dll` que trae los
+# tipos de `COMPONENTE["tipos"]` — así todas las pruebas que ya subían este
+# fixture (alta, HTTP inesperado, etc.) siguen andando sin que nadie tenga que
+# enterarse de la verificación nueva. Si esto vuelve a ser bytes cualquiera,
+# las pruebas de `ContenidoDelNupkg` quedan de decorado: dejan de probar nada
+# porque el .nupkg real (con datos completos) sería indistinguible del roto.
+BYTES_NUPKG = _nupkg_de_mentira(COMPONENTE["tipos"])
 
 
 def comp(**cambios):
@@ -214,6 +252,69 @@ class PaqueteEnDisco(Base):
 
 
 # ---------------------------------------------------------------------------
+# El contenido del .nupkg (D-57 b, 2026-09-25): `dotnet pack` puede terminar
+# con éxito sin regenerar el .nupkg si MSBuild da `GenerateNuspec` por
+# "up-to-date" contra una caché de `obj/` vieja. Una fecha dice que el archivo
+# se escribió; solo el contenido dice qué tiene adentro. Por eso se abre el
+# .nupkg como el .zip que es, se extrae el .dll y se comprueba que los tipos
+# que el playbook declara están de verdad adentro, ANTES de subir nada.
+# ---------------------------------------------------------------------------
+class ContenidoDelNupkg(Base):
+    def test_si_al_dll_le_falta_un_tipo_declarado_queda_bloqueado_y_no_sube_nada(self):
+        # El caso real del 2026-09-25: el .nupkg se "armó" pero con el .dll
+        # viejo, sin las clases nuevas.
+        self.escribir_nupkg(_nupkg_de_mentira(COMPONENTE["tipos"][:-1]))  # falta ListaBlancaStep
+        ruta = self.escribir_playbook()
+        cliente = self.armar(ClienteSimulado(), paquete=None)
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("bloqueado", estado, detalle)
+        self.assertIn("Sanic.Mppp.Plugins.Steps.ListaBlancaStep", detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_si_al_dll_no_le_falta_ningun_tipo_declarado_se_sube_normalmente(self):
+        self.escribir_nupkg(_nupkg_de_mentira(COMPONENTE["tipos"]))
+        ruta = self.escribir_playbook()
+        cliente = ClienteSimulado()
+        respuestas = [(200, {"value": []}, {}), (200, {"value": [fila_paquete()]}, {})]
+        cliente.responder(
+            "GET", es_ruta_paquetes,
+            lambda r, c, s: respuestas.pop(0) if respuestas else (200, {"value": [fila_paquete()]}, {}),
+        )
+        self.armar(cliente, paquete=fila_paquete())
+        cliente.responder("POST", "pluginpackages", (204, {}, {"OData-EntityId": f"x(  {PAQUETE_ID})"}))
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("creado", estado, detalle)
+
+    def test_un_nupkg_sin_ningun_dll_adentro_queda_bloqueado(self):
+        self.escribir_nupkg(_nupkg_de_mentira(COMPONENTE["tipos"], con_dll=False))
+        ruta = self.escribir_playbook()
+        cliente = self.armar(ClienteSimulado(), paquete=None)
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("bloqueado", estado, detalle)
+        self.assertIn(".dll", detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_un_nupkg_que_no_es_un_zip_valido_queda_bloqueado_no_error(self):
+        # No es forma inesperada de la plataforma: es la señal de que
+        # `dotnet pack` no regeneró el archivo (D-57 b).
+        self.escribir_nupkg(b"esto no es un zip, aunque pese y exista")
+        ruta = self.escribir_playbook()
+        cliente = self.armar(ClienteSimulado(), paquete=None)
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("bloqueado", estado, detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_actualizar_contenido_tambien_verifica_el_dll_antes_del_patch(self):
+        self.escribir_nupkg(_nupkg_de_mentira(COMPONENTE["tipos"][:-1]))
+        ruta = self.escribir_playbook()
+        cliente = self.armar(ClienteSimulado(), paquete=fila_paquete())
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente, actualizar_contenido=True)
+        self.assertEqual("bloqueado", estado, detalle)
+        self.assertIn("Sanic.Mppp.Plugins.Steps.ListaBlancaStep", detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+
+# ---------------------------------------------------------------------------
 # Contra el entorno
 # ---------------------------------------------------------------------------
 class ContraElEntorno(Base):
@@ -288,6 +389,39 @@ class ContraElEntorno(Base):
         self.assertIn("Sanic.Mppp.Plugins.Steps.ListaBlancaStep", detalle)
         self.assertIn("no registró estos tipos", detalle)
 
+    def test_un_tipo_registrado_que_el_playbook_no_declara_se_denuncia_como_sobrante(self):
+        # D-57(c), 2026-09-25: `RevisionAtendidaStep` es una derivación previa del
+        # 2026-09-23 que sigue viva en el entorno y el playbook no la declara.
+        # Es la misma lección del ribbon (2026-09-24): verificar solo lo que
+        # FALTA miente si algo sobra.
+        self.escribir_nupkg()
+        ruta = self.escribir_playbook()
+        extra = "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep"
+        cliente = self.armar(ClienteSimulado(), paquete=fila_paquete(), tipos=COMPONENTE["tipos"] + [extra])
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)
+        self.assertIn(extra, detalle)
+        self.assertIn("sobran", detalle)
+
+    def test_solo_verificar_tambien_denuncia_los_tipos_sobrantes(self):
+        self.escribir_nupkg()
+        ruta = self.escribir_playbook()
+        extra = "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep"
+        cliente = self.armar(ClienteSimulado(), paquete=fila_paquete(), tipos=COMPONENTE["tipos"] + [extra])
+        estado, _, detalle = pp.construir(ruta, True, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)
+        self.assertIn(extra, detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_sin_tipos_sobrantes_no_se_denuncia_nada_de_mas(self):
+        # Que la denuncia de sobrantes no dispare falsos positivos cuando el
+        # entorno tiene EXACTAMENTE lo que el playbook declara.
+        self.escribir_nupkg()
+        ruta = self.escribir_playbook()
+        cliente = self.armar(ClienteSimulado(), paquete=fila_paquete(), tipos=COMPONENTE["tipos"])
+        estado, _, detalle = pp.construir(ruta, False, lambda: cliente)
+        self.assertEqual("ya_existia", estado, detalle)
+
     def test_un_paquete_sin_ensamblados_se_denuncia_con_la_lista_vacia(self):
         self.escribir_nupkg()
         ruta = self.escribir_playbook()
@@ -323,7 +457,11 @@ class ContraElEntorno(Base):
         self.assertFalse(cliente.hubo_escritura())
 
     def test_actualizar_contenido_hace_patch_del_content_y_nada_mas(self):
-        self.escribir_nupkg(b"PK\x03\x04 version nueva")
+        # `nuevo` tiene que ser un .nupkg real (D-57 b): con `--actualizar-contenido`
+        # se lee y se verifica igual que en el alta, así que un literal cualquiera
+        # ya no alcanza.
+        nuevo = _nupkg_de_mentira(COMPONENTE["tipos"])
+        self.escribir_nupkg(nuevo)
         ruta = self.escribir_playbook()
         cliente = self.armar(ClienteSimulado(), paquete=fila_paquete())
         cliente.responder("PATCH", lambda r: r.startswith("pluginpackages("), (204, {}, {}))
@@ -334,11 +472,14 @@ class ContraElEntorno(Base):
         patches = [l for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(1, len(patches))
         self.assertEqual({"content"}, set(patches[0]["cuerpo"]))
-        self.assertEqual(base64.b64encode(b"PK\x03\x04 version nueva").decode("ascii"), patches[0]["cuerpo"]["content"])
+        self.assertEqual(base64.b64encode(nuevo).decode("ascii"), patches[0]["cuerpo"]["content"])
         self.assertEqual(f"pluginpackages({PAQUETE_ID})", patches[0]["ruta"])
 
     def test_sin_la_bandera_no_se_actualiza_el_contenido_aunque_el_nupkg_haya_cambiado(self):
-        self.escribir_nupkg(b"PK\x03\x04 version nueva")
+        # No hace falta que este .nupkg sea válido para que la prueba pase (esta
+        # rama nunca lo lee), pero se deja igual como zip real: que ningún
+        # literal `b"PK\x03\x04..."` de relleno quede para copiar (D-57 b).
+        self.escribir_nupkg(_nupkg_de_mentira(COMPONENTE["tipos"]))
         ruta = self.escribir_playbook()
         cliente = self.armar(ClienteSimulado(), paquete=fila_paquete())
         estado, _, _ = pp.construir(ruta, False, lambda: cliente)

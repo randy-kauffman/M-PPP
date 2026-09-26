@@ -240,6 +240,27 @@ class ValidacionOffline(Base):
     def test_pasos_de_terceros_se_nombra_no_se_numera(self):
         self.rechaza(comp(pasosdeterceros="0"), "no es válido")
 
+    def test_la_descripcion_de_una_salida_respeta_el_tope_de_100_caracteres(self):
+        # D-57(a), 2026-09-25: `customapiresponseproperty.description` tiene tope de 100
+        # (Learn) y la herramienta no lo validaba offline; el largo de más llegaba como
+        # HTTP 400 DESPUÉS de crear la API, dejándola a medias (creada, con sus entradas,
+        # sin ninguna salida).
+        larga = "a" * 101
+        malo = comp(salida=[dict(COMPONENTE["salida"][0], descripcion=larga)])
+        self.rechaza(malo, "el máximo de la columna customapiresponseproperty.description es 100")
+
+    def test_la_descripcion_de_una_salida_de_exactamente_100_caracteres_se_acepta(self):
+        justo = "a" * 100
+        bueno = comp(salida=[dict(COMPONENTE["salida"][0], descripcion=justo)])
+        self.acepta(bueno)
+
+    def test_la_descripcion_de_una_entrada_no_tiene_tope_de_longitud(self):
+        # D-57(a): a diferencia de la salida, `customapirequestparameter.description` NO
+        # tiene tope documentado en Learn. No hay que inventarle uno.
+        larga = "a" * 500
+        bueno = comp(entrada=[dict(COMPONENTE["entrada"][0], descripcion=larga)])
+        self.acepta(bueno)
+
     def test_el_nombre_largo_del_parametro_se_calcula_no_se_escribe(self):
         self.assertEqual(
             "sanic_mppp_capiip_validarsolicitud_solicitudid",

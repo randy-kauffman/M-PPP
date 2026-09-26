@@ -71,6 +71,10 @@ TIPOS_CON_TABLA_ENTRADA = {"Entity", "EntityCollection", "EntityReference"}
 
 LARGO_UNIQUENAME = 128
 LARGO_NOMBRE = 256
+# Learn, tabla CustomAPIResponseProperty (verificado 2026-09-26). D-57(a):
+# `customapirequestparameter.description` NO tiene tope documentado — a
+# propósito no se le inventa uno acá.
+LARGO_DESCRIPCION_SALIDA = 100
 
 MENSAJE_FALLO_CLIENTE = (
     "no se pudo inicializar el cliente de Dataverse (fallo de red o de credenciales); "
@@ -158,6 +162,15 @@ def _validar_parametro(p, indice, claves, es_salida, vistos):
             f"{donde}: tipo = {p['tipo']!r} necesita `logicalentityname`, que este playbook no sabe declarar todavía"
         )
     exigir_sin_tildes(p["displayname"], f"{donde}.displayname")
+    # D-57(a), 2026-09-25: `customapiresponseproperty.description` tiene tope de 100 (Learn) y esta
+    # herramienta no lo validaba offline, así que el largo de más llegaba como HTTP 400 DESPUÉS de
+    # crear la API, dejándola a medias (creada, con sus entradas, sin ninguna salida). El parámetro de
+    # entrada NO tiene ese tope documentado: no se le inventa uno.
+    if es_salida and len(p["descripcion"]) > LARGO_DESCRIPCION_SALIDA:
+        raise ErrorPlaybook(
+            f"{donde}: descripcion tiene {len(p['descripcion'])} caracteres; "
+            f"el máximo de la columna customapiresponseproperty.description es {LARGO_DESCRIPCION_SALIDA}"
+        )
 
 
 def _validar_estructura(datos, identidad):

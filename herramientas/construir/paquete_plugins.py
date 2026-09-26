@@ -26,8 +26,10 @@ Lo único que se puede actualizar es el contenido, y solo si se lo piden con
 (creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import base64
+import io
 import os
 import sys
+import zipfile
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _RAIZ = os.path.dirname(os.path.dirname(_AQUI))
@@ -161,10 +163,48 @@ def validar_playbook(datos, identidad):
     _validar_estructura(datos, identidad)
 
 
-def leer_nupkg(ruta_relativa):
+def _tipos_faltantes_en_dll(crudo, tipos_declarados):
+    """Abre el .nupkg como el .zip que es, junta el contenido de todos los
+    `.dll` bajo `lib/` y busca ahí el nombre de clase (último tramo del tipo
+    completo) como cadena terminada en NUL — así se ve en el heap `#Strings`
+    de la metadata .NET, sin necesidad de un parser de IL completo.
+
+    Devuelve la lista de tipos declarados que NO aparecen. Lanza `Bloqueado`
+    si el archivo no es un .zip válido o si no trae ningún .dll: en los dos
+    casos no tiene sentido seguir, porque no hay contenido que comparar.
+
+    Por qué por CONTENIDO y no por fecha (D-57 b, 2026-09-25): MSBuild puede
+    dar `GenerateNuspec` por "up-to-date" contra una caché de `obj/`
+    desactualizada, y entonces `dotnet pack` termina con éxito sin regenerar
+    el `.nupkg` de verdad. `dotnet clean` no lo arregla porque `Pack` no es
+    parte de ese target. Eso hizo que se subiera un paquete sin las clases
+    nuevas y se midiera código viejo durante un día entero. Una fecha dice que
+    el archivo se escribió; solo el contenido dice qué tiene adentro."""
+    try:
+        paquete = zipfile.ZipFile(io.BytesIO(crudo))
+    except zipfile.BadZipFile:
+        raise Bloqueado(
+            "el .nupkg no es un .zip válido; es la señal de que `dotnet pack` no lo regeneró "
+            "(MSBuild puede dar `GenerateNuspec` por \"up-to-date\" contra una caché de `obj/` vieja: "
+            "borrá `obj/` y `bin/` a mano y volvé a empaquetar)"
+        )
+    with paquete:
+        dlls = [n for n in paquete.namelist() if n.startswith("lib/") and n.lower().endswith(".dll")]
+        if not dlls:
+            raise Bloqueado(
+                "el .nupkg no trae ningún .dll bajo 'lib/'; no se puede verificar que traiga los tipos "
+                "que el playbook declara"
+            )
+        contenido = b"".join(paquete.read(n) for n in dlls)
+    return [t for t in tipos_declarados if t.rsplit(".", 1)[-1].encode("utf-8") + b"\x00" not in contenido]
+
+
+def leer_nupkg(ruta_relativa, tipos_declarados):
     """Lee el .nupkg de la raíz del repositorio y lo devuelve en base64, que es
     como viaja en la columna `content`. Lanza `Bloqueado` si no está armado:
-    no es un error del playbook, es que falta correr `dotnet pack`."""
+    no es un error del playbook, es que falta correr `dotnet pack`. También
+    lanza `Bloqueado` si el .dll de adentro no trae alguno de los `tipos`
+    declarados: subirlo así sube un paquete que no sirve para nada."""
     ruta = os.path.join(_RAIZ, ruta_relativa)
     if not os.path.isfile(ruta):
         raise Bloqueado(
@@ -179,6 +219,14 @@ def leer_nupkg(ruta_relativa):
         raise Bloqueado(
             f"el paquete '{ruta_relativa}' pesa {len(crudo)} bytes, más que el tope de {MAXIMO_BYTES_NUPKG}; "
             "casi siempre significa que se coló un ensamblado que ya vive en el sandbox (el SDK de Dataverse)"
+        )
+    faltan = _tipos_faltantes_en_dll(crudo, tipos_declarados)
+    if faltan:
+        raise Bloqueado(
+            f"el paquete '{ruta_relativa}' no trae estos tipos declarados en el playbook: {faltan}. "
+            "Es la señal de que `dotnet pack` no regeneró el .nupkg (MSBuild puede dar `GenerateNuspec` "
+            "por \"up-to-date\" contra una caché de `obj/` vieja): borrá `obj/` y `bin/` a mano y volvé "
+            "a empaquetar."
         )
     return crudo, base64.b64encode(crudo).decode("ascii")
 
@@ -259,6 +307,17 @@ def _verificar(dv, datos, solution_id, paquete):
             f"la plataforma no registró estos tipos de plugin: {faltan}. "
             f"Ensamblados del paquete: {ensamblados or 'ninguno'}. Tipos registrados: {sorted(tipos) or 'ninguno'}"
         )
+    # Es la misma lección del ribbon (2026-09-24, D-58): una verificación que
+    # solo mira lo que FALTA miente si algo sobra. `RevisionAtendidaStep`
+    # (D-57 c) es justamente eso: un tipo de una derivación previa que quedó
+    # registrado en el entorno sin que ningún playbook lo declarara nunca.
+    sobran = sorted(set(tipos) - set(datos["tipos"]))
+    if sobran:
+        difs.append(
+            f"la plataforma tiene tipos de plugin registrados que el playbook no declara (sobran): {sobran}. "
+            "Puede ser una derivación previa: agregalos a `tipos` si siguen sirviendo, o borrá el step/Custom "
+            "API que apunte a ellos y después el tipo, si ya no sirven"
+        )
 
     componente = _componente_de_la_solucion(dv, solution_id, paquete_id)
     if componente is None:
@@ -278,7 +337,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, actualizar_contenido, 
     if paquete is None:
         if solo_verificar:
             return "difiere", componente, f"el paquete '{datos['uniquename']}' no existe en el entorno"
-        crudo, contenido = leer_nupkg(datos["nupkg"])
+        crudo, contenido = leer_nupkg(datos["nupkg"], datos["tipos"])
         cuerpo = {
             "name": datos["nombre"],
             "uniquename": datos["uniquename"],
@@ -296,7 +355,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, actualizar_contenido, 
     else:
         accion = "ya_existia"
         if actualizar_contenido and not solo_verificar:
-            crudo, contenido = leer_nupkg(datos["nupkg"])
+            crudo, contenido = leer_nupkg(datos["nupkg"], datos["tipos"])
             paquete_id = exigir_forma(paquete.get("pluginpackageid"), str, C_PAQUETE, "pluginpackageid", no_vacio=True)
             print(f"Actualizo el contenido del paquete: {len(crudo)} bytes ({len(contenido)} en base64).", flush=True)
             est, resp, _ = escribir_metadatos(

@@ -48,7 +48,8 @@ dotnet pack src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj -c 
     "Sanic.Mppp.Plugins.Steps.PostTransicionDeFilaStep",
     "Sanic.Mppp.Plugins.Steps.AtenderPorClasificarStep",
     "Sanic.Mppp.Plugins.Api.ObtenerFilasPendientesApi",
-    "Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi"
+    "Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi",
+    "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep"
   ]
 }
 ```
