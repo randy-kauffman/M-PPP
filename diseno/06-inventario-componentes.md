@@ -209,7 +209,18 @@ Desaparece el Flow B de la definición (`07` DF-01). Los hijos se construyen ant
 | 13.5 | Usuario de aplicación del RPA | | 2 |
 | 13.6 | Usuario de aplicación del histórico e infraestructura Azure | Administrador de Azure | 3 |
 
-### 13.7.1 Prerrequisito de migración: ejercitar el mecanismo de D-8 antes de depender de él
+### 13.7.1 Prerrequisito de migración: ejercitar el mecanismo de D-8 — **HECHO EN DEV el 2026-09-26**
+
+**El mecanismo existe y está verificado en Dev**: equipo `MPPP - Ejecutivos` (`teamtype = 2`, equipo de grupo de Entra ID) asociado al perfil `CSP - MPPP - Datos sensibles`. Se comprueba así, **desde el lado del EQUIPO**:
+
+```
+GET teams({teamid})/teamprofiles_association?$select=name
+  -> ['CSP - MPPP - Datos sensibles']
+```
+
+> **Ojo con cómo se verifica, porque miente en silencio.** La MISMA navegación `teamprofiles_association` consultada **desde el lado del PERFIL** devuelve **200 con lista vacía**, que se lee igual que "no hay ningún equipo". El 2026-09-26 esa lectura llevó a afirmar que D-8 no estaba hecho cuando sí lo estaba. **Una consulta que devuelve vacío se verifica desde el otro lado antes de convertirla en una afirmación.** Es la misma familia que el `$filter` que devolvía 200 vacío sobre la app (2026-09-23).
+
+Lo que queda para cada entorno nuevo es **ejecutar la cadena**, no diseñarla:
 
 En **Desarrollo, 13.7 no hace falta**: nadie necesita leer `sanic_numeroidentificacion` ni
 `sanic_numerocuenta` ahí, y durante la fase 1 se trabajó con `User1` y `User2` asignados **directo**
@@ -227,7 +238,7 @@ ese día, con la gente esperando. Por eso la prueba de punta a punta es parte de
 5. Si en ese entorno quedaron usuarios asignados directo al perfil, **quitarlos**: mientras estén,
    tapan si el mecanismo real funciona o no.
 
-Los pasos 3 y 4 son la tarea. Los dos primeros son clics.
+Los pasos 3 y 4 son la tarea. Los dos primeros son clics. **En Dev los cuatro ya se hicieron**; en Test y Producción hay que repetirlos.
 
 ### 13.8 Instalación en un entorno nuevo — el procedimiento completo
 
