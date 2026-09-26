@@ -34,10 +34,12 @@ Mismo criterio en Solicitud para los humanos: solo `sanic_requiererevision` (el 
 | Fila | R W Ap : O | R W Ap : O | — | — |
 | ResultadoRegla | R:O | R:O | — | — |
 | Bitacora | R:O | R:O | — | — |
+| MotivoAccion | **C R W D : U** | **C R W D : U** | — | — |
 | CorridaHistorico (fase 3) | — | — | — | R:O |
 | **Borrado** en cualquier tabla | — | — | — | — |
 
-- **Nadie borra.** Los catálogos se desactivan (`W` alcanza para cambiar el estado); la unidad histórica solo la purga el job nativo (D-35).
+- **`MotivoAccion` es la única tabla donde un humano BORRA, y es a propósito** (verificado contra el entorno el 2026-09-26: Ejecutivo y Supervisor con `C R W D` en alcance **usuario**). No es una tabla de negocio: es el **transporte** del diálogo de motivo (`05` DA-03). Se crea un registro, el comando lee el texto y el registro se descarta. Alcance **usuario** y no organización: cada quien toca solo el suyo. Por eso su `D` **no contradice** el "nadie borra" de abajo, que se declara sobre las tablas de negocio y sobre la unidad histórica. Hasta el 2026-09-26 esta tabla no figuraba en la matriz y, como la matriz es la fuente contra la que se verifica, esos privilegios se leían como privilegio de más (D-48).
+- **Nadie borra** en las tablas de negocio ni en la unidad histórica. Los catálogos se desactivan (`W` alcanza para cambiar el estado); la unidad histórica solo la purga el job nativo (D-35).
 - Ejecutivo y Supervisor tienen exactamente los mismos privilegios sobre Fila; lo que los distingue es **qué transición les deja hacer el plugin** según su rol. Son **mutuamente excluyentes por usuario** (D-25): el plugin rechaza toda transición de un usuario que tenga los dos roles. Lo mismo vale para cualquier combinación que incluya al RPA (D-11, 2026-09-21): el RPA es una identidad de aplicación aparte, y si además trae un rol humano es una mala configuración; falla cerrado y no transiciona nada hasta que se corrija.
 - "Mis clientes" es una **vista**, no un permiso (RF-19, D-13): Fila → Plan → Cliente con `ownerid = usuario actual`. Todos leen todo a nivel O para cubrir ausencias.
 - El Administrador de planes **no** ve Filas ni datos sensibles: administra catálogos, no gestiones (RF-11, D-37).
