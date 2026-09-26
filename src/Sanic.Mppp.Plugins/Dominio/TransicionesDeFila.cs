@@ -31,6 +31,22 @@ namespace Sanic.Mppp.Plugins.Dominio
 
         /// <summary>Parámetro `rpa.puedeaprobar` (por defecto, no).</summary>
         public bool RpaPuedeAprobar { get; set; }
+
+        /// <summary>
+        /// `sanic_claimhasta` de la fila ANTES de esta transición (diseno/03 §2, "El claim: reserva con
+        /// vencimiento"). `null` = nunca se reservó = libre. El claim frena a las PERSONAS, nunca al bot.
+        /// </summary>
+        public DateTime? ClaimHasta { get; set; }
+
+        /// <summary>El "ahora" del pipeline (mismo instante que <c>PlomeriaDeFila.AhoraUtc</c>), para decidir con <see cref="ReglasDelRpa.ClaimVigente"/> si el claim sigue vigente.</summary>
+        public DateTime Ahora { get; set; }
+
+        /// <summary>
+        /// `true` si quien pide la transición es código de servidor (el bot, vía SYSTEM anidado o identidad de
+        /// aplicación — <c>Steps.BaseDeStep.EsCodigoDeServidor</c>). El claim nunca frena a quien reporta como
+        /// código de servidor (diseno/03 §2: "el claim NO frena al bot cuando reporta").
+        /// </summary>
+        public bool EsCodigoDeServidor { get; set; }
     }
 
     /// <summary>Lo que el step tiene que hacer con las columnas de quién y cuándo, si la transición se permite.</summary>
@@ -78,6 +94,44 @@ namespace Sanic.Mppp.Plugins.Dominio
         private const string MensajeAmbosRoles = "Un usuario con los roles de Ejecutivo y de Supervisor no puede hacer ninguna transición (D-25).";
         private const string MensajeSinDigitador = "No se puede aprobar una fila sin saber quién la digitó.";
         private const string MensajeMismoDigitador = "Quien digitó la fila no puede aprobarla: falta la segregación de funciones.";
+
+        /// <summary>
+        /// El mensaje de rechazo cuando el claim está vigente (diseno/03 §2). Dice CUÁNTO FALTA, nunca UNA HORA
+        /// (decisión del aprobador, 2026-09-25).
+        ///
+        /// Por qué. `Ahora` y `ClaimHasta` llegan siempre en UTC (el plugin los lee con `Retrieve` y con el reloj
+        /// del contexto). Nicaragua es UTC-6: un claim que vence a las 15:30 UTC son las 09:30 en la pantalla del
+        /// ejecutivo, y decirle "se libera a las 15:30" le miente por seis horas — le va a parecer que falta toda
+        /// la tarde cuando en realidad falta un rato. El plugin NO tiene forma confiable de saber la zona horaria
+        /// de quien lo lee (no hay sesión de usuario que consultar desde acá, y meter esa infraestructura para
+        /// esto es desproporcionado), así que en vez de convertir una hora que puede estar mal, se evita mostrar
+        /// una hora: la DURACIÓN restante es correcta sin importar en qué zona horaria esté quien la lee.
+        ///
+        /// Si alguien "mejora" esto a un timestamp más adelante, va a reintroducir el mismo bug: dejarlo escrito
+        /// acá para que no haga falta redescubrirlo.
+        /// </summary>
+        private static string MensajeClaimVigente(PedidoDeTransicion pedido)
+        {
+            var restante = pedido.ClaimHasta.Value - pedido.Ahora;
+            return $"La fila está reservada por el proceso automático; se libera {TextoDeCuantoFalta(restante)}.";
+        }
+
+        /// <summary>
+        /// "En N minutos", redondeando SIEMPRE hacia arriba (nunca se le dice a alguien que ya se liberó cuando
+        /// todavía falta una fracción), y nunca "0 minutos": una fila que dice "se libera en 0 minutos" y no se
+        /// libera es exactamente el tipo de detalle que hace desconfiar de todo el sistema. Por debajo del minuto
+        /// se dice "menos de un minuto" en vez de redondear a cero.
+        /// </summary>
+        private static string TextoDeCuantoFalta(TimeSpan restante)
+        {
+            if (restante.TotalMinutes < 1)
+            {
+                return "en menos de un minuto";
+            }
+
+            var minutos = (int)Math.Ceiling(restante.TotalMinutes);
+            return minutos == 1 ? "en 1 minuto" : $"en {minutos} minutos";
+        }
 
         /// <summary>Una fila de la tabla de diseno/03 §4: desde, hacia (la clave), quién autoriza, si exige mensaje, efecto y evento.</summary>
         /// <summary>Qué texto exige la transición, y por lo tanto QUIÉN lo va a leer.</summary>
@@ -223,9 +277,22 @@ namespace Sanic.Mppp.Plugins.Dominio
             }
 
             // D-25 (04 §2): Ejecutivo y Supervisor son mutuamente excluyentes por usuario, para cualquier transición.
+            // Va PRIMERO porque es una MALA CONFIGURACIÓN, y una mala configuración siempre gana: hay que
+            // arreglarla ya, no esperar a que se destrabe sola (revisión del aprobador, 2026-09-25).
             if (pedido.Actor.Roles.HasFlag(RolDeActor.Ejecutivo) && pedido.Actor.Roles.HasFlag(RolDeActor.Supervisor))
             {
                 return new ResultadoDeTransicion(false, MensajeAmbosRoles, EfectoDeTransicion.Ninguno, null);
+            }
+
+            // El claim (diseno/03 §2): mientras esté vigente, frena a cualquier PERSONA para CUALQUIER transición
+            // de esta fila — no es una regla de una transición puntual, es un candado sobre la fila entera. Va
+            // ACÁ, después de D-25 y antes de `Autorizar`, porque a diferencia de D-25 es un estado TEMPORAL: un
+            // "no autorizado" genérico sería menos verdadero (y menos útil) que decir que la fila está, de hecho,
+            // reservada y por cuánto más lo sigue estando. Nunca frena al código de servidor (el bot, que puede
+            // reportar aunque el claim ya venció o siga vivo: `03` §2, "el claim NO frena al bot cuando reporta").
+            if (!pedido.EsCodigoDeServidor && ReglasDelRpa.ClaimVigente(pedido.ClaimHasta, pedido.Ahora))
+            {
+                return new ResultadoDeTransicion(false, MensajeClaimVigente(pedido), EfectoDeTransicion.Ninguno, null);
             }
 
             var motivoDeRechazo = definicion.Autorizar(pedido);

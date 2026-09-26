@@ -186,6 +186,29 @@ namespace Sanic.Mppp.Plugins.Steps
         }
 
         /// <summary>
+        /// `sanic_claimhasta` ACTUAL de la fila (diseno/03 §2, "El claim"). No viaja en la pre-image registrada
+        /// (`sanic_estado, sanic_digitadapor, sanic_solicitudid`): ampliarla es tocar el registro de steps, fuera
+        /// de este alcance. Se lee con un `Retrieve` propio de UNA sola columna.
+        ///
+        /// Se SALTEA para el código de servidor: el claim nunca lo frena a él (03 §2), así que preguntarlo sería
+        /// gastar una consulta que nadie va a mirar.
+        ///
+        /// **Costo, dicho de frente** (revisión del aprobador, 2026-09-25): el ribbon transiciona filas en LOTE,
+        /// así que esto es una consulta extra POR FILA que transiciona una PERSONA. Se acepta por ser de una sola
+        /// columna; no convertirla en una consulta de dos.
+        /// </summary>
+        internal static DateTime? LeerClaimHasta(IOrganizationService servicio, Guid filaId, bool esCodigoDeServidor)
+        {
+            if (esCodigoDeServidor)
+            {
+                return null;
+            }
+
+            var fila = servicio.Retrieve(TablasHistorico.Fila, filaId, new ColumnSet("sanic_claimhasta"));
+            return fila.Contains("sanic_claimhasta") ? (DateTime?)fila["sanic_claimhasta"] : null;
+        }
+
+        /// <summary>
         /// El usuario cuyos roles de negocio hay que resolver para autorizar la transición (revisión de código,
         /// 2026-09-21, spike C-05 parte B): si NO es código de servidor, o si es código de servidor sin anidar
         /// (identidad de aplicación en profundidad 1: es quien llama de verdad), es `InitiatingUserId`. Si es código
@@ -266,6 +289,8 @@ namespace Sanic.Mppp.Plugins.Steps
             var actorId = PlomeriaDeFila.ResolverIdentidadDelActor(contexto, esCodigoDeServidor, target, preImagen, hacia);
             var roles = actorId.HasValue ? PlomeriaDeFila.DeterminarRoles(servicio, actorId.Value) : RolDeActor.Ninguno;
             var rpaPuedeAprobar = PlomeriaDeFila.LeerRpaPuedeAprobar(servicio);
+            var ahora = PlomeriaDeFila.AhoraUtc(contexto);
+            var claimHasta = PlomeriaDeFila.LeerClaimHasta(servicio, target.Id, esCodigoDeServidor);
 
             var pedido = new PedidoDeTransicion
             {
@@ -278,6 +303,9 @@ namespace Sanic.Mppp.Plugins.Steps
                 NotaInterna = target.Contains("sanic_notainterna") ? target["sanic_notainterna"] as string : null,
                 DigitadaPor = digitadaPorPrevio,
                 RpaPuedeAprobar = rpaPuedeAprobar,
+                ClaimHasta = claimHasta,
+                Ahora = ahora,
+                EsCodigoDeServidor = esCodigoDeServidor,
             };
 
             var resultado = TransicionesDeFila.Evaluar(pedido);
@@ -287,6 +315,11 @@ namespace Sanic.Mppp.Plugins.Steps
             }
 
             AplicarEfecto(target, resultado.Efecto, contexto, esCodigoDeServidor);
+
+            // diseno/03 §3, "Atención manual: una MARCA, no un estado": "Se apaga sola. La marca la limpia
+            // CUALQUIER transición exitosa de la fila". Sin enumerar casos: no importa el Efecto, el Hacia, ni
+            // quién hizo la transición (persona o bot) — si llegamos acá, se permitió, y se apaga.
+            target["sanic_requiereatencionmanual"] = false;
         }
 
         /// <summary>Escribe quién y cuándo según el efecto (03 §4). A una persona nunca se le cree lo que mandó; al código de servidor se le confía lo que ya trae, y se completa solo lo que falte.</summary>
