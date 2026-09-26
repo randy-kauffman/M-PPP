@@ -231,8 +231,8 @@ def main(argv):
     if otra is not None:
         digitadas = [f for f in otra if f.get("estado") == "digitada"]
         print(f"   Digitadas devueltas: {len(digitadas)}")
-        print("   Con rpa.puedeaprobar = no NO tiene que venir ninguna. Cambiá el parámetro y repetí")
-        print("   para ver que con 'si' aparecen solas, sin tocar una línea de código.")
+        print("   Con rpa.puedeaprobar = si (como está en Dev), las Digitadas por el propio bot vuelven")
+        print("   para que las apruebe. Si el parámetro está en 'no', esta lista tiene que venir vacía.")
 
     print("\n5. atencionmanual — la marca prende y el claim se libera")
     registrar(bot, [{"filaid": uno["filaid"], "resultado": "atencionmanual", "codigo": "RECH-GEN",
