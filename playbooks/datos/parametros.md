@@ -232,8 +232,8 @@ coinciden con la plantilla real del cliente.
         "choice": "sanic_mppp_ch_tipoparametro",
         "etiqueta": "Numero"
       },
-      "sanic_valor": "50",
-      "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 \u00a73). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion, no la cuota. Valor PROVISIONAL: hay que MEDIRLO, no estimarlo (D-54)."
+      "sanic_valor": "100",
+      "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 \u00a73). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion (BP-PP-053), no la cuota. **MEDIDO en Dev el 2026-09-26**: 0,33 s por item, lineal de 10 a 50 (10->3,9s · 25->7,9s · 50->16,7s). Con 100 son ~33 s, el 28% del presupuesto, con mas de 3x de margen para degradacion. **Hay que volver a medirlo en Produccion**: Dev vacio no es Produccion con carga y con tablas grandes."
     }
   ]
 }
