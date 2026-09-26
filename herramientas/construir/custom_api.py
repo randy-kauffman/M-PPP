@@ -80,8 +80,17 @@ MENSAJE_FALLO_CLIENTE = (
 CLAVES = {
     "tipo": str, "nombre": str, "displayname": str, "descripcion": str, "plugintype": str,
     "esfuncion": bool, "esprivada": bool, "binding": str, "pasosdeterceros": str,
-    "habilitadaenflujos": bool, "privilegio": str, "entrada": list, "salida": list,
+    "habilitadaenflujos": bool, "entrada": list, "salida": list,
 }
+# `privilegio` (ExecutePrivilegeName) es el UNICO campo de texto que puede ir VACIO, y no es un
+# descuido: D-9 (2026-09-25) decidio que las dos Custom API del RPA lo lleven vacio A PROPOSITO,
+# porque la puerta es el plugin y no un privilegio. `ExecutePrivilegeName` exige nombrar un
+# privilegio que YA exista, y el RPA no tiene ninguno propio: cualquiera que se eligiera le abriria
+# esas API a los ejecutivos. Vacio = sin puerta de plataforma, y la puerta esta en `PuertaDelRpa`.
+# Sigue siendo OBLIGATORIO declararlo: hay que escribir `"privilegio": ""` a proposito, nunca
+# omitirlo, para que nadie se lo olvide sin querer.
+CLAVES_TEXTO_QUE_PUEDEN_IR_VACIAS = {"privilegio"}
+CLAVES["privilegio"] = str
 CLAVES_PARAMETRO = {"nombre": str, "displayname": str, "descripcion": str, "tipo": str, "opcional": bool}
 CLAVES_SALIDA = {"nombre": str, "displayname": str, "descripcion": str, "tipo": str}
 
@@ -114,7 +123,8 @@ def _validar_bloque(datos, claves, de_donde):
         raise ErrorPlaybook(f"{de_donde} no tiene las claves esperadas: {'; '.join(partes)}")
     for clave, tipo in claves.items():
         # Un booleano en False es legítimo; un texto vacío no.
-        exigir_forma(datos[clave], tipo, de_donde, clave, no_vacio=(tipo is str))
+        vacio_permitido = clave in CLAVES_TEXTO_QUE_PUEDEN_IR_VACIAS
+        exigir_forma(datos[clave], tipo, de_donde, clave, no_vacio=(tipo is str and not vacio_permitido))
 
 
 def _validar_parametro(p, indice, claves, es_salida, vistos):
@@ -130,6 +140,11 @@ def _validar_parametro(p, indice, claves, es_salida, vistos):
     if nombre in vistos:
         raise ErrorPlaybook(f"{donde}: el nombre {nombre!r} está repetido")
     vistos.add(nombre)
+    # Ojo: `vistos` se pasa por SEPARADO para entrada y para salida. En Dataverse son dos tablas
+    # distintas (`customapirequestparameters` y `customapiresponseproperties`) y la plataforma no
+    # las choca, asi que un mismo nombre en las dos es legitimo. `registrarresultadorpa` lo
+    # necesita: manda `resultados` (el lote) y devuelve `resultados` (uno por item), y esa simetria
+    # es el contrato con el bot. Hasta el 2026-09-25 se compartia un solo set y quedaba prohibido.
 
     if p["tipo"] not in TIPOS_DE_PARAMETRO:
         raise ErrorPlaybook(
@@ -177,13 +192,13 @@ def _validar_estructura(datos, identidad):
     if "." not in datos["plugintype"]:
         raise ErrorPlaybook(f"plugintype = {datos['plugintype']!r} no parece un nombre de tipo .NET completo")
 
-    vistos = set()
+    vistos_entrada, vistos_salida = set(), set()
     for i, p in enumerate(datos["entrada"]):
         exigir_forma(p, dict, "el bloque de la Custom API", f"entrada[{i}]")
-        _validar_parametro(p, i, CLAVES_PARAMETRO, es_salida=False, vistos=vistos)
+        _validar_parametro(p, i, CLAVES_PARAMETRO, es_salida=False, vistos=vistos_entrada)
     for i, p in enumerate(datos["salida"]):
         exigir_forma(p, dict, "el bloque de la Custom API", f"salida[{i}]")
-        _validar_parametro(p, i, CLAVES_SALIDA, es_salida=True, vistos=vistos)
+        _validar_parametro(p, i, CLAVES_SALIDA, es_salida=True, vistos=vistos_salida)
 
     if datos["esfuncion"] and not datos["salida"]:
         # Learn: una Action puede no devolver nada; una Function TIENE que devolver.

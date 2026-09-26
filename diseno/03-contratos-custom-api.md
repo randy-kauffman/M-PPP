@@ -291,6 +291,8 @@ Hoy todo lo que falla sale como excepción con prosa, y el bot no puede distingu
 
 **Por qué** (aprobador, 2026-09-25): a una llamada por hecho, 3.000 filas son 6.000 llamadas —digitar y aprobar— más las de consulta. Consume cuota y hace lento al bot. El lote acepta **de 1 a `rpa.lote.maximo`** resultados en una llamada, cada uno con la misma forma de arriba.
 
+**La forma del parámetro de ENTRADA del lote** (decisión del 2026-09-25; el contrato no la definía y lo detectó quien fue a registrar la API): un **único parámetro `String` llamado `resultados`**, con el arreglo JSON de los ítems, **simétrico a la salida**, que también se llama `resultados`. En Dataverse son dos tablas distintas (`customapirequestparameters` y `customapiresponseproperties`), así que el mismo nombre en las dos es legítimo, y esa simetría es justamente lo que hace el contrato legible del lado del bot: manda `resultados`, recibe `resultados`.
+
 **Falla parcial: NUNCA todo o nada.** Si el ítem 23 de 50 trae un código sin mapear y rechazáramos el lote entero, **perderíamos 49 hechos reales de AS400**. La respuesta es **por ítem**, y la llamada devuelve **200**:
 
 ```json

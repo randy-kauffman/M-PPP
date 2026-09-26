@@ -157,6 +157,14 @@ class Base(unittest.TestCase):
 # Validación offline
 # ---------------------------------------------------------------------------
 class ValidacionOffline(Base):
+    def acepta(self, componente):
+        """Pasa la validación offline. No se mira el estado final —sin entorno no hay entorno que
+        mirar—, sino que NO se haya rechazado por forma del playbook."""
+        centinela = FabricaCentinela()
+        estado, _, detalle = ca.construir(self.escribir(componente), False, centinela)
+        self.assertTrue(centinela.llamada,
+                        f"se rechazó en la validación offline y no tenía que rechazarse: {detalle}")
+
     def rechaza(self, componente, fragmento):
         centinela = FabricaCentinela()
         estado, _, detalle = ca.construir(self.escribir(componente), False, centinela)
@@ -180,10 +188,33 @@ class ValidacionOffline(Base):
         malo = comp(entrada=[dict(COMPONENTE["entrada"][0], nombre="solicitud_id")])
         self.rechaza(malo, "solo puede llevar minúsculas ASCII y dígitos")
 
-    def test_un_nombre_repetido_entre_entrada_y_salida_se_rechaza(self):
-        # El nombre es el identificador del parámetro al llamar la API.
-        malo = comp(salida=[dict(COMPONENTE["salida"][0], nombre="solicitudid")])
+    def test_un_nombre_repetido_DENTRO_de_la_entrada_se_rechaza(self):
+        # El nombre es el identificador del parámetro al llamar la API: dos iguales en la misma
+        # lista son ambiguos.
+        uno = COMPONENTE["entrada"][0]
+        malo = comp(entrada=[uno, dict(uno, displayname="Otro")])
         self.rechaza(malo, "está repetido")
+
+    def test_el_mismo_nombre_en_entrada_y_en_salida_SI_se_admite(self):
+        """Cambiado el 2026-09-25: la regla anterior era demasiado estricta.
+
+        En Dataverse son DOS TABLAS distintas —`customapirequestparameters` y
+        `customapiresponseproperties`— y la plataforma no las choca. Prohibirlo bloqueaba un diseño
+        legítimo: `registrarresultadorpa` manda `resultados` (el lote) y devuelve `resultados` (uno
+        por ítem), y esa simetría ES el contrato con el bot. El plugin ya compilado lee y escribe
+        por ese nombre exacto, así que la herramienta no puede ser más estricta que la plataforma.
+        """
+        bueno = comp(salida=[dict(COMPONENTE["salida"][0], nombre="solicitudid")])
+        self.acepta(bueno)
+
+    def test_privilegio_VACIO_se_admite_pero_hay_que_declararlo(self):
+        """D-9 (2026-09-25): las dos Custom API del RPA llevan `ExecutePrivilegeName` vacío A
+        PROPÓSITO, porque la puerta es el plugin y no un privilegio. Vacío se admite; **omitir** la
+        clave no, para que nadie se lo olvide sin querer."""
+        self.acepta(comp(privilegio=""))
+        faltante = comp()
+        del faltante["privilegio"]
+        self.rechaza(faltante, "privilegio")
 
     def test_un_tipo_que_no_existe_se_rechaza_nombrando_los_validos(self):
         malo = comp(salida=[dict(COMPONENTE["salida"][0], tipo="Int32")])
