@@ -344,8 +344,16 @@ def _diferencias_de_la_api(datos, api, plugintype_id):
         ("name", datos["nombre"]), ("displayname", datos["displayname"]), ("description", datos["descripcion"]),
         ("executeprivilegename", datos["privilegio"]), ("isprivate", datos["esprivada"]),
     ):
-        if api.get(campo) != valor:
-            difs.append(f"{campo} es {api.get(campo)!r} y el playbook dice {valor!r}")
+        actual = api.get(campo)
+        # Dataverse normaliza un texto vacio a `null` al guardarlo. Sin esta equivalencia, una
+        # Custom API con `privilegio: ""` —las dos del RPA, por D-9— quedaba en `difiere` PARA
+        # SIEMPRE: la herramienta pedia "" y la plataforma devolvia None, y `--completar` no podia
+        # cerrarlo porque escribir "" vuelve a dar None. Un componente correcto que nunca se puede
+        # verificar limpio es peor que uno roto: entrena a leer `difiere` como ruido de fondo.
+        if actual is None and valor == "":
+            continue
+        if actual != valor:
+            difs.append(f"{campo} es {actual!r} y el playbook dice {valor!r}")
             corregibles[campo] = valor
 
     tipo = api.get("PluginTypeId") or {}
