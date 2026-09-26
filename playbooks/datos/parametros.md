@@ -16,6 +16,15 @@ enums del dominio (`Dominio/Choices.g.cs`), no los textos del Excel: la comparac
 de listas ya ignora mayusculas, tildes y ñ, asi que INCLUSION matchea Inclusion sin
 necesidad de declarar variantes.
 
+**`rpa.puedeaprobar` DIVERGE POR ENTORNO A PROPOSITO.** El playbook siembra `no`, que es el valor seguro: sin el
+aval de C-03 el bot no puede aprobar lo que el mismo digito. **C-03 se cerro el 2026-09-25 (el aval existe; su
+contenido es confidencial y no vive en este repositorio), y en DEV el parametro se paso a `si` a mano ese mismo
+dia, por orden del aprobador, para poder ejercitar el ciclo completo del bot.** Por eso `datos.py --solo-verificar`
+va a reportar `difiere` en esta fila contra Dev, y eso es lo ESPERADO, no una deriva: que se prenda o no es una
+decision operativa de cada entorno (D-53), no del playbook. **No se corrige con `--completar`**: eso lo volveria a
+apagar. Si alguna vez el `difiere` de esta fila desaparece contra un entorno donde deberia estar prendido, ahi si
+hay que mirar.
+
 Valores con fuente:
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
