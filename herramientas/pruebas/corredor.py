@@ -2,9 +2,14 @@
 """Corredor automático de las pruebas funcionales de fase 1 (`2026-001-referencias-planes-pago`).
 
     python3 herramientas/pruebas/corredor.py                  # corre todo, limpia sus datos al final
-    python3 herramientas/pruebas/corredor.py --archivo 03      # solo los casos de un archivo (00,01,02,03,05,06,08)
+    python3 herramientas/pruebas/corredor.py --archivo 03      # solo los casos de un archivo (00,01,03,05,06,08)
     python3 herramientas/pruebas/corredor.py --sin-limpiar     # deja las Solicitudes creadas, para inspeccionar
     python3 herramientas/pruebas/corredor.py --cobertura       # solo imprime qué cubre y qué no, sin tocar Dev
+
+**El archivo `02` (Reglas de Solicitud) se migró a `sets/set_s.py`.** Corré
+`python3 herramientas/pruebas/correr.py S` para esos 7 casos — el motor nuevo,
+autocontenido (`CONVENCIONES.md` §8). Este archivo sigue vivo para el resto
+(00, 01, 03, 05, 06, 08) mientras se migran uno por uno.
 
 **Qué es esto.** Orquesta las herramientas que ya existen en `herramientas/pruebas/`
 (`preparar_datos.py`, `generar_excel.py`, `simulador.py`, `verificar_accesos.py`,
@@ -155,13 +160,6 @@ TITULOS = {
     "C-04": "Remitente no reconocido",
     "C-07": "El mismo correo dos veces no duplica (alcance reducido, ver Notas)",
     "C-08": "Sin adjunto",
-    "S-01": "El adjunto no es un Excel",
-    "S-02": "Dos Excel en el mismo correo",
-    "S-03": "Un Excel y un archivo que no lo es",
-    "S-04": "La hoja de datos tiene otro nombre",
-    "S-05": "Excel con la estructura correcta pero sin filas",
-    "S-06": "Volumen: 100 filas (presupuesto < 10 s)",
-    "S-07": "El acuse de una Rechazada dice lo que tiene que decir",
     "R-01": "Valores fuera de las listas (LISTAS_VALIDAS)",
     "R-02": "Largos y formato (LARGOS_Y_FORMATO)",
     "R-03": "Plan que no existe (PLAN_EXISTE)",
@@ -441,119 +439,14 @@ def c08(ctx):
 
 
 # ===========================================================================
-# 02 — Reglas de nivel Solicitud (S-01..S-07)
+# 02 — Reglas de nivel Solicitud (S-01..S-07): MIGRADO a `sets/set_s.py`.
+#
+# Corré `python3 herramientas/pruebas/correr.py S` en vez de `--archivo 02`
+# acá. Se saca este bloque para que no queden dos versiones del mismo caso
+# corriendo (una autocontenida, otra compartiendo la preparación global de
+# este archivo) — CONVENCIONES.md §8. El resto de los sets (C, R, I, G, A) se
+# migra igual, uno por vez (§8.1: se serializa, no hay apuro).
 # ===========================================================================
-@caso("S-01", "02")
-def s01(ctx):
-    c = Caso("S-01", "02", "El adjunto no es un Excel")
-    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba S-01", cantidad_adjuntos=1, cantidad_excel=0)
-    reglas = sim.leer_reglas(ctx.dv, sid)
-    c.check("TRAE_ADJUNTO = Cumplida", reglas.get("TRAE_ADJUNTO", {}).get("sanic_resultado") == CUMPLIDA)
-    c.check("ADJUNTO_ES_EXCEL = No cumplida", reglas.get("ADJUNTO_ES_EXCEL", {}).get("sanic_resultado") == NOCUMPLIDA)
-    for cod in ("UN_SOLO_EXCEL", "ESTRUCTURA_PLANTILLA", "TIENE_FILAS"):
-        c.check(f"{cod} = Omitida", reglas.get(cod, {}).get("sanic_resultado") == OMITIDA)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    c.check("Estado = Rechazada", s.get("sanic_estadoprocesamiento") == RECH)
-    c.check("acuse presente", bool(s.get("sanic_acusecontenido")))
-    return c
-
-
-@caso("S-02", "02")
-def s02(ctx):
-    c = Caso("S-02", "02", "Dos Excel en el mismo correo")
-    # Dos Excel: ING no sube NINGUNO (Hay_exactamente_un_excel exige ==1). Se simula igual:
-    # cantidad_excel=2 y no se pasa excel_a_subir.
-    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba S-02", cantidad_adjuntos=2, cantidad_excel=2)
-    reglas = sim.leer_reglas(ctx.dv, sid)
-    c.check("UN_SOLO_EXCEL = No cumplida", reglas.get("UN_SOLO_EXCEL", {}).get("sanic_resultado") == NOCUMPLIDA)
-    for cod in ("ESTRUCTURA_PLANTILLA", "TIENE_FILAS"):
-        c.check(f"{cod} = Omitida", reglas.get(cod, {}).get("sanic_resultado") == OMITIDA)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    c.check("Estado = Rechazada", s.get("sanic_estadoprocesamiento") == RECH)
-    return c
-
-
-@caso("S-03", "02")
-def s03(ctx):
-    c = Caso("S-03", "02", "Un Excel y un archivo que no lo es")
-    sid, mid, rc, rv = ctx.procesar(
-        remitente=REMITENTE, asunto="Prueba S-03", cantidad_adjuntos=2, cantidad_excel=1,
-        excel_a_subir=excel("E01-feliz-formato11.xlsx"))
-    reglas = sim.leer_reglas(ctx.dv, sid)
-    for cod in ("TRAE_ADJUNTO", "ADJUNTO_ES_EXCEL", "UN_SOLO_EXCEL", "ESTRUCTURA_PLANTILLA", "TIENE_FILAS"):
-        c.check(f"{cod} = Cumplida", reglas.get(cod, {}).get("sanic_resultado") == CUMPLIDA)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    c.check("Estado = En proceso, 3 filas Validadas",
-            s.get("sanic_estadoprocesamiento") == ENPROC and s.get("sanic_filasvalidas") == 3)
-    return c
-
-
-@caso("S-04", "02")
-def s04(ctx):
-    c = Caso("S-04", "02", "La hoja de datos tiene otro nombre")
-    sid, mid, rc, rv = ctx.procesar(
-        remitente=REMITENTE, asunto="Prueba S-04", cantidad_adjuntos=1, cantidad_excel=1,
-        excel_a_subir=excel("E12-hoja-renombrada.xlsx"))
-    reglas = sim.leer_reglas(ctx.dv, sid)
-    c.check("UN_SOLO_EXCEL = Cumplida", reglas.get("UN_SOLO_EXCEL", {}).get("sanic_resultado") == CUMPLIDA)
-    c.check("ESTRUCTURA_PLANTILLA = No cumplida", reglas.get("ESTRUCTURA_PLANTILLA", {}).get("sanic_resultado") == NOCUMPLIDA)
-    c.check("TIENE_FILAS = Omitida", reglas.get("TIENE_FILAS", {}).get("sanic_resultado") == OMITIDA)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    c.check("Estado = Rechazada (regla fallida, no un Error de plataforma)", s.get("sanic_estadoprocesamiento") == RECH,
-            ESTADO_SOL_TXT.get(s.get("sanic_estadoprocesamiento")))
-    return c
-
-
-@caso("S-05", "02")
-def s05(ctx):
-    c = Caso("S-05", "02", "Excel con la estructura correcta pero sin filas")
-    sid, mid, rc, rv = ctx.procesar(
-        remitente=REMITENTE, asunto="Prueba S-05", cantidad_adjuntos=1, cantidad_excel=1,
-        excel_a_subir=excel("E11-sin-filas.xlsx"))
-    reglas = sim.leer_reglas(ctx.dv, sid)
-    c.check("ESTRUCTURA_PLANTILLA = Cumplida", reglas.get("ESTRUCTURA_PLANTILLA", {}).get("sanic_resultado") == CUMPLIDA)
-    c.check("TIENE_FILAS = No cumplida", reglas.get("TIENE_FILAS", {}).get("sanic_resultado") == NOCUMPLIDA)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    c.check("Estado = Rechazada, filas t/v/r = 0/0/0",
-            s.get("sanic_estadoprocesamiento") == RECH and (s.get("sanic_filastotales") or 0) == 0)
-    c.check("acuse presente", bool(s.get("sanic_acusecontenido")))
-    return c
-
-
-@caso("S-06", "02")
-def s06(ctx):
-    c = Caso("S-06", "02", "Volumen: 100 filas (presupuesto < 10 s)")
-    sid, _ = ctx.solicitud(remitente=REMITENTE, asunto="Prueba S-06 volumen 100",
-                            cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=excel("E14-volumen-100.xlsx"))
-    sim.clasificar(ctx.dv, sid)
-    t0 = time.monotonic()
-    rv = sim.validar(ctx.dv, sid)
-    segundos = time.monotonic() - t0
-    c.check("filas t/v/r = 100/100/0", (rv.get("filastotales"), rv.get("filasvalidas"), rv.get("filasrechazadas")) == (100, 100, 0), str(rv))
-    # Mide SOLO la llamada a la Custom API (sin el resto del flujo, que acá no corre):
-    # es una medida más estricta que la del caso original, no más floja. Si esto ya
-    # tarda cerca de 10s, el presupuesto del flujo completo está en riesgo.
-    c.check(f"la llamada a {sim.VALIDAR_SOLICITUD} tardó menos de 10 s (tardó {segundos:.2f}s)", segundos < 10.0)
-    return c
-
-
-@caso("S-07", "02")
-def s07(ctx):
-    c = Caso("S-07", "02", "El acuse de una Rechazada dice lo que tiene que decir")
-    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba S-07", cantidad_adjuntos=0, cantidad_excel=0)
-    s = sim.leer_solicitud(ctx.dv, sid)
-    texto = s.get("sanic_acusecontenido") or ""
-    numero = s.get("sanic_nombre") or ""
-    c.check("contiene el número de solicitud", numero in texto, numero)
-    c.check("dice 'no hay nada que procesar' o equivalente", "no hay nada" in texto.lower() or "nada que procesar" in texto.lower())
-    c.check("dice que no va a recibir otro correo por esta solicitud",
-            "no va a recibir" in texto.lower() or "no recibirá" in texto.lower() or "no recibira" in texto.lower())
-    c.check("pide corregir y reenviar", "reenv" in texto.lower() or "corrija" in texto.lower() or "correo nuevo" in texto.lower())
-    c.check("trae el texto obligatorio de 'no responda a este mensaje'",
-            "no responda" in texto.lower())
-    for tecnico in ("TRAE_ADJUNTO", "ADJUNTO_ES_EXCEL", "UN_SOLO_EXCEL", "ESTRUCTURA_PLANTILLA", "TIENE_FILAS"):
-        c.check(f"no menciona el nombre técnico de la regla '{tecnico}'", tecnico not in texto)
-    return c
 
 
 # ===========================================================================
@@ -1142,6 +1035,13 @@ NO_CUBIERTOS = {
     "P-02": ("00", "El remitente de las pruebas", "es una decisión humana (elegir una casilla real); este corredor usa un remitente ficticio propio para todo lo automatizable"),
     "C-05": ("01", "El correo se mueve y cambia de identificador", "exige un correo real en el buzón compartido y que MPPP-ING lo mueva; es lo único que ese flujo hace que no se puede reproducir sin Outlook real"),
     "C-06": ("01", "El .eml queda guardado con el nombre original", "prueba que MPPP-ING capture bien el adjunto de Outlook; acá el .eml y el Excel los sube el propio corredor, así que 'verificarlo' sería probar el corredor, no el sistema"),
+    "S-01": ("02", "El adjunto no es un Excel", "MIGRADO: corré `python3 herramientas/pruebas/correr.py S` (set autocontenido, `sets/set_s.py`)"),
+    "S-02": ("02", "Dos Excel en el mismo correo", "MIGRADO: correr.py S"),
+    "S-03": ("02", "Un Excel y un archivo que no lo es", "MIGRADO: correr.py S"),
+    "S-04": ("02", "La hoja de datos tiene otro nombre", "MIGRADO: correr.py S"),
+    "S-05": ("02", "Excel con la estructura correcta pero sin filas", "MIGRADO: correr.py S"),
+    "S-06": ("02", "Volumen: 100 filas (presupuesto < 10 s)", "MIGRADO: correr.py S"),
+    "S-07": ("02", "El acuse de una Rechazada dice lo que tiene que decir", "MIGRADO: correr.py S (ya no es Manual: ver la corrección en el MD)"),
     "M-01": ("04", "El acuse llega, y llega una sola vez", "Mail.Send pendiente (MPPP-COM/MPPP-ENV mandan correo real); punto de extensión: un cliente Graph que lea la bandeja del remitente de prueba, ver sección EXTENSIÓN"),
     "M-02": ("04", "El acuse de una Rechazada cierra la Solicitud", "N-A (falta Mail.Send): el cierre lo dispara MPPP-COM al ver que el acuse llegó; sin envío real no hay evento que lo dispare en el mismo sentido que prueba el caso"),
     "M-03": ("04", "Copia y remitente", "N-A (falta Mail.Send): requiere leer una bandeja de correo real para confirmar que el CC no recibió nada"),
@@ -1249,7 +1149,7 @@ def imprimir_reporte(resultados, archivos_filtrados):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--archivo", help="corré solo los casos de un archivo del plan (00,01,02,03,05,06,08); admite varios separados por coma")
+    p.add_argument("--archivo", help="corré solo los casos de un archivo del plan (00,01,03,05,06,08; el 02 se migró a correr.py S); admite varios separados por coma")
     p.add_argument("--sin-limpiar", action="store_true", help="no borra las Solicitudes que creó (para inspeccionarlas después)")
     p.add_argument("--cobertura", action="store_true", help="solo imprime la sección de cobertura, sin tocar Dev")
     p.add_argument("--con-comportamiento-roles", action="store_true",
