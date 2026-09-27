@@ -57,10 +57,13 @@ Ninguna de estas herramientas se edita ni se ejecuta desde acá: los comandos de
 evaluar nada más, y si no existe lo dice con `MPPP-RPA-007` en vez de un "no autorizado" genérico
 — la confusión que costó horas el 2026-09-22 (rol nunca creado vs. permisos).
 
-**Necesita.** Acceso de Administrador técnico a Seguridad → Roles de seguridad; anotado el nombre
-exacto y el `roleid` vigente de `SR - MPPP - RPA` para poder restaurarlo; una ventana de Dev donde
-nadie más esté corriendo pruebas de fase 2 (este caso apaga la puerta para **todo** el entorno
-mientras dura).
+**Necesita.** Acceso de **plataforma** a Seguridad → Roles de seguridad (System
+Administrator/Customizer de Dataverse) — esto **no** es el rol de negocio `SR - MPPP -
+Administrador tecnico` que prueba `local/sesion-admin_tecnico.json`: ese rol está acotado a
+Parámetros y Reglas dentro de la app (`04-matriz-privilegios.md`) y no incluye administrar roles de
+seguridad de la plataforma. Anotado el nombre exacto y el `roleid` vigente de `SR - MPPP - RPA`
+para poder restaurarlo; una ventana de Dev donde nadie más esté corriendo pruebas de fase 2 (este
+caso apaga la puerta para **todo** el entorno mientras dura).
 
 > **ADVERTENCIA — alto riesgo de entorno compartido.** Este caso rompe temporalmente el acceso del
 > bot real para TODO Dev. Ya existe cobertura sin este riesgo: `PuertaDelRpaAceptacion` (8 pruebas
