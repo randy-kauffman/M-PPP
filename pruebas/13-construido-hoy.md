@@ -23,7 +23,8 @@ Convención de IDs: prefijo `H-` (**H**oy), ver el encabezado de `09-rpa-fase2.m
 entrada propia en el sitemap. Ahora `subarea_paraatencionmanual` está entre "Por aprobar" y "Por
 clasificar".
 
-**Necesita.** Sesión de Ejecutivo.
+**Necesita.** Sesión `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`; confirmarla viva y
+con ese rol con `python3 herramientas/pruebas/estado_sesiones.py` antes de correr el caso).
 
 **Cómo.** Abrir la app y mirar el área Trabajo del sitemap.
 
@@ -48,8 +49,10 @@ clientes — por digitar**, **Todos — por digitar**, **Por aprobar** y **Mis c
 devueltas** — y a NINGUNA otra (ni Filas, ni Terminadas, ni Tomadas por el bot: no son vistas de
 trabajo).
 
-**Necesita.** Sesión de Ejecutivo y de Supervisor (para "Por aprobar"); al menos una fila con la
-marca prendida visible en alguna de las cuatro vistas.
+**Necesita.** `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) y
+`local/sesion-supervisor.json` (rol `SR - MPPP - Supervisor`, para "Por aprobar") — las dos
+confirmadas con `estado_sesiones.py`; al menos una fila con la marca prendida visible en alguna de
+las cuatro vistas.
 
 **Cómo.** Abrir cada una de las 7 vistas de Fila (las 4 de trabajo + Filas + Terminadas + Tomadas
 por el bot) y revisar sus columnas.
@@ -72,7 +75,9 @@ no son de trabajo, contra el criterio explícito del diseño).
 **Qué prueba.** El pedido textual del aprobador de poder distinguir las dos vías de DN-01 desde el
 sitemap, cada una con su propia vista por defecto.
 
-**Necesita.** Sesión de Administrador de planes.
+**Necesita.** Sesión `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes`,
+confirmada con `estado_sesiones.py` — es quien administra las dos vías de autorización de DN-01; el
+Administrador técnico no ve estas tablas, `04-matriz-privilegios.md`).
 
 **Cómo.** Abrir el grupo Catálogos del sitemap.
 
@@ -96,7 +101,8 @@ entradas abren la misma vista.
 `sanic_autorizadoid`, `sanic_clienteid`) y su sección "Evidencia de la autorización" (ver también
 `10-autorizacion-cliente.md` U-10, que prueba el guardado; este caso es solo de estructura visual).
 
-**Necesita.** Sesión de Administrador de planes.
+**Necesita.** Sesión `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes`,
+confirmada con `estado_sesiones.py`).
 
 **Cómo.** Abrir (o crear) un registro de `AutorizacionCliente`.
 
@@ -119,8 +125,11 @@ encabezado no están.
 "Autorizaciones - Clientes" reusa el ícono de "Autorizaciones - Planes". Ninguno de los dos generó
 un web resource nuevo.
 
-**Necesita.** Sesión de Ejecutivo y de Administrador de planes; acceso de lectura a los web
-resources de íconos (`sanic_mppp_wr_svg_*`) para confirmar el nombre exacto que usa cada entrada.
+**Necesita.** `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`, para "Para atención
+manual") y `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes`, para
+"Autorizaciones - Clientes"/"Autorizaciones - Planes") — las dos confirmadas con
+`estado_sesiones.py`; acceso de lectura a los web resources de íconos (`sanic_mppp_wr_svg_*`) para
+confirmar el nombre exacto que usa cada entrada.
 
 **Cómo.** Comparar visualmente el ícono de "Para atención manual" contra "Para revisar", y el de
 "Autorizaciones - Clientes" contra "Autorizaciones - Planes"; si hace falta desambiguar a simple
@@ -149,9 +158,15 @@ la próxima vez que un botón nuevo "no aparezca", sin importar cuál sea.
 días, si el problema es de REGLAS o de METADATA COMPILADA — son diagnósticos opuestos con el mismo
 síntoma superficial ("no lo veo").
 
-**Necesita.** Acceso de Administrador técnico al maker portal (`make.powerapps.com`) sobre la
-solución `sanic_mppp_sol_mantenimientoppp`; sesión de Ejecutivo o Supervisor para reproducir en la
-app; el parámetro de URL `&ribbondebug=true` agregado a la URL de la app model-driven.
+**Necesita.** Acceso de **customización de la solución** en `make.powerapps.com` sobre
+`sanic_mppp_sol_mantenimientoppp` — esto es un privilegio de PLATAFORMA (System
+Administrator/System Customizer de Dataverse), **no** el rol de negocio `SR - MPPP - Administrador
+tecnico` que prueban `local/sesion-admin_tecnico.json` y `estado_sesiones.py`: ese rol de negocio
+está acotado a las tablas Parámetro y Reglas dentro de la app (`04-matriz-privilegios.md`, §"El
+Administrador técnico solo toca lo técnico") y no da acceso al maker portal para regenerar
+metadata. Además: `local/sesion-ejecutivo.json` o `local/sesion-supervisor.json` (rol `SR - MPPP -
+Ejecutivo`/`SR - MPPP - Supervisor`) para reproducir el síntoma en la app; el parámetro de URL
+`&ribbondebug=true` agregado a la URL de la app model-driven.
 
 **Cómo.**
 1. Abrir la vista de Filas en la app con `&ribbondebug=true` en la URL, y usar el **Command
@@ -197,4 +212,4 @@ ausente" en el DOM real ya lo automatiza `pruebas/gui/ayudantes/ribbon.mjs`, per
 | H-03 "Autorizaciones - Clientes" diferenciada | | sesión admin_planes |
 | H-04 formulario AutorizacionCliente: estructura | | sesión admin_planes |
 | H-05 íconos reutilizados, no nuevos | | sesiones ejecutivo/admin_planes |
-| H-06 diagnóstico REGLAS vs. METADATA COMPILADA | | maker portal, manual |
+| H-06 diagnóstico REGLAS vs. METADATA COMPILADA | | maker portal (System Administrator/Customizer de plataforma, NO `admin_tecnico`), manual |
