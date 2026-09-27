@@ -15,6 +15,8 @@ mismo*. Ante la duda, no se reenvía y lo mira una persona (D-21).
 
 **Qué prueba.** La cadena `Validación` → estado En proceso → `MPPP-COM` → `MPPP-ENV`.
 
+**Necesita.** Acceso a la bandeja del REMITENTE (para ver el acuse real); la Solicitud de C-01.
+
 **Cómo.** Usá la Solicitud de **C-01**. Mirá tu casilla.
 
 **Esperado.**
@@ -31,11 +33,16 @@ mismo*. Ante la duda, no se reenvía y lo mira una persona (D-21).
 **Esperá 5 minutos y mirá otra vez**: no tiene que llegar un segundo acuse. `MPPP-VIG` corre cada
 10 minutos y **no** debe reenviar nada.
 
+**Automatizable.** Manual (`Mail.Send` real; `corredor.py` lo marca N-A — punto de extensión
+pendiente: un cliente Graph que lea la bandeja del remitente de prueba).
+
 ---
 
 ## M-02 · El acuse de una Rechazada cierra la Solicitud
 
 **Qué prueba.** DD-09: acuse de una **Rechazada** → **Cerrada** + `sanic_fechacerrada`.
+
+**Necesita.** Una Solicitud Rechazada (de S-01, S-05 o C-08); acceso a la bandeja del REMITENTE.
 
 **Cómo.** Usá cualquier Solicitud que haya quedado **Rechazada** (S-01, S-05, C-08…).
 
@@ -51,11 +58,17 @@ mismo*. Ante la duda, no se reenvía y lo mira una persona (D-21).
 > La diferencia con M-01 es todo el punto: una Rechazada **termina acá** (no hay nada que digitar),
 > una En proceso sigue viva hasta que se digiten y aprueben sus filas.
 
+**Automatizable.** Manual (N-A en `corredor.py`: falta `Mail.Send`; el cierre lo dispara
+`MPPP-COM` al ver que el acuse llegó de verdad).
+
 ---
 
 ## M-03 · Copia y remitente
 
 **Qué prueba.** DF-03: solo al remitente, nunca a los de copia.
+
+**Necesita.** El REMITENTE con una segunda dirección propia para poner en copia; acceso a ambas
+bandejas.
 
 **Cómo.** Correo nuevo con `E01-feliz-formato11.xlsx`, pero poné **otra dirección tuya en CC**.
 
@@ -64,11 +77,17 @@ mismo*. Ante la duda, no se reenvía y lo mira una persona (D-21).
 **FALLA si** le llega a la copia: se le estaría verificando la autorización a uno y respondiéndole
 a otro.
 
+**Automatizable.** Manual (N-A en `corredor.py`: falta `Mail.Send`, y hace falta leer una bandeja
+real para confirmar que a la copia no le llegó nada).
+
 ---
 
 ## M-04 · La respuesta final, cuando todas las filas se resuelven
 
 **Qué prueba.** El ciclo completo hasta **Procesada** → respuesta final → **Cerrada**.
+
+**Necesita.** La Solicitud de C-01; sesión `ejecutivo` para marcar Digitada; sesión `supervisor`
+para Aprobar; acceso a la bandeja del REMITENTE.
 
 **Depende de**: `05-app-y-comandos.md`, porque hay que digitar y aprobar desde la app.
 
@@ -91,11 +110,17 @@ a otro.
 **Leé la respuesta final completa.** Tiene que decir qué pasó con cada fila y llevar el texto
 obligatorio de DF-08 ("no responda a este mensaje…").
 
+**Automatizable.** Manual (depende de `05` -interfaz de navegador- y de `Mail.Send` real para la
+respuesta final).
+
 ---
 
 ## M-05 · Nunca dos veces lo mismo
 
 **Qué prueba.** D-21 y el paso 1 de `MPPP-ENV`: si el acuse ya está **iniciado**, no se envía otra vez.
+
+**Necesita.** La Solicitud de C-01 con acuse ya enviado; permiso para editar la Solicitud (rol de
+administración, o API con privilegio de escritura).
 
 **Cómo.** Forzá un segundo disparo de `MPPP-COM` sobre una Solicitud que ya tiene acuse enviado:
 en la app, abrí la Solicitud de **C-01** y cambiale el estado a **En proceso** (si ya está ahí,
@@ -112,11 +137,17 @@ tocá y guardá cualquier otro campo para que se dispare una actualización).
 **FALLA si** llega un segundo correo. Es el defecto más caro de todos: el cliente recibe dos acuses
 contradictorios de la misma solicitud.
 
+**Automatizable.** Manual (N-A en `corredor.py`: exige comprobar que NO llegó un segundo correo
+real).
+
 ---
 
 ## M-06 · Envío iniciado sin confirmar → revisión humana
 
 **Qué prueba.** Que una comunicación a medias **no se reenvíe** y levante bandera (D-21).
+
+**Necesita.** Una Solicitud En proceso sin acuse; permiso para editar `sanic_fechaacuseiniciado`
+(rol de administración o API con privilegio de escritura).
 
 **Cómo.** Simulá el estado a medias: en la app, sobre una Solicitud **En proceso** que todavía no
 tenga acuse, poné `sanic_fechaacuseiniciado` con la hora de hace 40 minutos y dejá
@@ -135,11 +166,17 @@ tenga acuse, poné `sanic_fechaacuseiniciado` con la hora de hace 40 minutos y d
 > Éste es el costo aceptado del diseño: ante la duda no se reenvía y lo mira una persona. Si acá
 > llega un correo, la garantía de "como máximo una vez" no existe.
 
+**Automatizable.** Manual (depende del disparo real de `MPPP-VIG` sobre `MPPP-COM`/`MPPP-ENV`, y
+de `Mail.Send`).
+
 ---
 
 ## M-07 · El cuerpo lo arma el código, no el flujo
 
 **Qué prueba.** DD-08: el contenido viene de `sanic_acusecontenido`, que escribe la Custom API.
+
+**Necesita.** Una Solicitud con acuse ya enviado; acceso a la bandeja del REMITENTE para comparar
+contra el correo real.
 
 **Cómo.** Abrí una Solicitud con acuse y compará el campo `sanic_acusecontenido` con el correo que
 te llegó:
@@ -153,6 +190,9 @@ por el flujo.
 
 **FALLA si** el correo trae algo que no está en el campo (una firma automática, un encabezado
 puesto por Power Automate, un "Sent from…").
+
+**Automatizable.** Manual (compara `sanic_acusecontenido` contra el correo REAL recibido; el
+contenido del campo ya se verifica indirectamente en S-07/R-13).
 
 ---
 

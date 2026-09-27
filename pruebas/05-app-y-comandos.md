@@ -19,6 +19,9 @@ número uno y el arreglo es de un minuto.
 
 **Qué prueba.** Los `CustomAction` en sus dos ubicaciones.
 
+**Necesita.** Sesión `ejecutivo` (o cualquier rol con acceso a Filas/Solicitudes); la Solicitud de
+C-01 con filas Validadas.
+
 **Cómo.** Abrí la vista **Por digitar** (grilla de Filas) y seleccioná una fila.
 
 **Esperado.** En la barra aparecen **5 botones propios** con su ícono:
@@ -30,11 +33,17 @@ Y en **Solicitudes**, seleccionando una fila: `Atendido` · `Descartar` · `Revi
 **También verificá en la subgrilla**: abrí una Solicitud y mirá su subgrilla de Filas. Los 5 de
 Fila tienen que estar ahí también.
 
+**Automatizable.** GUI (sesión `ejecutivo`; ya cubierto en paralelo por `pruebas/gui/`, ver
+`ribbon-fila.spec.mjs`).
+
 ---
 
 ## A-02 · Los comandos genéricos NO aparecen (12.6)
 
 **Qué prueba.** Los `HideCustomAction` en las 10 tablas.
+
+**Necesita.** Sesión con acceso a todas las tablas del sitemap (un usuario con los 4 roles, o
+recorrer con cada sesión).
 
 **Cómo.** En **cada** entrada del sitemap, seleccioná una fila y mirá la barra (incluido el menú
 `…`).
@@ -51,11 +60,15 @@ Bitácora (sí en los catálogos, donde el alta es de una persona).
 | Bitácora | | **sí** |
 | Cliente, Plan, Autorizado, Autorización, Parámetro, Regla | | (Nuevo **sí** aparece) |
 
+**Automatizable.** GUI.
+
 ---
 
 ## A-03 · Digitada, sobre varias filas a la vez
 
 **Qué prueba.** `Sanic.Mppp.Comandos.digitada` y la acción masiva (DA-02).
+
+**Necesita.** Sesión `ejecutivo`; las 3 filas Validadas de C-01.
 
 **Cómo.** Vista **Por digitar**, seleccioná **las 3 filas** de C-01, botón **Digitada**.
 
@@ -72,15 +85,21 @@ Bitácora (sí en los catálogos, donde el alta es de una persona).
 **FALLA si**: el diálogo no dice la cantidad, hay que refrescar a mano, o el texto sale en inglés
 teniendo el usuario español.
 
+**Automatizable.** GUI (sesión `ejecutivo`).
+
 ---
 
 ## A-04 · Cancelar no cambia nada
 
 **Qué prueba.** Que el diálogo de confirmación realmente frene.
 
+**Necesita.** Sesión `ejecutivo`; filas seleccionables.
+
 **Cómo.** Seleccioná filas, apretá **Digitada** y dale **Cancelar**.
 
 **Esperado.** **Nada** cambia. Ninguna fila cambia de estado, no hay entradas nuevas en Bitácora.
+
+**Automatizable.** GUI (sesión `ejecutivo`).
 
 ---
 
@@ -88,10 +107,14 @@ teniendo el usuario español.
 
 **Qué prueba.** El `EnableRule` `Mscrm.SelectionCountAtLeastOne`.
 
+**Necesita.** Sesión `ejecutivo` (o cualquier rol con acceso a la vista).
+
 **Cómo.** Sin seleccionar ninguna fila, mirá la barra.
 
 **Esperado.** Los botones propios están **deshabilitados** (grises). Si se pudiera apretar, el
 mensaje sería *"No hay ninguna fila seleccionada."*
+
+**Automatizable.** GUI.
 
 ---
 
@@ -99,17 +122,26 @@ mensaje sería *"No hay ninguna fila seleccionada."*
 
 **Qué prueba.** `Sanic.Mppp.Comandos.aprobar`.
 
+**Necesita.** Sesión `supervisor`; las filas Digitadas que dejó A-03.
+
 **Cómo.** Entrá con un usuario con rol **SR - MPPP - Supervisor**. Vista **Por aprobar**,
 seleccioná las filas de A-03, botón **Aprobar**.
 
 **Esperado.** Las filas pasan a **Aprobada**; cuando se resuelven **todas** las de la Solicitud,
 pasa a **Procesada** y arranca la respuesta final (caso M-04).
 
+**Automatizable.** API (proxy de servidor: `comportamiento_roles.py --con-escritura`, corrido por
+`corredor.py` con la bandera `--con-comportamiento-roles`) + GUI (sesión `supervisor`) para
+confirmar la experiencia real en pantalla.
+
 ---
 
 ## A-07 · El plugin manda, no el botón (DA-07)
 
 **Qué prueba.** Lo más importante de la seguridad: la regla real está en el servidor.
+
+**Necesita.** Sesión `supervisor`; una fila que el mismo supervisor haya digitado (para probar la
+segregación de funciones).
 
 **Cómo.** Con el Supervisor, intentá **Aprobar** una fila que **él mismo digitó** (segregación de
 funciones), o **Digitada** sobre una fila que ya está **Aprobada**.
@@ -128,11 +160,18 @@ saltearía llamando al Web API.
 
 > Que **unas filas se apliquen y otras no** es el comportamiento pedido (`05` §5), no un defecto.
 
+**Automatizable.** API (proxy de servidor: `comportamiento_roles.py --con-escritura`, corrido por
+`corredor.py` con `--con-comportamiento-roles`) — **este es el caso de seguridad más importante
+del archivo y ya tiene automatización de servidor**; GUI opcional para confirmar el mensaje que ve
+el usuario.
+
 ---
 
 ## A-08 · Rechazada en AS400 — el diálogo de motivo
 
 **Qué prueba.** El corazón de DA-03 corregida: `navigateTo` a `entityrecord` en modo creación.
+
+**Necesita.** Sesión `ejecutivo` o `supervisor`; 2 filas seleccionadas.
 
 **Cómo.** Vista **Por digitar** o **Por aprobar**, seleccioná 2 filas, botón **Rechazada en AS400**.
 
@@ -153,21 +192,30 @@ saltearía llamando al Web API.
 > Verificá que no quede basura: en la tabla **Motivo de acción** no debería quedar ningún registro
 > después de usar el comando.
 
+**Automatizable.** GUI.
+
 ---
 
 ## A-09 · Cancelar el diálogo de motivo
 
 **Qué prueba.** Que cerrar sin guardar **no cambie nada**.
 
+**Necesita.** Sesión `ejecutivo`; filas seleccionadas.
+
 **Cómo.** Apretá **Anular** sobre filas seleccionadas y cerrá el diálogo con la **X** (sin guardar).
 
 **Esperado.** **Ninguna** fila cambia de estado. No hay registro de motivo colgado.
+
+**Automatizable.** GUI.
 
 ---
 
 ## A-10 · Anular y Devolver
 
 **Qué prueba.** Los otros dos comandos con motivo.
+
+**Necesita.** Sesión `ejecutivo` (Anular) y sesión `supervisor` (Devolver); filas en
+Validada/Digitada.
 
 **Cómo.**
 - **Anular**: sobre filas en Validada o Digitada.
@@ -185,11 +233,18 @@ saltearía llamando al Web API.
 > **Por digitar**, las dos vistas están mal filtradas (y está bien que aparezca en las dos si así
 > lo dice el diseño — comparalo con `05` §2).
 
+**Automatizable.** API (proxy de servidor: `comportamiento_roles.py --con-escritura`, corrido por
+`corredor.py` con `--con-comportamiento-roles`) + GUI para confirmar las vistas Devueltas/estado en
+pantalla.
+
 ---
 
 ## A-11 · Atendido y Descartar, sobre Solicitudes
 
 **Qué prueba.** Los dos comandos de la grilla de Solicitudes.
+
+**Necesita.** Sesión `ejecutivo`; las Solicitudes de C-02 y C-04 (No reconocida / No es correo
+nuevo).
 
 **Cómo.** Vista **Por clasificar** (Solicitudes en No reconocida o No es correo nuevo, de C-02 y
 C-04). Seleccioná una y probá **Atendido**; con otra, **Descartar**.
@@ -204,11 +259,16 @@ C-04). Seleccioná una y probá **Atendido**; con otra, **Descartar**.
 En los dos: confirmación con la cantidad, la Solicitud sale de **Por clasificar**, y **no se le
 envía nada al cliente**.
 
+**Automatizable.** GUI (no automatizado esta vuelta: no hay herramienta de orquestación existente
+para el PATCH de `sanic_estadoprocesamiento`; punto de extensión directo).
+
 ---
 
 ## A-12 · Revisado
 
 **Qué prueba.** El octavo comando: apaga la marca y deja la nota.
+
+**Necesita.** Sesión `ejecutivo` o `supervisor`; la Solicitud de M-06 con `requiererevision = sí`.
 
 **Cómo.** Sobre una Solicitud con `sanic_requiererevision = sí` (la de M-06), vista **Para
 revisar**, botón **Revisado**. Escribí una nota.
@@ -222,11 +282,16 @@ revisar**, botón **Revisado**. Escribí una nota.
 | La nota | queda en `sanic_motivorevision` y el plugin la pasa a la **Bitácora** |
 | La Solicitud | sale de **Para revisar** |
 
+**Automatizable.** GUI (no automatizado esta vuelta, mismo motivo que A-11).
+
 ---
 
 ## A-13 · Multiidioma de los botones
 
 **Qué prueba.** Que cada etiqueta tenga su texto en 1033 y 3082 (convención del proyecto).
+
+**Necesita.** Un usuario con el idioma configurado en inglés (Configuración personal → Idiomas);
+cualquiera de las 4 sesiones.
 
 **Cómo.** Si tenés un usuario con el idioma en inglés, entrá con él. Si no, cambiá el idioma en
 **Configuración personal → Idiomas**.
@@ -245,6 +310,8 @@ revisar**, botón **Revisado**. Escribí una nota.
 | Revisado | Reviewed |
 
 Y los **mensajes del JavaScript** (confirmación, resultado) también cambian de idioma.
+
+**Automatizable.** GUI.
 
 ---
 

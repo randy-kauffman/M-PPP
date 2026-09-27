@@ -28,6 +28,9 @@ Casi todas terminan en segundos sin hacer nada — eso es lo normal y lo esperad
 
 **Qué prueba.** Que la recurrencia esté viva y que una ejecución vacía sea barata.
 
+**Necesita.** Acceso a Power Automate (rol de Maker o administrador del entorno) para ver el
+historial de ejecuciones de `MPPP-VIG`.
+
 **Cómo.** Sin tocar nada, mirá las ejecuciones de `MPPP-VIG` de la última hora.
 
 **Esperado.**
@@ -41,11 +44,17 @@ Casi todas terminan en segundos sin hacer nada — eso es lo normal y lo esperad
 
 **FALLA si** hay ejecuciones fallidas, o si alguna cambió algo sin que hubiera nada pendiente.
 
+**Automatizable.** Manual (API de administración de flujos de Power Automate, no Dataverse Web
+API; además hay que esperar el schedule real de 10 minutos).
+
 ---
 
 ## V-02 · Bloque 1 — un correo que quedó en la bandeja
 
 **Qué prueba.** Que un correo que `MPPP-REC` no llegó a procesar se ingiera igual.
+
+**Necesita.** Permiso para apagar/prender `Cloud Flow - MPPP - REC` (rol de Maker/administrador de
+Power Automate); el REMITENTE; el adjunto `E01-feliz-formato11.xlsx`.
 
 **Cómo.**
 1. **Apagá** `Cloud Flow - MPPP - REC` (Turn off).
@@ -65,11 +74,17 @@ Casi todas terminan en segundos sin hacer nada — eso es lo normal y lo esperad
 > Esto prueba lo que promete DF-02: si el disparador de correo se cae, **no se pierde ningún
 > correo**. Es la garantía más valiosa del diseño.
 
+**Automatizable.** Manual (exige apagar un flujo real, mandar un correo real y esperar 15+
+minutos; la decisión de reingerir vive dentro del flujo `MPPP-VIG`, no en un plugin).
+
 ---
 
 ## V-03 · Bloque 2 — una Solicitud que quedó en Ingresada
 
 **Qué prueba.** El reintento de clasificación y validación, con su contador.
+
+**Necesita.** Permiso para editar una Solicitud (`sanic_estadoprocesamiento`,
+`sanic_fechaingresada`) — rol de administración o API con privilegio de escritura.
 
 **Cómo.** En la app, abrí una Solicitud **Cerrada** o **En proceso** y volvela a **Ingresada**
 (y poné `sanic_fechaingresada` con la hora de hace 20 minutos). Esperá a que corra VIG.
@@ -85,12 +100,19 @@ Casi todas terminan en segundos sin hacer nada — eso es lo normal y lo esperad
 
 **FALLA si** las filas se duplican. Sería procesar dos veces la misma plantilla.
 
+**Automatizable.** Manual (la lógica de reintento — comparar `sanic_reintentosvalidacion` contra
+el máximo, incrementar, Bitácora `Reintento` — vive DENTRO del flujo `MPPP-VIG`, no en un
+plugin/Custom API que un PATCH pueda ejercitar).
+
 ---
 
 ## V-04 · Bloque 2 — se acaban los reintentos
 
 **Qué prueba.** Que después de `vigilancia.reintentos.maximo` se levante para revisión humana en
 vez de reintentar para siempre.
+
+**Necesita.** Permiso para editar `sanic_reintentosvalidacion` de una Solicitud (rol de
+administración o API con privilegio de escritura).
 
 **Cómo.** Sobre una Solicitud en **Ingresada** vieja, poné `sanic_reintentosvalidacion = 3`
 (el máximo). Esperá a que corra VIG.
@@ -104,11 +126,17 @@ vez de reintentar para siempre.
 | `sanic_motivorevision` | *"Validacion fallida 3 veces."* |
 | Dónde se ve | vista **Para revisar** |
 
+**Automatizable.** Manual (mismo motivo que V-03: la condición de "se acabaron los reintentos" es
+un If dentro de Power Automate).
+
 ---
 
 ## V-05 · Bloque 3 — una comunicación que no salió
 
 **Qué prueba.** Que una Solicitud En proceso sin acuse se recupere.
+
+**Necesita.** Permiso para apagar/prender `Cloud Flow - MPPP - COM`; el REMITENTE; el adjunto
+`E01-feliz-formato11.xlsx`.
 
 **Cómo.**
 1. **Apagá** `Cloud Flow - MPPP - COM`.
@@ -125,11 +153,17 @@ vez de reintentar para siempre.
 | Bitácora `Acuse iniciado` / `Acuse enviado` | origen **MPPP-VIG** (no MPPP-COM) |
 | Llega **una sola vez** | sí |
 
+**Automatizable.** Manual (depende de `MPPP-COM`/`MPPP-ENV` real —`Mail.Send`— y del schedule de
+`MPPP-VIG`).
+
 ---
 
 ## V-06 · Bloque 5 — los correos por clasificar vencen
 
 **Qué prueba.** DF-09: lo que nadie clasifica en 30 días pasa a **Vencida**.
+
+**Necesita.** Permiso para editar `sanic_fecharecibido` de una Solicitud No reconocida (la de
+C-04); rol de administración o API con privilegio de escritura.
 
 **Cómo.** Tomá una Solicitud en **No reconocida** (C-04) y poné `sanic_fecharecibido` con una fecha
 de hace **40 días**. Esperá a que corra VIG.
@@ -146,6 +180,9 @@ de hace **40 días**. Esperá a que corra VIG.
 
 > **Vencida** y no **Descartada**: la distinción es a propósito. Descartada = alguien decidió
 > ignorarlo. Vencida = **nadie lo miró**, y eso es un dato de gestión.
+
+**Automatizable.** Manual (la comparación de 30 días y el pase a Vencida viven en `MPPP-VIG`, no
+en un plugin).
 
 ---
 
