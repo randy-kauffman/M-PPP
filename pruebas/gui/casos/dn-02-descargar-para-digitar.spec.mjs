@@ -13,6 +13,7 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdirSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import { usuarioActivo, verificarSesionExiste } from "../ayudantes/sesion.mjs";
 import { abrirApp, irASitemap, esperarGrilla, seleccionarFilas } from "../ayudantes/navegacion.mjs";
@@ -36,6 +37,8 @@ test.use({ storageState: verificarSesionExiste(usuario) });
 
 test.describe("DN-02 — Descargar para digitar", () => {
   test("el boton descarga un .xlsx valido con las filas seleccionadas", async ({ page }) => {
+    mkdirSync(CARPETA_DESCARGAS, { recursive: true });
+
     await abrirApp(page);
     await irASitemap(page, SITEMAP.porDigitar);
     await esperarGrilla(page);
