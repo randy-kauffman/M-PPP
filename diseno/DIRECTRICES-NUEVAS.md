@@ -167,7 +167,7 @@ construcción.
 ## DN-02 · Exportación
 
 **Custom API `sanic_mppp_capi_exportarparadigitar`** — recibe los `filaid` seleccionados, devuelve
-el `.xlsx` en base64. Lo arma **C# con Open XML SDK** (ya se usa para leer, ya se midió en C-05), no
+el `.xlsx` en base64. Lo arma **C# con Open XML SDK 3.1.0**, que ya está referenciado en el ensamblado de producción, no
 JavaScript: un `.xlsx` a mano en el navegador es frágil y no se agregan librerías al cliente.
 
 **Parámetro nuevo `exportacion.columnas`**, JSON: la lista ordenada de campos, y **su orden ES el
@@ -178,6 +178,11 @@ orden de las columnas** del Excel. Hermano de `plantilla.estructura`, pero de sa
 > parámetro**, sin tocar una línea. Se siembra con lo que el ejecutivo necesita para digitar en
 > AS400 —cuenta e identificación incluidas— porque ese es el trabajo; y queda escrito que **ese
 > archivo sale de la plataforma sin la protección de columna encima** (RNF-04, BP-PP-004).
+
+> **PRECISIÓN (2026-09-26, la marcó el constructor y tenía razón).** El spike C-05 midió **LECTURA**
+> en el sandbox real, no escritura. Que la librería esté no garantiza que **escribir** un `.xlsx` de
+> cientos de filas entre en el presupuesto de 2 minutos (BP-PP-053). **Hay que MEDIRLO**, igual que se
+> midió `rpa.lote.maximo`: la escritura se cronometra con un volumen real antes de confiar en ella.
 
 **Comando *Descargar para digitar*** sobre la grilla de Filas, masivo como todos los demás.
 
