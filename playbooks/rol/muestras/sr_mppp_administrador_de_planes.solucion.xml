@@ -5,12 +5,14 @@
       <RolePrivileges>
         <RolePrivilege name="prvActivateSynchronousWorkflow" level="Basic" />
         <RolePrivilege name="prvAppendNewProcess" level="Global" />
+        <RolePrivilege name="prvAppendsanic_mppp_tbl_autorizacioncliente" level="Global" />
         <RolePrivilege name="prvAppendsanic_mppp_tbl_autorizacionplan" level="Global" />
         <RolePrivilege name="prvAppendsanic_mppp_tbl_autorizado" level="Global" />
         <RolePrivilege name="prvAppendsanic_mppp_tbl_cliente" level="Global" />
         <RolePrivilege name="prvAppendsanic_mppp_tbl_plan" level="Global" />
         <RolePrivilege name="prvAppendToAsyncOperation" level="Basic" />
         <RolePrivilege name="prvAppendToNewProcess" level="Global" />
+        <RolePrivilege name="prvAppendTosanic_mppp_tbl_autorizacioncliente" level="Global" />
         <RolePrivilege name="prvAppendTosanic_mppp_tbl_autorizacionplan" level="Global" />
         <RolePrivilege name="prvAppendTosanic_mppp_tbl_autorizado" level="Global" />
         <RolePrivilege name="prvAppendTosanic_mppp_tbl_cliente" level="Global" />
@@ -26,6 +28,7 @@
         <RolePrivilege name="prvAssignWorkflow" level="Basic" />
         <RolePrivilege name="prvAssignWorkflowSession" level="Basic" />
         <RolePrivilege name="prvCreateNewProcess" level="Global" />
+        <RolePrivilege name="prvCreatesanic_mppp_tbl_autorizacioncliente" level="Global" />
         <RolePrivilege name="prvCreatesanic_mppp_tbl_autorizacionplan" level="Global" />
         <RolePrivilege name="prvCreatesanic_mppp_tbl_autorizado" level="Global" />
         <RolePrivilege name="prvCreatesanic_mppp_tbl_cliente" level="Global" />
@@ -65,6 +68,7 @@
         <RolePrivilege name="prvReadRelationship" level="Global" />
         <RolePrivilege name="prvReadReport" level="Basic" />
         <RolePrivilege name="prvReadRole" level="Global" />
+        <RolePrivilege name="prvReadsanic_mppp_tbl_autorizacioncliente" level="Global" />
         <RolePrivilege name="prvReadsanic_mppp_tbl_autorizacionplan" level="Global" />
         <RolePrivilege name="prvReadsanic_mppp_tbl_autorizado" level="Global" />
         <RolePrivilege name="prvReadsanic_mppp_tbl_cliente" level="Global" />
@@ -96,6 +100,7 @@
         <RolePrivilege name="prvWorkflowExecution" level="Global" />
         <RolePrivilege name="prvWriteAsyncOperation" level="Basic" />
         <RolePrivilege name="prvWriteNewProcess" level="Global" />
+        <RolePrivilege name="prvWritesanic_mppp_tbl_autorizacioncliente" level="Global" />
         <RolePrivilege name="prvWritesanic_mppp_tbl_autorizacionplan" level="Global" />
         <RolePrivilege name="prvWritesanic_mppp_tbl_autorizado" level="Global" />
         <RolePrivilege name="prvWritesanic_mppp_tbl_cliente" level="Global" />

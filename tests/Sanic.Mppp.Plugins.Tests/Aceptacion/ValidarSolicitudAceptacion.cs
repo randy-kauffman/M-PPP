@@ -485,5 +485,76 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
             Assert.Empty(m.Resultados());
         }
+
+        // ------------------------------------------------------------------ DN-01 (wiring, punto 4): el modo de autorizacion llega hasta acá
+        // Prueba que ValidarSolicitud (1) lee `autorizacion.modo` con CatalogosDataverse.ResolverModoDeAutorizacion(),
+        // y (2) pasa el modo y los clientes autorizados del remitente al constructor de CatalogosDeValidacion — no
+        // alcanza con que el dominio (AutorizacionPorClienteAceptacion) ya sepa mirar la vía correcta si nadie
+        // adentro de ValidarSolicitud se la pasa.
+        [Fact]
+        public void En_modo_cliente_una_fila_de_un_plan_del_mismo_cliente_se_valida_sin_autorizacionplan_propia()
+        {
+            var m = new Mundo(Excel(Fila(plan: "0099")));
+            m.Parametro(ModoDeAutorizacionParametro.Nombre, "cliente");
+
+            // El plan 0099 es del MISMO cliente que el 0042 (ACME), pero NO tiene su propia AutorizacionPlan:
+            // en modo plan esta fila quedaría Sin autorización. Solo se valida si el modo cliente autoriza por
+            // TODOS los planes del cliente, sin enumerarlos (DN-01).
+            var planActual = m.Svc.Retrieve(Tablas.Plan, m.PlanId, new ColumnSet("sanic_clienteid"));
+            var clienteId = planActual.GetAttributeValue<EntityReference>("sanic_clienteid").Id;
+            m.Svc.Sembrar(new Entity(Tablas.Plan)
+            {
+                ["statecode"] = new OptionSetValue(0), ["sanic_codigo"] = "0099",
+                ["sanic_tipoformato"] = new OptionSetValue((int)TipoDeFormatoDelPlan._11), ["sanic_moneda"] = new OptionSetValue((int)Moneda.USD),
+                ["sanic_clienteid"] = new EntityReference(Tablas.Cliente, clienteId),
+            });
+
+            // Un autorizado "hermano" (mismo correo, otra fila de catálogo), autorizado por CLIENTE, sin ninguna
+            // AutorizacionPlan propia — así la única vía posible para validar esta fila es la de cliente.
+            var autorizadoHermano = m.Svc.Sembrar(new Entity(Tablas.Autorizado) { ["statecode"] = new OptionSetValue(0), ["sanic_nombre"] = "ana@acme.com" });
+            m.Svc.Sembrar(new Entity(Tablas.AutorizacionCliente)
+            {
+                ["statecode"] = new OptionSetValue(0),
+                ["sanic_autorizadoid"] = new EntityReference(Tablas.Autorizado, autorizadoHermano),
+                ["sanic_clienteid"] = new EntityReference(Tablas.Cliente, clienteId),
+            });
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            var fila = Assert.Single(m.Filas());
+            Assert.Equal((int)EstadoDeLaFila.Validada, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+        }
+
+        [Fact]
+        public void En_modo_cliente_una_autorizacionplan_existente_deja_de_alcanzar_sin_autorizacioncliente()
+        {
+            // Mismo remitente y mismo plan 0042 de siempre: Mundo YA sembró una AutorizacionPlan(ana@acme.com, 0042)
+            // válida. En modo PLAN esta fila se valida (lo prueba el resto de esta clase). En modo CLIENTE, sin
+            // ninguna AutorizacionCliente, tiene que dejar de alcanzar: si esto da Validada, ValidarSolicitud no
+            // está mirando el modo — sigue usando la vía vieja de memoria.
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ModoDeAutorizacionParametro.Nombre, "cliente");
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.Rechazada, 1, 0, 1), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            var fila = Assert.Single(m.Filas());
+            Assert.Equal((int)EstadoDeLaFila.SinAutorizacion, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+            // No negociable (DN-01 punto 5): el mismo texto unificado que en modo plan, byte a byte.
+            Assert.Equal("El plan 0042 no existe o usted no está autorizado sobre él.", (string)fila["sanic_mensaje"]);
+        }
+
+        [Fact]
+        public void Sin_el_parametro_autorizacion_modo_el_comportamiento_es_el_de_siempre_modo_plan()
+        {
+            // El parámetro no existe en el entorno todavía (playbook recién sembrado en algunos entornos, no en
+            // todos): tiene que degradar a plan y seguir validando por AutorizacionPlan, sin romper nada.
+            var m = new Mundo(Excel(Fila()));
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+        }
     }
 }

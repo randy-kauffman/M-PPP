@@ -5,6 +5,7 @@ using Microsoft.Xrm.Sdk;
 using Sanic.Mppp.Plugins.Datos;
 using Sanic.Mppp.Plugins.Dominio;
 using Sanic.Mppp.Plugins.Tests.Dobles;
+using Sanic.Mppp.Plugins.Validacion;
 using Xunit;
 
 namespace Sanic.Mppp.Plugins.Tests.Aceptacion
@@ -316,6 +317,150 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Un_servicio_nulo_es_un_error_de_programacion()
         {
             Assert.Throws<ArgumentNullException>(() => new CatalogosDataverse(null));
+        }
+
+        // ------------------------------------------------------------------ DN-01 (wiring, punto 4): el nombre lógico de la tabla nueva
+        [Fact]
+        public void La_tabla_autorizacioncliente_tiene_su_nombre_logico()
+        {
+            Assert.Equal("sanic_mppp_tbl_autorizacioncliente", Tablas.AutorizacionCliente);
+        }
+
+        // ------------------------------------------------------------------ DN-01 (wiring): resolver el parámetro `autorizacion.modo`
+        [Fact]
+        public void Resolver_modo_de_autorizacion_lee_el_parametro_en_una_sola_consulta_y_degrada_a_plan_si_falta()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var catalogos = new CatalogosDataverse(svc);
+
+            Assert.Equal(ModoDeAutorizacion.Plan, catalogos.ResolverModoDeAutorizacion());
+            Assert.Equal(1, Consultas(svc));
+        }
+
+        [Fact]
+        public void Resolver_modo_de_autorizacion_devuelve_cliente_cuando_el_parametro_lo_dice()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            svc.Sembrar(Entidad(Tablas.Parametro, Tablas.Activo, ("sanic_nombre", ModoDeAutorizacionParametro.Nombre), ("sanic_version", 1), ("sanic_valor", "cliente")));
+
+            Assert.Equal(ModoDeAutorizacion.Cliente, new CatalogosDataverse(svc).ResolverModoDeAutorizacion());
+        }
+
+        [Fact]
+        public void Resolver_modo_de_autorizacion_degrada_a_plan_con_basura_nunca_lanza()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            svc.Sembrar(Entidad(Tablas.Parametro, Tablas.Activo, ("sanic_nombre", ModoDeAutorizacionParametro.Nombre), ("sanic_version", 1), ("sanic_valor", "clienteX")));
+
+            Assert.Equal(ModoDeAutorizacion.Plan, new CatalogosDataverse(svc).ResolverModoDeAutorizacion());
+        }
+
+        // ------------------------------------------------------------------ DN-01 (wiring): ClientesAutorizadosDe (AutorizacionCliente)
+        private sealed class MundoCliente
+        {
+            public OrganizationServiceEnMemoria Svc = new OrganizationServiceEnMemoria();
+            public Guid ClienteActivo, ClienteInactivo;
+
+            public MundoCliente()
+            {
+                ClienteActivo = Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", "ACME")));
+                ClienteInactivo = Svc.Sembrar(Entidad(Tablas.Cliente, Inactivo, ("sanic_nombre", "VIEJA SA")));
+            }
+
+            public Guid Autorizado(string correo, int estado = Tablas.Activo) =>
+                Svc.Sembrar(Entidad(Tablas.Autorizado, estado, ("sanic_nombre", correo)));
+
+            public void AutorizacionCliente(Guid autorizado, Guid cliente, int estado = Tablas.Activo)
+            {
+                Svc.Sembrar(Entidad(Tablas.AutorizacionCliente, estado,
+                    ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)),
+                    ("sanic_clienteid", new EntityReference(Tablas.Cliente, cliente))));
+            }
+        }
+
+        [Fact]
+        public void Clientes_autorizados_de_un_correo_salen_solo_si_todo_esta_activo()
+        {
+            var m = new MundoCliente();
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+            m.AutorizacionCliente(yo, m.ClienteInactivo); // cliente inactivo: no cuenta
+            var yoInactivo = m.Autorizado("otro@acme.com", Inactivo);
+            var clienteSuelto = m.Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", "BETA")));
+            m.AutorizacionCliente(yoInactivo, clienteSuelto);
+            m.AutorizacionCliente(yo, m.ClienteActivo, Inactivo); // autorización inactiva
+
+            var clientes = new CatalogosDataverse(m.Svc).ClientesAutorizadosDe("ana@acme.com");
+
+            Assert.Equal(new[] { m.ClienteActivo }, clientes);
+        }
+
+        [Fact]
+        public void El_correo_de_clientes_autorizados_se_busca_como_lo_guarda_dataverse_sin_espacios_y_en_minuscula()
+        {
+            var m = new MundoCliente();
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+            var catalogos = new CatalogosDataverse(m.Svc);
+
+            Assert.Equal(new[] { m.ClienteActivo }, catalogos.ClientesAutorizadosDe("  Ana@ACME.com  "));
+            Assert.Empty(catalogos.ClientesAutorizadosDe("nadie@acme.com"));
+        }
+
+        [Fact]
+        public void Sin_correo_clientes_autorizados_no_hay_consulta_y_el_conjunto_es_nuevo_cada_vez()
+        {
+            var m = new MundoCliente();
+            var catalogos = new CatalogosDataverse(m.Svc);
+            Assert.Empty(catalogos.ClientesAutorizadosDe(null));
+            Assert.Empty(catalogos.ClientesAutorizadosDe("   "));
+            Assert.Equal(0, Consultas(m.Svc));
+
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+            catalogos.ClientesAutorizadosDe("ana@acme.com").Add(Guid.NewGuid());
+            Assert.Single(catalogos.ClientesAutorizadosDe("ana@acme.com"));
+        }
+
+        [Fact]
+        public void El_numero_de_consultas_de_clientes_autorizados_no_crece_con_la_cantidad_de_autorizaciones()
+        {
+            var m = new MundoCliente();
+            var yo = m.Autorizado("ana@acme.com");
+            for (var i = 0; i < 20; i++)
+            {
+                var cliente = m.Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", $"C{i}")));
+                m.AutorizacionCliente(yo, cliente);
+            }
+
+            var clientes = new CatalogosDataverse(m.Svc).ClientesAutorizadosDe("ana@acme.com");
+            Assert.Equal(20, clientes.Count);
+            Assert.InRange(Consultas(m.Svc), 1, 3);
+        }
+
+        // ------------------------------------------------------------------ DN-01 (wiring): PlanesActivosPorCodigo trae el cliente dueño
+        [Fact]
+        public void Los_planes_activos_traen_el_cliente_dueno_del_plan_para_el_modo_cliente_de_dn01()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var cliente = Guid.NewGuid();
+            Plan(svc, "0042", TipoDeFormatoDelPlan._11, Moneda.USD, cliente);
+
+            var plan = Assert.Single(new CatalogosDataverse(svc).PlanesActivosPorCodigo(new[] { "0042" }));
+
+            Assert.Equal(cliente, plan.ClienteId);
+        }
+
+        [Fact]
+        public void Un_plan_activo_sin_cliente_dueno_es_un_error_real()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var e = Entidad(Tablas.Plan, Tablas.Activo, ("sanic_codigo", "0042"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._11)), ("sanic_moneda", new OptionSetValue((int)Moneda.USD)));
+            var id = svc.Sembrar(e);
+
+            var ex = Assert.Throws<InvalidOperationException>(() => new CatalogosDataverse(svc).PlanesActivosPorCodigo(new[] { "0042" }));
+            Assert.Contains("sanic_clienteid", ex.Message);
+            Assert.Contains(id.ToString(), ex.Message);
         }
     }
 }
