@@ -29,6 +29,7 @@ Reglas citadas: BP-PP-091, 093, 094, 095, 100, 186. Requisitos: RF-03, RF-11 a R
 | **Trabajo** | Por digitar | Vista de Filas en estado Validada | Ejecutivo |
 | | **Devueltas** | Vista de Filas que el Supervisor devolvió (Validada con mensaje de devolución) | Ejecutivo |
 | | Por aprobar | Vista de Filas en estado Digitada | Supervisor |
+| | **Para atención manual** | Vista de Filas con `sanic_requiereatencionmanual` = sí. Existía desde la fase 2 pero **no tenía entrada propia en el sitemap** — un olvido, no una decisión: su hermana conceptual del lado Solicitud, *Para revisar*, sí la tenía. Corregido el 2026-09-27 (hallazgo del aprobador); reúsa el ícono de *Para revisar*, mismo patrón de negocio | Ejecutivo |
 | | **Por clasificar** | Vista de Solicitudes en estado No reconocida o No es correo nuevo, con su motivo | Ejecutivo |
 | | Para revisar | Vista de Solicitudes con `sanic_requiererevision` = sí | Ejecutivo, Supervisor |
 | **Consulta** | Solicitudes | Todas las Solicitudes | Ejecutivo, Supervisor |
@@ -44,7 +45,7 @@ Columnas pensadas para digitar sin abrir el registro. Las protegidas (identifica
 
 | Vista (tabla) | Filtro | Columnas | Orden |
 |---|---|---|---|
-| **Mis clientes — por digitar** (Fila) · *por defecto del Ejecutivo* | Estado = Validada **y** Plan → Cliente → propietario = usuario actual (RF-19, D-13) | Solicitud, n.º de fila, Gestión, Clasificación, Plan, Referencia, Nombre, Tipo ID, Identificación, Cuenta, Moneda, Banco, Validada el | Solicitud, n.º de fila |
+| **Mis clientes — por digitar** (Fila) · *por defecto del Ejecutivo* | Estado = Validada **y** Plan → Cliente → propietario = usuario actual (RF-19, D-13) | Solicitud, n.º de fila, **Requiere atención manual**, Gestión, Clasificación, Plan, Referencia, Nombre, Tipo ID, Identificación, Cuenta, Moneda, Banco, Validada el | Solicitud, n.º de fila |
 | Todos — por digitar (Fila) | Estado = Validada | las mismas + Cliente | ídem |
 | **Por aprobar** (Fila) · *por defecto del Supervisor* | Estado = Digitada | las mismas + Digitada por, Digitada el | Digitada el |
 | Mis clientes — devueltas (Fila) | Estado = Validada, con mensaje de devolución | + Mensaje | |
@@ -67,6 +68,21 @@ Las entra el RPA y no existen hasta la fase 2, así que **no cuentan en las 17 d
 
 **La columna "Tomada por el bot hasta" se agrega también a la grilla de Filas**, para que la reserva se vea sin cambiar de vista.
 
+> **Corregido el 2026-09-27 (hallazgo del aprobador).** *Para atención manual* se construyó en Dev en
+> la fase 2 pero **nunca se enganchó al sitemap**: un olvido de fase 2, no una decisión — su hermana
+> conceptual del lado Solicitud, *Para revisar*, sí tenía su entrada propia (`subarea_pararevisar`).
+> Se agregó `subarea_paraatencionmanual` en el área Trabajo, entre *Por aprobar* y *Por clasificar*
+> (§2 de arriba), reusando el ícono `sanic_mppp_wr_svg_pararevisar` — mismo patrón de negocio, no se
+> creó un web resource nuevo. Además, el aprobador señaló que en las vistas de trabajo no había forma
+> de ver que una fila estaba marcada: se agregó la columna `sanic_requiereatencionmanual` (Sí/No,
+> ancho chico) a **Mis clientes — por digitar**, **Todos — por digitar**, **Por aprobar** y **Mis
+> clientes — devueltas** (§3 de arriba), segunda columna en las cuatro, pegada al n.º de fila y antes
+> del resto, para que se vea de un vistazo. Por aprobar y devueltas se evaluaron y sí correspondía:
+> `atencionmanual` (`03` §"Qué filas entran") vale también sobre una fila Digitada, y
+> `sanic_notainterna` es la misma columna que usa tanto el bot al marcar atención manual como el
+> supervisor al devolver una fila, así que sin la columna nueva esas dos vistas de trabajo tenían el
+> mismo problema de fondo que motivó el hallazgo. **No** se agregó a Filas, Terminadas ni Tomadas por
+> el bot: no son vistas de trabajo donde alguien levanta filas para actuar sobre ellas.
 > Detalle de implementación a verificar antes de construir: filtrar *"claim vigente ahora"* en una vista guardada necesita un operador de fecha relativa de FetchXML (familia `next-x-hours`). **Se confirma en Learn al construir la vista**; si no diera, se muestra la columna y el ejecutivo lee la hora, que resuelve lo mismo.
 
 ### Lista cerrada de las 17 vistas (inventario 12.2), hoy 20
