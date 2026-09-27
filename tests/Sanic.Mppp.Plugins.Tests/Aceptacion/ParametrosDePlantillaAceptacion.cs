@@ -253,6 +253,88 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(null, null, null));
         }
 
+        // ------------------------------------------------------------------ plantilla.obligatoriedad · porGestion (DN-03)
+        // DN-03 (aprobador, 2026-09-26, diseno/DIRECTRICES-NUEVAS.md): "el bloque de hoy NO se toca y sigue rigiendo";
+        // `porGestion` lo ajusta ENCIMA. `opcionales` afloja, `obligatorios` endurece; la gestión gana sobre lo global.
+        internal const string ObligatoriedadConPorGestion = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],""porGestion"":{
+            ""Exclusion"":{""opcionales"":[{""campo"":""numeroCuenta""},{""campo"":""banco""}]},
+            ""Modificacion"":{""obligatorios"":[{""campo"":""referencia""}]}
+        }}";
+
+        internal const string ObligatoriedadConReglasYPorGestion = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],
+            ""reglas"":[{""gestion"":""Exclusion"",""clasificacion"":""*"",""formato"":""*"",""opcionales"":[""moneda"",""banco""]}],
+            ""porGestion"":{
+                ""Exclusion"":{""opcionales"":[{""campo"":""numeroCuenta""}]},
+                ""Modificacion"":{""obligatorios"":[{""campo"":""referencia""}]}
+            }}";
+
+        internal const string ObligatoriedadConPorGestionNulo = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],""porGestion"":null}";
+
+        [Fact]
+        public void DN03_un_parametro_sin_porGestion_se_comporta_exactamente_como_hoy()
+        {
+            // DN-03, "Compatibilidad": lo que ya está sembrado en tres entornos (sin 'porGestion') sigue dando
+            // EXACTAMENTE lo mismo que antes de esta directriz. Mismos valores que ya fija
+            // Se_suman_los_opcionales_de_todas_las_reglas_que_calzan_y_el_asterisco_calza_con_todo.
+            var o = ObligatoriedadPlantilla.DesdeJson(ObligatoriedadConReglas);
+            string[] De(Gestion? g, Clasificacion? c, TipoDeFormatoDelPlan? f) => o.CamposOpcionales(g, c, f).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+            Assert.Equal(new[] { "referencia" }, De(Gestion.Inclusion, Clasificacion.ACH, TipoDeFormatoDelPlan._10));
+            Assert.Equal(new[] { "banco", "moneda", "referencia" }, De(Gestion.Exclusion, Clasificacion.ACH, TipoDeFormatoDelPlan._10));
+            Assert.Equal(new[] { "banco", "moneda", "numeroCuenta", "referencia" }, De(Gestion.Exclusion, Clasificacion.CK, TipoDeFormatoDelPlan._06));
+            Assert.Equal(new[] { "referencia", "tipoIdentificacion" }, o.CamposOpcionales(null, Clasificacion.BAC, TipoDeFormatoDelPlan._11).OrderBy(x => x, StringComparer.Ordinal));
+        }
+
+        [Fact]
+        public void DN03_porGestion_afloja_con_opcionales_y_endurece_con_obligatorios_la_gestion_gana_sobre_lo_global()
+        {
+            var o = ObligatoriedadPlantilla.DesdeJson(ObligatoriedadConPorGestion);
+            string[] De(Gestion? g) => o.CamposOpcionales(g, null, null).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+            Assert.Equal(new[] { "referencia" }, De(Gestion.Inclusion)); // sin entrada en porGestion: solo el bloque global
+            Assert.Equal(new[] { "banco", "numeroCuenta", "referencia" }, De(Gestion.Exclusion)); // afloja: suma a lo global
+            Assert.Equal(new string[0], De(Gestion.Modificacion)); // endurece: saca 'referencia' aunque lo global la daba por opcional
+        }
+
+        [Fact]
+        public void DN03_porGestion_se_compone_con_las_reglas_existentes_sin_pisarlas()
+        {
+            var o = ObligatoriedadPlantilla.DesdeJson(ObligatoriedadConReglasYPorGestion);
+            string[] De(Gestion? g, Clasificacion? c, TipoDeFormatoDelPlan? f) => o.CamposOpcionales(g, c, f).OrderBy(x => x, StringComparer.Ordinal).ToArray();
+
+            Assert.Equal(new[] { "banco", "moneda", "numeroCuenta", "referencia" }, De(Gestion.Exclusion, Clasificacion.ACH, TipoDeFormatoDelPlan._10));
+            Assert.Equal(new string[0], De(Gestion.Modificacion, Clasificacion.ACH, TipoDeFormatoDelPlan._10));
+            Assert.Equal(new[] { "referencia" }, De(Gestion.Inclusion, Clasificacion.ACH, TipoDeFormatoDelPlan._10));
+        }
+
+        [Fact]
+        public void DN03_una_gestion_vacia_o_invalida_en_la_fila_rige_solo_el_bloque_global_porGestion_no_se_mira()
+        {
+            // DN-03: esa fila ya falló LISTAS_VALIDAS por su cuenta; sumarle un efecto de porGestion sería ruido.
+            var o = ObligatoriedadPlantilla.DesdeJson(ObligatoriedadConPorGestion);
+            Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(null, null, null));
+        }
+
+        [Theory]
+        [InlineData("  exclusión  ")]
+        [InlineData("EXCLUSION")]
+        [InlineData("ExclusioN")]
+        public void DN03_los_nombres_de_gestion_de_porGestion_se_comparan_sin_distinguir_caja_ni_tildes(string clave)
+        {
+            // DN-03: "los nombres de gestión se comparan sin distinguir caja ni tildes, igual que ya hace la
+            // validación de listas" (ListasPlantilla.Normalizar).
+            var json = ObligatoriedadConPorGestion.Replace("\"Exclusion\":", $"\"{clave}\":");
+            var o = ObligatoriedadPlantilla.DesdeJson(json);
+            Assert.Equal(new[] { "banco", "numeroCuenta", "referencia" }, o.CamposOpcionales(Gestion.Exclusion, null, null).OrderBy(x => x, StringComparer.Ordinal));
+        }
+
+        [Fact]
+        public void DN03_porGestion_explicitamente_nulo_se_comporta_igual_que_ausente()
+        {
+            var o = ObligatoriedadPlantilla.DesdeJson(ObligatoriedadConPorGestionNulo);
+            Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(Gestion.Exclusion, null, null));
+        }
+
         [Theory]
         [InlineData(null)]
         [InlineData(" ")]
@@ -272,6 +354,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(@"{""porDefecto"":""obligatorio"",""reglas"":[{""gestion"":""*"",""clasificacion"":""*"",""formato"":""*""}]}")]
         [InlineData(@"{""porDefecto"":""obligatorio"",""reglas"":[{""gestion"":""*"",""clasificacion"":""*"",""formato"":""*"",""opcionales"":[""saldo""]}]}")]
         [InlineData(@"{""porDefecto"":""obligatorio"",""reglas"":[null]}")]
+        // DN-03: "una gestión que no existe en porGestion" es error ruidoso de configuración, como cualquier parámetro mal cargado.
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Bajas"":{""opcionales"":[{""campo"":""banco""}]}}}")] // gestión desconocida
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":[]}")] // porGestion no es un objeto
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":""no es un objeto""}}")]
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[{""campo"":""saldo""}]}}}")] // campo desconocido
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""obligatorios"":[{""campo"":""saldo""}]}}}")]
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[{""campo"":""Referencia""}]}}}")] // los nombres de campo son exactos
         public void Una_obligatoriedad_mal_cargada_revienta_con_el_motivo(string json)
         {
             var ex = Assert.Throws<FormatException>(() => ObligatoriedadPlantilla.DesdeJson(json));

@@ -412,6 +412,37 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.True(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(("numeroPlan", "9999"))).Cumple);
         }
 
+        // ------------------------------------------------------------------ OBLIGATORIEDAD · porGestion (DN-03)
+        [Fact]
+        public void DN03_la_obligatoriedad_tambien_se_puede_ajustar_por_gestion_sin_cambiar_el_evaluador()
+        {
+            var catalogos = Catalogos(ParametrosDePlantillaAceptacion.ObligatoriedadConPorGestion);
+
+            // Exclusion: numeroCuenta y banco son opcionales (además de referencia, que ya lo era globalmente).
+            Assert.True(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, ("gestion", "Exclusion"), ("numeroCuenta", null), ("banco", null))).Cumple);
+            // La misma fila como Inclusion: sin ajuste por gestión, faltan los dos.
+            Assert.False(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, ("gestion", "Inclusion"), ("numeroCuenta", null), ("banco", null))).Cumple);
+            // Modificacion: 'referencia' se vuelve obligatoria aunque el bloque global la daba por opcional.
+            Assert.False(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, ("gestion", "Modificacion"), ("referencia", null))).Cumple);
+            Assert.True(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, ("gestion", "Modificacion"), ("referencia", "REF"))).Cumple);
+        }
+
+        [Fact]
+        public void DN03_el_mensaje_de_obligatoriedad_no_menciona_la_gestion_ni_aunque_dependa_de_ella()
+        {
+            // DN-03: "el mensaje al cliente no cambia... que la obligatoriedad dependa de la gestión no puede
+            // filtrarse al texto" (D-41: sigue nombrando el campo, sin citar el valor, y ahora tampoco la gestión).
+            var catalogos = Catalogos(ParametrosDePlantillaAceptacion.ObligatoriedadConPorGestion);
+            var fila = Fila(catalogos, ("gestion", "Modificacion"), ("referencia", null));
+            var veredicto = Suelta(ReglasDeRegistro.Obligatoriedad, fila);
+
+            Assert.False(veredicto.Cumple);
+            var texto = MensajeAlCliente.Componer(null, veredicto, ReglasDeRegistro.Obligatoriedad);
+            Assert.Equal("Faltan datos obligatorios: Referencia.", texto);
+            Assert.DoesNotContain("Modificacion", texto, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("gestion", texto, StringComparison.OrdinalIgnoreCase);
+        }
+
         // ------------------------------------------------------------------ REFERENCIA_FORMATO_11 (D-17)
         [Theory]
         [InlineData("1", "BAC", "10200000000000000001")]
