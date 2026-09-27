@@ -6,15 +6,20 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
 Formulario nuevo, agregado el 2026-09-27: pedido textual del aprobador ("Quiero agregar un nuevo
 correo autorizado al cliente y solo me sale 'Nombre' y 'Owner'"). Hoy `AutorizacionCliente` solo
 tiene el formulario "Information" de fábrica, sin ningún lookup visible; este playbook lo reemplaza.
-Calcado de `autorizacionplan.md`, con dos diferencias de fondo:
+Calcado de `autorizacionplan.md`, con una diferencia de fondo:
 
-1. Esta tabla **no tiene** `sanic_documentofirmado` ni `sanic_fechadocumento` (a diferencia de
-   `AutorizacionPlan`), así que **no lleva** la sección "Evidencia de la autorizacion".
-2. `sanic_nombre` es, igual que en `AutorizacionPlan`, un nombre **calculado por el step del
+1. `sanic_nombre` es, igual que en `AutorizacionPlan`, un nombre **calculado por el step del
    servidor** (correo → cliente): nadie lo digita. Por eso va en el encabezado como los demás tres
    campos, en solo lectura de hecho (lo calcula el servidor), aunque el formulario entero no está
    marcado `solo_lectura` porque el Administrador de planes sí edita el lookup de Cliente y el de
    Autorizado al crear el registro.
+
+Actualizado el 2026-09-27 por decisión del aprobador (ver `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md`
+§2, "Decisión del aprobador"): `AutorizacionCliente` ahora tiene `sanic_documentofirmado` y
+`sanic_fechadocumento`, igual que `AutorizacionPlan`, así que este formulario **agrega** la sección
+"Evidencia de la autorizacion" con esos dos campos. Motivo de negocio: autorizar por cliente habilita
+TODOS los planes del cliente a la vez, más amplio que autorizar por plan; no puede exigir menos
+respaldo documental.
 
 ## 1. Identidad
 
@@ -43,7 +48,7 @@ Calcado de `autorizacionplan.md`, con dos diferencias de fondo:
   "nombre": "Autorizacion por cliente",
   "tabla": "sanic_mppp_tbl_autorizacioncliente",
   "solo_lectura": false,
-  "descripcion": "Formulario principal de Autorizacion por cliente (DN-01): un correo autorizado sobre TODOS los planes de un cliente. Convive con Autorizacion (AutorizacionPlan) por plan; ninguna reemplaza a la otra. Esta tabla NO lleva evidencia: no tiene sanic_documentofirmado ni sanic_fechadocumento.",
+  "descripcion": "Formulario principal de Autorizacion por cliente (DN-01): un correo autorizado sobre TODOS los planes de un cliente. Convive con Autorizacion (AutorizacionPlan) por plan; ninguna reemplaza a la otra. La evidencia firmada se agregó el 2026-09-27 por decisión del aprobador.",
   "pestana": "General",
   "encabezado": [
     "sanic_nombre",
@@ -52,23 +57,24 @@ Calcado de `autorizacionplan.md`, con dos diferencias de fondo:
   ],
   "secciones": [
     {
-      "titulo": "Datos",
+      "titulo": "Evidencia de la autorizacion",
       "campos": [
-        "ownerid"
+        "sanic_documentofirmado",
+        "sanic_fechadocumento"
       ]
     }
   ]
 }
 ```
 
-Decisión de este playbook, no del diseño: la sección **"Datos" con `ownerid`**. `AutorizacionCliente`
-no tiene columnas propias además de las tres del encabezado (`sanic_nombre`, `sanic_autorizadoid`,
-`sanic_clienteid`; verificado contra la metadata el 2026-09-27) y no es el lado "uno" de ninguna
-relación, así que no admite ninguna subgrilla. `formulario.py` exige al menos una sección con
-`campos`, `subgrilla` o `webresource` (la lista no puede ir vacía): con las tres columnas de negocio
-ya puestas en el encabezado, no queda ningún campo propio para una sección. Se resuelve con el mismo
-patrón que ya usa `playbooks/formulario/cliente.md` §2 (sección "Datos" con `ownerid`): un campo
-nativo de toda tabla `usuario`, no inventado para este cambio.
+Decisión de este playbook, no del diseño: **se quita la sección "Datos" con `ownerid`** que llevaba
+la versión anterior de este playbook. Esa sección no venía del diseño: se había agregado solo porque
+`formulario.py` exige al menos una sección con `campos`, `subgrilla` o `webresource`, y hasta el
+2026-09-27 esta tabla no tenía ninguna columna propia fuera de las tres del encabezado. Ahora que
+`sanic_documentofirmado` y `sanic_fechadocumento` existen, la sección "Evidencia de la autorizacion"
+cumple ese mínimo por sí sola con campos que sí vienen del negocio, así que el placeholder de
+`ownerid` ya no aporta nada y se retira. `ownerid` sigue estando disponible en el formulario por
+las vistas y la seguridad estándar de Dataverse; no hace falta declararlo a mano.
 
 ## 3. Precondiciones
 
