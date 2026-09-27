@@ -335,6 +335,30 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(Gestion.Exclusion, null, null));
         }
 
+        [Fact]
+        public void DN03_porGestion_como_objeto_vacio_es_lo_mismo_que_ausente()
+        {
+            // Un objeto vacío (cero gestiones configuradas) NO es lo mismo que una entrada de gestión sin efecto: acá
+            // simplemente no hay ningún ajuste todavía, y es justo la forma en la que se siembra el parámetro (DN-03,
+            // "conservando el comportamiento actual hasta que el negocio diga qué aflojar en cada gestión").
+            var json = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],""porGestion"":{}}";
+            var o = ObligatoriedadPlantilla.DesdeJson(json);
+            Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(Gestion.Exclusion, null, null));
+        }
+
+        [Fact]
+        public void DN03_si_un_campo_esta_en_opcionales_y_en_obligatorios_de_la_misma_gestion_gana_obligatorios()
+        {
+            // Decisión del aprobador (2026-09-27): ante la contradicción dentro de la MISMA entrada de porGestion se
+            // endurece, no se afloja. Pedir un dato de más molesta; dejar pasar una fila sin un dato que hacía falta
+            // llega a AS400. Mismo criterio de todo el proyecto: ante la duda, fallar cerrado.
+            var json = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],""porGestion"":{
+                ""Exclusion"":{""opcionales"":[{""campo"":""numeroCuenta""}],""obligatorios"":[{""campo"":""numeroCuenta""}]}
+            }}";
+            var o = ObligatoriedadPlantilla.DesdeJson(json);
+            Assert.Equal(new[] { "referencia" }, o.CamposOpcionales(Gestion.Exclusion, null, null));
+        }
+
         [Theory]
         [InlineData(null)]
         [InlineData(" ")]
@@ -361,6 +385,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[{""campo"":""saldo""}]}}}")] // campo desconocido
         [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""obligatorios"":[{""campo"":""saldo""}]}}}")]
         [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[{""campo"":""Referencia""}]}}}")] // los nombres de campo son exactos
+        // Decisión del aprobador (2026-09-27): dos claves que normalizan a la misma gestión son una ambigüedad que
+        // revienta, igual que ya hace ListasPlantilla con dos variantes que apuntan a valores distintos.
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[{""campo"":""banco""}]},""exclusión"":{""opcionales"":[{""campo"":""moneda""}]}}}")]
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""EXCLUSION"":{""opcionales"":[{""campo"":""banco""}]},""Exclusion"":{""opcionales"":[{""campo"":""moneda""}]}}}")]
+        // Decisión del aprobador (2026-09-27): una entrada sin 'opcionales' ni 'obligatorios' es una regla que alguien
+        // cree que puso y no puso, mismo criterio que 'regla sin campos opcionales' en 'reglas'.
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{}}}")]
+        [InlineData(@"{""porDefecto"":""obligatorio"",""porGestion"":{""Exclusion"":{""opcionales"":[],""obligatorios"":[]}}}")]
         public void Una_obligatoriedad_mal_cargada_revienta_con_el_motivo(string json)
         {
             var ex = Assert.Throws<FormatException>(() => ObligatoriedadPlantilla.DesdeJson(json));
