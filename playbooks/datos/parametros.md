@@ -37,14 +37,25 @@ hay que mirar.
 **`plantilla.obligatoriedad` ganó `porGestion` el 2026-09-27 (DN-03, `diseno/DIRECTRICES-NUEVAS.md`),
 orden explícita del aprobador de resolverlo de 0 a 100 sin consultar.** Es un ajuste más simple que
 `reglas` —solo por Gestión, no toda la matriz Gestión×Clasificación×formato— y que además puede
-ENDURECER con `obligatorios`, no solo aflojar. Conviven: `reglas` y `porGestion` no se pisan.
-**La fila de acá abajo NO cambia** (`sanic_valor` y `sanic_version` quedan igual): un parámetro sin
-`porGestion` se comporta EXACTAMENTE como antes de DN-03 (compatibilidad fijada con pruebas), así que
-lo ya sembrado en los tres entornos sigue siendo válido tal cual está — no hay nada que empujar a
-Dev. `--solo-verificar` contra Dev (2026-09-27) lo confirma: `plantilla.obligatoriedad` da
-`ya_existia`, sin diferencia. Cuando el negocio decida qué aflojar o endurecer en cada gestión, esa
-sí va a ser una versión nueva (nunca se edita la vigente): la fila de abajo cambia recién ahí. Ver
-`diseno/02-diccionario-datos.md` §2.5 y `Validacion/ParametrosDePlantilla.cs` (`ObligatoriedadPlantilla`).
+ENDURECER con `obligatorios`, no solo aflojar. Conviven: `reglas` y `porGestion` no se pisan. La
+implementación (código y pruebas) quedó lista sin sembrar el parámetro con `porGestion`: la fila
+`sanic_version=1` de acá abajo **no cambió** (compatibilidad fijada con pruebas: un parámetro sin
+`porGestion` se comporta EXACTAMENTE como antes de DN-03), y `--solo-verificar` contra Dev
+(2026-09-27) lo confirmó `ya_existia`, sin diferencia.
+
+**El aprobador pidió sembrarlo YA (2026-09-27), con este criterio suyo: una EXCLUSIÓN solo necesita
+identificar a quién dar de baja — plan, identificación y referencia —, así que `numeroCuenta`,
+`banco` Y `moneda` quedan opcionales para `Exclusion`.** `Inclusion` y `Modificacion` NO llevan
+entrada en `porGestion` todavía (siguen bajo el bloque global, sin cambios). Como `sanic_nombre` +
+`sanic_version` es la clave de negocio y **nunca se edita la fila vigente** (ver más abajo, "cómo se
+maneja una versión nueva"), esto es una fila NUEVA: `plantilla.obligatoriedad` **`sanic_version=2`**.
+`Datos/Catalogos.cs` (`CatalogosDataverse.Parametro`) resuelve el parámetro activo por
+`sanic_nombre` + `statecode=Activo`, ordenando por `sanic_version` DESCENDENTE con `TopCount=1`: en
+cuanto la versión 2 quede sembrada (activa, que es el estado por defecto al crear), pasa a ser la
+que lee el motor sin tocar la versión 1, que queda de respaldo/histórico. Su descripción se marcó
+**PROVISIONAL**: es una regla de negocio que el aprobador todavía tiene que confirmar, y si cambia
+se siembra una `sanic_version=3`, nunca se edita la 2. Ver `diseno/02-diccionario-datos.md` §2.5 y
+`Validacion/ParametrosDePlantilla.cs` (`ObligatoriedadPlantilla`).
 
 **`exportacion.columnas` se agregó el 2026-09-26 (DN-02, `diseno/DIRECTRICES-NUEVAS.md`)**, orden
 explícita del aprobador de construir en Dev. Trae `numeroSolicitud` y `numeroFila` (trazabilidad,
@@ -68,11 +79,25 @@ solo con un mensaje claro (`src/Sanic.Mppp.Plugins/Api/ExportarParaDigitar.cs`,
 (`sanic_mppp_tbl_parametroid b88833e3-21ba-f111-aaad-000d3a301e02`) y se sacó de este playbook: no
 queda ningún rastro de `exportacion.maximo` ni en el entorno ni en el inventario.
 
+**Cómo se maneja una versión nueva de un parámetro (clave `sanic_nombre` + `sanic_version`).**
+`herramientas/construir/datos.py` no tiene ninguna semántica especial de "versión": busca cada fila
+del playbook por su clave de negocio completa (acá, nombre+version) y listo — si esa clave exacta no
+existe la crea, si existe y difiere la reporta (o la corrige con `--completar`). Sembrar una versión
+nueva es, para la herramienta, sembrar una fila más con la misma `sanic_nombre` y un `sanic_version`
+mayor: no toca ni reemplaza la fila anterior, que se deja tal cual en el playbook. Quién queda
+"vigente" lo decide el CÓDIGO al leer, no la herramienta al escribir: `CatalogosDataverse.Parametro`
+(`Datos/Catalogos.cs`) filtra por nombre y `statecode` activo, ordena por `sanic_version`
+descendente y toma la primera (`TopCount=1`) — la versión activa más alta gana. Por eso alcanza con
+agregar la fila nueva al playbook: no hay que borrar ni desactivar la anterior para que la nueva
+tome efecto, y **nunca se edita `sanic_valor` de una fila ya sembrada** para cambiar una regla de
+negocio (eso es lo que exige DN-03 con `plantilla.obligatoriedad`).
+
 Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
-- `plantilla.obligatoriedad`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18; `porGestion` agregado por DN-03 (2026-09-27), sembrado ausente.
+- `plantilla.obligatoriedad` `sanic_version=1`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
+- `plantilla.obligatoriedad` `sanic_version=2`: `porGestion.Exclusion` agregado por orden del aprobador (2026-09-27, DN-03) — PROVISIONAL, falta su confirmación de negocio.
 - Los tres de `vigilancia.*` y los dos de `retencion.dias.*`: **decididos por el aprobador el 2026-09-22** (D-45); no estaban en ningun archivo.
 
 Ojo: los fixtures de prueba (`ParametrosDePlantillaAceptacion`) y el mockup
@@ -158,6 +183,16 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "{\"porDefecto\":\"obligatorio\",\"opcionales\":[{\"campo\":\"referencia\"}]}",
       "sanic_descripcion": "Campos obligatorios. Arranca con todo obligatorio salvo Referencia (DD-16); crece con reglas cuando el negocio escriba la matriz."
+    },
+    {
+      "sanic_nombre": "plantilla.obligatoriedad",
+      "sanic_version": 2,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"porDefecto\":\"obligatorio\",\"opcionales\":[{\"campo\":\"referencia\"}],\"porGestion\":{\"Exclusion\":{\"opcionales\":[{\"campo\":\"numeroCuenta\"},{\"campo\":\"banco\"},{\"campo\":\"moneda\"}]}}}",
+      "sanic_descripcion": "PROVISIONAL (DN-03, sembrado 2026-09-27 por orden del aprobador): agrega porGestion.Exclusion con numeroCuenta, banco y moneda opcionales -- una exclusion solo necesita identificar a quien dar de baja (plan, identificacion y referencia). Inclusion y Modificacion no tienen entrada en porGestion todavia (siguen bajo el bloque global). Es una regla de negocio que el aprobador tiene que confirmar; se cambia sembrando una version nueva, nunca editando esta fila."
     },
     {
       "sanic_nombre": "rpa.puedeaprobar",
