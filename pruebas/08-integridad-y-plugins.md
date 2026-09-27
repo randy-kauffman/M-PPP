@@ -108,14 +108,30 @@ Lo mismo con un **Plan**: el nombre se arma con su código y su cliente.
 
 **Qué prueba.** `ListaBlancaStep`: que no se pueda escribir a mano lo que escribe el sistema.
 
+**Necesita.** Acceso al Web API con permiso de escritura sobre Fila (credenciales de servicio, o
+una sesión con un rol que tenga `W` sobre Fila — Ejecutivo o Supervisor, `04`); una Fila existente
+(la de C-01 alcanza). Para el lado de la app: sesión `ejecutivo` o `supervisor`.
+
 **Cómo.** Abrí una **Fila** en la app e intentá editar a mano una columna que llena la validación
-—por ejemplo `sanic_referencia`— y guardar.
+—por ejemplo `sanic_referencia`— y guardar. Además, probá un `PATCH` directo a esa columna por Web
+API.
 
 **Esperado.** **No deja**, o el campo está de solo lectura en el formulario **y** el plugin lo
 rechaza si se intenta por API.
 
-> El formulario de solo lectura no alcanza: la prueba real es por el Web API. Si tenés cómo,
-> probá un `PATCH` a esa columna.
+> **DEFECTO CONFIRMADO, no advertencia teórica.** Este archivo ya avisaba del riesgo; hoy está
+> demostrado y automatizado en `herramientas/pruebas/corredor.py` (caso I-07): un `PATCH` directo a
+> `sanic_referencia` por Web API se guarda con **HTTP 204** (éxito) en lugar de ser rechazado.
+> `ListaBlancaStep` **no** bloquea esta columna. El formulario puede estar bien (de solo lectura),
+> pero eso no alcanza: cualquiera con acceso al Web API y privilegio de escritura sobre Fila puede
+> pisar una referencia que va a AS400. **Queda pendiente de decisión del aprobador**: si
+> `ListaBlancaStep` tiene que extender su lista a `sanic_referencia` (y probablemente a las demás
+> columnas que solo escribe la validación), o si el riesgo se acepta porque el privilegio de
+> escritura ya está acotado a Ejecutivo/Supervisor por la matriz de `04`. No lo des por OK ni por
+> FALLA vos mismo: es un hallazgo para que el aprobador decida, anotalo como tal en Resultados.
+
+**Automatizable.** API (corredor.py, caso I-07 — ya demostrado; no hace falta correrlo de nuevo a
+mano para confirmar el defecto).
 
 ---
 

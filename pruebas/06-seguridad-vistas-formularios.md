@@ -28,6 +28,8 @@ roles de ese proyecto. Entonces, si en la app el usuario puede hacer algo que no
 pantalla **no se sabe quién se lo permitió**. Esto lo resuelve antes de empezar, y con nombre y
 apellido del rol culpable.
 
+**Necesita.** Credenciales de lectura en Dataverse; los usuarios de prueba ya creados (User1..User4).
+
 **Cómo.**
 
 ```bash
@@ -48,6 +50,8 @@ python3 herramientas/pruebas/verificar_accesos.py User1 User2 User3
 **Correr esto también después de cada cambio de roles.** Es lo único que detecta que un
 `ImportSolution` pisó un privilegio.
 
+**Automatizable.** API (`verificar_accesos.py`).
+
 ---
 
 ## G-00b · El comportamiento de cada rol, contra el entorno
@@ -62,6 +66,9 @@ agujero.
 venga. Por eso ninguna vio el defecto del 2026-09-23 — los plugins leían la tabla Parametro con la
 identidad de quien llamaba, y ningún rol de negocio tiene lectura ahí, así que **ninguna persona
 podía transicionar una fila**. Eso solo se ve contra la plataforma y con un usuario de verdad.
+
+**Necesita.** Credenciales de servicio con permiso para suplantar (`MSCRMCallerID`) a cada usuario
+de prueba; los usuarios User1..User4 ya creados.
 
 **Cómo.**
 
@@ -86,24 +93,37 @@ como verde.
 comandos, los íconos, el recorte del sitemap, las notificaciones y las columnas enmascaradas en
 pantalla no se ven desde acá. Esto prueba las reglas; los casos de abajo prueban la experiencia.
 
+**Automatizable.** API (`comportamiento_roles.py`; con `--con-escritura` actúa sobre CUALQUIER
+Fila del entorno en Validada/Digitada, no solo las propias — coordiná con quien esté probando en
+`pruebas/gui/` en paralelo antes de usar esa bandera).
+
 ---
 
-## G-01 · El sitemap: 4 áreas y 13 entradas
+## G-01 · El sitemap: 4 áreas y 15 entradas
 
 **Qué prueba.** El sitemap de 12.7 y que cada entrada abra **su** vista.
 
-**Cómo.** Con un usuario que tenga **todos** los roles, recorré el menú entero.
+**Necesita.** Un usuario con **los 4 roles** a la vez (o recorrer el menú 4 veces, una por sesión:
+`ejecutivo`, `supervisor`, `admin_planes`, `admin_tecnico`), para ver el sitemap completo sin
+recortar.
 
-**Esperado.**
+**Cómo.** Con ese usuario, recorré el menú entero.
+
+**Esperado.** **Corregido: eran 13 entradas, hoy son 15** (verificado en vivo contra Dev el
+2026-09-27 con `app.py --solo-verificar`: `"4 areas y 15 entradas"`). Se agregaron **Para atención
+manual** (Trabajo, fase 2 enganchada al sitemap recién el 2026-09-27) y **Autorizaciones -
+Clientes** (Catálogos, DN-01). Además cambiaron dos títulos: **"Autorizados"** ahora es **"Correos
+Autorizados"**, y **"Autorizaciones"** ahora es **"Autorizaciones - Planes"** (para distinguirla de
+la nueva "Autorizaciones - Clientes").
 
 | Área | Entradas |
 |---|---|
-| **Trabajo** | Por digitar · Devueltas · Por aprobar · Por clasificar · Para revisar |
+| **Trabajo** | Por digitar · Devueltas · Por aprobar · **Para atención manual** · Por clasificar · Para revisar |
 | **Consulta** | Solicitudes · Filas |
-| **Catálogos** | Clientes · Planes · Autorizados · Autorizaciones |
+| **Catálogos** | Clientes · Planes · **Correos Autorizados** · **Autorizaciones - Planes** · **Autorizaciones - Clientes** |
 | **Configuración** | Parámetros · Reglas |
 
-**Lo que más hay que mirar**: las 7 entradas que apuntan a **una vista específica** (no a la vista
+**Lo que más hay que mirar**: las entradas que apuntan a **una vista específica** (no a la vista
 por defecto de la tabla). Este patrón **nunca se pudo verificar** contra ningún sitemap del entorno
 y quedó anotado como pendiente.
 
@@ -112,13 +132,17 @@ y quedó anotado como pendiente.
 | Por digitar | **Mis clientes — por digitar** (no "Todos") |
 | Devueltas | **Mis clientes — devueltas** |
 | Por aprobar | **Por aprobar** |
+| **Para atención manual** | vista de Filas con `sanic_requiereatencionmanual` = sí |
 | Por clasificar | **Por clasificar** |
 | Para revisar | **Para revisar** |
 | Solicitudes | **Solicitudes** |
 | Filas | la vista de Filas que corresponda |
+| **Autorizaciones - Clientes** | **Autorizaciones por cliente activas** (por defecto de AutorizacionCliente) |
 
 **FALLA si** alguna abre la vista por defecto de la tabla en vez de la suya: las cuatro entradas
 sobre Fila mostrarían lo mismo y la navegación del diseño se cae.
+
+**Automatizable.** GUI (sesión con los 4 roles, o las 4 sesiones por separado).
 
 ---
 
@@ -126,18 +150,32 @@ sobre Fila mostrarían lo mismo y la navegación del diseño se cae.
 
 **Qué prueba.** Los 22 SVG de 12.1.
 
+**Necesita.** Sesión con acceso al sitemap (cualquiera de las 4); poder cambiar el tema de la app
+entre claro y oscuro.
+
 **Cómo.** Mirá el menú y la app.
 
 **Esperado.** Cada entrada tiene **su** ícono (no el genérico), y la app tiene el suyo en la barra.
-Los íconos se ven bien en **tema claro y oscuro** (usan `currentColor`).
+Los íconos se ven bien en **tema claro y oscuro** (usan `currentColor`). Siguen siendo 22: las dos
+entradas nuevas de sitemap (`Para atención manual`, `Autorizaciones - Clientes`) **reúsan** íconos
+existentes (el de "Para revisar" y el de "Autorizaciones - Planes"), no se sumó ninguno.
+
+**Automatizable.** GUI.
 
 ---
 
-## G-03 · Las 18 vistas existen y filtran
+## G-03 · Las 20 vistas existen y filtran
 
 **Qué prueba.** 12.2.
 
-**Cómo.** Recorré las vistas desde el selector de cada tabla.
+**Necesita.** Sesión con acceso a cada tabla (Ejecutivo/Supervisor para Fila y Solicitud,
+`admin_planes` para los catálogos, `admin_tecnico` para Parámetros/Reglas); datos previos de C-01,
+C-04, R-13 y compañía para que las vistas no aparezcan vacías.
+
+**Cómo.** Recorré las vistas desde el selector de cada tabla. **Corregido: eran 18, hoy son 20**
+(`diseno/05-app-model-driven.md` §3: se agregaron "Correos autorizados sobre este cliente",
+"Clientes que puede modificar" y "Autorizaciones por cliente activas", las tres sobre
+`AutorizacionCliente`, DN-01/2026-09-27).
 
 **Esperado.** Cada una trae lo que dice su nombre. Las más fáciles de verificar:
 
@@ -151,11 +189,17 @@ Los íconos se ven bien en **tema claro y oscuro** (usan `currentColor`).
 | Por clasificar | **No reconocida** y **No es correo nuevo** | Ingresada, En proceso |
 | Para revisar | `requiererevision = sí` | las demás |
 
+**Automatizable.** GUI (recorrer el selector de vistas de cada tabla).
+
 ---
 
 ## G-04 · La cartera del ejecutivo (RF-19, D-13)
 
 **Qué prueba.** Que **Mis clientes — por digitar** filtre por el propietario del Cliente.
+
+**Necesita.** Permiso para cambiar el propietario del Cliente `PR - Pruebas MPPP SA` (un rol de
+administración, no uno de los 4 de negocio: ninguno de ellos puede reasignar propietario); sesión
+`ejecutivo` para el resto del caso.
 
 **Cómo.**
 1. Poné como propietario del Cliente `PR - Pruebas MPPP SA` a **otro** usuario.
@@ -167,13 +211,20 @@ Los íconos se ven bien en **tema claro y oscuro** (usan `currentColor`).
 > Es comodidad, no seguridad: el ejecutivo **puede** ver todo si cambia de vista. Lo que prueba es
 > que la vista por defecto le muestre su cartera.
 
+**Automatizable.** GUI (sesión `ejecutivo`); el cambio de propietario es administrativo, no pasa
+por la app de negocio.
+
 ---
 
 ## G-05 · Perfil de seguridad de columna
 
 **Qué prueba.** 12 / P-06: identificación y cuenta son columnas protegidas.
 
-**Cómo.** Entrá con el **Administrador de planes** (que NO está en el perfil) y abrí una Fila.
+**Necesita.** Sesión `ejecutivo` o `supervisor` (tienen que VER el valor) y sesión `admin_planes`
+(NO tiene que verlo); una Fila con datos reales-ficticios (la de C-01 alcanza).
+
+**Cómo.** Entrá con el **Administrador de planes** (que NO está en el perfil por rol, ver más
+abajo) y abrí una Fila.
 
 **Esperado.**
 
@@ -185,27 +236,39 @@ Los íconos se ven bien en **tema claro y oscuro** (usan `currentColor`).
 **FALLA si** el Administrador de planes ve el número de cuenta. Es un dato bancario de una persona
 real.
 
-> **Bloqueante verificado el 2026-09-23.** Las dos columnas están protegidas de verdad
-> (`IsSecured = true` en las dos), pero **`CSP - MPPP - Datos sensibles` no tiene ni un usuario ni
-> un equipo asignado**. Hoy nadie lo alcanza salvo los System Administrator, que las leen por el
-> perfil automático de la plataforma. Es decir: **el Ejecutivo y el Supervisor NO ven la
-> identificación ni la cuenta**, que es justo lo que el ejecutivo tiene que digitar en AS400.
+> **Corregido el 2026-09-27 — la advertencia de "bloqueante" de acá abajo YA NO ES CIERTA, y se
+> verificó de nuevo antes de tocar este párrafo.** Cuando se escribió (2026-09-23), `CSP - MPPP -
+> Datos sensibles` no tenía ni un usuario ni un equipo asignado, así que el caso daba un falso
+> positivo (nadie veía la cuenta, ni siquiera el Ejecutivo). **Hoy no es así**: una consulta de
+> solo lectura contra `fieldsecurityprofiles` en Dev (2026-09-27) muestra el equipo **`MPPP -
+> Ejecutivos`** asociado al perfil, y además **User 1** (`User1@55xljh.onmicrosoft.com`, la sesión
+> `ejecutivo`) y **User 2** (`User2@55xljh.onmicrosoft.com`, la sesión `supervisor`) asociados
+> **directamente** al perfil como usuarios. Es decir: las dos cuentas de prueba que este mismo caso
+> usa para "sí tiene que ver el valor" **ya están cubiertas**, y el caso debería poder pasar de
+> verdad, no por el problema teórico anterior. No se verificó si la vía es exactamente la del
+> diseño (grupo de Entra + equipo de grupo, D-8) o una asignación directa hecha a mano para
+> destrabar las pruebas — para eso hace falta mirar Entra ID, que está fuera del alcance de una
+> consulta de Dataverse. Si el caso FALLA igual (el ejecutivo no ve la cuenta), no asumas que es el
+> mismo problema de antes: es un defecto nuevo y hay que investigarlo de cero.
 >
-> No es un defecto de la solución: el perfil y sus permisos **viajan** en la solución (6.1), pero
-> el grupo de Entra, el equipo de grupo y la asociación equipo ↔ perfil **no viajan** — son tarea de
-> administración en cada entorno (inventario 13.7, `04` §4 D-8). Nunca se hizo en Dev.
->
-> Hasta que se haga, G-05 da un falso positivo tranquilizador: el Administrador de planes no ve la
-> cuenta… pero tampoco la ve nadie. La mitad derecha de la tabla pasa y la izquierda falla.
+> El perfil y sus permisos en sí **viajan** en la solución (6.1) y están bien: `IsSecured = true`
+> en las dos columnas, y el perfil trae exactamente las dos (`canread = 4`, `cancreate = 0`,
+> `canupdate = 0`). Lo que no viaja con la solución es la asociación de miembros (inventario 13.7).
 
 > Probalo también **en la vista**, no solo en el formulario: una columna protegida tiene que
 > ocultarse en los dos lados.
+
+**Automatizable.** GUI (sesiones `ejecutivo`, `supervisor` y `admin_planes`); la pertenencia al
+perfil se puede confirmar de antemano por API de solo lectura (`fieldsecurityprofiles` →
+`systemuserprofiles_association` / `teamprofiles_association`), como se hizo para esta corrección.
 
 ---
 
 ## G-06 · Lo que cada rol NO puede
 
 **Qué prueba.** La matriz de privilegios (`04`).
+
+**Necesita.** Las 4 sesiones: `ejecutivo`, `supervisor`, `admin_planes`, `admin_tecnico`.
 
 **Cómo.** Con cada rol, intentá lo que no le toca.
 
@@ -215,11 +278,15 @@ real.
 |---|---|---|
 | Ejecutivo | ver y digitar Filas; ver Solicitudes | **aprobar**; editar Planes, Clientes, Parámetros, Reglas |
 | Supervisor | aprobar y devolver | crear Solicitudes a mano; editar catálogos |
-| Administrador de planes | crear y editar Clientes, Planes, Autorizados, Autorizaciones | ver Solicitudes ni Filas |
+| Administrador de planes | crear y editar Clientes, Planes, Autorizados, Autorizaciones **y Autorizaciones - Clientes** (`AutorizacionCliente`, DN-01) | ver Solicitudes ni Filas |
 | Administrador técnico | editar Parámetros y Reglas | ver Filas ni Solicitudes |
 
 **El más importante**: el **Administrador de planes no ve Solicitudes ni Filas**. Si las ve, está
 viendo datos bancarios que no le corresponden.
+
+**Automatizable.** API (proxy: `verificar_accesos.py`, corredor.py caso G-06 — verifica los
+privilegios subyacentes); GUI con las 4 sesiones para confirmar la experiencia real (ver G-00b:
+un privilegio correcto no garantiza que la pantalla se comporte bien).
 
 ---
 
@@ -227,35 +294,51 @@ viendo datos bancarios que no le corresponden.
 
 **Qué prueba.** Que el sitemap se recorte solo, por privilegios.
 
+**Necesita.** Las 4 sesiones, una por rol.
+
 **Cómo.** Entrá con cada rol **por separado** y mirá qué entradas del menú aparecen.
 
 **Esperado.**
 
 | Rol | Ve |
 |---|---|
-| Ejecutivo | Trabajo (Por digitar, Devueltas, Por clasificar, Para revisar), Consulta; Catálogos **solo lectura** |
+| Ejecutivo | Trabajo (Por digitar, Devueltas, Para atención manual, Por clasificar, Para revisar), Consulta; Catálogos **solo lectura** |
 | Supervisor | Trabajo (Por aprobar, Para revisar), Consulta |
-| Administrador de planes | **solo** Catálogos |
+| Administrador de planes | **solo** Catálogos (incluida Autorizaciones - Clientes) |
 | Administrador técnico | **solo** Configuración |
+
+**Automatizable.** GUI (las 4 sesiones, una por vez); los privilegios subyacentes ya los cubre
+G-06/`verificar_accesos.py`.
 
 ---
 
-## G-08 · Los 9 formularios
+## G-08 · Los 10 formularios
 
 **Qué prueba.** 12.3 + 12.4.
 
+**Necesita.** Sesión con acceso a cada tabla (Ejecutivo/Supervisor para Solicitud y Fila,
+`admin_planes` para Cliente/Plan/Autorizado/Autorización/Autorización por cliente,
+`admin_tecnico` para Parámetro/Regla); al menos un registro de cada tabla (los que ya dejaron C-01
+y P-03).
+
 **Cómo.** Abrí un registro de cada tabla con interfaz.
 
-**Esperado.** Los 9 abren sin error y muestran sus campos agrupados:
+**Esperado.** **Corregido: eran 9, hoy son 10** (`diseno/05-app-model-driven.md` §4 y §7: se agregó
+el formulario **Autorización por cliente**, sobre `AutorizacionCliente`, el 2026-09-27, DN-01). Los
+10 abren sin error y muestran sus campos agrupados:
 
-Solicitud · Fila · Cliente · Plan · Autorizado · Autorización · Parámetro · Regla · **Motivo de
-acción** (el del diálogo).
+Solicitud · Fila · Cliente · Plan · Autorizado · Autorización (AutorizacionPlan) · **Autorización
+por cliente (AutorizacionCliente)** · Parámetro · Regla · **Motivo de acción** (el del diálogo).
 
 **Mirá especialmente**:
 
 - **Solicitud**: sus subgrillas de Filas, ResultadoRegla y Bitácora traen datos.
 - **Autorización**: el campo de **archivo** `sanic_documentofirmado` deja subir y descargar un PDF.
+- **Autorización por cliente**: **no** tiene sección de evidencia (esa tabla no tiene
+  `sanic_documentofirmado` ni `sanic_fechadocumento`, a diferencia de Autorización).
 - **Motivo de acción**: **un solo campo**, Motivo, obligatorio.
+
+**Automatizable.** GUI (abrir un registro de cada tabla, con la sesión que corresponda).
 
 ---
 
@@ -264,7 +347,10 @@ acción** (el del diálogo).
 **Qué prueba.** D-42: la evidencia **no** condiciona la vigencia; es una lista de tareas del
 administrador.
 
-**Cómo.** Como Administrador de planes, abrí **Autorizaciones** y su vista *Sin evidencia*.
+**Necesita.** Sesión `admin_planes`; las autorizaciones que dejó P-03 (ninguna tiene evidencia
+cargada, a propósito).
+
+**Cómo.** Como Administrador de planes, abrí **Autorizaciones - Planes** y su vista *Sin evidencia*.
 
 **Esperado.** Muestra las autorizaciones **sin** documento firmado — incluidas las que
 `preparar_datos.py` creó.
@@ -273,11 +359,18 @@ administrador.
 autorizaciones sin evidencia. Si en algún lado una autorización sin documento hace fallar
 `AUTORIZACION_CORREO_PLAN`, es **FALLA** contra D-42.
 
+**Automatizable.** GUI (sesión `admin_planes`); que una autorización sin evidencia SÍ autorice ya
+lo demuestra cualquier caso de `01`/`02`/`03` corrido por `corredor.py` (todas sus autorizaciones
+también nacen sin evidencia).
+
 ---
 
 ## G-10 · La campana de notificaciones (DA-08)
 
 **Qué prueba.** Los avisos dentro de la app.
+
+**Necesita.** Sesión `ejecutivo`; haber corrido C-02 y C-04 antes (o cualquier caso que deje un
+correo en Por clasificar).
 
 **Cómo.** Después de correr C-02 y C-04, entrá como **Ejecutivo** y mirá la campana.
 
@@ -295,16 +388,23 @@ o la Solicitud correspondiente.
 **Una por solicitud y por tanda, nunca una por fila.** Si aparecen 25 avisos por una plantilla de
 25 filas, es FALLA.
 
+**Automatizable.** GUI (sesión `ejecutivo`).
+
 ---
 
 ## G-11 · Multiidioma de la app
 
 **Qué prueba.** La convención: etiquetas en 1033 y en el idioma del cliente.
 
+**Necesita.** Un usuario con el idioma cambiado a inglés (Configuración personal → Idiomas);
+cualquiera de las 4 sesiones alcanza.
+
 **Cómo.** Cambiá el idioma del usuario a inglés y recorré el sitemap y un par de formularios.
 
 **Esperado.** Las etiquetas del sitemap, las vistas y las columnas cambian de idioma. Ninguna
 queda con el texto del otro idioma ni con el nombre lógico crudo.
+
+**Automatizable.** GUI.
 
 ---
 
@@ -312,13 +412,21 @@ queda con el texto del otro idioma ni con el nombre lógico crudo.
 
 **Qué prueba.** Que la app no tenga componentes faltantes.
 
+**Necesita.** Credenciales de lectura en Dataverse (las que ya usan las herramientas del proyecto).
+Ningún rol de la app.
+
 **Cómo.**
 
 ```bash
 python3 herramientas/construir/app.py playbooks/app/mantenimientoppp.md --solo-verificar
 ```
 
-**Esperado.** `"estado": "ya_existia"` con `11 tablas, 4 roles ... ValidateApp sin errores`.
+**Esperado.** **Corregido: decía "11 tablas", hoy son 12** (verificado en vivo el 2026-09-27, este
+mismo comando: `"4 areas y 15 entradas, 12 tablas, 4 roles ... ValidateApp sin errores"` —
+la tabla 12 es `AutorizacionCliente`, DN-01). `"estado": "ya_existia"` con `12 tablas, 4 roles ...
+ValidateApp sin errores`.
+
+**Automatizable.** API (`app.py --solo-verificar`; corredor.py caso G-12).
 
 ---
 
