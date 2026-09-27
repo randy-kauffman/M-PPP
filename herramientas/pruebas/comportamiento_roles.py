@@ -33,9 +33,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dataverse_api import Dataverse  # noqa: E402
 
-# Los tres usuarios de prueba, por su nombre de inicio de sesión. Se resuelven al arrancar:
+# Los cuatro usuarios de prueba, por su nombre de inicio de sesión. Se resuelven al arrancar:
 # un GUID escrito a mano en un script envejece sin avisar.
-ALIAS = {"ejecutivo": "User1", "supervisor": "User2", "admin_planes": "User3"}
+#
+# Única fuente de verdad: `herramientas/pruebas/estado_sesiones.py` importa este mismo mapa
+# (y ROL_ESPERADO, más abajo) para la guarda de sesiones de navegador — no lo duplica.
+ALIAS = {
+    "ejecutivo": "User1",
+    "supervisor": "User2",
+    "admin_planes": "User3",
+    "admin_tecnico": "User4",
+}
 
 # Qué rol de MPPP tiene que tener cada uno para que esta suite signifique algo. Se comprueba al
 # arrancar: el 2026-09-24 a `User1` le cambiaron el rol a Administrador de planes para probar otra
@@ -45,6 +53,7 @@ ROL_ESPERADO = {
     "ejecutivo": "SR - MPPP - Ejecutivo",
     "supervisor": "SR - MPPP - Supervisor",
     "admin_planes": "SR - MPPP - Administrador de planes",
+    "admin_tecnico": "SR - MPPP - Administrador tecnico",
 }
 
 FILA = "sanic_mppp_tbl_filas"
