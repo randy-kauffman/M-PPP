@@ -114,6 +114,21 @@ namespace Sanic.Mppp.Plugins.Datos
             return _servicio.RetrieveMultiple(consulta).Entities.Select(Convertir).ToList();
         }
 
+        /// <summary>
+        /// Las Filas pedidas por id, para `sanic_mppp_capi_exportarparadigitar` (DN-02, diseno/DIRECTRICES-NUEVAS.md).
+        /// UNA sola consulta con `In`, SIN filtrar por `sanic_estado`: a diferencia de <see cref="Candidatas"/>, acá
+        /// quién puede pedir qué fila lo decide quien llama (una persona, desde la app), no este método. Un
+        /// `filaId` que no existe simplemente NO vuelve en la lista — nunca una excepción de plataforma atrapada
+        /// para seguir procesando el resto (mismo criterio que <see cref="LeerParaRegistro"/>, documentado ahí con
+        /// el incidente real del 2026-09-25: "ISV code reduced the open transaction count..."). El ORDEN de lo que
+        /// devuelve NO está garantizado: si el orden importa, lo decide quien llama sobre <paramref name="filaIds"/>.
+        /// `filaIds` vacío → sin consulta, lista vacía.
+        /// </summary>
+        public IList<FilaPendienteLeida> PorIds(IEnumerable<Guid> filaIds)
+        {
+            throw new NotImplementedException("DN-02: lo implementa el constructor contra FilasDataverseAceptacion, Etapa 2.");
+        }
+
         /// <summary>El tipo de formato de esos planes, por id, SIN filtrar por activo: una Fila ya validada tiene que
         /// poder reportarse al bot aunque el Plan se haya desactivado después (diseno/03 §2). UNA consulta con `In`;
         /// vacío → sin consulta y diccionario vacío.</summary>

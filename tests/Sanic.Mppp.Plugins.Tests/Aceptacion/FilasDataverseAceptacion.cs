@@ -121,6 +121,78 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Single(svc.Llamadas);
         }
 
+        // ---------- PorIds (DN-02, exportacion) ----------
+
+        [Fact]
+        public void PorIds_trae_las_filas_pedidas_sin_filtrar_por_estado()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var validada = svc.Sembrar(Fila(EstadoDeLaFila.Validada, Base, 1));
+            var aprobada = svc.Sembrar(Fila(EstadoDeLaFila.Aprobada, Base, 2));
+
+            var filas = new FilasDataverse(svc).PorIds(new[] { validada, aprobada });
+
+            Assert.Equal(2, filas.Count);
+            Assert.Contains(filas, f => f.FilaId == validada);
+            Assert.Contains(filas, f => f.FilaId == aprobada);
+        }
+
+        [Fact]
+        public void PorIds_un_id_inexistente_no_esta_en_el_resultado_y_no_revienta()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var existe = svc.Sembrar(Fila(EstadoDeLaFila.Validada, Base, 1));
+
+            var filas = new FilasDataverse(svc).PorIds(new[] { existe, Guid.NewGuid() });
+
+            Assert.Single(filas);
+            Assert.Equal(existe, filas[0].FilaId);
+        }
+
+        [Fact]
+        public void PorIds_vacio_no_consulta_nada()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var filas = new FilasDataverse(svc).PorIds(Array.Empty<Guid>());
+            Assert.Empty(filas);
+            Assert.Empty(svc.Llamadas);
+        }
+
+        [Fact]
+        public void PorIds_nulo_es_un_error_de_programacion()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            Assert.Throws<ArgumentNullException>(() => new FilasDataverse(svc).PorIds(null));
+        }
+
+        [Fact]
+        public void PorIds_es_UNA_sola_consulta()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var primera = svc.Sembrar(Fila(EstadoDeLaFila.Validada, Base, 1));
+            var segunda = svc.Sembrar(Fila(EstadoDeLaFila.Digitada, Base, 2));
+
+            new FilasDataverse(svc).PorIds(new[] { primera, segunda });
+
+            Assert.Single(svc.Llamadas);
+        }
+
+        [Fact]
+        public void PorIds_trae_los_valores_de_los_diez_campos_de_CamposDeFila()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var filaId = svc.Sembrar(Fila(EstadoDeLaFila.Validada, Base, 1));
+
+            var fila = new FilasDataverse(svc).PorIds(new[] { filaId }).Single();
+
+            Assert.Equal("0001", fila.NumeroPlan);
+            Assert.Equal(Gestion.Inclusion, fila.Gestion);
+            Assert.Equal(Clasificacion.ACH, fila.Clasificacion);
+            Assert.Equal(Moneda.COR, fila.Moneda);
+            Assert.Equal(Banco.BANPRO, fila.Banco);
+            Assert.Equal("REF-1", fila.Referencia);
+        }
+
         // ---------- Escrituras ----------
 
         [Fact]
