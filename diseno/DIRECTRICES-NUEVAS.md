@@ -40,7 +40,7 @@ cliente**, así que:
 | 3 | `AUTORIZACION_CORREO_PLAN` consulta **una vía u otra según el parámetro** — misma regla, misma posición en el orden, mismo efecto | **confirmado por el aprobador, 2026-09-26** |
 | 4 | En modo **cliente**, las filas de `AutorizacionPlan` **se conservan** y no se miran. Cambiar el parámetro vuelve a activarlas sin recargar nada | **confirmado por el aprobador, 2026-09-26** |
 | 5 | El **mensaje al cliente no cambia** en ningún modo. Sigue siendo el unificado del 2026-09-24 (`"El plan {plan} no existe o usted no está autorizado sobre él."`): distinguir "no existe" de "no autorizado" es el oráculo que ya cerramos | **no negociable** |
-| 6 | La app necesita poder cargar y ver las autorizaciones por cliente, y el Administrador de planes es quien las administra (RF-11) | **confirmado por el aprobador, 2026-09-26** |
+| 6 | La app necesita poder cargar y ver las autorizaciones por cliente, y el Administrador de planes es quien las administra (RF-11) | **cerrado 2026-09-27**: formulario nuevo `Autorizacion por cliente` (encabezado con `sanic_nombre`, `sanic_autorizadoid`, `sanic_clienteid`), subgrilla nueva "Clientes que puede modificar" en el formulario de Autorizado, y entrada de sitemap nueva "Autorizaciones - Clientes" con su propia vista por defecto ("Autorizaciones por cliente activas"); construido y verificado contra Dev (`playbooks/formulario/autorizacioncliente.md`, `playbooks/formulario/autorizado.md`, `playbooks/vista/clientes_que_puede_modificar.md`, `playbooks/vista/autorizaciones_por_cliente_activas.md`, `playbooks/app/mantenimientoppp.md`) |
 
 ---
 

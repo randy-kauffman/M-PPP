@@ -33,7 +33,7 @@ Reglas citadas: BP-PP-091, 093, 094, 095, 100, 186. Requisitos: RF-03, RF-11 a R
 | | Para revisar | Vista de Solicitudes con `sanic_requiererevision` = sí | Ejecutivo, Supervisor |
 | **Consulta** | Solicitudes | Todas las Solicitudes | Ejecutivo, Supervisor |
 | | Filas | Todas las Filas | Ejecutivo, Supervisor |
-| **Catálogos** | Clientes · Planes · Autorizados · Autorizaciones | Sus vistas. Autorizaciones (AutorizacionPlan) trae la vista **"Sin evidencia"**: el respaldo que el Administrador de planes tiene pendiente de cargar. Es una lista de tareas suya, **no** una lista de autorizaciones inválidas: esas autorizaciones ya valen (D-42) | Administrador de planes (Ejecutivo y Supervisor, solo lectura) |
+| **Catálogos** | Clientes · Planes · Correos Autorizados · Autorizaciones - Planes · Autorizaciones - Clientes | Sus vistas. Autorizaciones - Planes (AutorizacionPlan) trae la vista **"Sin evidencia"**: el respaldo que el Administrador de planes tiene pendiente de cargar. Es una lista de tareas suya, **no** una lista de autorizaciones inválidas: esas autorizaciones ya valen (D-42). Autorizaciones - Clientes (AutorizacionCliente) es la entrada nueva del 2026-09-27, pedido textual del aprobador de diferenciar las dos vías de DN-01 en el sitemap; reúsa el ícono de Autorizaciones - Planes, no se creó uno nuevo | Administrador de planes (Ejecutivo y Supervisor, solo lectura) |
 | **Configuración** | Parámetros · Reglas | Sus vistas | Administrador técnico |
 
 Un solo nivel, nombres de tarea y no de tabla, íconos Fluent en SVG (web resources `WR - MPPP - SVG - …`). Sin tableros en la fase 1. La entrada por defecto de cada perfil es su primera entrada de Trabajo.
@@ -69,14 +69,18 @@ Las entra el RPA y no existen hasta la fase 2, así que **no cuentan en las 17 d
 
 > Detalle de implementación a verificar antes de construir: filtrar *"claim vigente ahora"* en una vista guardada necesita un operador de fecha relativa de FetchXML (familia `next-x-hours`). **Se confirma en Learn al construir la vista**; si no diera, se muestra la columna y el ejecutivo lee la hora, que resuelve lo mismo.
 
-### Lista cerrada de las 17 vistas (inventario 12.2), hoy 18
+### Lista cerrada de las 17 vistas (inventario 12.2), hoy 20
 
 Cerrada el 2026-09-22 con el aprobador. Antes el inventario decía "~19" y la fórmula del párrafo de abajo daba 16: ninguno de los dos números se podía reconstruir. **Cada tabla de catálogo lleva UNA sola vista, "Activos".** La vista de búsqueda rápida (Quick Find) no se cuenta: toda tabla la trae y no hay nada que diseñar en ella.
 
 **Se agregó una 18.ª el 2026-09-27** (fila 18 de la tabla de abajo): DN-01 creó `AutorizacionCliente`
 y nunca se mostró en ningún formulario; orden explícita del aprobador de agregarle su subgrilla al
-Cliente. La lista deja de estar "cerrada" en el número 17, pero el criterio que la cerró (una vista
-por necesidad real de la app, no una vista "por las dudas") no cambia.
+Cliente. **Y dos más, 19.ª y 20.ª, ese mismo día**: los tres pedidos textuales del aprobador (ver
+`PENDIENTES.md`/la orden del 2026-09-27) — poder ver desde el correo con cuántos CLIENTES está
+relacionado (19), y diferenciar "Autorizaciones - Planes" de "Autorizaciones - Clientes" en el
+sitemap, para lo cual la segunda necesita su propia vista por defecto (20). La lista deja de estar
+"cerrada" en el número 17, pero el criterio que la cerró (una vista por necesidad real de la app, no
+una vista "por las dudas") no cambia.
 
 | # | Vista | Tabla | Para qué |
 |---|---|---|---|
@@ -91,19 +95,23 @@ por necesidad real de la app, no una vista "por las dudas") no cambia.
 | 9 | Clientes activos | Cliente | entrada de sitemap "Clientes" |
 | 10 | Planes activos | Plan | entrada de sitemap "Planes" |
 | 11 | Autorizados activos | Autorizado | entrada de sitemap "Autorizados" |
-| 12 | Autorizaciones activas | AutorizacionPlan | entrada de sitemap "Autorizaciones" |
+| 12 | Autorizaciones activas | AutorizacionPlan | entrada de sitemap "Autorizaciones - Planes" |
 | 13 | Parámetros activos | Parametro | entrada de sitemap "Parámetros" |
 | 14 | Reglas activas | Regla | entrada de sitemap "Reglas" |
 | 15 | Autorizaciones sin evidencia | AutorizacionPlan | pendientes del Administrador de planes. **No** son autorizaciones inválidas (D-42) |
 | 16 | Correos autorizados sobre este plan | AutorizacionPlan | subgrilla del formulario de Plan |
 | 17 | Planes que puede modificar | AutorizacionPlan | subgrilla del formulario de Autorizado |
 | 18 | Correos autorizados sobre este cliente | AutorizacionCliente | subgrilla del formulario de Cliente (agregada 2026-09-27, DN-01) |
+| 19 | Clientes que puede modificar | AutorizacionCliente | subgrilla del formulario de Autorizado (agregada 2026-09-27, pedido textual del aprobador) |
+| 20 | Autorizaciones por cliente activas | AutorizacionCliente | entrada de sitemap "Autorizaciones - Clientes" (agregada 2026-09-27, pedido textual del aprobador) |
 
 Las 16 y 17 son la misma tabla vista desde cada lado, como dice la nota de navegación de abajo. La
-18 no tiene ese espejo: `AutorizacionCliente` no tiene formulario ni subgrilla propia del lado de
-Autorizado en esta fase (fuera de alcance según el propio DN-01, `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §8).
+18 y la 19 también: `AutorizacionCliente` ya tiene su espejo completo en Autorizado, agregado el
+2026-09-27 (el playbook de tabla la dejaba "fuera de alcance" el 2026-09-26; el aprobador la pidió al
+día siguiente, textual: "si quiero entrar por correo y ver con cuántos clientes está relacionado ese
+correo, ¿cómo lo hago? Hoy por hoy sí puedo ver los planes, pero no los clientes").
 
-**Vista por defecto de cada tabla** (la que usa la plataforma en subgrillas y lookups cuando nadie elige otra): Fila → *Mis clientes — por digitar*; Solicitud → *Solicitudes*; AutorizacionPlan → *Autorizaciones activas*; y cada catálogo, su propia "Activos".
+**Vista por defecto de cada tabla** (la que usa la plataforma en subgrillas y lookups cuando nadie elige otra): Fila → *Mis clientes — por digitar*; Solicitud → *Solicitudes*; AutorizacionPlan → *Autorizaciones activas*; AutorizacionCliente → *Autorizaciones por cliente activas*; y cada catálogo, su propia "Activos".
 
 La vista "mis clientes" filtra por una relación de dos saltos (Fila → Plan → Cliente). Las vistas nativas lo admiten en su FetchXML; hay que comprobar al construir que el diseñador moderno no lo rompe al editarla.
 
@@ -117,8 +125,9 @@ Uno principal por tabla, **una sola pestaña**, sin pestaña de "Relacionados" v
 | **Solicitud** | Encabezado: Número, Estado, Remitente. *Correo* (recibido, asunto, archivos: correo original y Excel, para descargar). *Filas* (subgrilla con las filas y los mismos botones). *Reglas* (subgrilla de ResultadoRegla). *Comunicaciones* (acuse y respuesta final: cuándo y qué se dijo). *Bitácora* (subgrilla). | Solo lectura. |
 | **Cliente** | Nombre, CIFBAC, CIFCOM, Ejecutivo asignado. Subgrilla **Planes del cliente** (código, moneda, tipo de formato, cantidad de correos autorizados, estado). Subgrilla **Correos autorizados sobre este cliente** (correo, estado), sobre `AutorizacionCliente` — agregada el 2026-09-27, DN-01, orden explícita del aprobador. *(No es la misma subgrilla que se quitó el 2026-09-24, "Correos autorizados del cliente": esa mostraba `Autorizado` por un lookup directo a Cliente que ya no existe, "un correo ya no pertenece a un cliente". Esta es la tabla de unión `AutorizacionCliente` de DN-01 — un correo autoriza TODOS los planes del cliente a la vez —, que se creó el 2026-09-26 y no se había mostrado en ningún formulario todavía.)* | Administrador de planes |
 | **Plan** | Código, Cliente (el lookup lleva al cliente), Moneda, Tipo de formato. Subgrilla **Correos autorizados sobre este plan** (correo, evidencia, fecha del documento, estado), sobre AutorizacionPlan; cada renglón abre esa autorización. | Administrador de planes |
-| **Autorizado** | Correo, Cliente (el lookup lleva al cliente). Subgrilla **Planes que puede modificar** (plan, moneda, tipo de formato, evidencia, fecha del documento, estado), sobre AutorizacionPlan; cada renglón abre esa autorización. Desde ahí el Administrador de planes agrega una autorización nueva (solo planes del mismo cliente) o la desactiva; no se borra. **El Autorizado ya no lleva evidencia propia** (E-17). | Administrador de planes |
+| **Autorizado** | Correo, Cliente (el lookup lleva al cliente). Subgrilla **Planes que puede modificar** (plan, moneda, tipo de formato, evidencia, fecha del documento, estado), sobre AutorizacionPlan; cada renglón abre esa autorización. Subgrilla **Clientes que puede modificar** (cliente, CIF BAC, estado), sobre `AutorizacionCliente` — agregada el 2026-09-27, pedido textual del aprobador ("si quiero entrar por correo y ver con cuántos clientes está relacionado ese correo, ¿cómo lo hago? Hoy por hoy sí puedo ver los planes, pero no los clientes"). Desde ahí el Administrador de planes agrega una autorización nueva (solo planes del mismo cliente, o clientes enteros) o la desactiva; no se borra. **El Autorizado ya no lleva evidencia propia** (E-17). | Administrador de planes |
 | **Autorización** (AutorizacionPlan) | Correo, Plan y Cliente (los tres lookups navegables). Sección **Evidencia de la autorización**: Documento firmado (`sanic_documentofirmado`, control nativo de archivo: cargar, descargar, reemplazar y quitar; un archivo, hasta 10 MB) y Fecha del documento. **La evidencia NO condiciona la vigencia** (D-42, aprobador 2026-09-21; `02` §2.4): una autorización vale con el Autorizado, el Plan, el Cliente y la propia AutorizacionPlan activos, tenga o no el documento cargado. La evidencia es el respaldo que el administrador de planes tiene que subir, y el formulario se lo muestra pendiente con una notificación, pero **al cliente no se lo afecta porque el banco no cargó un papel**. El archivo solo se puede cargar después de guardar el registro (así funciona una columna de archivo), así que toda autorización nace "sin evidencia" y eso es normal. *(Corregido el 2026-09-22: esta celda decía "la evidencia es obligatoria" y que la autorización "no vale" hasta cargarla, que es justo la validación que D-42 mandó sacar.)* Ejecutivo y Supervisor la pueden descargar, no cambiar (`04` §1). | Administrador de planes |
+| **Autorización por cliente** (AutorizacionCliente) | Correo, Autorizado y Cliente (`sanic_nombre`, `sanic_autorizadoid`, `sanic_clienteid`, los tres en el encabezado, como en AutorizacionPlan). **Sin sección de evidencia**: esta tabla no tiene `sanic_documentofirmado` ni `sanic_fechadocumento` (DN-01). Sección técnica "Datos" con `ownerid`, mismo patrón que el formulario de Cliente, porque el formulario exige al menos una sección y no queda ningún campo propio libre tras el encabezado. Formulario nuevo, agregado el 2026-09-27, pedido textual del aprobador ("Quiero agregar un nuevo correo autorizado al cliente y solo me sale 'Nombre' y 'Owner'"): antes solo existía el formulario "Information" de fábrica, sin los lookups. | Administrador de planes |
 | **Parámetro** · **Regla** | Sus columnas; el valor JSON en un área de texto grande. | Administrador técnico |
 
 **Navegación entre catálogos** (pedido del aprobador sobre el mockup, 2026-09-20). Desde un Cliente se ven sus planes y sus correos autorizados; desde un Plan se viaja a su cliente y se ven los correos autorizados sobre él; desde un Autorizado se ven los planes que puede modificar. Desde una Fila, el Plan y el Cliente son enlaces. Todo con lo nativo: lookups y subgrillas; "Volver" regresa al registro anterior, no a la lista. La subgrilla de un Plan y la de un Autorizado muestran la misma tabla, AutorizacionPlan, vista desde cada lado: hacen falta dos vistas de esa tabla, una por lado (`06`).
@@ -155,8 +164,8 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 | Tipo | Cantidad | Detalle |
 |---|---|---|
 | App y sitemap | 1 + 1 | |
-| Vistas | ~16 | 5 de Fila, 3 de Solicitud, y activos + búsqueda de cada catálogo |
-| Formularios | 9 | Uno por tabla con interfaz (ResultadoRegla y Bitácora solo se ven en subgrilla) |
+| Vistas | 20 | Lista cerrada en `05` §3 (`06` §12.2): 5 de Fila, 3 de Solicitud, activos + búsqueda de cada catálogo, y las 4 de AutorizacionPlan/AutorizacionCliente para subgrillas y "sin evidencia" |
+| Formularios | 9 | Uno por tabla con interfaz (ResultadoRegla y Bitácora solo se ven en subgrilla); incluye `AutorizacionCliente`, agregado el 2026-09-27 |
 | Comandos | 8 | Los de §5 |
 | Tabla técnica + su creación rápida | 1 + 1 | `sanic_mppp_tbl_motivoaccion`: el diálogo de motivo (DA-03 corregida) |
 | Web resources | ~10 | Íconos SVG del sitemap y de los botones |
