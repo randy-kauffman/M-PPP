@@ -194,11 +194,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal("0042 - ACME S.A.", NombreCalculado.DePlan("0042", "ACME S.A."));
             Assert.Equal("0042", NombreCalculado.DePlan("0042", null));
             Assert.Equal("ana@acme.com → 0042", NombreCalculado.DeAutorizacionPlan("ana@acme.com", "0042"));
+            Assert.Equal("ana@acme.com → ACME S.A.", NombreCalculado.DeAutorizacionCliente("ana@acme.com", "ACME S.A."));
             Assert.Equal("MPPP-00000123-F01", NombreCalculado.DeFila("MPPP-00000123", 1));
             Assert.Equal("MPPP-00000123-F100", NombreCalculado.DeFila("MPPP-00000123", 100));
 
             Assert.Equal(100, NombreCalculado.DePlan("0042", new string('c', 300)).Length);
             Assert.Equal(400, NombreCalculado.DeAutorizacionPlan(new string('a', 500) + "@x.com", "0042").Length);
+            Assert.Equal(400, NombreCalculado.DeAutorizacionCliente(new string('a', 500) + "@x.com", "ACME S.A.").Length);
             Assert.Equal(120, NombreCalculado.DeFila(new string('s', 200), 7).Length);
         }
 
@@ -208,6 +210,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Throws<ArgumentException>(() => NombreCalculado.DePlan(" ", "ACME"));
             Assert.Throws<ArgumentException>(() => NombreCalculado.DeAutorizacionPlan(null, "0042"));
             Assert.Throws<ArgumentException>(() => NombreCalculado.DeAutorizacionPlan("ana@acme.com", " "));
+            Assert.Throws<ArgumentException>(() => NombreCalculado.DeAutorizacionCliente(null, "ACME S.A."));
+            Assert.Throws<ArgumentException>(() => NombreCalculado.DeAutorizacionCliente("ana@acme.com", " "));
             Assert.Throws<ArgumentException>(() => NombreCalculado.DeFila(null, 1));
             Assert.Throws<ArgumentOutOfRangeException>(() => NombreCalculado.DeFila("MPPP-1", 0));
         }

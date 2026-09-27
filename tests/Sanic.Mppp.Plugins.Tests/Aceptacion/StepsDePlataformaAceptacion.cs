@@ -282,6 +282,26 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void El_nombre_de_la_autorizacion_por_cliente_sale_de_sus_lookups_y_lo_que_venga_se_pisa()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var autorizadoId = svc.Sembrar(new Entity(Tablas.Autorizado) { ["sanic_nombre"] = "ana@acme.com" });
+            var clienteId = svc.Sembrar(new Entity(Tablas.Cliente) { ["sanic_nombre"] = "ACME S.A." });
+
+            var autorizacion = new Entity(Tablas.AutorizacionCliente, Guid.NewGuid())
+            {
+                ["sanic_nombre"] = "lo que mande el cliente",
+                ["sanic_autorizadoid"] = new EntityReference(Tablas.Autorizado, autorizadoId),
+                ["sanic_clienteid"] = new EntityReference(Tablas.Cliente, clienteId),
+            };
+            var ctx = new ContextoDePluginSimulado(svc, Ahora);
+            ctx.Contexto.MessageName = "Create";
+            ctx.Contexto.InputParameters["Target"] = autorizacion;
+            new NombreCalculadoStep().Execute(ctx);
+            Assert.Equal("ana@acme.com → ACME S.A.", autorizacion["sanic_nombre"]);
+        }
+
+        [Fact]
         public void Si_el_codigo_de_servidor_ya_trae_el_nombre_de_la_fila_no_se_vuelve_a_leer_la_solicitud()
         {
             // Revisión de código, 2026-09-21: este step corre en el Create de CADA fila; leer la Solicitud por fila es el N+1
@@ -324,6 +344,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             var (ctxFila, _) = Armar("Create", new Entity(TablasHistorico.Fila, Guid.NewGuid()) { ["sanic_numerofila"] = 1 });
             Assert.Throws<InvalidPluginExecutionException>(() => new NombreCalculadoStep().Execute(ctxFila));
+
+            var (ctxAutorizacionCliente, _) = Armar("Create", new Entity(Tablas.AutorizacionCliente, Guid.NewGuid()));
+            Assert.Throws<InvalidPluginExecutionException>(() => new NombreCalculadoStep().Execute(ctxAutorizacionCliente));
         }
 
         // ------------------------------------------------------------------ lo común
