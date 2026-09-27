@@ -55,6 +55,7 @@ la plataforma NO sustituye.
     "sanic_mppp_tbl_plan",
     "sanic_mppp_tbl_autorizado",
     "sanic_mppp_tbl_autorizacionplan",
+    "sanic_mppp_tbl_autorizacioncliente",
     "sanic_mppp_tbl_parametro",
     "sanic_mppp_tbl_regla",
     "sanic_mppp_tbl_resultadoregla",
@@ -197,8 +198,8 @@ la plataforma NO sustituye.
             {
               "id": "subarea_autorizados",
               "titulo": {
-                "1033": "Autorizados",
-                "3082": "Autorizados"
+                "1033": "Correos Autorizados",
+                "3082": "Correos Autorizados"
               },
               "tabla": "sanic_mppp_tbl_autorizado",
               "icono": "sanic_mppp_wr_svg_autorizados"
@@ -206,10 +207,19 @@ la plataforma NO sustituye.
             {
               "id": "subarea_autorizaciones",
               "titulo": {
-                "1033": "Autorizaciones",
-                "3082": "Autorizaciones"
+                "1033": "Autorizaciones - Planes",
+                "3082": "Autorizaciones - Planes"
               },
               "tabla": "sanic_mppp_tbl_autorizacionplan",
+              "icono": "sanic_mppp_wr_svg_autorizaciones"
+            },
+            {
+              "id": "subarea_autorizacionescliente",
+              "titulo": {
+                "1033": "Autorizaciones - Clientes",
+                "3082": "Autorizaciones - Clientes"
+              },
+              "tabla": "sanic_mppp_tbl_autorizacioncliente",
               "icono": "sanic_mppp_wr_svg_autorizaciones"
             }
           ]
@@ -256,4 +266,8 @@ la plataforma NO sustituye.
 
 ## 3. Precondiciones
 
-- Los 22 iconos, las 18 vistas, los 8 formularios y los 4 roles existen.
+- Los 22 iconos, las 20 vistas, los 9 formularios y los 4 roles existen. El ícono de la entrada
+  nueva `subarea_autorizacionescliente` **no es nuevo**: reúsa `sanic_mppp_wr_svg_autorizaciones`
+  (el mismo de `subarea_autorizaciones`), porque las dos entradas son la misma idea de negocio —una
+  autorización de correo—, solo que una es por plan y la otra por cliente; no se crea un web
+  resource nuevo para esto.
