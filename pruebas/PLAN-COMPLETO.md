@@ -1,7 +1,9 @@
 # Plan de pruebas funcionales — MPPP fase 1
-Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · 2026-09-23
+Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · 2026-09-23, corregido 2026-09-27
 Este documento junta los 10 archivos de `pruebas/` en uno solo, para leerlo de corrido.
-Los archivos separados (y los Excel) están en el repositorio, en `pruebas/`.
+Los archivos separados (y los Excel) están en el repositorio, en `pruebas/`. Regenerado a partir
+de ellos el 2026-09-27 para que las dos copias no se desincronicen: si editás algo, editalo en el
+archivo separado y volvé a generar este.
 
 ---
 ## Índice y cómo usarlo
