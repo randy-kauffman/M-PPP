@@ -106,6 +106,16 @@ la plataforma NO sustituye.
               "vista": "Por aprobar"
             },
             {
+              "id": "subarea_paraatencionmanual",
+              "titulo": {
+                "1033": "Para atencion manual",
+                "3082": "Para atencion manual"
+              },
+              "tabla": "sanic_mppp_tbl_fila",
+              "icono": "sanic_mppp_wr_svg_pararevisar",
+              "vista": "Para atencion manual"
+            },
+            {
               "id": "subarea_porclasificar",
               "titulo": {
                 "1033": "Por clasificar",
@@ -271,3 +281,12 @@ la plataforma NO sustituye.
   (el mismo de `subarea_autorizaciones`), porque las dos entradas son la misma idea de negocio —una
   autorización de correo—, solo que una es por plan y la otra por cliente; no se crea un web
   resource nuevo para esto.
+- El ícono de la entrada nueva `subarea_paraatencionmanual` **tampoco es nuevo**: reúsa
+  `sanic_mppp_wr_svg_pararevisar` (el mismo de `subarea_pararevisar`, Solicitud), porque las dos
+  entradas son el mismo patrón de negocio —"esto quedó marcado, alguien tiene que mirarlo"—, solo
+  que una es sobre Fila (el bot la marcó) y la otra sobre Solicitud (la máquina la marcó); no se
+  crea un web resource nuevo para esto. Hallazgo del aprobador (2026-09-27): la vista "Para atencion
+  manual" existía en Dev desde la fase 2 pero nunca tuvo entrada propia en el sitemap — un olvido,
+  no una decisión —, a diferencia de su hermana "Para revisar" que sí la tenía. Se agrega DESPUÉS de
+  `subarea_poraprobar` y ANTES de `subarea_porclasificar`: las entradas de Fila van juntas, las de
+  Solicitud después.
