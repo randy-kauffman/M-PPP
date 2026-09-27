@@ -437,14 +437,16 @@ ValidateApp sin errores`.
 
 | Caso | Resultado | Notas |
 |---|---|---|
+| G-00 privilegios efectivos | | |
+| G-00b comportamiento de cada rol | | |
 | G-01 sitemap y sus vistas | | |
 | G-02 íconos | | |
-| G-03 las 18 vistas | | |
+| G-03 las 20 vistas | | |
 | G-04 cartera del ejecutivo | | |
 | **G-05 columnas protegidas** | | |
 | **G-06 lo que cada rol no puede** | | |
 | G-07 sitemap por rol | | |
-| G-08 los 9 formularios | | |
+| G-08 los 10 formularios | | |
 | G-09 sin evidencia pero válida | | |
 | G-10 notificaciones | | |
 | G-11 multiidioma | | |
