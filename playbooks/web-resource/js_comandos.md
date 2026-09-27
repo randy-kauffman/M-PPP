@@ -4,12 +4,16 @@ Inventario 12.5. El contenido NO va en este playbook: vive en
 `recursos/js/comandos.js`, se edita y se revisa como un archivo, y la herramienta lo sube.
 
 Trae los OCHO comandos de fase 1 más **Atendida** (fase 2, `05-app-model-driven.md`
-§"Fase 2: dos vistas y un comando más"): nueve funciones en total. Los cuatro que piden un texto
-(Rechazada en AS400, Anular, Devolver, Revisado) abren el dialogo de motivo: el formulario de
-`sanic_mppp_tbl_motivoaccion` en modo creacion dentro de un dialogo (DA-03 corregida el
-2026-09-22), leen el motivo del registro que devuelve `savedEntityReference[0]` y lo borran.
-**Atendida no pide texto**, mismo patrón y mismo motivo que Revisado (`05` §5, corregido el
-2026-09-23).
+§"Fase 2: dos vistas y un comando más") más **Descargar para digitar** (DN-02,
+`diseno/DIRECTRICES-NUEVAS.md`, orden explícita del aprobador de construir en Dev el 2026-09-26):
+diez funciones en total. Los cuatro que piden un texto (Rechazada en AS400, Anular, Devolver,
+Revisado) abren el dialogo de motivo: el formulario de `sanic_mppp_tbl_motivoaccion` en modo
+creacion dentro de un dialogo (DA-03 corregida el 2026-09-22), leen el motivo del registro que
+devuelve `savedEntityReference[0]` y lo borran. **Atendida no pide texto**, mismo patrón y mismo
+motivo que Revisado (`05` §5, corregido el 2026-09-23). **Descargar para digitar NO escribe nada
+en Dataverse**: llama UNA vez (no fila por fila) a la Custom API
+`sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execute` y baja el `.xlsx` que
+devuelve con `Xrm.Navigation.openFile`.
 
 ## 1. Identidad
 
@@ -37,7 +41,7 @@ Trae los OCHO comandos de fase 1 más **Atendida** (fase 2, `05-app-model-driven
   "tipo": "web-resource",
   "nombre": "sanic_mppp_wr_js_comandos",
   "displayname": "WR - MPPP - JS - Comandos",
-  "descripcion": "Funciones de los nueve botones de la barra de comandos de Fila y Solicitud (12.5), incluido el dialogo de motivo (12.4).",
+  "descripcion": "Funciones de los diez botones de la barra de comandos de Fila y Solicitud (12.5), incluido el dialogo de motivo (12.4).",
   "recurso": "JS",
   "archivo": "recursos/js/comandos.js"
 }

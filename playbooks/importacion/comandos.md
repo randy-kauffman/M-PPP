@@ -26,6 +26,15 @@ separado para "Atendida" habría borrado los otros cinco. Apaga `sanic_requierea
 `regla`: no es una transición de estado, es un botón de "ya lo resolví", igual que "revisado",
 "atendido" y "descartar").
 
+**Botón "Descargar para digitar" agregado el 2026-09-26 (DN-02, `diseno/DIRECTRICES-NUEVAS.md`,
+orden explícita del aprobador de construir en Dev).** Mismo motivo que "Atendida": va en el MISMO
+cambio `ribbon` de `sanic_mppp_tbl_fila`, ahora con SIETE botones (secuencia 70, después de
+"atendida"). No lleva `regla`: no hay una restricción de estado para descargar (masivo, sobre
+cualquier selección de Fila, igual que "atendida"). Su función (`Sanic.Mppp.Comandos.
+descargarParaDigitar`, en `recursos/js/comandos.js`) NO escribe nada en Dataverse: llama UNA vez a
+la Custom API `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execute` y baja el
+`.xlsx` que devuelve con `Xrm.Navigation.openFile`.
+
 ## 1. Identidad
 
 ```json
@@ -172,6 +181,24 @@ separado para "Atendida" habría borrado los otros cinco. Apaga `sanic_requierea
             "SubGrid"
           ],
           "secuencia": 60
+        },
+        {
+          "id": "descargarparadigitar",
+          "funcion": "Sanic.Mppp.Comandos.descargarParaDigitar",
+          "icono": "sanic_mppp_wr_svg_cmddescargarparadigitar",
+          "etiqueta": {
+            "1033": "Download for entry",
+            "3082": "Descargar para digitar"
+          },
+          "tooltip": {
+            "1033": "Downloads the selected rows as an Excel file to enter in AS400.",
+            "3082": "Descarga en Excel las filas seleccionadas para digitarlas en AS400."
+          },
+          "ubicaciones": [
+            "HomepageGrid",
+            "SubGrid"
+          ],
+          "secuencia": 70
         }
       ],
       "ocultar": [

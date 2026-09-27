@@ -1,7 +1,12 @@
 # Playbook: paquete-plugins · sanic_mppp_pkg_plugins
 
 Inventario 8.0/8.1/8.2 dependen de este paquete: sin él no existen los `plugintype`
-a los que apuntan las dos Custom API y los 18 steps.
+a los que apuntan las Custom API y los steps.
+
+**`Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi` se agregó el 2026-09-26 (DN-02,
+`diseno/DIRECTRICES-NUEVAS.md`)**, para la Custom API `sanic_mppp_capi_exportarparadigitar`
+(`playbooks/custom-api/sanic_mppp_capi_exportarparadigitar.md`). El código ya está en verde
+(1080 pruebas) y no se toca desde acá.
 
 Antes de correr la herramienta hay que armar el .nupkg:
 
@@ -49,7 +54,8 @@ dotnet pack src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj -c 
     "Sanic.Mppp.Plugins.Steps.AtenderPorClasificarStep",
     "Sanic.Mppp.Plugins.Api.ObtenerFilasPendientesApi",
     "Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi",
-    "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep"
+    "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep",
+    "Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi"
   ]
 }
 ```

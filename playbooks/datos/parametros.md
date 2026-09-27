@@ -1,4 +1,4 @@
-# Playbook: datos · parametros (los 18)
+# Playbook: datos · parametros (los 20)
 
 **`autorizacion.modo` se agregó el 2026-09-26 (DN-01, `diseno/DIRECTRICES-NUEVAS.md`, "Diseño resuelto").**
 Declara qué vía consulta `AUTORIZACION_CORREO_PLAN`: `plan` (la de hoy, `AutorizacionPlan`) o `cliente`
@@ -33,6 +33,19 @@ va a reportar `difiere` en esta fila contra Dev, y eso es lo ESPERADO, no una de
 decision operativa de cada entorno (D-53), no del playbook. **No se corrige con `--completar`**: eso lo volveria a
 apagar. Si alguna vez el `difiere` de esta fila desaparece contra un entorno donde deberia estar prendido, ahi si
 hay que mirar.
+
+**`exportacion.columnas` y `exportacion.maximo` se agregaron el 2026-09-26 (DN-02,
+`diseno/DIRECTRICES-NUEVAS.md`)**, orden explícita del aprobador de construir en Dev.
+`exportacion.columnas` trae `numeroSolicitud` y `numeroFila` (trazabilidad, sin eso el archivo no
+sirve para volver a marcar lo digitado) más los diez campos de `plantilla.estructura` que el
+ejecutivo necesita para digitar en AS400 — cuenta e identificación incluidas: DN-02 dejó escrito
+que ese archivo sale de la plataforma SIN la protección de columna de RNF-04/BP-PP-004, decisión
+tomada a conciencia por el aprobador. **El CONJUNTO de columnas es una decisión del negocio, no del
+código**: agregar o sacar un campo es cambiar este parámetro, nunca tocar una línea de código (el
+plugin no tiene una lista propia de campos permitidos ni prohibidos). `exportacion.maximo` se
+siembra en `500`, **PROVISIONAL pendiente de medición (BP-PP-053)**: el spike C-05 midió LECTURA
+en el sandbox real, no la escritura del `.xlsx`, así que este tope no está medido todavía — hay que
+medirlo con volumen real, igual que se midió `rpa.lote.maximo`.
 
 Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
@@ -254,6 +267,26 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "100",
       "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 \u00a73). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion (BP-PP-053), no la cuota. **MEDIDO en Dev el 2026-09-26**: 0,33 s por item, lineal de 10 a 50 (10->3,9s · 25->7,9s · 50->16,7s). Con 100 son ~33 s, el 28% del presupuesto, con mas de 3x de margen para degradacion. **Hay que volver a medirlo en Produccion**: Dev vacio no es Produccion con carga y con tablas grandes."
+    },
+    {
+      "sanic_nombre": "exportacion.columnas",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"columnas\": [{\"campo\": \"numeroSolicitud\", \"encabezado\": \"No. Solicitud\"}, {\"campo\": \"numeroFila\", \"encabezado\": \"No. Fila\"}, {\"campo\": \"gestion\", \"encabezado\": \"Gestión\"}, {\"campo\": \"clasificacion\", \"encabezado\": \"Clasificación\"}, {\"campo\": \"numeroPlan\", \"encabezado\": \"No. Plan\"}, {\"campo\": \"nombreBeneficiario\", \"encabezado\": \"Nombre Colaborador / Proveedor\"}, {\"campo\": \"tipoIdentificacion\", \"encabezado\": \"Tipo ID\"}, {\"campo\": \"numeroIdentificacion\", \"encabezado\": \"No. Identificación\"}, {\"campo\": \"referencia\", \"encabezado\": \"Referencia\"}, {\"campo\": \"numeroCuenta\", \"encabezado\": \"No. Cuenta\"}, {\"campo\": \"moneda\", \"encabezado\": \"Moneda\"}, {\"campo\": \"banco\", \"encabezado\": \"Banco\"}]}",
+      "sanic_descripcion": "DN-02 (2026-09-26): orden de columnas del Excel de 'Descargar para digitar' (sanic_mppp_capi_exportarparadigitar); el orden del arreglo ES el orden de columnas (A = primer elemento). numeroSolicitud/numeroFila dan trazabilidad; el resto es lo que el ejecutivo necesita para digitar en AS400. DECISION DEL NEGOCIO: el conjunto de columnas se cambia editando este parametro, nunca tocando codigo."
+    },
+    {
+      "sanic_nombre": "exportacion.maximo",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "500",
+      "sanic_descripcion": "DN-02 (2026-09-26): tope de filas por llamada de sanic_mppp_capi_exportarparadigitar. Un pedido que lo supera rechaza LA LLAMADA ENTERA, nunca se recorta en silencio. PROVISIONAL: el spike C-05 midio LECTURA en el sandbox real, no la escritura del .xlsx; este tope no esta medido todavia (BP-PP-053) y hay que volver a medirlo con volumen real, igual que rpa.lote.maximo."
     }
   ]
 }

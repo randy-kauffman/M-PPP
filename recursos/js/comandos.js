@@ -106,7 +106,9 @@ Sanic.Mppp.Comandos = (function () {
             ninguna: "No rows were selected.",
             cerrar: "OK",
             sinMotivo: "No reason was entered. Nothing was changed.",
-            progreso: "Applying \"{accion}\"\u2026 {hechas} of {n}"
+            progreso: "Applying \"{accion}\"\u2026 {hechas} of {n}",
+            descargando: "Preparing the Excel file\u2026",
+            errorDescarga: "The file could not be prepared:"
         },
         3082: {
             confirmar: "¿Aplicar \"{accion}\" a {n} fila(s) seleccionada(s)?",
@@ -118,7 +120,9 @@ Sanic.Mppp.Comandos = (function () {
             ninguna: "No hay ninguna fila seleccionada.",
             cerrar: "Aceptar",
             sinMotivo: "No se escribio ningun motivo. No se cambio nada.",
-            progreso: "Aplicando \"{accion}\"\u2026 {hechas} de {n}"
+            progreso: "Aplicando \"{accion}\"\u2026 {hechas} de {n}",
+            descargando: "Preparando el archivo de Excel\u2026",
+            errorDescarga: "No se pudo preparar el archivo:"
         }
     };
 
@@ -461,6 +465,93 @@ Sanic.Mppp.Comandos = (function () {
         });
     }
 
+    /*
+     * "Descargar para digitar" (DN-02, `diseno/DIRECTRICES-NUEVAS.md`). NO usa
+     * `ejecutar`/`aplicar`: esas dos hacen "una peticion POR FILA" para escribir
+     * `sanic_estado`; esto es UNA sola llamada a la Custom API
+     * `sanic_mppp_capi_exportarparadigitar`, que devuelve un `.xlsx` armado en
+     * el servidor (C# + Open XML SDK, DN-02: "no JavaScript: un .xlsx a mano en
+     * el navegador es fragil y no se agregan librerias al cliente").
+     *
+     * `filaids` es StringArray (calza con `SelectedControlSelectedItemIds` sin
+     * JSON de por medio, ver el XML doc de `ExportarParaDigitarApi`).
+     * `parameterTypes.filaids` usa `structuralProperty: 4` (Collection, Learn
+     * "Xrm.WebApi.online.execute") con `typeName: "Edm.String"`: el tipo del
+     * ELEMENTO, no de la coleccion.
+     */
+    function pedidoExportarParaDigitar(ids) {
+        return {
+            filaids: ids,
+            getMetadata: function () {
+                return {
+                    boundParameter: null,
+                    parameterTypes: {
+                        filaids: { typeName: "Edm.String", structuralProperty: 4 }
+                    },
+                    operationType: 1, // Function (Learn: 0 Action, 1 Function, 2 CRUD)
+                    operationName: "sanic_mppp_capi_exportarparadigitar"
+                };
+            }
+        };
+    }
+
+    /*
+     * Nombre del archivo con fecha y hora locales, para que dos descargas del
+     * mismo dia no se pisen en la carpeta de Descargas de quien lo baja.
+     */
+    function nombreDeArchivoExportacion() {
+        var ahora = new Date();
+        function dosDigitos(n) { return (n < 10 ? "0" : "") + n; }
+        var sufijo = ahora.getFullYear().toString() +
+            dosDigitos(ahora.getMonth() + 1) + dosDigitos(ahora.getDate()) + "-" +
+            dosDigitos(ahora.getHours()) + dosDigitos(ahora.getMinutes()) + dosDigitos(ahora.getSeconds());
+        return "MPPP-para-digitar-" + sufijo + ".xlsx";
+    }
+
+    /*
+     * Base64 -> KB, para `fileSize` de `Xrm.Navigation.openFile` (Learn: numero
+     * en KB, no en bytes). Se redondea PARA ARRIBA: mejor declarar un poco de
+     * mas que uno de menos.
+     */
+    function tamanioEnKbDesdeBase64(base64) {
+        var bytesAproximados = Math.ceil((base64 || "").length * 3 / 4);
+        return Math.max(1, Math.ceil(bytesAproximados / 1024));
+    }
+
+    function descargarParaDigitar(ids, control) {
+        var t = idioma();
+        if (!ids || !ids.length) {
+            return Xrm.Navigation.openAlertDialog({ text: t.ninguna, confirmButtonLabel: t.cerrar });
+        }
+        var idsLimpios = ids.map(limpiarId);
+        return conProgreso(t.descargando, function () {
+            return Xrm.WebApi.online.execute(pedidoExportarParaDigitar(idsLimpios)).then(function (respuesta) {
+                return respuesta.json();
+            });
+        }).then(function (resultado) {
+            return Xrm.Navigation.openFile(
+                {
+                    fileContent: resultado.archivo,
+                    fileName: nombreDeArchivoExportacion(),
+                    fileSize: tamanioEnKbDesdeBase64(resultado.archivo),
+                    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                },
+                { openMode: 2 } // 2 = guardar (Learn, "openFile")
+            );
+        }, function (error) {
+            // Los dos rechazos de negocio (FilasNoEncontradasException,
+            // LoteDeExportacionExcedidoException) llegan con su mensaje TAL
+            // CUAL en `error.message` (decision del aprobador, ver el XML doc
+            // de ExportarParaDigitarApi): se muestra sin envolver, es lo que el
+            // ejecutivo necesita leer para actuar.
+            var texto = (error && error.message) || String(error);
+            return Xrm.Navigation.openAlertDialog({
+                text: t.errorDescarga + "\n\n" + texto,
+                confirmButtonLabel: t.cerrar
+            });
+        });
+    }
+
     return {
         digitada: function (ids, control) {
             return ejecutar("Digitada", FILA.tabla, cambioDe(FILA, FILA.DIGITADA), ids, control);
@@ -536,6 +627,7 @@ Sanic.Mppp.Comandos = (function () {
             return ejecutar("Atendida", FILA.tabla,
                 { sanic_requiereatencionmanual: false }, ids, control);
         },
+        descargarParaDigitar: descargarParaDigitar,
 
         /*
          * --- las reglas del ribbon (EnableRule / CustomRule) ---
