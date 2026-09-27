@@ -34,6 +34,18 @@ decision operativa de cada entorno (D-53), no del playbook. **No se corrige con 
 apagar. Si alguna vez el `difiere` de esta fila desaparece contra un entorno donde deberia estar prendido, ahi si
 hay que mirar.
 
+**`plantilla.obligatoriedad` ganó `porGestion` el 2026-09-27 (DN-03, `diseno/DIRECTRICES-NUEVAS.md`),
+orden explícita del aprobador de resolverlo de 0 a 100 sin consultar.** Es un ajuste más simple que
+`reglas` —solo por Gestión, no toda la matriz Gestión×Clasificación×formato— y que además puede
+ENDURECER con `obligatorios`, no solo aflojar. Conviven: `reglas` y `porGestion` no se pisan.
+**La fila de acá abajo NO cambia** (`sanic_valor` y `sanic_version` quedan igual): un parámetro sin
+`porGestion` se comporta EXACTAMENTE como antes de DN-03 (compatibilidad fijada con pruebas), así que
+lo ya sembrado en los tres entornos sigue siendo válido tal cual está — no hay nada que empujar a
+Dev. `--solo-verificar` contra Dev (2026-09-27) lo confirma: `plantilla.obligatoriedad` da
+`ya_existia`, sin diferencia. Cuando el negocio decida qué aflojar o endurecer en cada gestión, esa
+sí va a ser una versión nueva (nunca se edita la vigente): la fila de abajo cambia recién ahí. Ver
+`diseno/02-diccionario-datos.md` §2.5 y `Validacion/ParametrosDePlantilla.cs` (`ObligatoriedadPlantilla`).
+
 **`exportacion.columnas` se agregó el 2026-09-26 (DN-02, `diseno/DIRECTRICES-NUEVAS.md`)**, orden
 explícita del aprobador de construir en Dev. Trae `numeroSolicitud` y `numeroFila` (trazabilidad,
 sin eso el archivo no sirve para volver a marcar lo digitado) más los diez campos de
@@ -60,7 +72,7 @@ Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
-- `plantilla.obligatoriedad`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
+- `plantilla.obligatoriedad`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18; `porGestion` agregado por DN-03 (2026-09-27), sembrado ausente.
 - Los tres de `vigilancia.*` y los dos de `retencion.dias.*`: **decididos por el aprobador el 2026-09-22** (D-45); no estaban en ningun archivo.
 
 Ojo: los fixtures de prueba (`ParametrosDePlantillaAceptacion`) y el mockup
