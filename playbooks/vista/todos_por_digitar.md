@@ -46,6 +46,10 @@ desde las columnas, el orden y el filtro.
       "ancho": 70
     },
     {
+      "nombre": "sanic_requiereatencionmanual",
+      "ancho": 60
+    },
+    {
       "nombre": "sanic_estado",
       "ancho": 130
     },
@@ -150,3 +154,6 @@ desde las columnas, el orden y el filtro.
 ## 3. Precondiciones
 
 - La tabla y sus relaciones existen (P-03, P-04).
+- **Columna `sanic_requiereatencionmanual` agregada el 2026-09-27** (hallazgo del aprobador), misma
+  posicion y mismo motivo que en "Mis clientes - por digitar": segunda columna, pegada a
+  `sanic_numerofila` y ANTES de `sanic_estado`, ancho chico (60) por ser un Si/No.

@@ -46,6 +46,10 @@ desde las columnas, el orden y el filtro.
       "ancho": 70
     },
     {
+      "nombre": "sanic_requiereatencionmanual",
+      "ancho": 60
+    },
+    {
       "nombre": "sanic_estado",
       "ancho": 130
     },
@@ -155,3 +159,14 @@ desde las columnas, el orden y el filtro.
 ## 3. Precondiciones
 
 - La tabla y sus relaciones existen (P-03, P-04).
+- **Columna `sanic_requiereatencionmanual` agregada el 2026-09-27** (hallazgo del aprobador). Se
+  evaluo si correspondia sumarla acá (argumento en contra: la fila devuelta ya trae su propio motivo
+  visible en `sanic_notainterna`, y sumar columnas encarece la grilla) y **se decidio que si
+  corresponde**, porque el argumento en contra no aguanta un detalle tecnico: `sanic_notainterna` es
+  la MISMA columna que usa el bot para dejar "el porqué" cuando marca `atencionmanual` (`03`
+  §"Transición `atencionmanual`": "Prende `sanic_requiereatencionmanual`, deja el porqué en
+  `sanic_notainterna` y libera el claim"), y esa transición **no cambia el estado** (queda Validada).
+  Sin la columna nueva, el ejecutivo que abre "Mis clientes - devueltas" y ve una nota interna no
+  puede distinguir si la escribio el supervisor al devolver la fila o si la dejo el bot al marcarla
+  para atencion manual: son dos motivos distintos compartiendo el mismo texto. Va segunda, pegada a
+  `sanic_numerofila` y ANTES de `sanic_estado`, ancho chico (60) por ser un Si/No.

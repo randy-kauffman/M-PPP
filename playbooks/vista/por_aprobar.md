@@ -46,6 +46,10 @@ desde las columnas, el orden y el filtro.
       "ancho": 70
     },
     {
+      "nombre": "sanic_requiereatencionmanual",
+      "ancho": 60
+    },
+    {
       "nombre": "sanic_estado",
       "ancho": 130
     },
@@ -130,3 +134,11 @@ desde las columnas, el orden y el filtro.
 ## 3. Precondiciones
 
 - La tabla y sus relaciones existen (P-03, P-04).
+- **Columna `sanic_requiereatencionmanual` agregada el 2026-09-27** (hallazgo del aprobador). Se
+  evaluo si correspondia en esta vista de trabajo y **si corresponde**: `atencionmanual` (`03`
+  §"Qué filas entran") "**Vale también sobre una Digitada** (corregido el 2026-09-25): restringirlo
+  a Validada dejaría al bot sin forma de reportar un problema no clasificable **mientras está
+  aprobando**". Es decir, una fila puede estar en estado Digitada (y por lo tanto aparecer en "Por
+  aprobar") Y estar marcada por el bot para atencion manual al mismo tiempo: sin esta columna el
+  supervisor la aprobaria o rechazaria sin saber que el bot reporto un problema sobre ella. Va
+  segunda, pegada a `sanic_numerofila` y ANTES de `sanic_estado`, ancho chico (60) por ser un Si/No.

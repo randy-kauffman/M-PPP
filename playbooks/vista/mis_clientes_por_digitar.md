@@ -45,6 +45,10 @@ usuario fijo. Si esta anda, el resto son variaciones mas simples.
       "ancho": 70
     },
     {
+      "nombre": "sanic_requiereatencionmanual",
+      "ancho": 60
+    },
+    {
       "nombre": "sanic_estado",
       "ancho": 130
     },
@@ -152,3 +156,8 @@ usuario fijo. Si esta anda, el resto son variaciones mas simples.
 - Las tablas Fila, Plan y Cliente existen con sus relaciones (P-03 y P-04, hechas).
 - El `fetchxml` y el `layoutxml` NO se escriben aca: los genera la herramienta desde las
   columnas, el orden y el filtro de arriba.
+- **Columna `sanic_requiereatencionmanual` agregada el 2026-09-27** (hallazgo del aprobador): el
+  ejecutivo abria esta vista y no tenia forma de distinguir la fila que el bot dejo marcada con un
+  problema de una fila normal, todas se veian identicas. Va **segunda**, pegada a `sanic_numerofila`
+  y ANTES de `sanic_estado`/`sanic_gestion`/`sanic_clasificacion`: tiene que verse de un vistazo, no
+  perdida al final de catorce columnas. Ancho chico (60) porque es un Si/No.
