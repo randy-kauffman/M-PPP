@@ -40,7 +40,7 @@ cliente**, así que:
 | 3 | `AUTORIZACION_CORREO_PLAN` consulta **una vía u otra según el parámetro** — misma regla, misma posición en el orden, mismo efecto | **confirmado por el aprobador, 2026-09-26** |
 | 4 | En modo **cliente**, las filas de `AutorizacionPlan` **se conservan** y no se miran. Cambiar el parámetro vuelve a activarlas sin recargar nada | **confirmado por el aprobador, 2026-09-26** |
 | 5 | El **mensaje al cliente no cambia** en ningún modo. Sigue siendo el unificado del 2026-09-24 (`"El plan {plan} no existe o usted no está autorizado sobre él."`): distinguir "no existe" de "no autorizado" es el oráculo que ya cerramos | **no negociable** |
-| 6 | La app necesita poder cargar y ver las autorizaciones por cliente, y el Administrador de planes es quien las administra (RF-11) | **cerrado 2026-09-27**: formulario nuevo `Autorizacion por cliente` (encabezado con `sanic_nombre`, `sanic_autorizadoid`, `sanic_clienteid`), subgrilla nueva "Clientes que puede modificar" en el formulario de Autorizado, y entrada de sitemap nueva "Autorizaciones - Clientes" con su propia vista por defecto ("Autorizaciones por cliente activas"); construido y verificado contra Dev (`playbooks/formulario/autorizacioncliente.md`, `playbooks/formulario/autorizado.md`, `playbooks/vista/clientes_que_puede_modificar.md`, `playbooks/vista/autorizaciones_por_cliente_activas.md`, `playbooks/app/mantenimientoppp.md`) |
+| 6 | La app necesita poder cargar y ver las autorizaciones por cliente, y el Administrador de planes es quien las administra (RF-11) | **cerrado 2026-09-27**: formulario nuevo `Autorizacion por cliente` (encabezado con `sanic_nombre`, `sanic_autorizadoid`, `sanic_clienteid`, y sección "Evidencia de la autorizacion" con `sanic_documentofirmado` y `sanic_fechadocumento` — ver decisión del aprobador arriba), subgrilla nueva "Clientes que puede modificar" en el formulario de Autorizado, y entrada de sitemap nueva "Autorizaciones - Clientes" con su propia vista por defecto ("Autorizaciones por cliente activas"); construido y verificado contra Dev (`playbooks/formulario/autorizacioncliente.md`, `playbooks/formulario/autorizado.md`, `playbooks/vista/clientes_que_puede_modificar.md`, `playbooks/vista/autorizaciones_por_cliente_activas.md`, `playbooks/app/mantenimientoppp.md`) |
 
 ---
 
@@ -100,6 +100,19 @@ Confirmado por el aprobador el 2026-09-26. **Son dos directrices, no tres.**
 | Clave alternativa | autorizado + cliente (no se repite el par) |
 | Primaria | nombre calculado `<correo> → <cliente>`, T(400), como en AutorizacionPlan |
 | Privilegios | igual que AutorizacionPlan: Administrador de planes `C R W Ap At : O`; Ejecutivo y Supervisor `R:O` |
+
+**Evidencia firmada — agregada el 2026-09-27, decisión del aprobador.** Esta tabla se construyó
+primero tal cual el texto de arriba, sin `sanic_documentofirmado` ni `sanic_fechadocumento`, porque
+este "Diseño resuelto" no las mencionaba (a diferencia de `AutorizacionPlan`, §2.4 del diccionario de
+datos). El playbook de la tabla dejó constancia de esa ausencia como una nota explícita para el
+aprobador, sin decidir por cuenta propia si era intencional o un hueco. El aprobador decidió: es un
+hueco y hay que cerrarlo. Palabras del aprobador: *"Cuando entro a autorizacion x cliente, no esta la
+columna de archivo adjunto para adjuntar la autorizacion por escrito y la fecha de ese documento (al
+igual que en autorizacion por plan)."* **Motivo de negocio:** una autorización por cliente habilita
+TODOS los planes de ese cliente de una vez, o sea que es MÁS amplia que la autorización por plan — no
+tiene sentido que exija MENOS respaldo. Se agregaron `sanic_documentofirmado` (archivo, 10 MB, no
+requerida, auditada) y `sanic_fechadocumento` (fecha, no requerida, auditada), con la misma forma que
+sus pares de `AutorizacionPlan` (`playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §2).
 
 **`AutorizacionPlan` NO se toca, NO se migra, NO se borra.** Las dos vías conviven y el parámetro
 elige cuál se mira.

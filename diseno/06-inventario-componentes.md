@@ -72,7 +72,7 @@ Todas user-owned. El orden respeta los lookups: una tabla se crea después de la
 | 3.10 | `sanic_mppp_tbl_bitacora` | 7 | | | choices 2.12, 2.13 | 1 |
 | 3.11 | `sanic_mppp_tbl_corridahistorico` | por definir | | | | 3 |
 | 3.12 | `sanic_mppp_tbl_motivoaccion` | 2 | | | | 1 |
-| 3.13 | `sanic_mppp_tbl_autorizacioncliente` | 1 (solo la primaria calculada) | | | | 2 (DN-01, `DIRECTRICES-NUEVAS.md`) |
+| 3.13 | `sanic_mppp_tbl_autorizacioncliente` | 3 (`sanic_documentofirmado` y `sanic_fechadocumento` agregadas el 2026-09-27, decisión del aprobador) | 1 | | | 2 (DN-01, `DIRECTRICES-NUEVAS.md`) |
 
 ## 4. Relaciones — P-04
 
