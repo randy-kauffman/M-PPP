@@ -13,10 +13,12 @@ Convención de IDs: prefijo `E-` (**E**xportación), ver el encabezado de `09-rp
   `playbooks/datos/parametros.md`).
 - Al menos 2 Filas reales (cualquier estado: la Custom API no filtra por estado, exporta lo que se
   le pida por id) con datos ficticios `zz`/`ZZ`.
-- Sesión de un Ejecutivo o Supervisor para el caso de GUI (`local/sesion-ejecutivo.json`, generada
-  por el aprobador — `pruebas/gui/README.md`). El arnés de Playwright de `pruebas/gui/` **ya existe
-  y ya cubre la descarga de punta a punta** (`casos/dn-02-descargar-para-digitar.spec.mjs`): los
-  casos de acá que dependen de sesión real APUNTAN a ese arnés en vez de duplicarlo.
+- `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) o `local/sesion-supervisor.json`
+  (rol `SR - MPPP - Supervisor`) para el caso de GUI — generadas por el aprobador, ver
+  `pruebas/gui/README.md`; confirmarlas con `estado_sesiones.py`. El arnés de Playwright de
+  `pruebas/gui/` **ya existe y ya cubre la descarga de punta a punta**
+  (`casos/dn-02-descargar-para-digitar.spec.mjs`): los casos de acá que dependen de sesión real
+  APUNTAN a ese arnés en vez de duplicarlo.
 - Ninguno de los casos de acá toca `pruebas/gui/`.
 
 ---
@@ -26,7 +28,10 @@ Convención de IDs: prefijo `E-` (**E**xportación), ver el encabezado de `09-rp
 **Qué prueba.** Que el botón exista de verdad en el DOM, no solo en el servidor — la lección cara
 del 2026-09-27 (ver `13-construido-hoy.md` H-06): un comando puede estar publicado y no dibujarse.
 
-**Necesita.** Sesión real de Ejecutivo o Supervisor.
+**Necesita.** `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) o
+`local/sesion-supervisor.json` (rol `SR - MPPP - Supervisor`) — cualquiera de las dos sirve, ambas
+tienen el privilegio de la Custom API (ver E-09); confirmarla viva y con el rol correcto con
+`estado_sesiones.py` antes de correr Playwright.
 
 **Cómo.** Ya está automatizado: `MPPP_USUARIO=ejecutivo npx playwright test dn-02` (o
 `ribbon-fila`) desde `pruebas/gui/`.
@@ -229,10 +234,17 @@ una regresión de memoria en el código nuevo, y ahí sí amerita investigar.
 `ExecutePrivilegeName = prvReadsanic_mppp_tbl_fila` — un privilegio de plataforma que YA tienen
 Ejecutivo y Supervisor, y que Administrador de planes/técnico NO tienen.
 
-**Necesita.** Sesión (o token) de un usuario con el rol Administrador de planes, y otro con
-Administrador técnico. Ninguno de los dos con Ejecutivo/Supervisor asignado también.
+**Necesita.** No hace falta abrir un navegador: `herramientas/pruebas/comportamiento_roles.py` ya
+resuelve y verifica los 4 usuarios de prueba por su alias (`admin_planes` = `User3`, rol `SR - MPPP
+- Administrador de planes`; `admin_tecnico` = `User4`, rol `SR - MPPP - Administrador tecnico`) e
+impersona por `MSCRMCallerID` — el mismo mecanismo ya usado por esa suite para probar privilegios
+sin sesión de navegador. **Este caso NO es GUI**: no usa `local/sesion-*.json` (esos son
+`storageState` de Playwright, para el arnés de `pruebas/gui/`), sino la impersonación por API de
+`comportamiento_roles.py`.
 
-**Cómo.** Llamar `sanic_mppp_capi_exportarparadigitar` autenticado como cada uno de los dos.
+**Cómo.** Con un script que importe `Entorno` de `comportamiento_roles.py`:
+`ent.como("admin_planes", "POST", "sanic_mppp_capi_exportarparadigitar", {"filaids": []})` y lo
+mismo con `"admin_tecnico"`.
 
 **Qué tiene que pasar.** Las dos llamadas rechazadas por falta de privilegio (error de plataforma,
 no del plugin).
