@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using Sanic.Mppp.Plugins.Datos;
@@ -50,24 +51,34 @@ namespace Sanic.Mppp.Plugins.Api
     }
 
     /// <summary>
-    /// El pedido supera `exportacion.maximo`. Decisión del aprobador (2026-09-26): se rechaza LA LLAMADA ENTERA
-    /// nombrando el tope, nunca se recorta en silencio — recortar entregaría un archivo incompleto sin avisar, el
-    /// mismo pecado que omitir una fila faltante (<see cref="FilasNoEncontradasException"/>).
+    /// El plugin se acercó al presupuesto síncrono real de Dataverse (BP-PP-053) antes de terminar de armar el
+    /// archivo. Decisión del aprobador (2026-09-26, reemplaza el tope fijo `exportacion.maximo` que tenía esta
+    /// Custom API cuando era Function): sin tope de filas, tarde o temprano alguien selecciona un lote tan grande
+    /// que el tiempo no alcanza. En vez de dejar que la PLATAFORMA reviente con un error genérico e ininteligible,
+    /// el plugin lleva la cuenta del tiempo transcurrido y CORTA antes, con un mensaje que le dice a una persona
+    /// qué hacer: cuántas filas alcanzó a preparar y que vuelva a seleccionar menos. Nunca se entrega un archivo
+    /// parcial sin avisar (mismo criterio que <see cref="FilasNoEncontradasException"/>): se rechaza LA LLAMADA
+    /// ENTERA, porque un archivo con menos filas que las seleccionadas, entregado como si fuera completo, es
+    /// exactamente el mismo riesgo que este proyecto ya eliminó una vez (filas que el ejecutivo nunca digitó en
+    /// AS400 pero que el sistema puede llegar a dar por digitadas).
     /// </summary>
-    public sealed class LoteDeExportacionExcedidoException : Exception
+    public sealed class PresupuestoDeExportacionAgotandoseException : Exception
     {
-        public LoteDeExportacionExcedidoException(int pedidas, int tope)
-            : base($"Se pidieron {pedidas.ToString(CultureInfo.InvariantCulture)} filas; el máximo por llamada es " +
-                   $"{tope.ToString(CultureInfo.InvariantCulture)} (parámetro '{ExportarParaDigitar.ParametroMaximo}', " +
-                   "PROVISIONAL: conservador, sin medir la escritura real del Excel — BP-PP-053). Hacé la descarga en lotes más chicos.")
+        public PresupuestoDeExportacionAgotandoseException(int procesadas, int pedidas)
+            : base(
+                $"La descarga no alcanzó a terminar con las {pedidas.ToString(CultureInfo.InvariantCulture)} fila(s) " +
+                $"que seleccionaste: se llegaron a preparar {procesadas.ToString(CultureInfo.InvariantCulture)} antes " +
+                "de frenar a tiempo. Volvé a seleccionar con menos filas y descargá de nuevo en lotes más chicos.")
         {
+            Procesadas = procesadas;
             Pedidas = pedidas;
-            Tope = tope;
         }
 
-        public int Pedidas { get; }
+        /// <summary>Cuántas filas se alcanzaron a preparar ANTES de cortar (nunca se llegan a entregar: la llamada se rechaza entera).</summary>
+        public int Procesadas { get; }
 
-        public int Tope { get; }
+        /// <summary>Cuántas filas se habían pedido en total.</summary>
+        public int Pedidas { get; }
     }
 
     /// <summary>
@@ -76,10 +87,12 @@ namespace Sanic.Mppp.Plugins.Api
     /// (<see cref="ConfiguracionExportacion"/>, <see cref="Exportacion.ArmadorExportacionOpenXml"/>): no decide nada
     /// nuevo sobre el dominio de exportación en sí. Contrato (lo fijan las pruebas `ExportarParaDigitarAceptacion`):
     ///
-    ///  1. lee `exportacion.maximo` (REQUERIDO, entero positivo) y rechaza LA LLAMADA ENTERA si <c>filaIds</c> la
-    ///     supera (<see cref="LoteDeExportacionExcedidoException"/>) — decisión del aprobador, 2026-09-26: sembrado
-    ///     en 500, PROVISIONAL pendiente de medir la escritura real del Excel (BP-PP-053, la lectura la midió el
-    ///     spike C-05 pero la escritura no);
+    ///  1. YA NO hay tope de filas por llamada (decisión del aprobador, 2026-09-26: se eliminó `exportacion.maximo`
+    ///     al pasar la Custom API de Function a Action). El único límite que queda es el presupuesto síncrono real
+    ///     de Dataverse (BP-PP-053): <c>Ejecutar</c> lleva la cuenta del tiempo transcurrido mientras arma cada fila
+    ///     y, si se acerca al presupuesto, CORTA rechazando LA LLAMADA ENTERA con
+    ///     <see cref="PresupuestoDeExportacionAgotandoseException"/> (nombra cuántas alcanzó a preparar) en vez de
+    ///     dejar que la plataforma reviente con un error genérico;
     ///  2. lee `exportacion.columnas` y lo resuelve con <see cref="ConfiguracionExportacion.DesdeJson"/>: ausente es
     ///     <see cref="InvalidOperationException"/> (mismo criterio que
     ///     <see cref="RegistrarResultadoRpa"/>.ParametroObligatorio), mal formado propaga el
@@ -106,14 +119,27 @@ namespace Sanic.Mppp.Plugins.Api
         /// <summary>El parámetro de configuración (DN-02), hermano de `plantilla.estructura` pero de SALIDA.</summary>
         public const string ParametroColumnas = "exportacion.columnas";
 
-        /// <summary>El tope de filas por llamada (decisión del aprobador, 2026-09-26). Sembrado en 500, PROVISIONAL.</summary>
-        public const string ParametroMaximo = "exportacion.maximo";
-
         /// <summary>El número de Solicitud (`sanic_nombre`, ej. "MPPP-00000123"), agregado al vocabulario el 2026-09-26 para que el archivo tenga identidad de fila.</summary>
         public const string CampoNumeroSolicitud = "numeroSolicitud";
 
         /// <summary>`sanic_numerofila`, agregado al vocabulario el 2026-09-26 por el mismo motivo que <see cref="CampoNumeroSolicitud"/>.</summary>
         public const string CampoNumeroFila = "numeroFila";
+
+        /// <summary>
+        /// Presupuesto síncrono real de un plugin de Dataverse (BP-PP-053, `dataverse-async`). Nunca sale de un
+        /// parámetro configurable: un valor mal puesto ahí apuntaría el corte a un número que la plataforma no
+        /// respeta, y eso es peor que no cortar.
+        /// </summary>
+        private static readonly TimeSpan PresupuestoSincrono = TimeSpan.FromMinutes(2);
+
+        /// <summary>
+        /// Margen que se deja SIN procesar más filas, para alcanzar a armar el `.xlsx` de lo ya preparado y volver
+        /// (aunque termine en <see cref="PresupuestoDeExportacionAgotandoseException"/>) antes de que la
+        /// PLATAFORMA corte con un error genérico e ininteligible.
+        /// </summary>
+        private static readonly TimeSpan MargenParaTerminar = TimeSpan.FromSeconds(20);
+
+        private static readonly TimeSpan UmbralDeCorte = PresupuestoSincrono - MargenParaTerminar;
 
         private readonly FilasDataverse _filas;
         private readonly CatalogosDataverse _catalogos;
@@ -133,15 +159,25 @@ namespace Sanic.Mppp.Plugins.Api
         /// </param>
         public ResultadoDeExportacion Ejecutar(IList<Guid> filaIds)
         {
+            return Ejecutar(filaIds, RelojDeSistema());
+        }
+
+        /// <summary>
+        /// Igual que <see cref="Ejecutar(IList{Guid})"/>, con el reloj inyectado: es lo que le permite a una
+        /// prueba ejercitar el corte de <see cref="PresupuestoDeExportacionAgotandoseException"/> (BP-PP-053) sin
+        /// tener que esperar de verdad casi 2 minutos. Producción SIEMPRE pasa por el overload de un solo
+        /// parámetro, que arranca un cronómetro real.
+        /// </summary>
+        public ResultadoDeExportacion Ejecutar(IList<Guid> filaIds, Func<TimeSpan> transcurridoDesdeElInicio)
+        {
             if (filaIds == null)
             {
                 throw new ArgumentNullException(nameof(filaIds));
             }
 
-            var tope = ParametroMaximoLeido();
-            if (filaIds.Count > tope)
+            if (transcurridoDesdeElInicio == null)
             {
-                throw new LoteDeExportacionExcedidoException(filaIds.Count, tope);
+                throw new ArgumentNullException(nameof(transcurridoDesdeElInicio));
             }
 
             var configuracion = ConfiguracionExportacion.DesdeJson(ParametroObligatorio(ParametroColumnas).Valor);
@@ -157,10 +193,29 @@ namespace Sanic.Mppp.Plugins.Api
 
             var numerosDeSolicitud = _filas.NumerosDeSolicitud(encontradas.Select(f => f.SolicitudId).Distinct());
 
-            var filasParaExportar = filaIds.Select(id => ValoresDeFila(porId[id], numerosDeSolicitud)).ToList();
+            // Sin tope de filas (decisión del aprobador, 2026-09-26), un lote lo bastante grande puede acercarse al
+            // presupuesto síncrono real de Dataverse. Se arma fila por fila, chequeando el tiempo transcurrido ANTES
+            // de cada una: si ya se cruzó el umbral, se corta acá — nunca se entrega un archivo parcial sin avisar.
+            var filasParaExportar = new List<FilaParaExportar>(filaIds.Count);
+            foreach (var id in filaIds)
+            {
+                if (transcurridoDesdeElInicio() >= UmbralDeCorte)
+                {
+                    throw new PresupuestoDeExportacionAgotandoseException(filasParaExportar.Count, filaIds.Count);
+                }
+
+                filasParaExportar.Add(ValoresDeFila(porId[id], numerosDeSolicitud));
+            }
+
             var xlsx = _armador.Armar(filasParaExportar, configuracion);
 
             return new ResultadoDeExportacion(Convert.ToBase64String(xlsx), filasParaExportar.Count);
+        }
+
+        private static Func<TimeSpan> RelojDeSistema()
+        {
+            var cronometro = Stopwatch.StartNew();
+            return () => cronometro.Elapsed;
         }
 
         private static FilaParaExportar ValoresDeFila(FilaPendienteLeida fila, IDictionary<Guid, string> numerosDeSolicitud)
@@ -188,17 +243,6 @@ namespace Sanic.Mppp.Plugins.Api
                     [CampoNumeroFila] = fila.NumeroFila.ToString(CultureInfo.InvariantCulture),
                 },
             };
-        }
-
-        private int ParametroMaximoLeido()
-        {
-            var parametro = ParametroObligatorio(ParametroMaximo);
-            if (!int.TryParse(parametro.Valor, NumberStyles.Integer, CultureInfo.InvariantCulture, out var valor) || valor <= 0)
-            {
-                throw new InvalidOperationException($"El parámetro '{ParametroMaximo}' tiene que ser un entero positivo.");
-            }
-
-            return valor;
         }
 
         private ParametroLeido ParametroObligatorio(string nombre)

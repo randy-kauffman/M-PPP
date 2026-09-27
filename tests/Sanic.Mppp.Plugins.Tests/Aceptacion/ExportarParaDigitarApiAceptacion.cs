@@ -46,7 +46,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             };
         }
 
-        /// <summary>Un llamador con `exportacion.columnas` y `exportacion.maximo` cargados y una Fila lista, listo para llamar a la API.</summary>
+        /// <summary>Un llamador con `exportacion.columnas` cargado y una Fila lista, listo para llamar a la API.</summary>
         private static (ContextoDePluginSimulado ctx, OrganizationServiceEnMemoria svc, Guid filaId) Armar()
         {
             var svc = new OrganizationServiceEnMemoria();
@@ -56,13 +56,6 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 ["sanic_nombre"] = ExportarParaDigitar.ParametroColumnas,
                 ["sanic_version"] = 1,
                 ["sanic_valor"] = @"{""columnas"":[{""campo"":""numeroPlan"",""encabezado"":""Plan""},{""campo"":""nombreBeneficiario"",""encabezado"":""Nombre""}]}",
-            });
-            svc.Sembrar(new Entity(Tablas.Parametro)
-            {
-                ["statecode"] = new OptionSetValue(Tablas.Activo),
-                ["sanic_nombre"] = ExportarParaDigitar.ParametroMaximo,
-                ["sanic_version"] = 1,
-                ["sanic_valor"] = "500",
             });
             var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez"));
 
@@ -161,26 +154,27 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Empty(ctx.Contexto.OutputParameters);
         }
 
-        // ---------- Decision 2 (aprobador, 2026-09-26): el tope revienta con un mensaje especifico ----------
+        // ---------- Decision (aprobador, 2026-09-26 — reemplaza la decision del tope de filas): sin
+        // `exportacion.maximo`, el unico limite es el presupuesto de 2 minutos; si el plugin corta por eso, el
+        // mensaje llega tal cual, no generico (mismo criterio que la Decision 1) ----------
 
         [Fact]
-        public void El_lote_que_supera_exportacion_maximo_revienta_con_un_mensaje_especifico_no_generico()
+        public void El_corte_por_presupuesto_de_tiempo_revienta_con_un_mensaje_especifico_no_generico()
         {
-            var (ctx, svc, filaId) = Armar();
-            foreach (var p in svc.Registros(Tablas.Parametro))
+            var (ctx, _, filaId) = Armar();
+            ExportarParaDigitarApi.RelojParaPruebas = () => TimeSpan.FromMinutes(5); // siempre sobre el umbral
+            try
             {
-                if ((string)p["sanic_nombre"] == ExportarParaDigitar.ParametroMaximo)
-                {
-                    svc.Update(new Entity(Tablas.Parametro, p.Id) { ["sanic_valor"] = "1" });
-                }
+                var ex = Assert.Throws<InvalidPluginExecutionException>(() => new ExportarParaDigitarApi().Execute(ctx));
+
+                Assert.NotEqual(ExportarParaDigitarApi.MensajeDeErrorGenerico, ex.Message);
+                Assert.Contains("menos filas", ex.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.Empty(ctx.Contexto.OutputParameters);
             }
-            ctx.Contexto.InputParameters[ExportarParaDigitarApi.ParametroFilaIds] = new[] { filaId.ToString(), Guid.NewGuid().ToString() };
-
-            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new ExportarParaDigitarApi().Execute(ctx));
-
-            Assert.NotEqual(ExportarParaDigitarApi.MensajeDeErrorGenerico, ex.Message);
-            Assert.Contains(ExportarParaDigitar.ParametroMaximo, ex.Message);
-            Assert.Empty(ctx.Contexto.OutputParameters);
+            finally
+            {
+                ExportarParaDigitarApi.RelojParaPruebas = null; // nunca se puede filtrar a otra prueba
+            }
         }
 
         [Fact]

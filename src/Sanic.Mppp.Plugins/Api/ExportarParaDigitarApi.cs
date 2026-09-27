@@ -31,14 +31,16 @@ namespace Sanic.Mppp.Plugins.Api
     ///  - el servicio se crea con SYSTEM (`CreateOrganizationService(null)`, diseno/04 §1): igual que las demás,
     ///    nunca con los privilegios de quien llama;
     ///  - deja rastro en el trace al empezar y al terminar (cuántas filas), sin volcar valores de ninguna fila;
-    ///  - una <see cref="InvalidPluginExecutionException"/> de adentro se propaga. Dos rechazos de negocio (decisión
+    ///  - una <see cref="InvalidPluginExecutionException"/> de adentro se propaga. Los rechazos de negocio (decisión
     ///    del aprobador, 2026-09-26) llegan a quien llama con su mensaje TAL CUAL, sin genericizar, porque el
     ///    ejecutivo necesita esa información para actuar: <see cref="FilasNoEncontradasException"/> (una fila
     ///    pedida no existe — "diez segundos: volver a seleccionar y bajar de nuevo") y
-    ///    <see cref="LoteDeExportacionExcedidoException"/> (se superó `exportacion.maximo` — "hacé la descarga en
-    ///    lotes más chicos"). Cualquier OTRA excepción se traza completa y se vuelve a lanzar con un mensaje
-    ///    genérico (mismo criterio que las demás Custom API): esas dos no son "un error real" del sistema, son un
-    ///    rechazo esperado que el propio dominio ya redactó para que lo lea una persona.
+    ///    <see cref="PresupuestoDeExportacionAgotandoseException"/> (el plugin cortó solo antes de que la
+    ///    plataforma reviente por el presupuesto de 2 minutos — "volvé a seleccionar con menos filas"). Cualquier
+    ///    OTRA excepción se traza completa y se vuelve a lanzar con un mensaje genérico (mismo criterio que las
+    ///    demás Custom API): esas dos no son "un error real" del sistema, son un rechazo esperado que el propio
+    ///    dominio ya redactó para que lo lea una persona. Criterio general del proyecto: se genericiza lo que
+    ///    revela cómo funciona el sistema por dentro; se deja pasar lo que le dice a la persona qué tiene que hacer.
     /// </summary>
     public sealed class ExportarParaDigitarApi : IPlugin
     {
@@ -48,6 +50,15 @@ namespace Sanic.Mppp.Plugins.Api
 
         /// <summary>Lo único que se le dice a quien llama cuando algo se rompe de verdad. El detalle va al trace.</summary>
         public const string MensajeDeErrorGenerico = "No se pudo armar el archivo de exportación. El equipo tecnico ya tiene el detalle.";
+
+        /// <summary>
+        /// Seam SOLO para pruebas (requiere <c>InternalsVisibleTo</c> hacia el proyecto de pruebas): si no es null,
+        /// se usa como reloj en vez de un cronómetro real. Sin esto, una prueba de este wrapper que quisiera
+        /// ejercitar <see cref="PresupuestoDeExportacionAgotandoseException"/> tendría que esperar casi 2 minutos
+        /// de verdad. Producción NUNCA la toca: queda en null siempre, y en null usa el cronómetro real de
+        /// <see cref="ExportarParaDigitar"/>.
+        /// </summary>
+        internal static Func<TimeSpan> RelojParaPruebas;
 
         public void Execute(IServiceProvider serviceProvider)
         {
@@ -74,7 +85,8 @@ namespace Sanic.Mppp.Plugins.Api
                 trace.Trace($"ExportarParaDigitar: empieza. filas pedidas={filaIds.Count.ToString(CultureInfo.InvariantCulture)}.");
 
                 var core = new ExportarParaDigitar(new FilasDataverse(servicio), new CatalogosDataverse(servicio), new ArmadorExportacionOpenXml());
-                var resultado = core.Ejecutar(filaIds);
+                var reloj = RelojParaPruebas; // una sola lectura: evita una carrera si una prueba lo cambia a mitad de camino
+                var resultado = reloj != null ? core.Ejecutar(filaIds, reloj) : core.Ejecutar(filaIds);
 
                 contexto.OutputParameters[SalidaArchivo] = resultado.ArchivoBase64;
                 contexto.OutputParameters[SalidaExportadas] = resultado.Exportadas;
@@ -90,9 +102,9 @@ namespace Sanic.Mppp.Plugins.Api
                 // Decisión del aprobador (2026-09-26): este mensaje SÍ llega tal cual, no es un error interno.
                 throw new InvalidPluginExecutionException(ex.Message);
             }
-            catch (LoteDeExportacionExcedidoException ex)
+            catch (PresupuestoDeExportacionAgotandoseException ex)
             {
-                // Misma decisión: el ejecutivo necesita saber el tope para partir la descarga en lotes más chicos.
+                // Misma decisión: el ejecutivo necesita saber qué hacer (seleccionar menos), no un error de plataforma.
                 throw new InvalidPluginExecutionException(ex.Message);
             }
             catch (Exception ex)

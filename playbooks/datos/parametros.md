@@ -34,18 +34,27 @@ decision operativa de cada entorno (D-53), no del playbook. **No se corrige con 
 apagar. Si alguna vez el `difiere` de esta fila desaparece contra un entorno donde deberia estar prendido, ahi si
 hay que mirar.
 
-**`exportacion.columnas` y `exportacion.maximo` se agregaron el 2026-09-26 (DN-02,
-`diseno/DIRECTRICES-NUEVAS.md`)**, orden explícita del aprobador de construir en Dev.
-`exportacion.columnas` trae `numeroSolicitud` y `numeroFila` (trazabilidad, sin eso el archivo no
-sirve para volver a marcar lo digitado) más los diez campos de `plantilla.estructura` que el
-ejecutivo necesita para digitar en AS400 — cuenta e identificación incluidas: DN-02 dejó escrito
-que ese archivo sale de la plataforma SIN la protección de columna de RNF-04/BP-PP-004, decisión
-tomada a conciencia por el aprobador. **El CONJUNTO de columnas es una decisión del negocio, no del
-código**: agregar o sacar un campo es cambiar este parámetro, nunca tocar una línea de código (el
-plugin no tiene una lista propia de campos permitidos ni prohibidos). `exportacion.maximo` se
-siembra en `500`, **PROVISIONAL pendiente de medición (BP-PP-053)**: el spike C-05 midió LECTURA
-en el sandbox real, no la escritura del `.xlsx`, así que este tope no está medido todavía — hay que
-medirlo con volumen real, igual que se midió `rpa.lote.maximo`.
+**`exportacion.columnas` se agregó el 2026-09-26 (DN-02, `diseno/DIRECTRICES-NUEVAS.md`)**, orden
+explícita del aprobador de construir en Dev. Trae `numeroSolicitud` y `numeroFila` (trazabilidad,
+sin eso el archivo no sirve para volver a marcar lo digitado) más los diez campos de
+`plantilla.estructura` que el ejecutivo necesita para digitar en AS400 — cuenta e identificación
+incluidas: DN-02 dejó escrito que ese archivo sale de la plataforma SIN la protección de columna de
+RNF-04/BP-PP-004, decisión tomada a conciencia por el aprobador. **El CONJUNTO de columnas es una
+decisión del negocio, no del código**: agregar o sacar un campo es cambiar este parámetro, nunca
+tocar una línea de código (el plugin no tiene una lista propia de campos permitidos ni prohibidos).
+
+**`exportacion.maximo` existió entre el 2026-09-26 y el 2026-09-26 y se ELIMINÓ el mismo día.**
+Nació sembrado en 500 como tope PROVISIONAL de filas por llamada, mientras
+`sanic_mppp_capi_exportarparadigitar` era una Function (GET, ids en la URL): la medición real
+(BP-PP-053) encontró un HTTP 414 a las ~700 filas, techo de plataforma que ningún parámetro mueve,
+y el tope de 500 abrió un agujero (si lo que se baja no es exactamente lo seleccionado, el
+ejecutivo puede marcar como digitadas filas que nunca tipeó). Decisión del aprobador: la Custom API
+pasa a Action (POST, ids en el cuerpo), se elimina este parámetro por completo, y el único límite
+que queda es el presupuesto síncrono de 2 minutos, que el propio plugin vigila y por el que corta
+solo con un mensaje claro (`src/Sanic.Mppp.Plugins/Api/ExportarParaDigitar.cs`,
+`PresupuestoDeExportacionAgotandoseException`). Se borró la fila real de Dev
+(`sanic_mppp_tbl_parametroid b88833e3-21ba-f111-aaad-000d3a301e02`) y se sacó de este playbook: no
+queda ningún rastro de `exportacion.maximo` ni en el entorno ni en el inventario.
 
 Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
@@ -277,16 +286,6 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "{\"columnas\": [{\"campo\": \"numeroSolicitud\", \"encabezado\": \"No. Solicitud\"}, {\"campo\": \"numeroFila\", \"encabezado\": \"No. Fila\"}, {\"campo\": \"gestion\", \"encabezado\": \"Gestión\"}, {\"campo\": \"clasificacion\", \"encabezado\": \"Clasificación\"}, {\"campo\": \"numeroPlan\", \"encabezado\": \"No. Plan\"}, {\"campo\": \"nombreBeneficiario\", \"encabezado\": \"Nombre Colaborador / Proveedor\"}, {\"campo\": \"tipoIdentificacion\", \"encabezado\": \"Tipo ID\"}, {\"campo\": \"numeroIdentificacion\", \"encabezado\": \"No. Identificación\"}, {\"campo\": \"referencia\", \"encabezado\": \"Referencia\"}, {\"campo\": \"numeroCuenta\", \"encabezado\": \"No. Cuenta\"}, {\"campo\": \"moneda\", \"encabezado\": \"Moneda\"}, {\"campo\": \"banco\", \"encabezado\": \"Banco\"}]}",
       "sanic_descripcion": "DN-02 (2026-09-26): orden de columnas del Excel de 'Descargar para digitar' (sanic_mppp_capi_exportarparadigitar); el orden del arreglo ES el orden de columnas (A = primer elemento). numeroSolicitud/numeroFila dan trazabilidad; el resto es lo que el ejecutivo necesita para digitar en AS400. DECISION DEL NEGOCIO: el conjunto de columnas se cambia editando este parametro, nunca tocando codigo."
-    },
-    {
-      "sanic_nombre": "exportacion.maximo",
-      "sanic_version": 1,
-      "sanic_tipo": {
-        "choice": "sanic_mppp_ch_tipoparametro",
-        "etiqueta": "Numero"
-      },
-      "sanic_valor": "500",
-      "sanic_descripcion": "DN-02 (2026-09-26): tope de filas por llamada de sanic_mppp_capi_exportarparadigitar. Un pedido que lo supera rechaza LA LLAMADA ENTERA, nunca se recorta en silencio. PROVISIONAL: el spike C-05 midio LECTURA en el sandbox real, no la escritura del .xlsx; este tope no esta medido todavia (BP-PP-053) y hay que volver a medirlo con volumen real, igual que rpa.lote.maximo."
     }
   ]
 }

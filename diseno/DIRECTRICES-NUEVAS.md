@@ -189,3 +189,58 @@ orden de las columnas** del Excel. Hermano de `plantilla.estructura`, pero de sa
 **Lo masivo NO se construye: ya existe.** Seleccionar todas y marcarlas funciona desde el principio
 —el ribbon pasa la selección y `comandos.js` aplica una petición por fila en paralelo—, y las vistas
 *por digitar* y *Por aprobar* también.
+
+---
+
+# DN-03 · La obligatoriedad se define por GESTIÓN
+
+Recibida del aprobador el **2026-09-26**, con instrucción de resolverla **de 0 a 100 sin consultar**.
+Las decisiones de abajo las toma el arquitecto; quedan escritas acá para poder discutirlas después,
+no antes.
+
+## Lo que hay hoy
+
+`plantilla.obligatoriedad` es **global**: rige igual para toda fila, sin importar qué pide.
+
+```json
+{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}]}
+```
+
+## Lo que pide el negocio
+
+Que se pueda definir **por gestión**: `Inclusion`, `Exclusion`, `Modificacion`. Tiene todo el sentido
+— una **exclusión** no necesita los mismos datos que una **inclusión**: para dar de baja a alguien
+alcanza con identificarlo, no hace falta repetir su cuenta ni su banco.
+
+## Diseño resuelto
+
+**Forma nueva del parámetro. El bloque de hoy NO se toca y sigue rigiendo**: es el piso, y lo de
+`porGestion` lo ajusta encima.
+
+```json
+{
+  "porDefecto": "obligatorio",
+  "opcionales": [{"campo": "referencia"}],
+  "porGestion": {
+    "Exclusion":    {"opcionales": [{"campo": "numeroCuenta"}, {"campo": "banco"}]},
+    "Modificacion": {"obligatorios": [{"campo": "referencia"}]}
+  }
+}
+```
+
+| Decisión | Cuál y por qué |
+|---|---|
+| **Compatibilidad** | Un parámetro **sin** `porGestion` se comporta **exactamente como hoy**. Así el que ya está sembrado en tres entornos sigue siendo válido y nadie tiene que migrar nada |
+| **Precedencia** | Lo de la gestión **gana** sobre el bloque global. `opcionales` afloja, `obligatorios` endurece: las dos direcciones, porque el negocio puede querer cualquiera de las dos |
+| **Gestión vacía o inválida** | Rige **solo el bloque global**. No se falla cerrado acá: esa fila ya falló `LISTAS_VALIDAS` y va a ser rechazada por su propio motivo. Sumarle un segundo motivo derivado sería ruido, no información |
+| **Nombres de gestión** | Los **valores canónicos** del dominio (`Inclusion`, `Exclusion`, `Modificacion`), comparados **sin distinguir caja ni tildes**, igual que ya hace la validación de listas |
+| **Una gestión que no existe** en `porGestion` | **Error ruidoso de configuración**, como cualquier parámetro mal cargado. Un typo que se ignora en silencio es una regla que alguien cree que puso y no puso |
+| **La regla `OBLIGATORIEDAD`** | **No cambia de código, de orden, de nivel ni de efecto.** Solo cambia qué considera obligatorio. Mismo principio que DN-01 |
+| **El mensaje al cliente** | **No cambia.** Sigue nombrando el campo y **sin citar el valor** (D-41). Que la obligatoriedad ahora dependa de la gestión **no puede filtrarse al texto**: el cliente no tiene por qué deducir la configuración interna del banco |
+
+## Lo que hay que construir
+
+1. El dominio: leer la forma nueva y resolver la obligatoriedad **efectiva** de una fila según su gestión.
+2. Sus pruebas, con TDD, incluida **la de compatibilidad**: un parámetro sin `porGestion` se comporta idéntico a hoy.
+3. Sembrar el parámetro con la forma nueva, **conservando el comportamiento actual** hasta que el negocio diga qué aflojar en cada gestión.
+4. Documentarlo en `02` §Parámetros.

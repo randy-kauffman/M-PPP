@@ -478,6 +478,17 @@ Sanic.Mppp.Comandos = (function () {
      * `parameterTypes.filaids` usa `structuralProperty: 4` (Collection, Learn
      * "Xrm.WebApi.online.execute") con `typeName: "Edm.String"`: el tipo del
      * ELEMENTO, no de la coleccion.
+     *
+     * `operationType: 0` (Action/POST), NO 1 (Function/GET): decision del
+     * aprobador, 2026-09-26. Como Function, TODA llamada era un GET con los
+     * `filaid` en la query string, y la medicion real (BP-PP-053) encontro un
+     * HTTP 414 a las ~700 filas — techo de plataforma que ningun parametro
+     * mueve. Como Action, los ids viajan en el CUERPO del POST: no hay techo
+     * de largo de URL, y el unico limite que queda es el presupuesto de 2
+     * minutos que el propio plugin vigila (`PresupuestoDeExportacionAgotandoseException`).
+     * La Custom API se borro y se recreo en Dev con `esfuncion: false`
+     * (`isfunction` es inmutable una vez guardada, Learn "CustomAPI tables"):
+     * no alcanzaba con cambiar este archivo solo.
      */
     function pedidoExportarParaDigitar(ids) {
         return {
@@ -488,7 +499,7 @@ Sanic.Mppp.Comandos = (function () {
                     parameterTypes: {
                         filaids: { typeName: "Edm.String", structuralProperty: 4 }
                     },
-                    operationType: 1, // Function (Learn: 0 Action, 1 Function, 2 CRUD)
+                    operationType: 0, // Action (Learn: 0 Action, 1 Function, 2 CRUD)
                     operationName: "sanic_mppp_capi_exportarparadigitar"
                 };
             }
@@ -540,8 +551,8 @@ Sanic.Mppp.Comandos = (function () {
             );
         }, function (error) {
             // Los dos rechazos de negocio (FilasNoEncontradasException,
-            // LoteDeExportacionExcedidoException) llegan con su mensaje TAL
-            // CUAL en `error.message` (decision del aprobador, ver el XML doc
+            // PresupuestoDeExportacionAgotandoseException) llegan con su mensaje
+            // TAL CUAL en `error.message` (decision del aprobador, ver el XML doc
             // de ExportarParaDigitarApi): se muestra sin envolver, es lo que el
             // ejecutivo necesita leer para actuar.
             var texto = (error && error.message) || String(error);

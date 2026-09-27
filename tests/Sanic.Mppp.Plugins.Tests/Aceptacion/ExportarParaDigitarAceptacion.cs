@@ -17,11 +17,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
     /// (<see cref="FilasDataverse.PorIds"/>, <see cref="ConfiguracionExportacion"/>, <see cref="ArmadorExportacionOpenXml"/>):
     /// estas pruebas verifican el ENSAMBLAJE, no vuelven a probar cada pieza.
     ///
-    /// Las tres decisiones del aprobador (2026-09-26) que fija esta clase: (1) un `filaid` que no vuelve REVIENTA
-    /// la llamada entera, nombrando cuáles faltaron; (2) `exportacion.maximo` (sembrado en 500, PROVISIONAL) rechaza
-    /// LA LLAMADA ENTERA si se supera, nunca recorta en silencio; (3) el vocabulario de campos incluye, además de
+    /// Las decisiones del aprobador que fija esta clase: (1, 2026-09-26) un `filaid` que no vuelve REVIENTA
+    /// la llamada entera, nombrando cuáles faltaron; (2, 2026-09-26) el vocabulario de campos incluye, además de
     /// los diez de `CamposDeFila`, el número de Solicitud y el número de fila — sin eso el archivo no tiene
-    /// identidad para que el ejecutivo vuelva a marcar lo que digitó.
+    /// identidad para que el ejecutivo vuelva a marcar lo que digitó; (3, 2026-09-26 — reemplaza la decisión
+    /// original de `exportacion.maximo`) la Custom API pasó a Action y SE ELIMINÓ el tope de filas por llamada: el
+    /// único límite que queda es el presupuesto síncrono de 2 minutos (BP-PP-053), y el plugin se cuida solo,
+    /// cortando ANTES con un mensaje que le dice a una persona qué hacer (cuántas alcanzó a procesar, que
+    /// seleccione menos), nunca dejando que la plataforma reviente con un error genérico.
     /// </summary>
     public class ExportarParaDigitarAceptacion
     {
@@ -72,21 +75,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             });
         }
 
-        private static void SembrarMaximo(OrganizationServiceEnMemoria svc, string valor)
-        {
-            svc.Sembrar(new Entity(Tablas.Parametro)
-            {
-                ["statecode"] = new OptionSetValue(Tablas.Activo),
-                ["sanic_nombre"] = ExportarParaDigitar.ParametroMaximo,
-                ["sanic_version"] = 1,
-                ["sanic_valor"] = valor,
-            });
-        }
-
-        /// <summary>Siembra los dos parámetros que `Ejecutar` necesita siempre, con un tope alto por defecto para no interferir con pruebas que no lo están probando.</summary>
+        /// <summary>
+        /// Siembra el único parámetro que `Ejecutar` necesita siempre. Se llama igual que antes de la decisión del
+        /// aprobador (2026-09-26) de eliminar `exportacion.maximo` para no tocar las pruebas que no están probando
+        /// esa decisión: hoy es un alias liso de <see cref="SembrarColumnas"/>.
+        /// </summary>
         private static void SembrarParametros(OrganizationServiceEnMemoria svc, params (string campo, string encabezado)[] columnas)
         {
-            SembrarMaximo(svc, "500");
             SembrarColumnas(svc, columnas);
         }
 
@@ -196,7 +191,6 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Falta_el_parametro_exportacion_columnas_es_un_error_de_configuracion()
         {
             var svc = new OrganizationServiceEnMemoria();
-            SembrarMaximo(svc, "500"); // sin esto revienta por el tope, no por lo que se quiere probar
             var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez", "001-1", "111"));
 
             var ex = Assert.Throws<InvalidOperationException>(() => Core(svc).Ejecutar(new[] { filaId }));
@@ -207,7 +201,6 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Un_parametro_de_columnas_mal_formado_propaga_el_FormatException_del_dominio()
         {
             var svc = new OrganizationServiceEnMemoria();
-            SembrarMaximo(svc, "500");
             svc.Sembrar(new Entity(Tablas.Parametro)
             {
                 ["statecode"] = new OptionSetValue(Tablas.Activo),
@@ -218,36 +211,6 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez", "001-1", "111"));
 
             Assert.Throws<FormatException>(() => Core(svc).Ejecutar(new[] { filaId }));
-        }
-
-        [Fact]
-        public void Falta_el_parametro_exportacion_maximo_es_un_error_de_configuracion()
-        {
-            var svc = new OrganizationServiceEnMemoria();
-            SembrarColumnas(svc, ("numeroPlan", "Plan"));
-            var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez", "001-1", "111"));
-
-            var ex = Assert.Throws<InvalidOperationException>(() => Core(svc).Ejecutar(new[] { filaId }));
-            Assert.Contains(ExportarParaDigitar.ParametroMaximo, ex.Message);
-        }
-
-        public static System.Collections.Generic.IEnumerable<object[]> MaximosInvalidos()
-        {
-            yield return new object[] { "0" };
-            yield return new object[] { "-1" };
-            yield return new object[] { "no soy un numero" };
-        }
-
-        [Theory]
-        [MemberData(nameof(MaximosInvalidos))]
-        public void Exportacion_maximo_invalido_es_un_error_de_configuracion(string valor)
-        {
-            var svc = new OrganizationServiceEnMemoria();
-            SembrarColumnas(svc, ("numeroPlan", "Plan"));
-            SembrarMaximo(svc, valor);
-
-            var ex = Assert.Throws<InvalidOperationException>(() => Core(svc).Ejecutar(new Guid[0]));
-            Assert.Contains(ExportarParaDigitar.ParametroMaximo, ex.Message);
         }
 
         // ---------- Decision 1 (aprobador, 2026-09-26): un filaid que no vuelve REVIENTA nombrando cuales ----------
@@ -282,35 +245,110 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Contains(faltanteDos, ex.Faltantes);
         }
 
-        // ---------- Decision 2 (aprobador, 2026-09-26): tope `exportacion.maximo`, rechaza entero, no recorta ----------
+        // ---------- Decision del aprobador (2026-09-26): se elimina `exportacion.maximo` (BP-PP-053, Custom API
+        // pasada a Action). El unico limite que queda es el presupuesto de 2 minutos, mas abajo. ----------
 
         [Fact]
-        public void El_lote_que_supera_el_maximo_revienta_nombrando_pedidas_y_tope_sin_consultar_Dataverse()
+        public void Ya_no_existe_ningun_tope_de_filas_por_llamada_un_lote_de_1000_no_revienta_por_eso()
         {
             var svc = new OrganizationServiceEnMemoria();
-            SembrarColumnas(svc, ("numeroPlan", "Plan"));
-            SembrarMaximo(svc, "2");
-            var pedidos = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() }; // 3 > 2, ninguno existe
+            SembrarColumnas(svc, ("numeroPlan", "Plan")); // sin sembrar exportacion.maximo: ya no se lee
+            var pedidos = Enumerable.Range(0, 1000).Select(_ => Guid.NewGuid()).ToList(); // ninguno existe
 
-            var ex = Assert.Throws<LoteDeExportacionExcedidoException>(() => Core(svc).Ejecutar(pedidos));
-
-            Assert.Equal(3, ex.Pedidas);
-            Assert.Equal(2, ex.Tope);
-            // Se rechaza ANTES de tocar Fila: ni siquiera se gasta una consulta en algo que ya se sabe que se va a rechazar.
-            Assert.DoesNotContain(svc.Llamadas, l => l.Entidad == TablasHistorico.Fila);
+            // Antes de la decision, 1000 > exportacion.maximo (500) hubiera reventado ANTES de tocar Fila con
+            // LoteDeExportacionExcedidoException (tipo que ya no existe). Ahora sigue de largo hasta la
+            // verificacion real de que las filas existan, y revienta por ESO, no por un tope de cantidad.
+            var ex = Assert.Throws<FilasNoEncontradasException>(() => Core(svc).Ejecutar(pedidos));
+            Assert.Equal(1000, ex.Faltantes.Count);
         }
 
         [Fact]
-        public void El_lote_exactamente_igual_al_maximo_no_revienta()
+        public void Sin_exportacion_maximo_en_el_entorno_no_hay_ningun_error_de_configuracion_por_eso()
         {
             var svc = new OrganizationServiceEnMemoria();
-            SembrarParametros(svc, ("numeroPlan", "Plan"));
-            SembrarMaximo(svc, "1");
+            SembrarColumnas(svc, ("numeroPlan", "Plan")); // exportacion.maximo NUNCA se siembra en esta prueba
             var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez", "001-1", "111"));
 
-            var resultado = Core(svc).Ejecutar(new[] { filaId }); // 1 == 1, no supera
+            var resultado = Core(svc).Ejecutar(new[] { filaId });
 
             Assert.Equal(1, resultado.Exportadas);
+        }
+
+        // ---------- Decision del aprobador (2026-09-26): sin tope de filas, el unico limite es el presupuesto
+        // sincrono de 2 minutos (BP-PP-053). El plugin se cuida solo: si se acerca, CORTA con un mensaje que le
+        // dice a una persona que hacer (cuantas alcanzo a procesar, que seleccione menos), nunca un error tecnico
+        // generico de la plataforma. ----------
+
+        private static Func<TimeSpan> RelojQueYaEstaSobreElUmbral()
+        {
+            return () => TimeSpan.FromMinutes(5); // cualquier valor >= al umbral de corte
+        }
+
+        [Fact]
+        public void Si_ya_esta_sobre_el_umbral_antes_de_armar_una_sola_fila_corta_con_cero_procesadas()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            SembrarColumnas(svc, ("numeroPlan", "Plan"));
+            var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez", "001-1", "111"));
+
+            var ex = Assert.Throws<PresupuestoDeExportacionAgotandoseException>(
+                () => Core(svc).Ejecutar(new[] { filaId }, RelojQueYaEstaSobreElUmbral()));
+
+            Assert.Equal(0, ex.Procesadas);
+            Assert.Equal(1, ex.Pedidas);
+        }
+
+        [Fact]
+        public void Corta_a_mitad_de_camino_e_informa_cuantas_alcanzo_a_procesar_de_cuantas_se_pidieron()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            SembrarColumnas(svc, ("numeroPlan", "Plan"));
+            var idUno = svc.Sembrar(Fila(svc, "0001", "Uno", "001-1", "111"));
+            var idDos = svc.Sembrar(Fila(svc, "0002", "Dos", "001-2", "222"));
+            var idTres = svc.Sembrar(Fila(svc, "0003", "Tres", "001-3", "333"));
+            var llamados = 0;
+            // Las dos primeras filas alcanzan a armarse (tiempo bajo); al llegar a la tercera ya paso el umbral.
+            TimeSpan Reloj() { llamados++; return llamados <= 2 ? TimeSpan.Zero : TimeSpan.FromMinutes(5); }
+
+            var ex = Assert.Throws<PresupuestoDeExportacionAgotandoseException>(
+                () => Core(svc).Ejecutar(new[] { idUno, idDos, idTres }, Reloj));
+
+            Assert.Equal(2, ex.Procesadas);
+            Assert.Equal(3, ex.Pedidas);
+        }
+
+        [Fact]
+        public void El_mensaje_del_corte_por_tiempo_dice_que_hacer_y_no_expone_detalles_tecnicos()
+        {
+            var ex = new PresupuestoDeExportacionAgotandoseException(procesadas: 2, pedidas: 5);
+
+            Assert.Contains("2", ex.Message);
+            Assert.Contains("5", ex.Message);
+            Assert.Contains("menos filas", ex.Message, StringComparison.OrdinalIgnoreCase);
+            // Nunca un error tecnico: nada de nombres de excepcion, milisegundos, ni codigos HTTP.
+            Assert.DoesNotContain("Exception", ex.Message);
+            Assert.DoesNotContain("ms", ex.Message);
+            Assert.DoesNotContain("HTTP", ex.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Si_nunca_se_acerca_al_umbral_no_corta_y_arma_el_archivo_completo()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            SembrarColumnas(svc, ("numeroPlan", "Plan"));
+            var idUno = svc.Sembrar(Fila(svc, "0001", "Uno", "001-1", "111"));
+            var idDos = svc.Sembrar(Fila(svc, "0002", "Dos", "001-2", "222"));
+
+            var resultado = Core(svc).Ejecutar(new[] { idUno, idDos }, () => TimeSpan.Zero);
+
+            Assert.Equal(2, resultado.Exportadas);
+        }
+
+        [Fact]
+        public void El_reloj_inyectado_nulo_es_un_error_de_programacion()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            Assert.Throws<ArgumentNullException>(() => Core(svc).Ejecutar(new Guid[0], null));
         }
 
         [Fact]

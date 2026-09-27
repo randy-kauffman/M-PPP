@@ -3,6 +3,21 @@
 DN-02 (`diseno/DIRECTRICES-NUEVAS.md`, "Diseño resuelto — Exportación"). Orden explícita del
 aprobador de construir en Dev, 2026-09-26.
 
+**Reconstruida como Action el 2026-09-26 (misma fecha, orden explícita del aprobador).** Nació como
+Function (`esfuncion: true`) y, con `exportacion.maximo` en 500, la medición real mostró un HTTP 414
+a las ~700 filas: como es Function, TODA llamada es un GET con los `filaid` en la query string, y ese
+techo de plataforma es independiente de la velocidad de escritura del Excel y no lo mueve ningún
+parámetro. El tope de 500 filas por llamada abrió un agujero que detectó el aprobador: si lo que se
+baja no es exactamente lo que se seleccionó, el ejecutivo puede marcar como digitadas filas que nunca
+tipeó en AS400. Decisión: la API pasa a **Action** (`esfuncion: false`, POST, los ids viajan en el
+cuerpo), se elimina el tope de filas, y el único límite pasa a ser el presupuesto de 2 minutos
+(BP-PP-053, ver `src/Sanic.Mppp.Plugins/Api/ExportarParaDigitar.cs`). Verificado en Microsoft Learn
+("CustomAPI tables", "Create a custom API using the plug-in registration tool"): `isfunction`
+**"Cannot be changed after it is saved"**, así que la única forma de aplicar esto fue borrar la
+Custom API entera (con sus parámetros de entrada y salida, en cascada) y volver a crearla — es un
+componente propio, en Dev, que todavía no usa nadie. `filaids`, `archivo` y `exportadas` NO cambiaron:
+mismo contrato de entrada/salida, solo cambió cómo se invoca.
+
 Precondición: el paquete `sanic_mppp_pkg_plugins` tiene que estar registrado
 (`playbooks/paquete-plugins/sanic_mppp_pkg_plugins.md`) con
 `Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi` entre sus `tipos`.
@@ -46,7 +61,7 @@ Ver el XML doc de `Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi` para el contra
   "displayname": "CAPI - MPPP - Exportar para digitar",
   "descripcion": "Arma en Excel las filas seleccionadas, en el orden de columnas de exportacion.columnas, para que el ejecutivo las digite en AS400.",
   "plugintype": "Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi",
-  "esfuncion": true,
+  "esfuncion": false,
   "esprivada": false,
   "binding": "Global",
   "pasosdeterceros": "None",
