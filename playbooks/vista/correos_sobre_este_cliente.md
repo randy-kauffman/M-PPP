@@ -50,14 +50,14 @@ desde las columnas, el orden y el filtro.
       "enlace": "autorizado"
     },
     {
-      "nombre": "sanic_nombre",
-      "ancho": 260
+      "nombre": "sanic_fechadocumento",
+      "ancho": 140
     }
   ],
   "orden": [
     {
-      "columna": "sanic_nombre",
-      "sentido": "asc"
+      "columna": "sanic_fechadocumento",
+      "sentido": "desc"
     }
   ],
   "filtro": {
@@ -83,15 +83,16 @@ desde las columnas, el orden y el filtro.
 }
 ```
 
-Dos columnas, adrede: la primera (`autorizado.sanic_nombre`) es el correo tal cual vive en
-`Autorizado`, igual que en `correos_sobre_este_plan.md`. `AutorizacionCliente` **no tiene**
-`sanic_fechadocumento` (esa tabla no lleva evidencia, ver `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md`
-§2, nota para el aprobador), así que no hay una columna propia de fecha para ordenar como en la de
-Plan. Por eso se agrega la propia `sanic_nombre` de `AutorizacionCliente` (el nombre calculado
-"correo → cliente") como segunda columna: es la única columna propia de la tabla, y ordenar por una
-columna enlazada (`autorizado.sanic_nombre`) no es un camino que la herramienta ejercite en ningún
-otro playbook de este proyecto — se prefiere ordenar por la columna propia, probada, antes que
-inventar un uso nuevo de `vista.py` sin poder verificarlo primero.
+Dos columnas, igual que `correos_sobre_este_plan.md`: la primera (`autorizado.sanic_nombre`) es el
+correo tal cual vive en `Autorizado`; la segunda es la propia `sanic_fechadocumento` de
+`AutorizacionCliente`, y se ordena por ella descendente (el documento más reciente primero).
+
+Actualizado el 2026-09-27: hasta esa fecha esta nota decía que `AutorizacionCliente` **no tenía**
+`sanic_fechadocumento` y que por eso se ordenaba por la propia `sanic_nombre` de la tabla. Eso dejó de
+ser cierto: el aprobador decidió que el hueco de evidencia era real y había que cerrarlo (ver
+`playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §2, "Decisión del aprobador"), así que
+`AutorizacionCliente` ahora tiene `sanic_documentofirmado` y `sanic_fechadocumento`, igual que
+`AutorizacionPlan`, y esta vista se alinea con su hermana `correos_sobre_este_plan.md`.
 
 ## 3. Precondiciones
 

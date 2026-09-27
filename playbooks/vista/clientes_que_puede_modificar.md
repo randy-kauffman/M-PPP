@@ -7,10 +7,14 @@ relacionado (hoy solo ve los planes).
 
 Subgrilla del formulario de Autorizado: los clientes que ese correo puede modificar. Es el espejo
 exacto de `planes_que_puede_modificar.md` (misma tabla de unión, mismo lado "Autorizado"), pero del
-lado `AutorizacionCliente` en vez de `AutorizacionPlan`; y es hermana de `correos_sobre_este_cliente.md`
-(mismo patrón de columna propia para ordenar, por el mismo motivo: `AutorizacionCliente` no tiene
-`sanic_fechadocumento`, ver `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §2, nota para el
-aprobador).
+lado `AutorizacionCliente` en vez de `AutorizacionPlan`; y es hermana de `correos_sobre_este_cliente.md`.
+
+Actualizado el 2026-09-27: hasta esa fecha esta nota decía que se ordenaba por una columna propia de
+`AutorizacionCliente` distinta de la fecha porque esa tabla no tenía `sanic_fechadocumento`. Eso dejó
+de ser cierto: el aprobador decidió cerrar ese hueco (ver
+`playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §2, "Decisión del aprobador"), así que ahora
+esta vista ordena por `sanic_fechadocumento` descendente, igual que su hermana
+`planes_que_puede_modificar.md`.
 
 El `fetchxml` y el `layoutxml` NO se escriben aca: los genera la herramienta
 desde las columnas, el orden y el filtro.
@@ -56,14 +60,14 @@ desde las columnas, el orden y el filtro.
       "enlace": "cliente"
     },
     {
-      "nombre": "sanic_nombre",
-      "ancho": 260
+      "nombre": "sanic_fechadocumento",
+      "ancho": 140
     }
   ],
   "orden": [
     {
-      "columna": "sanic_nombre",
-      "sentido": "asc"
+      "columna": "sanic_fechadocumento",
+      "sentido": "desc"
     }
   ],
   "filtro": {
@@ -92,13 +96,9 @@ desde las columnas, el orden y el filtro.
 Tres columnas, adrede. Las dos primeras (`cliente.sanic_nombre`, `cliente.sanic_cifbac`) son "nombre
 y el identificador que corresponda" del cliente: la Razón social y el **CIF BAC**, el número de
 cliente propio del banco (`playbooks/tabla/sanic_mppp_tbl_cliente.md` §2: "Número de cliente en
-BAC"), no el CIF COM (identificador comercial/fiscal externo). La tercera es la propia `sanic_nombre`
-de `AutorizacionCliente` (el nombre calculado "correo → cliente"): igual que en
-`correos_sobre_este_cliente.md`, es la única columna propia de la tabla y la que se usa para ordenar.
-Ordenar por una columna enlazada (`cliente.sanic_nombre`) no es un camino que la herramienta ejercite
-en ningún otro playbook de este proyecto — se prefiere la columna propia, probada, antes que inventar
-un uso nuevo de `vista.py` sin poder verificarlo primero (mismo razonamiento que
-`correos_sobre_este_cliente.md` §2).
+BAC"), no el CIF COM (identificador comercial/fiscal externo). La tercera es la propia
+`sanic_fechadocumento` de `AutorizacionCliente`, igual que en `correos_sobre_este_cliente.md` y en
+`planes_que_puede_modificar.md`: se ordena por ella descendente, el documento más reciente primero.
 
 ## 3. Precondiciones
 
