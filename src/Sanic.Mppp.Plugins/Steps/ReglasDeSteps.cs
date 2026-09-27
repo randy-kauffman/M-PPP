@@ -284,6 +284,18 @@ namespace Sanic.Mppp.Plugins.Steps
             return TextoAscii.Recortar(nombre, 400);
         }
 
+        /// <summary>AutorizacionCliente: `<correo> → <cliente>`, T(400) (DN-01).</summary>
+        public static string DeAutorizacionCliente(string correo, string nombreDelCliente)
+        {
+            if (string.IsNullOrWhiteSpace(correo))
+                throw new ArgumentException("El correo es obligatorio para armar el nombre de la autorización.", nameof(correo));
+            if (string.IsNullOrWhiteSpace(nombreDelCliente))
+                throw new ArgumentException("El nombre del cliente es obligatorio para armar el nombre de la autorización.", nameof(nombreDelCliente));
+
+            var nombre = correo + " → " + nombreDelCliente;
+            return TextoAscii.Recortar(nombre, 400);
+        }
+
         /// <summary>Fila: `<solicitud>-F<nn>`, T(120), con el número de fila en dos dígitos como mínimo.</summary>
         public static string DeFila(string numeroDeSolicitud, int numeroDeFila)
         {

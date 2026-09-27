@@ -243,15 +243,16 @@ namespace Sanic.Mppp.Plugins.Steps
     }
 
     /// <summary>
-    /// 7.11, nombre calculado: `Create` PreOperation de Plan, AutorizacionPlan y Fila (diseno/03 §5; en las demás tablas la
-    /// primaria es autonumérica o es la clave de negocio). Completa `sanic_nombre` con <see cref="NombreCalculado"/>, pisando lo
-    /// que venga. Lo que necesita y no está en el `Target` lo lee del registro relacionado, con una consulta por lookup y solo
-    /// si hace falta: el nombre del Cliente para el Plan; el correo del Autorizado y el código del Plan para la AutorizacionPlan;
-    /// el `sanic_nombre` de la Solicitud para la Fila. Si falta el dato imprescindible (el lookup no viene), no se inventa un
-    /// nombre: se rechaza el guardado con el motivo. EXCEPCIÓN (revisión de código, 2026-09-21): si el `Target` de una Fila ya
-    /// trae `sanic_nombre` y quien escribe es código de servidor, se respeta y NO se lee la Solicitud; así la Custom API de
-    /// validación, que ya tiene el número en memoria, no provoca una lectura por fila (03 §1 paso 6). A una persona se le pisa
-    /// siempre, en las tres tablas.
+    /// 7.11, nombre calculado: `Create` PreOperation de Plan, AutorizacionPlan, AutorizacionCliente y Fila (diseno/03 §5; en las
+    /// demás tablas la primaria es autonumérica o es la clave de negocio). Completa `sanic_nombre` con
+    /// <see cref="NombreCalculado"/>, pisando lo que venga. Lo que necesita y no está en el `Target` lo lee del registro
+    /// relacionado, con una consulta por lookup y solo si hace falta: el nombre del Cliente para el Plan; el correo del
+    /// Autorizado y el código del Plan para la AutorizacionPlan; el correo del Autorizado y el nombre del Cliente para la
+    /// AutorizacionCliente (DN-01); el `sanic_nombre` de la Solicitud para la Fila. Si falta el dato imprescindible (el lookup
+    /// no viene), no se inventa un nombre: se rechaza el guardado con el motivo. EXCEPCIÓN (revisión de código, 2026-09-21): si
+    /// el `Target` de una Fila ya trae `sanic_nombre` y quien escribe es código de servidor, se respeta y NO se lee la
+    /// Solicitud; así la Custom API de validación, que ya tiene el número en memoria, no provoca una lectura por fila (03 §1
+    /// paso 6). A una persona se le pisa siempre, en las cuatro tablas.
     /// </summary>
     public sealed class NombreCalculadoStep : IPlugin
     {
@@ -271,6 +272,9 @@ namespace Sanic.Mppp.Plugins.Steps
                         break;
                     case Tablas.AutorizacionPlan:
                         target["sanic_nombre"] = NombreDeAutorizacionPlan(servicio, target);
+                        break;
+                    case Tablas.AutorizacionCliente:
+                        target["sanic_nombre"] = NombreDeAutorizacionCliente(servicio, target);
                         break;
                     case TablasHistorico.Fila:
                         // EXCEPCIÓN (revisión de código, 2026-09-21): si el Target ya trae sanic_nombre con contenido
@@ -315,6 +319,20 @@ namespace Sanic.Mppp.Plugins.Steps
             var codigoDePlan = plan.GetAttributeValue<string>("sanic_codigo");
 
             return NombreCalculado.DeAutorizacionPlan(correo, codigoDePlan);
+        }
+
+        private static string NombreDeAutorizacionCliente(IOrganizationService servicio, Entity target)
+        {
+            var autorizadoRef = LookupObligatorio(target, "sanic_autorizadoid", "el autorizado de la autorización");
+            var clienteRef = LookupObligatorio(target, "sanic_clienteid", "el cliente de la autorización");
+
+            var autorizado = servicio.Retrieve(Tablas.Autorizado, autorizadoRef.Id, new ColumnSet("sanic_nombre"));
+            var cliente = servicio.Retrieve(Tablas.Cliente, clienteRef.Id, new ColumnSet("sanic_nombre"));
+
+            var correo = autorizado.GetAttributeValue<string>("sanic_nombre");
+            var nombreDelCliente = cliente.GetAttributeValue<string>("sanic_nombre");
+
+            return NombreCalculado.DeAutorizacionCliente(correo, nombreDelCliente);
         }
 
         /// <summary>El Target ya trae un `sanic_nombre` con contenido (no nulo ni en blanco), sin mirar quién escribe.</summary>

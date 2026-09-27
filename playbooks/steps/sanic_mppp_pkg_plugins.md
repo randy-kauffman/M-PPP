@@ -186,6 +186,18 @@ Precondicion: el paquete `sanic_mppp_pkg_plugins` registrado.
       "preimagen": null
     },
     {
+      "nombre": "MPPP - Nombre calculado - Create de Autorizacioncliente",
+      "descripcion": "Completa sanic_nombre con el valor calculado (03 §5, DN-01).",
+      "plugintype": "Sanic.Mppp.Plugins.Steps.NombreCalculadoStep",
+      "mensaje": "Create",
+      "tabla": "sanic_mppp_tbl_autorizacioncliente",
+      "etapa": "PreOperation",
+      "modo": "Sincrono",
+      "orden": 20,
+      "filtro": [],
+      "preimagen": null
+    },
+    {
       "nombre": "MPPP - Nombre calculado - Create de Fila",
       "descripcion": "Completa sanic_nombre con el valor calculado (03 §5).",
       "plugintype": "Sanic.Mppp.Plugins.Steps.NombreCalculadoStep",
