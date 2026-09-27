@@ -211,8 +211,16 @@ persona).
 **Qué prueba.** DN-01 punto 6: la app necesita poder VER las autorizaciones por cliente desde el
 lado del Cliente (vista 18 de `05-app-model-driven.md` §3, agregada el 2026-09-27).
 
-**Necesita.** Sesión de un Administrador de planes (`local/sesion-administrador.json`, generada
-por el aprobador — ver `pruebas/gui/README.md`), un Cliente con al menos una `AutorizacionCliente`.
+**Necesita.** Sesión `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes` —
+generada por el aprobador con `node guardar-sesion.mjs admin_planes`, ver `pruebas/gui/README.md`;
+confirmar que está viva y con el rol correcto con `python3 herramientas/pruebas/estado_sesiones.py`
+antes de correr el caso). Un Cliente con al menos una `AutorizacionCliente`.
+
+> **Por qué este rol y no el otro.** DN-01 punto 6 es explícito: "el Administrador de planes es
+> quien las administra (RF-11)". El Administrador técnico (`SR - MPPP - Administrador tecnico`)
+> **no tiene lectura de Cliente ni de AutorizacionCliente** (`04-matriz-privilegios.md`: "solo toca
+> lo técnico, Parámetros y Reglas"): si se corre este caso con esa sesión por error, el formulario
+> ni siquiera abre — 403, no un defecto de la subgrilla.
 
 **Cómo.** Abrir el formulario de ese Cliente en la app.
 
@@ -234,8 +242,10 @@ con "no hay autorizaciones" es el mismo tipo de error que motivó H-06 en `13-co
 **Qué prueba.** El pedido textual del aprobador del 2026-09-27: poder entrar por correo y ver con
 cuántos CLIENTES está relacionado (antes solo se veían los planes).
 
-**Necesita.** Sesión de un Administrador de planes; un Autorizado con `AutorizacionCliente` hacia
-más de un Cliente.
+**Necesita.** Sesión `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes`,
+confirmada con `estado_sesiones.py` — mismo motivo que U-08: es quien administra Autorizados y
+Autorizaciones, el Administrador técnico no ve estas tablas). Un Autorizado con
+`AutorizacionCliente` hacia más de un Cliente.
 
 **Cómo.** Abrir el formulario de ese Autorizado.
 
@@ -258,7 +268,8 @@ adjunto... al igual que en autorizacion por plan"*) está cerrado: `sanic_docume
 10 MB, no requerida) y `sanic_fechadocumento` (fecha, no requerida), ambas auditadas, con la MISMA
 forma que sus pares de `AutorizacionPlan`.
 
-**Necesita.** Sesión de Administrador de planes; una `AutorizacionCliente` existente.
+**Necesita.** Sesión `local/sesion-admin_planes.json` (rol `SR - MPPP - Administrador de planes`,
+confirmada con `estado_sesiones.py`); una `AutorizacionCliente` existente.
 
 **Cómo.**
 1. Abrir el formulario y verificar que existe la sección "Evidencia de la autorización" con los
