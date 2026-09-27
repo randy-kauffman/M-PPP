@@ -126,7 +126,21 @@ namespace Sanic.Mppp.Plugins.Datos
         /// </summary>
         public IList<FilaPendienteLeida> PorIds(IEnumerable<Guid> filaIds)
         {
-            throw new NotImplementedException("DN-02: lo implementa el constructor contra FilasDataverseAceptacion, Etapa 2.");
+            if (filaIds == null)
+            {
+                throw new ArgumentNullException(nameof(filaIds));
+            }
+
+            var ids = filaIds.Distinct().ToList();
+            if (ids.Count == 0)
+            {
+                return new List<FilaPendienteLeida>();
+            }
+
+            var consulta = new QueryExpression(TablasHistorico.Fila) { ColumnSet = new ColumnSet(ColumnasCandidatas) };
+            consulta.Criteria.AddCondition(TablasHistorico.Fila + "id", ConditionOperator.In, ids.Cast<object>().ToArray());
+
+            return _servicio.RetrieveMultiple(consulta).Entities.Select(Convertir).ToList();
         }
 
         /// <summary>El tipo de formato de esos planes, por id, SIN filtrar por activo: una Fila ya validada tiene que

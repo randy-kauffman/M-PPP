@@ -13,22 +13,25 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
     /// <summary>
     /// El envoltorio `IPlugin` de `sanic_mppp_capi_exportarparadigitar` (DN-02, diseno/DIRECTRICES-NUEVAS.md). Traduce
     /// parámetros; no decide nada del negocio. A diferencia de las Custom API del RPA, ÉSTA no lleva una puerta en
-    /// código (ver el XML doc de <see cref="ExportarParaDigitarApi"/> y el reporte de la Etapa 1): por eso, a
-    /// diferencia de `ObtenerFilasPendientesApiAceptacion`, acá NO hay una prueba de "llamador no autorizado".
+    /// código (ver el XML doc de <see cref="ExportarParaDigitarApi"/>, confirmado por el aprobador el 2026-09-26):
+    /// por eso, a diferencia de `ObtenerFilasPendientesApiAceptacion`, acá NO hay una prueba de "llamador no
+    /// autorizado".
     /// </summary>
     public class ExportarParaDigitarApiAceptacion
     {
         private static readonly DateTime Ahora = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
 
-        private static Entity Fila(string numeroPlan, string nombreBeneficiario)
+        private static Entity Fila(OrganizationServiceEnMemoria svc, string numeroPlan, string nombreBeneficiario)
         {
+            var solicitudId = svc.Sembrar(new Entity(TablasHistorico.Solicitud) { ["sanic_nombre"] = "MPPP-00000001" });
+
             return new Entity(TablasHistorico.Fila)
             {
                 ["sanic_estado"] = new OptionSetValue((int)EstadoDeLaFila.Validada),
                 ["sanic_fechavalidada"] = Ahora,
                 ["sanic_numerofila"] = 1,
                 ["sanic_requiereatencionmanual"] = false,
-                ["sanic_solicitudid"] = new EntityReference(TablasHistorico.Solicitud, Guid.NewGuid()),
+                ["sanic_solicitudid"] = new EntityReference(TablasHistorico.Solicitud, solicitudId),
                 ["sanic_numeroplan"] = numeroPlan,
                 ["sanic_gestion"] = new OptionSetValue((int)Gestion.Inclusion),
                 ["sanic_clasificacion"] = new OptionSetValue((int)Clasificacion.ACH),
@@ -43,7 +46,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             };
         }
 
-        /// <summary>Un llamador con `exportacion.columnas` cargado y una Fila lista, listo para llamar a la API.</summary>
+        /// <summary>Un llamador con `exportacion.columnas` y `exportacion.maximo` cargados y una Fila lista, listo para llamar a la API.</summary>
         private static (ContextoDePluginSimulado ctx, OrganizationServiceEnMemoria svc, Guid filaId) Armar()
         {
             var svc = new OrganizationServiceEnMemoria();
@@ -54,7 +57,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 ["sanic_version"] = 1,
                 ["sanic_valor"] = @"{""columnas"":[{""campo"":""numeroPlan"",""encabezado"":""Plan""},{""campo"":""nombreBeneficiario"",""encabezado"":""Nombre""}]}",
             });
-            var filaId = svc.Sembrar(Fila("0001", "Ana Perez"));
+            svc.Sembrar(new Entity(Tablas.Parametro)
+            {
+                ["statecode"] = new OptionSetValue(Tablas.Activo),
+                ["sanic_nombre"] = ExportarParaDigitar.ParametroMaximo,
+                ["sanic_version"] = 1,
+                ["sanic_valor"] = "500",
+            });
+            var filaId = svc.Sembrar(Fila(svc, "0001", "Ana Perez"));
 
             var ctx = new ContextoDePluginSimulado(svc, Ahora);
             ctx.Contexto.MessageName = "sanic_mppp_capi_exportarparadigitar";
@@ -133,14 +143,58 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Empty(ctx.Contexto.OutputParameters);
         }
 
+        // ---------- Decision 1 (aprobador, 2026-09-26): revienta nombrando cuales filaid no volvieron ----------
+
+        [Fact]
+        public void Un_filaid_que_no_existe_revienta_con_un_mensaje_especifico_no_generico()
+        {
+            var (ctx, _, filaId) = Armar();
+            var noExiste = Guid.NewGuid();
+            ctx.Contexto.InputParameters[ExportarParaDigitarApi.ParametroFilaIds] = new[] { filaId.ToString(), noExiste.ToString() };
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new ExportarParaDigitarApi().Execute(ctx));
+
+            // A diferencia de un error interno, este mensaje SÍ tiene que llegar tal cual a quien llama: el
+            // ejecutivo necesita saber cuál fila no se exportó para volver a seleccionarla (decision del aprobador).
+            Assert.NotEqual(ExportarParaDigitarApi.MensajeDeErrorGenerico, ex.Message);
+            Assert.Contains(noExiste.ToString(), ex.Message);
+            Assert.Empty(ctx.Contexto.OutputParameters);
+        }
+
+        // ---------- Decision 2 (aprobador, 2026-09-26): el tope revienta con un mensaje especifico ----------
+
+        [Fact]
+        public void El_lote_que_supera_exportacion_maximo_revienta_con_un_mensaje_especifico_no_generico()
+        {
+            var (ctx, svc, filaId) = Armar();
+            foreach (var p in svc.Registros(Tablas.Parametro))
+            {
+                if ((string)p["sanic_nombre"] == ExportarParaDigitar.ParametroMaximo)
+                {
+                    svc.Update(new Entity(Tablas.Parametro, p.Id) { ["sanic_valor"] = "1" });
+                }
+            }
+            ctx.Contexto.InputParameters[ExportarParaDigitarApi.ParametroFilaIds] = new[] { filaId.ToString(), Guid.NewGuid().ToString() };
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new ExportarParaDigitarApi().Execute(ctx));
+
+            Assert.NotEqual(ExportarParaDigitarApi.MensajeDeErrorGenerico, ex.Message);
+            Assert.Contains(ExportarParaDigitar.ParametroMaximo, ex.Message);
+            Assert.Empty(ctx.Contexto.OutputParameters);
+        }
+
         [Fact]
         public void Un_error_real_no_le_cuenta_nada_a_quien_llama_y_el_detalle_va_al_trace()
         {
             var (ctx, svc, _) = Armar();
-            // Rompemos la config real dejando el parametro con un valor mal formado.
+            // Rompemos la config real dejando el parametro de columnas con un valor mal formado (el de maximo
+            // queda intacto: si tambien se corrompiera, revienta por el tope, no por lo que se quiere probar).
             foreach (var p in svc.Registros(Tablas.Parametro))
             {
-                svc.Update(new Entity(Tablas.Parametro, p.Id) { ["sanic_valor"] = "esto no es JSON" });
+                if ((string)p["sanic_nombre"] == ExportarParaDigitar.ParametroColumnas)
+                {
+                    svc.Update(new Entity(Tablas.Parametro, p.Id) { ["sanic_valor"] = "esto no es JSON" });
+                }
             }
 
             var ex = Assert.Throws<InvalidPluginExecutionException>(() => new ExportarParaDigitarApi().Execute(ctx));

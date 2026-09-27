@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using Microsoft.Xrm.Sdk;
+using Sanic.Mppp.Plugins.Datos;
+using Sanic.Mppp.Plugins.Exportacion;
 
 namespace Sanic.Mppp.Plugins.Api
 {
@@ -15,8 +19,10 @@ namespace Sanic.Mppp.Plugins.Api
     ///    `03-contratos-custom-api.md` encabezado, D-9): `ExecutePrivilegeName` de la plataforma, sobre un privilegio
     ///    que YA existe y que solo tienen los roles que deben poder exportar. Por eso ESTA clase, igual que
     ///    <see cref="ValidarSolicitudApi"/> y <see cref="ClasificarCorreoApi"/>, NO trae una primera línea de
-    ///    autorización: el registro de la Custom API (`ExecutePrivilegeName`, fuera de alcance de esta etapa) es el
-    ///    control completo. Ver el reporte de la Etapa 1 para el privilegio recomendado;
+    ///    autorización. **Confirmado por el aprobador, 2026-09-26**: `ExecutePrivilegeName = prvReadsanic_mppp_tbl_fila`
+    ///    — Ejecutivo y Supervisor lo tienen (`04-matriz-privilegios.md` §2: `R W Ap:O` sobre Fila), Administrador de
+    ///    planes y Administrador técnico no tienen nada sobre Fila, así que quedan afuera solos. El registro real de
+    ///    ese privilegio en la Custom API sigue fuera de alcance de este plugin (es una tarea de `pac`/Dev);
     ///  - `filaids` (StringArray, REQUERIDO): ausente, o presente pero no es un arreglo de texto →
     ///    <see cref="InvalidPluginExecutionException"/>; un elemento que no se puede leer como <see cref="Guid"/> →
     ///    <see cref="InvalidPluginExecutionException"/> que nombra la posición. Un arreglo VACÍO no es un error: se
@@ -25,8 +31,14 @@ namespace Sanic.Mppp.Plugins.Api
     ///  - el servicio se crea con SYSTEM (`CreateOrganizationService(null)`, diseno/04 §1): igual que las demás,
     ///    nunca con los privilegios de quien llama;
     ///  - deja rastro en el trace al empezar y al terminar (cuántas filas), sin volcar valores de ninguna fila;
-    ///  - una <see cref="InvalidPluginExecutionException"/> de adentro se propaga; cualquier otra excepción se traza
-    ///    completa y se vuelve a lanzar con un mensaje genérico (mismo criterio que las demás Custom API).
+    ///  - una <see cref="InvalidPluginExecutionException"/> de adentro se propaga. Dos rechazos de negocio (decisión
+    ///    del aprobador, 2026-09-26) llegan a quien llama con su mensaje TAL CUAL, sin genericizar, porque el
+    ///    ejecutivo necesita esa información para actuar: <see cref="FilasNoEncontradasException"/> (una fila
+    ///    pedida no existe — "diez segundos: volver a seleccionar y bajar de nuevo") y
+    ///    <see cref="LoteDeExportacionExcedidoException"/> (se superó `exportacion.maximo` — "hacé la descarga en
+    ///    lotes más chicos"). Cualquier OTRA excepción se traza completa y se vuelve a lanzar con un mensaje
+    ///    genérico (mismo criterio que las demás Custom API): esas dos no son "un error real" del sistema, son un
+    ///    rechazo esperado que el propio dominio ya redactó para que lo lea una persona.
     /// </summary>
     public sealed class ExportarParaDigitarApi : IPlugin
     {
@@ -39,7 +51,83 @@ namespace Sanic.Mppp.Plugins.Api
 
         public void Execute(IServiceProvider serviceProvider)
         {
-            throw new NotImplementedException("DN-02: lo implementa el constructor contra ExportarParaDigitarApiAceptacion, Etapa 2.");
+            if (serviceProvider == null)
+            {
+                throw new InvalidPluginExecutionException("No se recibió el proveedor de servicios del plugin.");
+            }
+
+            var contexto = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+            var fabrica = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+            var trace = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+            if (contexto == null || fabrica == null || trace == null)
+            {
+                throw new InvalidPluginExecutionException("Faltan servicios de la plataforma para ejecutar la Custom API.");
+            }
+
+            // SYSTEM, no quien llama (diseno/04 §1): igual que las demás Custom API de este proyecto.
+            var servicio = fabrica.CreateOrganizationService(null);
+
+            var filaIds = LeerFilaIds(contexto);
+
+            try
+            {
+                trace.Trace($"ExportarParaDigitar: empieza. filas pedidas={filaIds.Count.ToString(CultureInfo.InvariantCulture)}.");
+
+                var core = new ExportarParaDigitar(new FilasDataverse(servicio), new CatalogosDataverse(servicio), new ArmadorExportacionOpenXml());
+                var resultado = core.Ejecutar(filaIds);
+
+                contexto.OutputParameters[SalidaArchivo] = resultado.ArchivoBase64;
+                contexto.OutputParameters[SalidaExportadas] = resultado.Exportadas;
+
+                trace.Trace($"ExportarParaDigitar: termina. exportadas={resultado.Exportadas.ToString(CultureInfo.InvariantCulture)}.");
+            }
+            catch (InvalidPluginExecutionException)
+            {
+                throw;
+            }
+            catch (FilasNoEncontradasException ex)
+            {
+                // Decisión del aprobador (2026-09-26): este mensaje SÍ llega tal cual, no es un error interno.
+                throw new InvalidPluginExecutionException(ex.Message);
+            }
+            catch (LoteDeExportacionExcedidoException ex)
+            {
+                // Misma decisión: el ejecutivo necesita saber el tope para partir la descarga en lotes más chicos.
+                throw new InvalidPluginExecutionException(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                trace.Trace(ex.ToString());
+                throw new InvalidPluginExecutionException(MensajeDeErrorGenerico);
+            }
+        }
+
+        /// <summary>`filaids`: REQUERIDO, StringArray (calza con `SelectedControlSelectedItemIds` del ribbon sin JSON de por medio). Cada elemento tiene que parsear como Guid.</summary>
+        private static IList<Guid> LeerFilaIds(IPluginExecutionContext contexto)
+        {
+            if (!contexto.InputParameters.Contains(ParametroFilaIds))
+            {
+                throw new InvalidPluginExecutionException($"El parámetro '{ParametroFilaIds}' es requerido.");
+            }
+
+            if (!(contexto.InputParameters[ParametroFilaIds] is string[] valores))
+            {
+                throw new InvalidPluginExecutionException($"El parámetro '{ParametroFilaIds}' tiene que ser un arreglo de texto (StringArray).");
+            }
+
+            var ids = new List<Guid>(valores.Length);
+            for (var i = 0; i < valores.Length; i++)
+            {
+                if (!Guid.TryParse(valores[i], out var id))
+                {
+                    throw new InvalidPluginExecutionException(
+                        $"El parámetro '{ParametroFilaIds}' trae un valor que no es un identificador válido en la posición {(i + 1).ToString(CultureInfo.InvariantCulture)}.");
+                }
+
+                ids.Add(id);
+            }
+
+            return ids;
         }
     }
 }
