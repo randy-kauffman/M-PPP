@@ -121,6 +121,49 @@ modo = cliente  →  ¿hay AutorizacionCliente(correo, cliente dueño de ese pla
 se negocia**: un texto que distinga "el plan no existe" de "no estás autorizado" es un oráculo, y ya
 lo cerramos una vez.
 
+## DN-01 · El modo cambia TODO, no una parte
+
+**Corrección del aprobador, 2026-09-26**, después de que el diseño inicial dejara `REMITENTE_RECONOCIDO`
+afuera:
+
+> *"El portero también tiene que preguntar lo mismo. Cuando cambien los modos hay que cambiarlo todo
+> en su totalidad, no pedacito por pedacito."*
+
+**Y tenía razón: un interruptor que cambia la mitad del sistema no es un interruptor, es una trampa.**
+Con el modo en `cliente`, un correo autorizado solo por cliente era rechazado por
+`REMITENTE_RECONOCIDO` **antes de abrir el Excel** — y una No reconocida **no recibe respuesta**, así
+que el cliente mandaba su solicitud y no se enteraba de nada.
+
+### Hay UN solo punto donde se consulta la autorización, y ahí va el modo
+
+Barrido del código (2026-09-26): **una función, dos llamadores, ningún tercero**.
+
+```
+Datos/Catalogos.cs:209   PlanesAutorizadosDe(correo)
+         ↑                          ↑
+ClasificarCorreo.cs:242      ValidarSolicitud.cs:246
+  REMITENTE_RECONOCIDO          AUTORIZACION_CORREO_PLAN
+     (nivel Correo)                (nivel Registro)
+```
+
+**El modo se resuelve AHÍ, no en cada llamador.** `PlanesAutorizadosDe` devuelve, según
+`autorizacion.modo`:
+
+| modo | qué devuelve |
+|---|---|
+| `plan` | los planes de `AutorizacionPlan` para ese correo — **exactamente como hoy** |
+| `cliente` | **todos los planes de los clientes** sobre los que ese correo tiene `AutorizacionCliente` |
+
+Así los dos niveles contestan lo mismo **sin que ninguno tenga que saber del modo**, y **nadie puede
+olvidarse de uno**: no hay dónde olvidarse. Si mañana aparece un tercer consumidor, hereda el modo por
+construcción.
+
+> **La prueba que lo fija**: con `modo = cliente` y un correo autorizado SOLO por cliente, el correo
+> **entra** (pasa `REMITENTE_RECONOCIDO`) **y** sus filas quedan autorizadas. Los dos niveles, en la
+> misma prueba. Si alguien vuelve a partir el modo en dos, esa prueba se pone roja.
+
+---
+
 ## DN-02 · Exportación
 
 **Custom API `sanic_mppp_capi_exportarparadigitar`** — recibe los `filaid` seleccionados, devuelve

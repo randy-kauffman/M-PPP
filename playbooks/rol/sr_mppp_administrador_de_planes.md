@@ -61,6 +61,13 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
       "anexar": "organizacion",
       "anexar_a": "organizacion"
     },
+    "sanic_mppp_tbl_autorizacioncliente": {
+      "crear": "organizacion",
+      "leer": "organizacion",
+      "escribir": "organizacion",
+      "anexar": "organizacion",
+      "anexar_a": "organizacion"
+    },
     "sanic_mppp_tbl_regla": {
       "leer": "organizacion"
     }
@@ -69,7 +76,7 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
 }
 ```
 
-Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 22 de este playbook. Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
+Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 27 de este playbook (22 + 5 de `AutorizacionCliente`, agregada por DN-01 el 2026-09-26). Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
 
 Decisiones que este playbook toma y el diseño no traía:
 
@@ -80,6 +87,7 @@ Decisiones que este playbook toma y el diseño no traía:
 Viene del diseño, no lo decide este playbook:
 
 - Privilegios: `04` §2, columna Administrador de planes.
+- `AutorizacionCliente` (DN-01, `DIRECTRICES-NUEVAS.md`, aprobador 2026-09-26) lleva EXACTAMENTE los mismos privilegios que `AutorizacionPlan`: es su hermana, la vía por cliente (`04` §2, nota agregada el 2026-09-26).
 - Nadie borra: los catálogos se desactivan (`04` §2).
 - `asignar` solo sobre Cliente: el dueño del cliente es su ejecutivo (RF-19, D-23).
 - No lee Solicitud ni Fila a propósito: traen cuentas e identificaciones en crudo (`04` §4).
@@ -94,7 +102,7 @@ Las de la receta (`seguridad/patrones.md` §2.1), con estos valores esperados:
 | 1 | La solución existe, no es managed, y su publisher coincide | los de la sección 1 |
 | 2 | Hay exactamente una unidad de negocio raíz | una |
 | 3 | El rol base existe una vez en la unidad raíz | `App Opener` |
-| 4 | Cada tabla nombrada existe, y cada privilegio admite el alcance pedido | `sanic_mppp_tbl_cliente` · `sanic_mppp_tbl_plan` · `sanic_mppp_tbl_autorizado` · `sanic_mppp_tbl_autorizacionplan` · `sanic_mppp_tbl_regla` |
+| 4 | Cada tabla nombrada existe, y cada privilegio admite el alcance pedido | `sanic_mppp_tbl_cliente` · `sanic_mppp_tbl_plan` · `sanic_mppp_tbl_autorizado` · `sanic_mppp_tbl_autorizacionplan` · `sanic_mppp_tbl_autorizacioncliente` · `sanic_mppp_tbl_regla` |
 
 Si alguna falla: estado `bloqueado`, no se crea nada.
 
@@ -121,6 +129,7 @@ Privilegios sobre las tablas de la solución. **Exactamente estos**: uno de meno
 | `sanic_mppp_tbl_plan` | `prvCreatesanic_mppp_tbl_plan` = Global · `prvReadsanic_mppp_tbl_plan` = Global · `prvWritesanic_mppp_tbl_plan` = Global · `prvAppendsanic_mppp_tbl_plan` = Global · `prvAppendTosanic_mppp_tbl_plan` = Global |
 | `sanic_mppp_tbl_autorizado` | `prvCreatesanic_mppp_tbl_autorizado` = Global · `prvReadsanic_mppp_tbl_autorizado` = Global · `prvWritesanic_mppp_tbl_autorizado` = Global · `prvAppendsanic_mppp_tbl_autorizado` = Global · `prvAppendTosanic_mppp_tbl_autorizado` = Global |
 | `sanic_mppp_tbl_autorizacionplan` | `prvCreatesanic_mppp_tbl_autorizacionplan` = Global · `prvReadsanic_mppp_tbl_autorizacionplan` = Global · `prvWritesanic_mppp_tbl_autorizacionplan` = Global · `prvAppendsanic_mppp_tbl_autorizacionplan` = Global · `prvAppendTosanic_mppp_tbl_autorizacionplan` = Global |
+| `sanic_mppp_tbl_autorizacioncliente` | `prvCreatesanic_mppp_tbl_autorizacioncliente` = Global · `prvReadsanic_mppp_tbl_autorizacioncliente` = Global · `prvWritesanic_mppp_tbl_autorizacioncliente` = Global · `prvAppendsanic_mppp_tbl_autorizacioncliente` = Global · `prvAppendTosanic_mppp_tbl_autorizacioncliente` = Global |
 | `sanic_mppp_tbl_regla` | `prvReadsanic_mppp_tbl_regla` = Global |
 
 Otros privilegios:

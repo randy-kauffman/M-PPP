@@ -28,6 +28,7 @@ Mismo criterio en Solicitud para los humanos: solo `sanic_requiererevision` (el 
 | Plan | R:O | R:O | C R W Ap At : O | — |
 | Autorizado | R:O | R:O | C R W Ap At : O | — |
 | AutorizacionPlan | R:O | R:O | C R W Ap At : O | — |
+| AutorizacionCliente | R:O | R:O | C R W Ap At : O | — |
 | Parametro | — | — | — | C R W : O |
 | Regla | R:O | R:O | R:O | C R W : O |
 | Solicitud | R W At : O | R At : O | — | — |
@@ -38,6 +39,7 @@ Mismo criterio en Solicitud para los humanos: solo `sanic_requiererevision` (el 
 | CorridaHistorico (fase 3) | — | — | — | R:O |
 | **Borrado** en cualquier tabla | — | — | — | — |
 
+- **`AutorizacionCliente` (DN-01, `DIRECTRICES-NUEVAS.md`, aprobador 2026-09-26) tiene EXACTAMENTE los mismos privilegios que `AutorizacionPlan`**: es su hermana, la vía por cliente, y conviven sin que ninguna reemplace a la otra. El Administrador de planes la administra igual (RF-11); Ejecutivo y Supervisor solo la leen.
 - **`MotivoAccion` es la única tabla donde un humano BORRA, y es a propósito** (verificado contra el entorno el 2026-09-26: Ejecutivo y Supervisor con `C R W D` en alcance **usuario**). No es una tabla de negocio: es el **transporte** del diálogo de motivo (`05` DA-03). Se crea un registro, el comando lee el texto y el registro se descarta. Alcance **usuario** y no organización: cada quien toca solo el suyo. Por eso su `D` **no contradice** el "nadie borra" de abajo, que se declara sobre las tablas de negocio y sobre la unidad histórica. Hasta el 2026-09-26 esta tabla no figuraba en la matriz y, como la matriz es la fuente contra la que se verifica, esos privilegios se leían como privilegio de más (D-48).
 - **Nadie borra** en las tablas de negocio ni en la unidad histórica. Los catálogos se desactivan (`W` alcanza para cambiar el estado); la unidad histórica solo la purga el job nativo (D-35).
 - Ejecutivo y Supervisor tienen exactamente los mismos privilegios sobre Fila; lo que los distingue es **qué transición les deja hacer el plugin** según su rol. Son **mutuamente excluyentes por usuario** (D-25): el plugin rechaza toda transición de un usuario que tenga los dos roles. Lo mismo vale para cualquier combinación que incluya al RPA (D-11, 2026-09-21): el RPA es una identidad de aplicación aparte, y si además trae un rol humano es una mala configuración; falla cerrado y no transiciona nada hasta que se corrija.

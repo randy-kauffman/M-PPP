@@ -1,4 +1,13 @@
-# Playbook: datos · parametros (los 17)
+# Playbook: datos · parametros (los 18)
+
+**`autorizacion.modo` se agregó el 2026-09-26 (DN-01, `diseno/DIRECTRICES-NUEVAS.md`, "Diseño resuelto").**
+Declara qué vía consulta `AUTORIZACION_CORREO_PLAN`: `plan` (la de hoy, `AutorizacionPlan`) o `cliente`
+(la nueva, `AutorizacionCliente`). Se siembra en `plan`: **el comportamiento de hoy no cambia solo por
+agregar el parámetro.** Tiene el mismo criterio de fallback quemado que `servicio.cuenta` y
+`rpa.horas.tolerancia`: un valor que falta o viene con basura degrada a `plan`, nunca tumba la
+validación (`Validacion/ReglasDeRegistro.cs`, `ModoDeAutorizacionParametro.Resolver`). Cambiar este
+parámetro a `cliente` en un entorno activa la vía por cliente sin recargar nada: las filas de
+`AutorizacionPlan` se conservan, solo dejan de mirarse.
 
 **`servicio.cuenta` se agrego el 2026-09-23 y hoy tiene un valor PROVISORIO.** Declara el UPN de la
 cuenta con la que los cinco flujos escriben en Dataverse; `BaseDeStep.EsCodigoDeServidor` lo usa
@@ -26,6 +35,7 @@ apagar. Si alguna vez el `difiere` de esta fila desaparece contra un entorno don
 hay que mirar.
 
 Valores con fuente:
+- `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
 - `plantilla.obligatoriedad`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
@@ -65,6 +75,16 @@ coinciden con la plantilla real del cliente.
     "sanic_version"
   ],
   "filas": [
+    {
+      "sanic_nombre": "autorizacion.modo",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Texto"
+      },
+      "sanic_valor": "plan",
+      "sanic_descripcion": "DN-01 (2026-09-26): 'plan' o 'cliente', que via consulta AUTORIZACION_CORREO_PLAN. Sembrado en 'plan' (el comportamiento de hoy). Fallback quemado en el codigo: falta o basura degrada a 'plan', nunca tumba la validacion."
+    },
     {
       "sanic_nombre": "correo.prefijos.reenvio",
       "sanic_version": 1,

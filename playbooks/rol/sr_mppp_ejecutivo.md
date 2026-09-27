@@ -44,6 +44,9 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
     "sanic_mppp_tbl_autorizacionplan": {
       "leer": "organizacion"
     },
+    "sanic_mppp_tbl_autorizacioncliente": {
+      "leer": "organizacion"
+    },
     "sanic_mppp_tbl_regla": {
       "leer": "organizacion"
     },
@@ -74,7 +77,7 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
 }
 ```
 
-Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 13 de este playbook. Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
+Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 14 de este playbook (13 + 1 de `AutorizacionCliente`, agregada por DN-01 el 2026-09-26). Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
 
 Decisiones que este playbook toma y el diseño no traía:
 
@@ -85,6 +88,7 @@ Decisiones que este playbook toma y el diseño no traía:
 Viene del diseño, no lo decide este playbook:
 
 - Privilegios: `04` §2, columna Ejecutivo.
+- `AutorizacionCliente` (DN-01, `DIRECTRICES-NUEVAS.md`, aprobador 2026-09-26): mismo privilegio `R:O` que `AutorizacionPlan` (`04` §2, nota agregada el 2026-09-26).
 - Nadie borra (`04` §2).
 - Tiene `escribir` sobre Fila y Solicitud, pero qué columnas puede tocar lo limita la lista blanca del plugin (`04` §1), no este rol.
 - Ejecutivo y Supervisor son mutuamente excluyentes por usuario (D-25): lo controla el plugin.
@@ -99,7 +103,7 @@ Las de la receta (`seguridad/patrones.md` §2.1), con estos valores esperados:
 | 1 | La solución existe, no es managed, y su publisher coincide | los de la sección 1 |
 | 2 | Hay exactamente una unidad de negocio raíz | una |
 | 3 | El rol base existe una vez en la unidad raíz | `App Opener` |
-| 4 | Cada tabla nombrada existe, y cada privilegio admite el alcance pedido | `sanic_mppp_tbl_cliente` · `sanic_mppp_tbl_plan` · `sanic_mppp_tbl_autorizado` · `sanic_mppp_tbl_autorizacionplan` · `sanic_mppp_tbl_regla` · `sanic_mppp_tbl_solicitud` · `sanic_mppp_tbl_fila` · `sanic_mppp_tbl_resultadoregla` · `sanic_mppp_tbl_bitacora` |
+| 4 | Cada tabla nombrada existe, y cada privilegio admite el alcance pedido | `sanic_mppp_tbl_cliente` · `sanic_mppp_tbl_plan` · `sanic_mppp_tbl_autorizado` · `sanic_mppp_tbl_autorizacionplan` · `sanic_mppp_tbl_autorizacioncliente` · `sanic_mppp_tbl_regla` · `sanic_mppp_tbl_solicitud` · `sanic_mppp_tbl_fila` · `sanic_mppp_tbl_resultadoregla` · `sanic_mppp_tbl_bitacora` |
 
 Si alguna falla: estado `bloqueado`, no se crea nada.
 
@@ -126,6 +130,7 @@ Privilegios sobre las tablas de la solución. **Exactamente estos**: uno de meno
 | `sanic_mppp_tbl_plan` | `prvReadsanic_mppp_tbl_plan` = Global |
 | `sanic_mppp_tbl_autorizado` | `prvReadsanic_mppp_tbl_autorizado` = Global |
 | `sanic_mppp_tbl_autorizacionplan` | `prvReadsanic_mppp_tbl_autorizacionplan` = Global |
+| `sanic_mppp_tbl_autorizacioncliente` | `prvReadsanic_mppp_tbl_autorizacioncliente` = Global |
 | `sanic_mppp_tbl_regla` | `prvReadsanic_mppp_tbl_regla` = Global |
 | `sanic_mppp_tbl_solicitud` | `prvReadsanic_mppp_tbl_solicitud` = Global · `prvWritesanic_mppp_tbl_solicitud` = Global · `prvAppendTosanic_mppp_tbl_solicitud` = Global |
 | `sanic_mppp_tbl_fila` | `prvReadsanic_mppp_tbl_fila` = Global · `prvWritesanic_mppp_tbl_fila` = Global · `prvAppendsanic_mppp_tbl_fila` = Global |
