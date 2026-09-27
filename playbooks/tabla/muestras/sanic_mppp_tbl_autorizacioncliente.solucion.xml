@@ -493,6 +493,7 @@
               <LogicalName>sanic_autorizadoid</LogicalName>
               <RequiredLevel>required</RequiredLevel>
               <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
               <ValidForUpdateApi>1</ValidForUpdateApi>
               <ValidForReadApi>1</ValidForReadApi>
               <ValidForCreateApi>1</ValidForCreateApi>
@@ -531,6 +532,7 @@
               <LogicalName>sanic_clienteid</LogicalName>
               <RequiredLevel>required</RequiredLevel>
               <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
               <ValidForUpdateApi>1</ValidForUpdateApi>
               <ValidForReadApi>1</ValidForReadApi>
               <ValidForCreateApi>1</ValidForCreateApi>
@@ -561,6 +563,84 @@
               </displaynames>
               <Descriptions>
                 <Description description="Cliente sobre cuyos planes se autoriza al correo (todos, sin enumerarlos)." languagecode="1033" />
+              </Descriptions>
+            </attribute>
+            <attribute PhysicalName="sanic_documentofirmado">
+              <Type>file</Type>
+              <Name>sanic_documentofirmado</Name>
+              <LogicalName>sanic_documentofirmado</LogicalName>
+              <RequiredLevel>none</RequiredLevel>
+              <DisplayMask>ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>disabled</ImeMode>
+              <ValidForUpdateApi>0</ValidForUpdateApi>
+              <ValidForReadApi>1</ValidForReadApi>
+              <ValidForCreateApi>0</ValidForCreateApi>
+              <IsCustomField>1</IsCustomField>
+              <IsAuditEnabled>1</IsAuditEnabled>
+              <IsSecured>0</IsSecured>
+              <IntroducedVersion>1.0.0.0</IntroducedVersion>
+              <IsCustomizable>1</IsCustomizable>
+              <IsRenameable>1</IsRenameable>
+              <CanModifySearchSettings>0</CanModifySearchSettings>
+              <CanModifyRequirementLevelSettings>0</CanModifyRequirementLevelSettings>
+              <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+              <SourceType>0</SourceType>
+              <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+              <IsSortableEnabled>0</IsSortableEnabled>
+              <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+              <CanModifyIsSortableSettings>0</CanModifyIsSortableSettings>
+              <IsDataSourceSecret>0</IsDataSourceSecret>
+              <AutoNumberFormat />
+              <IsSearchable>0</IsSearchable>
+              <IsFilterable>0</IsFilterable>
+              <IsRetrievable>0</IsRetrievable>
+              <IsLocalizable>0</IsLocalizable>
+              <MaxValue>10240</MaxValue>
+              <displaynames>
+                <displayname description="Documento firmado" languagecode="1033" />
+              </displaynames>
+              <Descriptions>
+                <Description description="Evidencia de ESTA autorización: el documento firmado que respalda que este correo opere sobre TODOS los planes de este cliente. Obligatoria por negocio: sin archivo, la autorización no vale." languagecode="1033" />
+              </Descriptions>
+            </attribute>
+            <attribute PhysicalName="sanic_fechadocumento">
+              <Type>datetime</Type>
+              <Name>sanic_fechadocumento</Name>
+              <LogicalName>sanic_fechadocumento</LogicalName>
+              <RequiredLevel>none</RequiredLevel>
+              <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>inactive</ImeMode>
+              <ValidForUpdateApi>1</ValidForUpdateApi>
+              <ValidForReadApi>1</ValidForReadApi>
+              <ValidForCreateApi>1</ValidForCreateApi>
+              <IsCustomField>1</IsCustomField>
+              <IsAuditEnabled>1</IsAuditEnabled>
+              <IsSecured>0</IsSecured>
+              <IntroducedVersion>1.0.0.0</IntroducedVersion>
+              <IsCustomizable>1</IsCustomizable>
+              <IsRenameable>1</IsRenameable>
+              <CanModifySearchSettings>1</CanModifySearchSettings>
+              <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+              <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+              <SourceType>0</SourceType>
+              <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+              <IsSortableEnabled>0</IsSortableEnabled>
+              <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+              <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+              <IsDataSourceSecret>0</IsDataSourceSecret>
+              <AutoNumberFormat />
+              <IsSearchable>0</IsSearchable>
+              <IsFilterable>0</IsFilterable>
+              <IsRetrievable>0</IsRetrievable>
+              <IsLocalizable>0</IsLocalizable>
+              <Format>date</Format>
+              <CanChangeDateTimeBehavior>1</CanChangeDateTimeBehavior>
+              <Behavior>2</Behavior>
+              <displaynames>
+                <displayname description="Fecha del documento" languagecode="1033" />
+              </displaynames>
+              <Descriptions>
+                <Description description="Fecha del documento firmado." languagecode="1033" />
               </Descriptions>
             </attribute>
             <attribute PhysicalName="sanic_mppp_tbl_autorizacionclienteId">
@@ -846,8 +926,8 @@
               <IntroducedVersion>1.0.0.0</IntroducedVersion>
               <IsCustomizable>0</IsCustomizable>
               <EntityKeyAttributes>
-                <AttributeName>sanic_autorizadoid</AttributeName>
                 <AttributeName>sanic_clienteid</AttributeName>
+                <AttributeName>sanic_autorizadoid</AttributeName>
               </EntityKeyAttributes>
               <displaynames>
                 <displayname description="KEY - MPPP - Autorizacion por cliente - Autorizado y cliente" languagecode="1033" />
@@ -1037,34 +1117,26 @@
             <IntroducedVersion>1.0</IntroducedVersion>
             <FormPresentation>1</FormPresentation>
             <FormActivationState>1</FormActivationState>
-            <form>
+            <form headerdensity="HighWithControls">
               <tabs>
-                <tab verticallayout="true" id="{985F15DF-C031-41B6-A75D-79749704C4BF}" IsUserDefined="1">
+                <tab verticallayout="true" id="{ACF13F12-631B-594B-A754-C67BD38A60F7}" IsUserDefined="1" labelid="{C98129A9-505E-505E-BDF4-8683E519E7E4}">
                   <labels>
                     <label description="General" languagecode="1033" />
                   </labels>
                   <columns>
                     <column width="100%">
                       <sections>
-                        <section showlabel="false" showbar="false" IsUserDefined="0" id="{586EA470-1606-4BAF-AE18-CFF3E6E1B7E7}">
+                        <section showlabel="true" showbar="false" IsUserDefined="0" id="{B49C8215-C81A-5706-9CA2-897B39A8C439}" labelid="{71DF1598-E94F-5D32-9353-2ECBAB032015}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">
                           <labels>
-                            <label description="General" languagecode="1033" />
+                            <label description="Datos" languagecode="1033" />
                           </labels>
                           <rows>
                             <row>
-                              <cell id="{9934AAF6-8931-42D3-BDD0-E67CC06B7FAC}">
-                                <labels>
-                                  <label description="Nombre" languagecode="1033" />
-                                </labels>
-                                <control id="sanic_nombre" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="sanic_nombre" />
-                              </cell>
-                            </row>
-                            <row>
-                              <cell id="{CDC4BE8D-8DE6-4741-A29C-04303C2C1EB2}">
+                              <cell id="{F98AFEDF-A075-546B-A619-7D6B2B65DAFD}" locklevel="0" colspan="1" rowspan="1" labelid="{97B003D5-FDF8-569D-A6AC-7FF55162575D}">
                                 <labels>
                                   <label description="Owner" languagecode="1033" />
                                 </labels>
-                                <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" />
+                                <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" disabled="false" />
                               </cell>
                             </row>
                           </rows>
@@ -1074,14 +1146,38 @@
                   </columns>
                 </tab>
               </tabs>
+              <header id="{891D47C2-2D44-5C8A-88B2-A0BE835564B5}" celllabelposition="Top" columns="111" labelwidth="115" celllabelalignment="Left">
+                <rows>
+                  <row>
+                    <cell id="{C41FF753-7DF9-5B2A-B72B-CDA6F55E8380}" locklevel="0" colspan="1" rowspan="1" labelid="{E283600E-515F-581B-8535-32D8DD7C1047}">
+                      <labels>
+                        <label description="Nombre" languagecode="1033" />
+                      </labels>
+                      <control id="sanic_nombre" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="sanic_nombre" disabled="false" />
+                    </cell>
+                    <cell id="{0743F0CB-4F95-5D21-841B-C73B2B110060}" locklevel="0" colspan="1" rowspan="1" labelid="{0DAB0285-8B23-5C9C-9E62-1D042163E9C5}">
+                      <labels>
+                        <label description="Correo autorizado" languagecode="1033" />
+                      </labels>
+                      <control id="sanic_autorizadoid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="sanic_autorizadoid" disabled="false" />
+                    </cell>
+                    <cell id="{60F7DE32-29B1-5E13-8C4E-B22A45AAFED4}" locklevel="0" colspan="1" rowspan="1" labelid="{E17591E0-CCCE-5903-AF7E-0A2D4E7E4846}">
+                      <labels>
+                        <label description="Cliente" languagecode="1033" />
+                      </labels>
+                      <control id="sanic_clienteid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="sanic_clienteid" disabled="false" />
+                    </cell>
+                  </row>
+                </rows>
+              </header>
             </form>
             <IsCustomizable>1</IsCustomizable>
             <CanBeDeleted>1</CanBeDeleted>
             <LocalizedNames>
-              <LocalizedName description="Information" languagecode="1033" />
+              <LocalizedName description="Autorizacion por cliente" languagecode="1033" />
             </LocalizedNames>
             <Descriptions>
-              <Description description="A form for this entity." languagecode="1033" />
+              <Description description="Formulario principal de Autorizacion por cliente (DN-01): un correo autorizado sobre TODOS los planes de un cliente. Convive con Autorizacion (AutorizacionPlan) por plan; ninguna reemplaza a la otra. Esta tabla NO lleva evidencia: no tiene sanic_documentofirmado ni sanic_fechadocumento." languagecode="1033" />
             </Descriptions>
           </systemform>
         </forms>
@@ -1144,7 +1240,7 @@
             <CanBeDeleted>0</CanBeDeleted>
             <isquickfindquery>0</isquickfindquery>
             <isprivate>0</isprivate>
-            <isdefault>1</isdefault>
+            <isdefault>0</isdefault>
             <savedqueryid>{b590ddba-2f82-432e-b079-5c40af4b38a8}</savedqueryid>
             <layoutxml>
               <grid name="resultset" jump="sanic_nombre" select="1" icon="1" preview="1">
@@ -1270,6 +1366,121 @@
             <LocalizedNames>
               <LocalizedName description="Autorizacion por cliente Lookup View" languagecode="1033" />
             </LocalizedNames>
+          </savedquery>
+          <savedquery>
+            <IsCustomizable>1</IsCustomizable>
+            <CanBeDeleted>1</CanBeDeleted>
+            <isquickfindquery>0</isquickfindquery>
+            <isprivate>0</isprivate>
+            <isdefault>1</isdefault>
+            <savedqueryid>{c575fe63-98ba-f111-aaad-000d3a301e02}</savedqueryid>
+            <layoutxml>
+              <grid name="resultset" jump="sanic_nombre" select="1" preview="1" icon="1">
+  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+    <cell name="sanic_nombre" width="280" />
+  </row>
+</grid>
+            </layoutxml>
+            <querytype>0</querytype>
+            <fetchxml>
+              <fetch version="1.0" output-format="xml-platform" mapping="logical">
+                <entity name="sanic_mppp_tbl_autorizacioncliente">
+                  <attribute name="sanic_mppp_tbl_autorizacionclienteid" />
+                  <attribute name="sanic_nombre" />
+                  <order attribute="sanic_nombre" descending="false" />
+                  <filter type="and">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                  </filter>
+                </entity>
+              </fetch>
+            </fetchxml>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <LocalizedNames>
+              <LocalizedName description="Autorizaciones por cliente activas" languagecode="1033" />
+            </LocalizedNames>
+            <Descriptions>
+              <Description description="Autorizaciones de correo sobre cliente vigentes (DN-01)." languagecode="1033" />
+            </Descriptions>
+          </savedquery>
+          <savedquery>
+            <IsCustomizable>1</IsCustomizable>
+            <CanBeDeleted>1</CanBeDeleted>
+            <isquickfindquery>0</isquickfindquery>
+            <isprivate>0</isprivate>
+            <isdefault>0</isdefault>
+            <savedqueryid>{6a86fc5d-98ba-f111-aaad-000d3a301e02}</savedqueryid>
+            <layoutxml>
+              <grid name="resultset" jump="cliente.sanic_nombre" select="1" preview="1" icon="1">
+  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+    <cell name="cliente.sanic_nombre" width="240" />
+    <cell name="cliente.sanic_cifbac" width="130" />
+    <cell name="sanic_nombre" width="260" />
+  </row>
+</grid>
+            </layoutxml>
+            <querytype>0</querytype>
+            <fetchxml>
+              <fetch version="1.0" output-format="xml-platform" mapping="logical">
+                <entity name="sanic_mppp_tbl_autorizacioncliente">
+                  <attribute name="sanic_mppp_tbl_autorizacionclienteid" />
+                  <attribute name="sanic_nombre" />
+                  <order attribute="sanic_nombre" descending="false" />
+                  <filter type="and">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                  </filter>
+                  <link-entity name="sanic_mppp_tbl_cliente" from="sanic_mppp_tbl_clienteid" to="sanic_clienteid" alias="cliente" link-type="inner">
+                    <attribute name="sanic_nombre" />
+                    <attribute name="sanic_cifbac" />
+                  </link-entity>
+                </entity>
+              </fetch>
+            </fetchxml>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <LocalizedNames>
+              <LocalizedName description="Clientes que puede modificar" languagecode="1033" />
+            </LocalizedNames>
+            <Descriptions>
+              <Description description="Subgrilla del formulario de Autorizado: los clientes que ese correo puede modificar (DN-01)." languagecode="1033" />
+            </Descriptions>
+          </savedquery>
+          <savedquery>
+            <IsCustomizable>1</IsCustomizable>
+            <CanBeDeleted>1</CanBeDeleted>
+            <isquickfindquery>0</isquickfindquery>
+            <isprivate>0</isprivate>
+            <isdefault>0</isdefault>
+            <savedqueryid>{b43d5489-93ba-f111-aaad-000d3a301e02}</savedqueryid>
+            <layoutxml>
+              <grid name="resultset" jump="autorizado.sanic_nombre" select="1" preview="1" icon="1">
+  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+    <cell name="autorizado.sanic_nombre" width="260" />
+    <cell name="sanic_nombre" width="260" />
+  </row>
+</grid>
+            </layoutxml>
+            <querytype>0</querytype>
+            <fetchxml>
+              <fetch version="1.0" output-format="xml-platform" mapping="logical">
+                <entity name="sanic_mppp_tbl_autorizacioncliente">
+                  <attribute name="sanic_mppp_tbl_autorizacionclienteid" />
+                  <attribute name="sanic_nombre" />
+                  <order attribute="sanic_nombre" descending="false" />
+                  <filter type="and">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                  </filter>
+                  <link-entity name="sanic_mppp_tbl_autorizado" from="sanic_mppp_tbl_autorizadoid" to="sanic_autorizadoid" alias="autorizado" link-type="inner">
+                    <attribute name="sanic_nombre" />
+                  </link-entity>
+                </entity>
+              </fetch>
+            </fetchxml>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <LocalizedNames>
+              <LocalizedName description="Correos autorizados sobre este cliente" languagecode="1033" />
+            </LocalizedNames>
+            <Descriptions>
+              <Description description="Subgrilla del formulario de Cliente: los correos que pueden modificar cualquier plan de ese cliente (DN-01)." languagecode="1033" />
+            </Descriptions>
           </savedquery>
           <savedquery>
             <IsCustomizable>1</IsCustomizable>

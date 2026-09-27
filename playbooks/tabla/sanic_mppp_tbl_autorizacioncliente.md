@@ -44,7 +44,27 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
     "requerida": true,
     "autonumerico": ""
   },
-  "columnas": []
+  "columnas": [
+    {
+      "nombre": "sanic_documentofirmado",
+      "displayname": "Documento firmado",
+      "descripcion": "Evidencia de ESTA autorización: el documento firmado que respalda que este correo opere sobre TODOS los planes de este cliente. Obligatoria por negocio: sin archivo, la autorización no vale.",
+      "tipo": "archivo",
+      "requerida": false,
+      "protegida": false,
+      "auditoria": true,
+      "tamano_kb": 10240
+    },
+    {
+      "nombre": "sanic_fechadocumento",
+      "displayname": "Fecha del documento",
+      "descripcion": "Fecha del documento firmado.",
+      "tipo": "fecha",
+      "requerida": false,
+      "protegida": false,
+      "auditoria": true
+    }
+  ]
 }
 ```
 
@@ -55,11 +75,14 @@ Decisiones que este playbook toma y el diseño no traía:
 | Nombre visible de la tabla | `Autorizacion por cliente` / `Autorizaciones por cliente` | `AutorizacionPlan` ya ocupa «Autorizacion»/«Autorizaciones» en la app (`05` §4); el nombre lógico sigue siendo `autorizacioncliente` y el texto de negocio lo fija el playbook (`02` DD-19) |
 | Nombre visible y descripción de la primaria | `Nombre` — «Nombre calculado por la solución: correo → cliente. Nadie lo digita.» | Mismo patrón que `sanic_mppp_tbl_autorizacionplan` (DIRECTRICES-NUEVAS.md, DN-01: "Primaria: nombre calculado `<correo> → <cliente>`, T(400), como en AutorizacionPlan") |
 | La primaria es requerida, aunque sea calculada | `requerida: true` | Mismo razonamiento que `AutorizacionPlan`: la calcula la solución y nadie la digita (`01` §4); en el formulario va en solo lectura u oculta (BP-PP-192), y eso no bloquea el guardado (Learn, *Troubleshoot form issues*) |
-| Sin columnas propias además de la primaria | `"columnas": []` | DN-01 ("Diseño resuelto") describe la forma de esta tabla en cuatro renglones — Lookups, Clave alternativa, Primaria, Privilegios — y **no incluye** evidencia firmada ni fecha de documento, a diferencia de `AutorizacionPlan` (`02` §2.4). Ver nota de alcance abajo |
+| Nombres visibles de las columnas | `Nombre`, `Documento firmado`, `Fecha del documento` | Texto de negocio (`02` DD-19), igual que `AutorizacionPlan` |
+| La evidencia es obligatoria pero la columna **no** es requerida | `requerida: false` | Un archivo solo se puede cargar con el registro ya creado; la obligatoriedad se cumple cerrando por defecto. Mismo razonamiento que `AutorizacionPlan` (`02` §2.4) |
+| Tamaño máximo del documento | `10240` KB | 10 MB, mismo límite que `AutorizacionPlan` (`02` §2.4) |
+| Se agregan `sanic_documentofirmado` y `sanic_fechadocumento`, aunque DN-01 "Diseño resuelto" no las mencionaba | columnas presentes | Decisión del aprobador, 2026-09-27 (ver nota abajo): la autorización por cliente habilita TODOS los planes de ese cliente de una vez, es decir es MÁS amplia que la autorización por plan; no tiene sentido que exija MENOS respaldo documental que ella |
 
 Viene del diseño, no lo decide este playbook: **auditoría nativa, notas y actividades** = activada · no · no (`02` DD-18: es un catálogo, mismo criterio que `AutorizacionPlan`).
 
-**Nota para el aprobador (no se resuelve acá):** `AutorizacionPlan` exige un documento firmado como evidencia de esa autorización puntual (`02` §2.4, RF-11, D-08). El texto de DN-01 "Diseño resuelto" para `AutorizacionCliente` no menciona evidencia ni fecha de documento, y esta tabla se construye tal cual esa especificación: **sin `sanic_documentofirmado` ni `sanic_fechadocumento`**. Eso significa que autorizar por cliente no deja el mismo rastro de respaldo firmado que autorizar por plan. Si eso es intencional o un hueco de la directriz, lo decide el aprobador; no se agregó por cuenta propia.
+**Decisión del aprobador (2026-09-27):** el texto de DN-01 "Diseño resuelto" para `AutorizacionCliente` no mencionaba evidencia ni fecha de documento, a diferencia de `AutorizacionPlan` (`02` §2.4, RF-11, D-08). Esta tabla se había construido tal cual esa especificación, sin `sanic_documentofirmado` ni `sanic_fechadocumento`, dejando explícitamente a criterio del aprobador si eso era intencional o un hueco. El aprobador decidió: es un hueco y hay que cerrarlo. Palabras del aprobador: "Cuando entro a autorizacion x cliente, no esta la columna de archivo adjunto para adjuntar la autorizacion por escrito y la fecha de ese documento (al igual que en autorizacion por plan)." Motivo de negocio: una autorización por cliente habilita TODOS los planes de ese cliente de una vez, o sea que es MÁS amplia que la autorización por plan — no tiene sentido que exija MENOS respaldo. Se agregan las dos columnas con la misma forma que `AutorizacionPlan`.
 
 ## 3. Precondiciones
 
@@ -93,7 +116,7 @@ python3 herramientas/construir/muestra_tabla.py playbooks/tabla/sanic_mppp_tbl_a
 |---|---|---|
 | 1 | `GET EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')` | 200 · `OwnershipType = UserOwned` · `IsManaged = false` · `IsCustomEntity = true` · `HasNotes = false` · `HasActivities = false` · `IsAuditEnabled = true` · `PrimaryNameAttribute = sanic_nombre` |
 | 2 | Nombre, plural y descripción en 1033 | los de la sección 2; ninguna etiqueta en otro idioma |
-| 3 | Columnas (1, solo la primaria): tipo, requerida, protegida, auditoría, nombre visible, descripción | `sanic_nombre` texto 400 requerida, auditada |
+| 3 | Columnas (3): tipo, requerida, protegida, auditoría, nombre visible, descripción y lo propio de su tipo | `sanic_nombre` texto 400 requerida · `sanic_documentofirmado` archivo hasta 10240 KB opcional · `sanic_fechadocumento` fecha sola opcional; todas auditadas |
 | 4 | Ninguna columna propia de más | salvo lookups, que nacen con su relación |
 | 5 | Pertenece a la solución de la sección 1 | una fila en `solutioncomponents` (tipo de componente 1) |
 | 6 | Segunda ejecución sin `--solo-verificar` | estado `ya_existia`, código de salida 0 |
@@ -105,7 +128,7 @@ Se hacen todas las comprobaciones de la sección 5. Si todas pasan: `ya_existia`
 
 ## 7. Reversa
 
-`DELETE EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')`, posible mientras la tabla esté vacía y nada la referencie. **Irreversible desde que se crea**: el nombre lógico de la tabla, el tipo de propiedad (`usuario`) y el tipo de la primaria. El largo se puede ampliar después; achicarlo, no.
+`DELETE EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')`, posible mientras la tabla esté vacía y nada la referencie. **Irreversible desde que se crea**: el nombre lógico de la tabla y el de cada columna, el tipo de propiedad (`usuario`), el tipo de cada columna y el comportamiento de fecha sola de `sanic_fechadocumento`. Los largos se pueden ampliar después; achicarlos, no.
 
 ## 8. Fuera de alcance
 
