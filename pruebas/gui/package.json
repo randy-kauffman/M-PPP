@@ -1,0 +1,20 @@
+{
+  "name": "mppp-pruebas-gui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arnes de pruebas de navegador (Playwright) para MPPP. Ve lo que una prueba de API nunca puede ver: si el boton se DIBUJA.",
+  "type": "module",
+  "scripts": {
+    "instalar-navegador": "playwright install chromium",
+    "sesion": "node guardar-sesion.mjs",
+    "descubrir-selectores": "node descubrir-selectores.mjs",
+    "verificar-sin-sesion": "node verificar-sin-sesion.mjs",
+    "pruebas": "playwright test",
+    "pruebas:ui": "playwright test --ui",
+    "pruebas:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "exceljs": "^4.4.0"
+  }
+}

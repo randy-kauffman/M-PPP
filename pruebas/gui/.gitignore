@@ -1,0 +1,15 @@
+# Dependencias e instalacion local de Playwright: se reinstalan con npm install
+node_modules/
+
+# Salidas de las corridas: no son artefactos versionables
+test-results/
+playwright-report/
+blob-report/
+.cache/
+
+# Descargas capturadas durante una corrida (los .xlsx que bajan los casos DN-02)
+descargas/
+
+# Nunca: nada de local/ llega aqui tampoco (ya cubierto por /local/ en el .gitignore raiz,
+# pero se repite por las dudas si alguien corre este arnes desde otra copia del repo)
+local/
