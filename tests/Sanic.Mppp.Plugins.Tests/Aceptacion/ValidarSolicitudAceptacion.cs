@@ -536,6 +536,19 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var m = new Mundo(Excel(Fila()));
             m.Parametro(ModoDeAutorizacionParametro.Nombre, "cliente");
 
+            // El texto "no negociable" (DN-01 punto 5) sale del catálogo (`sanic_mensajecliente` de la Regla, que
+            // MotorDeReglas.cs compone vía MensajeAlCliente.Componer), NO de un default en el código: en Dataverse,
+            // PLAN_EXISTE y AUTORIZACION_CORREO_PLAN ya traen ese mismo texto configurado (playbooks/datos/reglas.md).
+            // Este Mundo compartido no lo siembra para ninguna regla (las demás pruebas del archivo solo miran que
+            // el mensaje no esté vacío); esta prueba SÍ mira el texto exacto, así que lo configura acá — sin tocar
+            // el resto del fixture ni ninguna otra prueba.
+            const string plantillaUnificada = "El plan {plan} no existe o usted no está autorizado sobre él.";
+            foreach (var codigo in new[] { ReglasDeRegistro.PlanExiste, ReglasDeRegistro.AutorizacionCorreoPlan })
+            {
+                var regla = m.Svc.Registros(Tablas.Regla).Single(r => (string)r["sanic_codigo"] == codigo);
+                m.Svc.Update(new Entity(Tablas.Regla, regla.Id) { ["sanic_mensajecliente"] = plantillaUnificada });
+            }
+
             var r = m.Correr();
 
             Assert.Equal((EstadoDeLaSolicitud.Rechazada, 1, 0, 1), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));

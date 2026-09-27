@@ -15,6 +15,10 @@ namespace Sanic.Mppp.Plugins.Datos
         public const string Plan = "sanic_mppp_tbl_plan";
         public const string Autorizado = "sanic_mppp_tbl_autorizado";
         public const string AutorizacionPlan = "sanic_mppp_tbl_autorizacionplan";
+
+        /// <summary>DN-01 (diseno/DIRECTRICES-NUEVAS.md): la vía por CLIENTE, hermana de <see cref="AutorizacionPlan"/>. Ya existe en Dev.</summary>
+        public const string AutorizacionCliente = "sanic_mppp_tbl_autorizacioncliente";
+
         public const string Parametro = "sanic_mppp_tbl_parametro";
         public const string Regla = "sanic_mppp_tbl_regla";
 
@@ -163,7 +167,15 @@ namespace Sanic.Mppp.Plugins.Datos
 
         /// <summary>
         /// Los planes ACTIVOS cuyo `sanic_codigo` está en la lista (ya normalizados). UNA consulta con `In`, sin repetidos y sin
-        /// nulos ni blancos en la lista; lista vacía → sin consulta y lista vacía.
+        /// nulos ni blancos en la lista; lista vacía → sin consulta y lista vacía. Trae también el cliente dueño
+        /// (`sanic_clienteid`), pero SIN exigirlo (DN-01, corrección del aprobador 2026-09-26): esta función la usan
+        /// los DOS modos, y en modo <see cref="ModoDeAutorizacion.Plan"/> el dueño del plan no se mira para nada —
+        /// exigirlo acá rompería el modo que está activo en TODOS los entornos hoy, para proteger un modo que
+        /// todavía nadie usa (exactamente al revés de "un dato de configuración incompleto degrada el control,
+        /// nunca voltea la operación": mismo criterio que `servicio.cuenta`, `rpa.horas.tolerancia`,
+        /// `rpa.minutos.claimmaximo` y `autorizacion.modo`). Un plan sin dueño conocido queda con
+        /// <see cref="PlanDelCatalogo.ClienteId"/> nulo, y en modo Cliente eso significa fallar cerrado: nunca se da
+        /// por autorizado (ya lo prueba <see cref="CatalogosDeValidacion.EstaAutorizado"/>).
         /// </summary>
         public IList<PlanDelCatalogo> PlanesActivosPorCodigo(IEnumerable<string> codigos)
         {
@@ -180,7 +192,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
             var consulta = new QueryExpression(Tablas.Plan)
             {
-                ColumnSet = new ColumnSet("sanic_codigo", "sanic_tipoformato", "sanic_moneda")
+                ColumnSet = new ColumnSet("sanic_codigo", "sanic_tipoformato", "sanic_moneda", "sanic_clienteid")
             };
             consulta.Criteria.AddCondition("sanic_codigo", ConditionOperator.In, codigosLimpios.Cast<object>().ToArray());
             consulta.Criteria.AddCondition(ColumnaEstado, ConditionOperator.Equal, Tablas.Activo);
@@ -193,17 +205,24 @@ namespace Sanic.Mppp.Plugins.Datos
                     registro.Id,
                     RequeridoTexto(registro, "sanic_codigo"),
                     RequeridoChoice<TipoDeFormatoDelPlan>(registro, "sanic_tipoformato"),
-                    RequeridoChoice<Moneda>(registro, "sanic_moneda")));
+                    RequeridoChoice<Moneda>(registro, "sanic_moneda"),
+                    OpcionalReferencia(registro, "sanic_clienteid")?.Id));
             }
 
             return planes;
         }
 
         /// <summary>
-        /// Los ids de plan sobre los que ese correo tiene una autorización con TODO activo: el Autorizado (`sanic_nombre` = correo,
-        /// comparado tal como lo guarda Dataverse: sin espacios a los lados y en minúscula), la AutorizacionPlan, el Plan y el
-        /// Cliente del plan (diseno/02 §2.4; la evidencia no cuenta, D-42). Número FIJO de consultas (a lo sumo cuatro, una por
-        /// tabla, con `In`), y ninguna si el correo viene nulo o en blanco (conjunto vacío). Conjunto nuevo en cada llamada.
+        /// Los ids de plan sobre los que ese correo tiene autorización vigente (diseno/02 §2.4; DN-01, diseno/DIRECTRICES-NUEVAS.md
+        /// "El modo cambia TODO, no una parte"). ÚNICO punto donde se consulta la autorización: acá adentro, y solo acá, se
+        /// resuelve `autorizacion.modo` — <see cref="Api.ClasificarCorreo"/> y <see cref="Api.ValidarSolicitud"/> llaman esto
+        /// mismo sin saber de modos, así ninguno puede quedarse afuera si el modo cambia.
+        ///  - modo <see cref="ModoDeAutorizacion.Plan"/> (fallback quemado, comportamiento de hoy): el Autorizado, la
+        ///    AutorizacionPlan, el Plan y el Cliente del plan, todo activo (D-42: la evidencia no cuenta).
+        ///  - modo <see cref="ModoDeAutorizacion.Cliente"/>: el Autorizado, la AutorizacionCliente y el Cliente, todo activo;
+        ///    devuelve TODOS los planes activos de esos clientes, sin enumerarlos. `AutorizacionPlan` se conserva pero
+        ///    queda muda (diseno/DIRECTRICES-NUEVAS.md DN-01 punto 4).
+        /// Ninguna si el correo viene nulo o en blanco (conjunto vacío, ni una consulta). Conjunto nuevo en cada llamada.
         /// Corta en el primer paso que da vacío, para no gastar las consultas siguientes.
         /// </summary>
         public ISet<Guid> PlanesAutorizadosDe(string correo)
@@ -214,7 +233,27 @@ namespace Sanic.Mppp.Plugins.Datos
             }
 
             var correoNormalizado = correo.Trim().ToLowerInvariant();
+            var modo = ResolverModoDeAutorizacion();
 
+            return modo == ModoDeAutorizacion.Cliente
+                ? PlanesAutorizadosPorCliente(correoNormalizado)
+                : PlanesAutorizadosPorPlan(correoNormalizado);
+        }
+
+        // ------------------------------------------------------------------ helpers de PlanesAutorizadosDe
+
+        /// <summary>`autorizacion.modo` (DN-01): degrada al fallback quemado (<see cref="ModoDeAutorizacion.Plan"/>) si el
+        /// parámetro falta o trae basura — nunca lanza, nunca tumba la validación.</summary>
+        private ModoDeAutorizacion ResolverModoDeAutorizacion()
+        {
+            var parametro = Parametro(ModoDeAutorizacionParametro.Nombre);
+            return ModoDeAutorizacionParametro.Resolver(parametro?.Valor);
+        }
+
+        /// <summary>El comportamiento de hoy, EXACTAMENTE (diseno/DIRECTRICES-NUEVAS.md, "DN-01 · Modelo": "sin cambiar una
+        /// línea de comportamiento"): Autorizado -&gt; AutorizacionPlan -&gt; Plan -&gt; Cliente, todo activo.</summary>
+        private ISet<Guid> PlanesAutorizadosPorPlan(string correoNormalizado)
+        {
             // Paso 1: Autorizados activos con ese correo exacto.
             var autorizadosIds = IdsActivosPorCondicion(Tablas.Autorizado, "sanic_nombre", ConditionOperator.Equal, correoNormalizado);
             if (autorizadosIds.Count == 0)
@@ -242,7 +281,36 @@ namespace Sanic.Mppp.Plugins.Datos
             return new HashSet<Guid>(clientePorPlan.Where(p => clientesActivos.Contains(p.Value)).Select(p => p.Key));
         }
 
-        // ------------------------------------------------------------------ helpers de PlanesAutorizadosDe
+        /// <summary>
+        /// DN-01: Autorizado -&gt; AutorizacionCliente -&gt; Cliente, todo activo, y TODOS los planes activos de esos
+        /// clientes (sin enumerarlos). `AutorizacionPlan` no se mira: esa vía queda muda en este modo.
+        /// </summary>
+        private ISet<Guid> PlanesAutorizadosPorCliente(string correoNormalizado)
+        {
+            // Paso 1: Autorizados activos con ese correo exacto (mismo paso 1 que el modo Plan).
+            var autorizadosIds = IdsActivosPorCondicion(Tablas.Autorizado, "sanic_nombre", ConditionOperator.Equal, correoNormalizado);
+            if (autorizadosIds.Count == 0)
+            {
+                return new HashSet<Guid>();
+            }
+
+            // Paso 2: AutorizacionCliente activas de esos autorizados -> ids de cliente.
+            var clienteIds = ClienteIdsDeAutorizaciones(autorizadosIds);
+            if (clienteIds.Count == 0)
+            {
+                return new HashSet<Guid>();
+            }
+
+            // Paso 3: Clientes activos entre esos ids.
+            var clientesActivos = IdsActivosPorCondicion(Tablas.Cliente, ColumnaIdCliente, ConditionOperator.In, clienteIds.Cast<object>().ToArray());
+            if (clientesActivos.Count == 0)
+            {
+                return new HashSet<Guid>();
+            }
+
+            // Paso 4: TODOS los planes activos de esos clientes, sin enumerarlos.
+            return PlanesActivosDeClientes(clientesActivos);
+        }
 
         private List<Guid> IdsActivosPorCondicion(string tabla, string columna, ConditionOperator operador, params object[] valores)
         {
@@ -270,6 +338,29 @@ namespace Sanic.Mppp.Plugins.Datos
             consulta.Criteria.AddCondition(ColumnaEstado, ConditionOperator.Equal, Tablas.Activo);
             return _servicio.RetrieveMultiple(consulta).Entities
                 .ToDictionary(e => e.Id, e => RequeridoReferencia(e, "sanic_clienteid").Id);
+        }
+
+        /// <summary>DN-01: AutorizacionCliente activas de esos autorizados -&gt; ids de CLIENTE (columna de referencia).</summary>
+        private List<Guid> ClienteIdsDeAutorizaciones(IReadOnlyCollection<Guid> autorizadosIds)
+        {
+            var consulta = new QueryExpression(Tablas.AutorizacionCliente) { ColumnSet = new ColumnSet("sanic_clienteid") };
+            consulta.Criteria.AddCondition("sanic_autorizadoid", ConditionOperator.In, autorizadosIds.Cast<object>().ToArray());
+            consulta.Criteria.AddCondition(ColumnaEstado, ConditionOperator.Equal, Tablas.Activo);
+            return _servicio.RetrieveMultiple(consulta).Entities
+                .Select(e => RequeridoReferencia(e, "sanic_clienteid").Id)
+                .Distinct()
+                .ToList();
+        }
+
+        /// <summary>DN-01: todos los ids de Plan ACTIVOS cuyo `sanic_clienteid` está entre esos clientes. Un plan sin
+        /// `sanic_clienteid` (columna opcional para este modo, ver <see cref="PlanesActivosPorCodigo"/>) nunca calza
+        /// acá: no se inventa un dueño.</summary>
+        private HashSet<Guid> PlanesActivosDeClientes(IReadOnlyCollection<Guid> clienteIds)
+        {
+            var consulta = new QueryExpression(Tablas.Plan) { ColumnSet = new ColumnSet() };
+            consulta.Criteria.AddCondition("sanic_clienteid", ConditionOperator.In, clienteIds.Cast<object>().ToArray());
+            consulta.Criteria.AddCondition(ColumnaEstado, ConditionOperator.Equal, Tablas.Activo);
+            return new HashSet<Guid>(_servicio.RetrieveMultiple(consulta).Entities.Select(e => e.Id));
         }
 
         // ------------------------------------------------------------------ traducción Entity -> tipos del dominio
@@ -323,6 +414,13 @@ namespace Sanic.Mppp.Plugins.Datos
             }
 
             throw ErrorColumna(registro, columna);
+        }
+
+        /// <summary>Como <see cref="RequeridoReferencia"/> pero SIN exigir: nulo si la columna falta o no es una referencia. Para
+        /// columnas que un modo mira y el otro no (DN-01: `sanic_clienteid` del Plan).</summary>
+        private static EntityReference OpcionalReferencia(Entity registro, string columna)
+        {
+            return registro.Contains(columna) ? registro[columna] as EntityReference : null;
         }
 
         private static IList<string> SepararDependeDe(string crudo)

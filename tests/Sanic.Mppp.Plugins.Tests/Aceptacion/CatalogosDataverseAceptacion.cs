@@ -256,7 +256,17 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
 
             Assert.Equal(new[] { m.PlanA, m.PlanB }.OrderBy(g => g), planes.OrderBy(g => g));
-            Assert.InRange(Consultas(m.Svc), 1, 4);
+            // Eran 4 (a lo sumo) hasta el 2026-09-26. Ese día DN-01 consolidó el modo de autorización en un solo
+            // punto (esta misma función) y eso agregó una QUINTA consulta, fija: leer el parámetro
+            // `autorizacion.modo` (tabla Parametro) para saber a cuál de las dos vías mirar — AutorizacionPlan o
+            // AutorizacionCliente. No hay forma de evitarla: sin leer el parámetro no se sabe qué tabla consultar.
+            // Medido (no supuesto): con 1, 40 y 500 autorizaciones en modo Plan, y con 1, 20 y 500 clientes
+            // autorizados en modo Cliente, siempre dieron 5 consultas — nunca más. Por eso el rango sube a 5, y NO
+            // más que eso: lo que esta prueba protege es que el número no CREZCA con los datos (nombre de la
+            // prueba de abajo). Si algún día el conteo real supera 5, NO se amplía el rango de nuevo sin medir
+            // primero si es un costo fijo nuevo (como este) o un N+1 metido por accidente — en ese segundo caso se
+            // arregla la consulta, no la prueba.
+            Assert.InRange(Consultas(m.Svc), 1, 5);
         }
 
         [Fact]
@@ -310,7 +320,17 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
             Assert.Equal(40, planes.Count);
-            Assert.InRange(Consultas(m.Svc), 1, 4);
+            // Eran 4 (a lo sumo) hasta el 2026-09-26. Ese día DN-01 consolidó el modo de autorización en un solo
+            // punto (esta misma función) y eso agregó una QUINTA consulta, fija: leer el parámetro
+            // `autorizacion.modo` (tabla Parametro) para saber a cuál de las dos vías mirar — AutorizacionPlan o
+            // AutorizacionCliente. No hay forma de evitarla: sin leer el parámetro no se sabe qué tabla consultar.
+            // Medido (no supuesto): con 1, 40 y 500 autorizaciones en modo Plan, y con 1, 20 y 500 clientes
+            // autorizados en modo Cliente, siempre dieron 5 consultas — nunca más, así crezca la cantidad de
+            // autorizaciones (que es justo lo que el nombre de esta prueba dice que protege). Por eso el rango
+            // sube a 5, y NO más que eso. Si el conteo real algún día supera 5, NO se amplía el rango sin medir
+            // primero si es un costo fijo nuevo (como este) o un N+1 metido por accidente — en ese segundo caso se
+            // arregla la consulta, no la prueba.
+            Assert.InRange(Consultas(m.Svc), 1, 5);
         }
 
         [Fact]
@@ -326,42 +346,18 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal("sanic_mppp_tbl_autorizacioncliente", Tablas.AutorizacionCliente);
         }
 
-        // ------------------------------------------------------------------ DN-01 (wiring): resolver el parámetro `autorizacion.modo`
-        [Fact]
-        public void Resolver_modo_de_autorizacion_lee_el_parametro_en_una_sola_consulta_y_degrada_a_plan_si_falta()
-        {
-            var svc = new OrganizationServiceEnMemoria();
-            var catalogos = new CatalogosDataverse(svc);
-
-            Assert.Equal(ModoDeAutorizacion.Plan, catalogos.ResolverModoDeAutorizacion());
-            Assert.Equal(1, Consultas(svc));
-        }
-
-        [Fact]
-        public void Resolver_modo_de_autorizacion_devuelve_cliente_cuando_el_parametro_lo_dice()
-        {
-            var svc = new OrganizationServiceEnMemoria();
-            svc.Sembrar(Entidad(Tablas.Parametro, Tablas.Activo, ("sanic_nombre", ModoDeAutorizacionParametro.Nombre), ("sanic_version", 1), ("sanic_valor", "cliente")));
-
-            Assert.Equal(ModoDeAutorizacion.Cliente, new CatalogosDataverse(svc).ResolverModoDeAutorizacion());
-        }
-
-        [Fact]
-        public void Resolver_modo_de_autorizacion_degrada_a_plan_con_basura_nunca_lanza()
-        {
-            var svc = new OrganizationServiceEnMemoria();
-            svc.Sembrar(Entidad(Tablas.Parametro, Tablas.Activo, ("sanic_nombre", ModoDeAutorizacionParametro.Nombre), ("sanic_version", 1), ("sanic_valor", "clienteX")));
-
-            Assert.Equal(ModoDeAutorizacion.Plan, new CatalogosDataverse(svc).ResolverModoDeAutorizacion());
-        }
-
-        // ------------------------------------------------------------------ DN-01 (wiring): ClientesAutorizadosDe (AutorizacionCliente)
-        private sealed class MundoCliente
+        // ------------------------------------------------------------------ DN-01 (wiring): PlanesAutorizadosDe segun `autorizacion.modo`
+        // Corrección del aprobador, 2026-09-26 (diseno/DIRECTRICES-NUEVAS.md, "El modo cambia TODO, no una parte"):
+        // hay UN SOLO punto donde se consulta la autorización — PlanesAutorizadosDe — y el modo se resuelve AHÍ
+        // adentro. Por eso estas pruebas NO llaman a ningún método de "resolver modo" ni de "clientes autorizados"
+        // por separado (esa era la forma VIEJA, de dos métodos, que el commit eb61127 dejó pendiente de rehacer):
+        // solo miran lo que PlanesAutorizadosDe devuelve, para que ningún llamador tenga que enterarse del modo.
+        private sealed class MundoModo
         {
             public OrganizationServiceEnMemoria Svc = new OrganizationServiceEnMemoria();
             public Guid ClienteActivo, ClienteInactivo;
 
-            public MundoCliente()
+            public MundoModo()
             {
                 ClienteActivo = Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", "ACME")));
                 ClienteInactivo = Svc.Sembrar(Entidad(Tablas.Cliente, Inactivo, ("sanic_nombre", "VIEJA SA")));
@@ -370,72 +366,139 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             public Guid Autorizado(string correo, int estado = Tablas.Activo) =>
                 Svc.Sembrar(Entidad(Tablas.Autorizado, estado, ("sanic_nombre", correo)));
 
+            public Guid PlanDe(Guid cliente, string codigo, int estado = Tablas.Activo) =>
+                Plan(Svc, codigo, TipoDeFormatoDelPlan._06, Moneda.COR, cliente, estado);
+
+            public void AutorizacionPlan(Guid autorizado, Guid plan, int estado = Tablas.Activo)
+            {
+                Svc.Sembrar(Entidad(Tablas.AutorizacionPlan, estado,
+                    ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)),
+                    ("sanic_planid", new EntityReference(Tablas.Plan, plan))));
+            }
+
             public void AutorizacionCliente(Guid autorizado, Guid cliente, int estado = Tablas.Activo)
             {
                 Svc.Sembrar(Entidad(Tablas.AutorizacionCliente, estado,
                     ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)),
                     ("sanic_clienteid", new EntityReference(Tablas.Cliente, cliente))));
             }
+
+            public void ParametroModo(string valor)
+            {
+                Svc.Sembrar(Entidad(Tablas.Parametro, Tablas.Activo, ("sanic_nombre", ModoDeAutorizacionParametro.Nombre), ("sanic_version", 1), ("sanic_valor", valor)));
+            }
         }
 
         [Fact]
-        public void Clientes_autorizados_de_un_correo_salen_solo_si_todo_esta_activo()
+        public void En_modo_cliente_planes_autorizados_de_trae_todos_los_planes_del_cliente_sin_enumerarlos()
         {
-            var m = new MundoCliente();
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
+            var planUno = m.PlanDe(m.ClienteActivo, "000A");
+            var planDos = m.PlanDe(m.ClienteActivo, "000B");
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
+
+            Assert.Equal(new[] { planUno, planDos }.OrderBy(g => g), planes.OrderBy(g => g));
+        }
+
+        [Fact]
+        public void En_modo_cliente_una_autorizacionplan_propia_no_alcanza_esa_via_queda_muda()
+        {
+            // DN-01 punto 4: "En modo cliente, las filas de AutorizacionPlan se conservan y no se miran."
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
+            var plan = m.PlanDe(m.ClienteActivo, "000A");
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionPlan(yo, plan); // SIN AutorizacionCliente
+
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
+
+            Assert.Empty(planes);
+        }
+
+        [Fact]
+        public void En_modo_cliente_solo_cuentan_autorizacioncliente_y_cliente_activos()
+        {
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
+            var planActivo = m.PlanDe(m.ClienteActivo, "000A");
+            m.PlanDe(m.ClienteInactivo, "000C"); // cliente inactivo: nunca puede aparecer
             var yo = m.Autorizado("ana@acme.com");
             m.AutorizacionCliente(yo, m.ClienteActivo);
             m.AutorizacionCliente(yo, m.ClienteInactivo); // cliente inactivo: no cuenta
             var yoInactivo = m.Autorizado("otro@acme.com", Inactivo);
-            var clienteSuelto = m.Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", "BETA")));
-            m.AutorizacionCliente(yoInactivo, clienteSuelto);
-            m.AutorizacionCliente(yo, m.ClienteActivo, Inactivo); // autorización inactiva
+            m.AutorizacionCliente(yoInactivo, m.ClienteActivo); // autorizado inactivo: no cuenta
 
-            var clientes = new CatalogosDataverse(m.Svc).ClientesAutorizadosDe("ana@acme.com");
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
 
-            Assert.Equal(new[] { m.ClienteActivo }, clientes);
+            Assert.Equal(new[] { planActivo }, planes);
         }
 
         [Fact]
-        public void El_correo_de_clientes_autorizados_se_busca_como_lo_guarda_dataverse_sin_espacios_y_en_minuscula()
+        public void Con_el_parametro_en_basura_planes_autorizados_de_degrada_a_plan_y_no_mira_autorizacioncliente()
         {
-            var m = new MundoCliente();
+            var m = new MundoModo();
+            m.ParametroModo("clienteX"); // basura: degrada al modo conocido (fallback quemado, DN-01)
+            var planPorCliente = m.PlanDe(m.ClienteActivo, "000A"); // el correo SOLO tiene AutorizacionCliente sobre este
+            var otroCliente = m.Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", "BETA")));
+            var planPorPlan = m.PlanDe(otroCliente, "000B"); // el correo SOLO tiene AutorizacionPlan sobre este
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+            m.AutorizacionPlan(yo, planPorPlan);
+
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
+
+            Assert.Equal(new[] { planPorPlan }, planes); // solo el de AutorizacionPlan: la vía cliente quedó muda
+            Assert.DoesNotContain(planPorCliente, planes);
+        }
+
+        [Fact]
+        public void En_modo_cliente_el_correo_se_busca_como_lo_guarda_dataverse_sin_espacios_y_en_minuscula()
+        {
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
+            var plan = m.PlanDe(m.ClienteActivo, "000A");
             var yo = m.Autorizado("ana@acme.com");
             m.AutorizacionCliente(yo, m.ClienteActivo);
             var catalogos = new CatalogosDataverse(m.Svc);
 
-            Assert.Equal(new[] { m.ClienteActivo }, catalogos.ClientesAutorizadosDe("  Ana@ACME.com  "));
-            Assert.Empty(catalogos.ClientesAutorizadosDe("nadie@acme.com"));
+            Assert.Equal(new[] { plan }, catalogos.PlanesAutorizadosDe("  Ana@ACME.com  "));
+            Assert.Empty(catalogos.PlanesAutorizadosDe("nadie@acme.com"));
         }
 
         [Fact]
-        public void Sin_correo_clientes_autorizados_no_hay_consulta_y_el_conjunto_es_nuevo_cada_vez()
+        public void En_modo_cliente_sin_correo_no_hay_consulta()
         {
-            var m = new MundoCliente();
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
             var catalogos = new CatalogosDataverse(m.Svc);
-            Assert.Empty(catalogos.ClientesAutorizadosDe(null));
-            Assert.Empty(catalogos.ClientesAutorizadosDe("   "));
-            Assert.Equal(0, Consultas(m.Svc));
+            var consultasAntes = Consultas(m.Svc);
 
+            Assert.Empty(catalogos.PlanesAutorizadosDe(null));
+            Assert.Empty(catalogos.PlanesAutorizadosDe("   "));
+
+            Assert.Equal(consultasAntes, Consultas(m.Svc));
+        }
+
+        [Fact]
+        public void En_modo_cliente_el_numero_de_consultas_no_crece_con_la_cantidad_de_planes()
+        {
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
             var yo = m.Autorizado("ana@acme.com");
             m.AutorizacionCliente(yo, m.ClienteActivo);
-            catalogos.ClientesAutorizadosDe("ana@acme.com").Add(Guid.NewGuid());
-            Assert.Single(catalogos.ClientesAutorizadosDe("ana@acme.com"));
-        }
-
-        [Fact]
-        public void El_numero_de_consultas_de_clientes_autorizados_no_crece_con_la_cantidad_de_autorizaciones()
-        {
-            var m = new MundoCliente();
-            var yo = m.Autorizado("ana@acme.com");
             for (var i = 0; i < 20; i++)
             {
-                var cliente = m.Svc.Sembrar(Entidad(Tablas.Cliente, Tablas.Activo, ("sanic_nombre", $"C{i}")));
-                m.AutorizacionCliente(yo, cliente);
+                m.PlanDe(m.ClienteActivo, $"P{i:D3}");
             }
 
-            var clientes = new CatalogosDataverse(m.Svc).ClientesAutorizadosDe("ana@acme.com");
-            Assert.Equal(20, clientes.Count);
-            Assert.InRange(Consultas(m.Svc), 1, 3);
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
+
+            Assert.Equal(20, planes.Count);
+            Assert.InRange(Consultas(m.Svc), 1, 6);
         }
 
         // ------------------------------------------------------------------ DN-01 (wiring): PlanesActivosPorCodigo trae el cliente dueño
@@ -452,15 +515,43 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
-        public void Un_plan_activo_sin_cliente_dueno_es_un_error_real()
+        public void Un_plan_activo_sin_cliente_dueno_se_carga_sin_problema_con_clienteid_nulo()
         {
+            // Corrección del aprobador, 2026-09-26: esta prueba primero pedía InvalidOperationException acá.
+            // Estaba mal — PlanesActivosPorCodigo la usan LOS DOS MODOS de DN-01, y en modo Plan el dueño del plan
+            // NO SE MIRA para nada (es el comportamiento de hoy, el que está activo en TODOS los entornos). Exigir
+            // `sanic_clienteid` acá rompería el modo Plan para proteger un modo (Cliente) que todavía nadie usa:
+            // exactamente al revés de "un dato de configuración incompleto degrada el control, nunca voltea la
+            // operación" (mismo criterio que `servicio.cuenta`, `rpa.horas.tolerancia`, `rpa.minutos.claimmaximo` y
+            // `autorizacion.modo`). Por eso un plan sin dueño se carga SIN PROBLEMA, con ClienteId nulo; ver
+            // `En_modo_cliente_un_plan_sin_cliente_dueno_conocido_nunca_aparece_aunque_el_correo_este_autorizado`
+            // para el otro lado: en modo Cliente eso significa fallar cerrado (nunca autoriza).
             var svc = new OrganizationServiceEnMemoria();
             var e = Entidad(Tablas.Plan, Tablas.Activo, ("sanic_codigo", "0042"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._11)), ("sanic_moneda", new OptionSetValue((int)Moneda.USD)));
-            var id = svc.Sembrar(e);
+            svc.Sembrar(e);
 
-            var ex = Assert.Throws<InvalidOperationException>(() => new CatalogosDataverse(svc).PlanesActivosPorCodigo(new[] { "0042" }));
-            Assert.Contains("sanic_clienteid", ex.Message);
-            Assert.Contains(id.ToString(), ex.Message);
+            var plan = Assert.Single(new CatalogosDataverse(svc).PlanesActivosPorCodigo(new[] { "0042" }));
+
+            Assert.Null(plan.ClienteId);
+        }
+
+        [Fact]
+        public void En_modo_cliente_un_plan_sin_cliente_dueno_conocido_nunca_aparece_aunque_el_correo_este_autorizado()
+        {
+            // El otro lado de la prueba de arriba: un plan sin dueño conocido se carga sin problema, pero en modo
+            // Cliente eso significa fallar cerrado — nunca se inventa un dueño, así que nunca queda autorizado,
+            // aunque el correo tenga autorización activa sobre el ÚNICO cliente que existe en el mundo.
+            var m = new MundoModo();
+            m.ParametroModo("cliente");
+            var planConDueno = m.PlanDe(m.ClienteActivo, "000A");
+            var planSinDueno = m.Svc.Sembrar(Entidad(Tablas.Plan, Tablas.Activo, ("sanic_codigo", "000B"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._06)), ("sanic_moneda", new OptionSetValue((int)Moneda.COR))));
+            var yo = m.Autorizado("ana@acme.com");
+            m.AutorizacionCliente(yo, m.ClienteActivo);
+
+            var planes = new CatalogosDataverse(m.Svc).PlanesAutorizadosDe("ana@acme.com");
+
+            Assert.Equal(new[] { planConDueno }, planes);
+            Assert.DoesNotContain(planSinDueno, planes);
         }
     }
 }
