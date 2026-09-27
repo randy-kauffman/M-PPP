@@ -69,9 +69,14 @@ Las entra el RPA y no existen hasta la fase 2, así que **no cuentan en las 17 d
 
 > Detalle de implementación a verificar antes de construir: filtrar *"claim vigente ahora"* en una vista guardada necesita un operador de fecha relativa de FetchXML (familia `next-x-hours`). **Se confirma en Learn al construir la vista**; si no diera, se muestra la columna y el ejecutivo lee la hora, que resuelve lo mismo.
 
-### Lista cerrada de las 17 vistas (inventario 12.2)
+### Lista cerrada de las 17 vistas (inventario 12.2), hoy 18
 
 Cerrada el 2026-09-22 con el aprobador. Antes el inventario decía "~19" y la fórmula del párrafo de abajo daba 16: ninguno de los dos números se podía reconstruir. **Cada tabla de catálogo lleva UNA sola vista, "Activos".** La vista de búsqueda rápida (Quick Find) no se cuenta: toda tabla la trae y no hay nada que diseñar en ella.
+
+**Se agregó una 18.ª el 2026-09-27** (fila 18 de la tabla de abajo): DN-01 creó `AutorizacionCliente`
+y nunca se mostró en ningún formulario; orden explícita del aprobador de agregarle su subgrilla al
+Cliente. La lista deja de estar "cerrada" en el número 17, pero el criterio que la cerró (una vista
+por necesidad real de la app, no una vista "por las dudas") no cambia.
 
 | # | Vista | Tabla | Para qué |
 |---|---|---|---|
@@ -92,8 +97,11 @@ Cerrada el 2026-09-22 con el aprobador. Antes el inventario decía "~19" y la f�
 | 15 | Autorizaciones sin evidencia | AutorizacionPlan | pendientes del Administrador de planes. **No** son autorizaciones inválidas (D-42) |
 | 16 | Correos autorizados sobre este plan | AutorizacionPlan | subgrilla del formulario de Plan |
 | 17 | Planes que puede modificar | AutorizacionPlan | subgrilla del formulario de Autorizado |
+| 18 | Correos autorizados sobre este cliente | AutorizacionCliente | subgrilla del formulario de Cliente (agregada 2026-09-27, DN-01) |
 
-Las 16 y 17 son la misma tabla vista desde cada lado, como dice la nota de navegación de abajo.
+Las 16 y 17 son la misma tabla vista desde cada lado, como dice la nota de navegación de abajo. La
+18 no tiene ese espejo: `AutorizacionCliente` no tiene formulario ni subgrilla propia del lado de
+Autorizado en esta fase (fuera de alcance según el propio DN-01, `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §8).
 
 **Vista por defecto de cada tabla** (la que usa la plataforma en subgrillas y lookups cuando nadie elige otra): Fila → *Mis clientes — por digitar*; Solicitud → *Solicitudes*; AutorizacionPlan → *Autorizaciones activas*; y cada catálogo, su propia "Activos".
 
@@ -107,7 +115,7 @@ Uno principal por tabla, **una sola pestaña**, sin pestaña de "Relacionados" v
 |---|---|---|
 | **Fila** | Encabezado: Estado, Solicitud, n.º de fila. *Gestión* (los diez datos de la plantilla, más la referencia recibida). *Resultado* (Mensaje). *Trazabilidad* (validada, digitada por y cuándo, aprobada por y cuándo). | **Todo de solo lectura.** El estado se cambia con los botones; la lista blanca de columnas del plugin rechazaría cualquier otra edición (`04` §1). |
 | **Solicitud** | Encabezado: Número, Estado, Remitente. *Correo* (recibido, asunto, archivos: correo original y Excel, para descargar). *Filas* (subgrilla con las filas y los mismos botones). *Reglas* (subgrilla de ResultadoRegla). *Comunicaciones* (acuse y respuesta final: cuándo y qué se dijo). *Bitácora* (subgrilla). | Solo lectura. |
-| **Cliente** | Nombre, CIFBAC, CIFCOM, Ejecutivo asignado. Subgrilla **Planes del cliente** (código, moneda, tipo de formato, cantidad de correos autorizados, estado). *(La subgrilla **Correos autorizados del cliente** se quitó el 2026-09-24: un correo ya no pertenece a un cliente.)* | Administrador de planes |
+| **Cliente** | Nombre, CIFBAC, CIFCOM, Ejecutivo asignado. Subgrilla **Planes del cliente** (código, moneda, tipo de formato, cantidad de correos autorizados, estado). Subgrilla **Correos autorizados sobre este cliente** (correo, estado), sobre `AutorizacionCliente` — agregada el 2026-09-27, DN-01, orden explícita del aprobador. *(No es la misma subgrilla que se quitó el 2026-09-24, "Correos autorizados del cliente": esa mostraba `Autorizado` por un lookup directo a Cliente que ya no existe, "un correo ya no pertenece a un cliente". Esta es la tabla de unión `AutorizacionCliente` de DN-01 — un correo autoriza TODOS los planes del cliente a la vez —, que se creó el 2026-09-26 y no se había mostrado en ningún formulario todavía.)* | Administrador de planes |
 | **Plan** | Código, Cliente (el lookup lleva al cliente), Moneda, Tipo de formato. Subgrilla **Correos autorizados sobre este plan** (correo, evidencia, fecha del documento, estado), sobre AutorizacionPlan; cada renglón abre esa autorización. | Administrador de planes |
 | **Autorizado** | Correo, Cliente (el lookup lleva al cliente). Subgrilla **Planes que puede modificar** (plan, moneda, tipo de formato, evidencia, fecha del documento, estado), sobre AutorizacionPlan; cada renglón abre esa autorización. Desde ahí el Administrador de planes agrega una autorización nueva (solo planes del mismo cliente) o la desactiva; no se borra. **El Autorizado ya no lleva evidencia propia** (E-17). | Administrador de planes |
 | **Autorización** (AutorizacionPlan) | Correo, Plan y Cliente (los tres lookups navegables). Sección **Evidencia de la autorización**: Documento firmado (`sanic_documentofirmado`, control nativo de archivo: cargar, descargar, reemplazar y quitar; un archivo, hasta 10 MB) y Fecha del documento. **La evidencia NO condiciona la vigencia** (D-42, aprobador 2026-09-21; `02` §2.4): una autorización vale con el Autorizado, el Plan, el Cliente y la propia AutorizacionPlan activos, tenga o no el documento cargado. La evidencia es el respaldo que el administrador de planes tiene que subir, y el formulario se lo muestra pendiente con una notificación, pero **al cliente no se lo afecta porque el banco no cargó un papel**. El archivo solo se puede cargar después de guardar el registro (así funciona una columna de archivo), así que toda autorización nace "sin evidencia" y eso es normal. *(Corregido el 2026-09-22: esta celda decía "la evidencia es obligatoria" y que la autorización "no vale" hasta cargarla, que es justo la validación que D-42 mandó sacar.)* Ejecutivo y Supervisor la pueden descargar, no cambiar (`04` §1). | Administrador de planes |

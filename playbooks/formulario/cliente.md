@@ -51,11 +51,28 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
         "lookup": "sanic_clienteid",
         "vista": "Planes activos"
       }
+    },
+    {
+      "titulo": "Correos autorizados sobre este cliente",
+      "subgrilla": {
+        "tabla": "sanic_mppp_tbl_autorizacioncliente",
+        "lookup": "sanic_clienteid",
+        "vista": "Correos autorizados sobre este cliente"
+      }
     }
   ]
 }
 ```
 
+Sección agregada el 2026-09-27 (DN-01, orden explícita del aprobador): `AutorizacionCliente` se creó
+y nunca se mostró en ningún formulario. Es la tabla de UNIÓN correo↔cliente (un correo autoriza
+TODOS los planes de ese cliente a la vez), **no** el lookup directo `Autorizado.Cliente` que `05`
+§4 dice que se quitó el 2026-09-24 ("un correo ya no pertenece a un cliente"): esa fue una relación
+distinta, de cardinalidad 1:1 desde Autorizado, y sigue sin existir. Mismo patrón que la subgrilla
+"Correos autorizados sobre este plan" que ya tiene el formulario de Plan sobre `AutorizacionPlan`.
+
 ## 3. Precondiciones
 
 - La tabla, sus columnas y las vistas de las subgrillas existen.
+- La relación `sanic_mppp_cliente_autorizacioncliente` (lookup `sanic_clienteid` en
+  `sanic_mppp_tbl_autorizacioncliente`, inventario 4.13) existe.
