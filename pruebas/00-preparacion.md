@@ -228,6 +228,8 @@ Los que más van a importar:
 > El código `007` de BAC importa: es el que se usa para construir la referencia de formato 11, y
 > sale del Excel real del cliente. Si ahí dijera otra cosa, las referencias saldrían mal en AS400.
 
+**Automatizable.** API (`ver_solicitud.py --parametros`; corredor.py caso P-06).
+
 ---
 
 ## Resultados

@@ -61,7 +61,10 @@ TIENE cada uno?"*; esta responde *"¿qué puede HACER?"*. Hacen falta las dos: u
 con un plugin que falla da un usuario bloqueado, y un plugin correcto con un privilegio de más da un
 agujero.
 
-**Por qué no alcanza con las pruebas de C#.** Las 800 pruebas usan un doble de
+**Por qué no alcanza con las pruebas de C#.** **Corregido: decía "las 800 pruebas"; el número
+crece con cada commit y no es lo que importa** (`diseno/PENDIENTES.md` D-57 lo registra en 981 al
+2026-09-26; no se volvió a correr `dotnet test` para esta corrección porque no es una cifra que
+haga falta clavar). Lo que importa es el motivo: usan un doble de
 `IOrganizationService` que **no modela privilegios**: devuelve lo que se le pide, venga de quien
 venga. Por eso ninguna vio el defecto del 2026-09-23 — los plugins leían la tabla Parametro con la
 identidad de quien llamaba, y ningún rol de negocio tiene lectura ahí, así que **ninguna persona
