@@ -23,6 +23,8 @@ estructura de la plantilla" cuando en realidad no había adjunto le miente al ej
 
 **Qué prueba.** `ADJUNTO_ES_EXCEL` (D-15).
 
+**Necesita.** El REMITENTE; el adjunto `A01-no-es-excel.txt`.
+
 **Cómo.** Correo nuevo, asunto `Prueba S-01`, adjuntando **solo** `A01-no-es-excel.txt`.
 
 **Esperado.**
@@ -36,11 +38,16 @@ estructura de la plantilla" cuando en realidad no había adjunto le miente al ej
 | Estado | **Rechazada** |
 | Acuse | sí |
 
+**Automatizable.** API (`corredor.py`, caso S-01).
+
 ---
 
 ## S-02 · Dos Excel en el mismo correo
 
 **Qué prueba.** `UN_SOLO_EXCEL`. No se adivina cuál procesar.
+
+**Necesita.** El REMITENTE; los adjuntos `E01-feliz-formato11.xlsx` y
+`E13-formato06-referencia-libre.xlsx`.
 
 **Cómo.** Correo nuevo adjuntando **`E01-feliz-formato11.xlsx` y `E13-formato06-referencia-libre.xlsx`**.
 
@@ -56,12 +63,16 @@ estructura de la plantilla" cuando en realidad no había adjunto le miente al ej
 
 > Que no se suba **ninguno** es parte del diseño: si no sabemos cuál es el bueno, no elegimos.
 
+**Automatizable.** API (`corredor.py`, caso S-02).
+
 ---
 
 ## S-03 · Un Excel y un archivo que no lo es
 
 **Qué prueba.** Que un adjunto extra que no sea Excel **no** rompa nada: el Excel candidato sigue
 siendo el único `.xlsx`.
+
+**Necesita.** El REMITENTE; los adjuntos `E01-feliz-formato11.xlsx` y `A01-no-es-excel.txt`.
 
 **Cómo.** Correo nuevo adjuntando **`E01-feliz-formato11.xlsx` y `A01-no-es-excel.txt`**.
 
@@ -75,11 +86,15 @@ siendo el único `.xlsx`.
 
 > Caso real y frecuente: el cliente manda la plantilla y además un PDF de respaldo.
 
+**Automatizable.** API (`corredor.py`, caso S-03).
+
 ---
 
 ## S-04 · La hoja de datos tiene otro nombre
 
 **Qué prueba.** `ESTRUCTURA_PLANTILLA` contra `plantilla.estructura` (hoja `Datos`).
+
+**Necesita.** El REMITENTE; el adjunto `E12-hoja-renombrada.xlsx`.
 
 **Cómo.** Correo nuevo con **`E12-hoja-renombrada.xlsx`** (la hoja se llama `Datos2`).
 
@@ -96,11 +111,15 @@ siendo el único `.xlsx`.
 > evento `Error` o la Solicitud queda en **Ingresada**, es FALLA: una plantilla mal armada es un
 > caso de negocio esperable, no una excepción (`03` §1, "Errores").
 
+**Automatizable.** API (`corredor.py`, caso S-04).
+
 ---
 
 ## S-05 · Excel con la estructura correcta pero sin filas
 
 **Qué prueba.** `TIENE_FILAS`.
+
+**Necesita.** El REMITENTE; el adjunto `E11-sin-filas.xlsx`.
 
 **Cómo.** Correo nuevo con **`E11-sin-filas.xlsx`**.
 
@@ -114,12 +133,16 @@ siendo el único `.xlsx`.
 | filas t/v/r | `0 / 0 / 0` |
 | Acuse | sí |
 
+**Automatizable.** API (`corredor.py`, caso S-05).
+
 ---
 
 ## S-06 · Volumen: 100 filas
 
 **Qué prueba.** El presupuesto de tiempo (`03` §1: objetivo **< 10 s**) y que `cantidadFilas` = 100
 del parámetro se respete.
+
+**Necesita.** El REMITENTE; el adjunto `E14-volumen-100.xlsx`.
 
 **Cómo.** Correo nuevo con **`E14-volumen-100.xlsx`**. **Anotá la hora de envío.**
 
@@ -135,11 +158,17 @@ del parámetro se respete.
 **Cómo medir**: en el visor, restá las dos marcas de la Bitácora. Si pasa de 10 s, anotalo con el
 número: no es un FALLA de funcionalidad, pero es un dato para la fase de rendimiento.
 
+**Automatizable.** API (`corredor.py`, caso S-06; mide el mismo presupuesto de tiempo que pide
+este caso).
+
 ---
 
 ## S-07 · El acuse de una Rechazada dice lo que tiene que decir
 
 **Qué prueba.** DD-09 y el texto obligatorio de DF-08. Esto lo lee un cliente del banco.
+
+**Necesita.** Acceso a la bandeja del REMITENTE, para leer el acuse real de un caso Rechazada
+(S-01, S-02, S-04, S-05 o C-08).
 
 **Cómo.** Tomá el acuse que llegó en cualquier caso Rechazada (S-01, S-02, S-04, S-05 o C-08) y
 leelo completo en tu casilla.
@@ -160,6 +189,9 @@ nombre de una regla técnica (`TRAE_ADJUNTO` y compañía) o se menciona cualqui
 
 > El punto 5 no es decorativo: es lo que evita que el cliente conteste el acuse y su respuesta
 > caiga en **Por clasificar** para siempre.
+
+**Automatizable.** Manual (exige leer un correo real; `corredor.py` no manda correo real todavía —
+`Mail.Send` pendiente).
 
 ---
 

@@ -14,6 +14,10 @@ reglas de **nivel Correo**: `ES_CORREO_NUEVO` y `REMITENTE_RECONOCIDO`.
 
 **Qué prueba.** La cadena entera: `MPPP-REC` → `MPPP-ING` → clasificación → validación.
 
+**Necesita.** El `REMITENTE` de P-02, autorizado sobre el plan `PR11` (P-03); el adjunto
+`E01-feliz-formato11.xlsx` (P-04); buzón compartido y los cinco flujos activos (P-01, P-01b, P-05).
+Ningún rol de la app: llega por correo.
+
 **Cómo.** Desde tu `REMITENTE`, mandá a `mppp@55xljh.onmicrosoft.com`:
 
 - Asunto: `Prueba C-01 inclusiones`
@@ -49,12 +53,17 @@ reglas de **nivel Correo**: `ES_CORREO_NUEVO` y `REMITENTE_RECONOCIDO`.
 > distinto o rellena por la derecha, es **FALLA**: la referencia va a AS400 y un dígito corrido
 > manda la plata a otra cuenta.
 
+**Automatizable.** API (`corredor.py`, caso C-01, vía `simulador.py`, sin correo real). Con correo
+real es manual: enviar y esperar 1-2 minutos.
+
 ---
 
 ## C-02 · Una respuesta NO se procesa
 
 **Qué prueba.** `ES_CORREO_NUEVO` con una respuesta (DF-08). Es lo que impide un bucle de correos
 con un "fuera de oficina".
+
+**Necesita.** El acuse de C-01 en la bandeja del `REMITENTE`, para responderlo.
 
 **Cómo.** Tomá el acuse que te llegó en C-01 y **respondelo** (Responder, no correo nuevo). Adjuntá
 `E01-feliz-formato11.xlsx` para que quede claro que no se procesa aunque traiga plantilla.
@@ -74,12 +83,16 @@ con un "fuera de oficina".
 > **Lo más importante de este caso es lo que NO pasa**: si te llega una respuesta automática del
 > sistema, es FALLA grave. Ahí está el bucle infinito que DF-08 evita.
 
+**Automatizable.** API (`corredor.py`, caso C-02, simula la respuesta sin correo real).
+
 ---
 
 ## C-03 · Un reenvío SÍ se procesa
 
 **Qué prueba.** Que `ES_CORREO_NUEVO` distinga reenvío de respuesta por el prefijo del asunto
 (`FW:`, `FWD:`, `RV:`, `REENV:`, de `correo.prefijos.reenvio`).
+
+**Necesita.** El `REMITENTE` autorizado; el adjunto `E01-feliz-formato11.xlsx`.
 
 **Cómo.** Reenviá (Forward) cualquier correo a `mppp@…`, con asunto empezando en `FW:` y adjuntando
 `E01-feliz-formato11.xlsx`.
@@ -89,11 +102,16 @@ con un "fuera de oficina".
 > Un reenvío trae `In-Reply-To`/`References` igual que una respuesta. Lo único que lo distingue es
 > el prefijo. Si este caso queda en **No es correo nuevo**, la regla no está mirando el asunto.
 
+**Automatizable.** API (`corredor.py`, caso C-03).
+
 ---
 
 ## C-04 · Remitente no reconocido
 
 **Qué prueba.** `REMITENTE_RECONOCIDO` (RF-02).
+
+**Necesita.** Una dirección de correo que NO esté en Autorizados (distinta del `REMITENTE` de
+P-03); el adjunto `E01-feliz-formato11.xlsx`.
 
 **Cómo.** Mandá desde **otra** dirección, una que NO esté en Autorizados, con
 `E01-feliz-formato11.xlsx` adjunto.
@@ -110,12 +128,16 @@ con un "fuera de oficina".
 | Comunicación | **NINGUNA** |
 | Dónde se ve | vista **Por clasificar** del sitemap |
 
+**Automatizable.** API (`corredor.py`, caso C-04, con un remitente propio no autorizado).
+
 ---
 
 ## C-05 · El correo se mueve y cambia de identificador
 
 **Qué prueba.** El paso 7 de `MPPP-ING` y DF-04: el identificador de Outlook **cambia al mover**, y
 por eso hay una acción aparte que lo vuelve a guardar.
+
+**Necesita.** Acceso al buzón compartido para ver la carpeta `Procesados`; la Solicitud de C-01.
 
 **Cómo.** Usá la Solicitud de C-01. Mirá `Procesados` en el buzón y el campo del visor.
 
@@ -127,11 +149,17 @@ por eso hay una acción aparte que lo vuelve a guardar.
 > Si el correo quedó en la bandeja, `MPPP-VIG` lo va a reingerir a los 15 minutos y vas a ver una
 > segunda Solicitud… **no**: la clave única lo impide (C-07). Vas a ver reintentos en la Bitácora.
 
+**Automatizable.** Manual (exige un correo real movido de verdad por `MPPP-ING`; no hay Web API
+para inspeccionar carpetas de Outlook).
+
 ---
 
 ## C-06 · El `.eml` queda guardado
 
 **Qué prueba.** RF-10 y el insumo del plugin liviano: sin el `.eml` no hay clasificación.
+
+**Necesita.** Sesión con acceso de lectura a Solicitud (Ejecutivo o Supervisor) para abrir la
+Solicitud de C-01 y descargar el archivo.
 
 **Cómo.** Abrí la Solicitud de C-01 en la app, pestaña con los archivos.
 
@@ -141,11 +169,18 @@ tiene el `.xlsx` con **el nombre original** del adjunto.
 > Descargá el `.eml` y abrilo con un editor de texto: tienen que verse las cabeceras
 > (`From:`, `Subject:`, `Message-ID:`). Es lo que lee el clasificador.
 
+**Automatizable.** Manual (el `.eml` real lo captura `MPPP-ING` desde Outlook; en `corredor.py` el
+`.eml` y el Excel los sube el propio script, así que "verificarlo" ahí probaría el corredor, no el
+sistema).
+
 ---
 
 ## C-07 · El mismo correo dos veces no duplica
 
 **Qué prueba.** La clave alternativa sobre `sanic_messageid` (DD-03) y el paso 4b de `MPPP-ING`.
+
+**Necesita.** Acceso al buzón compartido (para mover el correo de `Procesados` de vuelta a la
+bandeja) o, si se simula, la Solicitud de C-01.
 
 **Cómo.** No se puede reenviar el mismo `Message-ID` desde el cliente de correo, así que se fuerza:
 
@@ -165,12 +200,17 @@ bandeja de entrada**. `MPPP-VIG` lo va a reingerir en los próximos 15 minutos.
 > Este caso protege contra el peor escenario del sistema: **procesar dos veces la misma plantilla**
 > y mandarle al cliente dos acuses distintos.
 
+**Automatizable.** API (`corredor.py`, caso C-07, simulado sin mover correo real). Con correo real
+es manual: requiere acceso al buzón compartido y esperar a `MPPP-VIG`.
+
 ---
 
 ## C-08 · Sin adjunto
 
 **Qué prueba.** `TRAE_ADJUNTO` y, sobre todo, que las reglas que dependen de ella queden
 **Omitidas** y no "No cumplidas" (DD-13).
+
+**Necesita.** El `REMITENTE` de P-02; un correo sin ningún archivo adjunto.
 
 **Cómo.** Mandá un correo nuevo desde tu `REMITENTE`, asunto `Prueba C-08 sin adjunto`,
 **sin ningún archivo adjunto**.
@@ -193,6 +233,8 @@ bandeja de entrada**. `MPPP-VIG` lo va a reingerir en los próximos 15 minutos.
 
 > Ojo con la firma con logo: una imagen incrustada llega como adjunto `isInline = true` y **no
 > cuenta** (DF-07). Si este caso dice "trae 1 adjunto", la regla no está filtrando los inline.
+
+**Automatizable.** API (`corredor.py`, caso C-08).
 
 ---
 
