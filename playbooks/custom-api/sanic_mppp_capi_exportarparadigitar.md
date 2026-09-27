@@ -97,7 +97,7 @@ Ver el XML doc de `Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi` para el contra
 
 - El paquete de plugins registrado, con `Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi` entre sus `plugintype`.
 - El privilegio `prvReadsanic_mppp_tbl_fila` existe (lo crea la tabla Fila, ya construida).
-- Los parámetros `exportacion.columnas` y `exportacion.maximo` sembrados (`playbooks/datos/parametros.md`).
+- El parámetro `exportacion.columnas` sembrado (`playbooks/datos/parametros.md`). `exportacion.maximo` existió y se eliminó el 2026-09-26 (ver ese playbook): ya no es una precondición.
 
 ## 4. Qué es inmutable
 

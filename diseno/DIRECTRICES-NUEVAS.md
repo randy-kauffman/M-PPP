@@ -184,6 +184,71 @@ orden de las columnas** del Excel. Hermano de `plantilla.estructura`, pero de sa
 > cientos de filas entre en el presupuesto de 2 minutos (BP-PP-053). **Hay que MEDIRLO**, igual que se
 > midió `rpa.lote.maximo`: la escritura se cronometra con un volumen real antes de confiar en ella.
 
+### Decisión final del aprobador (2026-09-26): sin tope de filas, Action en vez de Function
+
+La primera versión se registró como **Function** (invocación por GET, `filaids` en la URL) y se
+sembró `exportacion.maximo = 500` como tope PROVISIONAL. La medición real con volumen (BP-PP-053)
+encontró:
+
+- **HTTP 414 a las ~700 filas**: como Function, TODA llamada es un GET con los `filaid` en la query
+  string, y ese es un **techo de plataforma que ningún parámetro mueve** (ni `exportacion.maximo` ni
+  ningún otro). El tope de 500 quedaba con menos de 200 filas de colchón frente a ese techo.
+- El tope de 500 filas abrió un **agujero de integridad** que detectó el aprobador: si lo que se
+  descarga no es exactamente lo que el ejecutivo seleccionó (por ejemplo, un recorte silencioso),
+  el sistema puede terminar marcando como digitadas filas que el ejecutivo nunca tipeó en AS400.
+
+**Decisión**: la Custom API pasa a **Action** (POST, los `filaid` viajan en el cuerpo) — `isfunction`
+es **inmutable** una vez guardada la Custom API (Learn, "CustomAPI tables"), así que se borró la API
+entera (parámetros de entrada/salida en cascada, verificado que no quedó nada huérfano) y se volvió a
+crear. Se **elimina `exportacion.maximo`** por completo (parámetro, playbook, entorno y plugin, con
+su excepción `LoteDeExportacionExcedidoException`). El único límite que queda es el **presupuesto
+síncrono de 2 minutos** de la plataforma (BP-PP-053).
+
+**El plugin se cuida solo.** Sin tope de filas, tarde o temprano alguien selecciona un lote enorme.
+`ExportarParaDigitar.Ejecutar` lleva la cuenta del tiempo transcurrido mientras arma cada fila y, si
+se acerca al presupuesto (umbral: 120 s menos 20 s de margen = 100 s), **corta él mismo** con
+`PresupuestoDeExportacionAgotandoseException` en vez de dejar que la plataforma reviente con un error
+genérico. El mensaje le dice a una persona **qué hacer** — cuántas filas alcanzó a preparar y que
+vuelva a seleccionar menos —, nunca expone milisegundos, nombres de excepción ni códigos HTTP.
+
+**Criterio del proyecto para estos mensajes** (aplica a toda la Custom API, no solo a esta): **se
+genericiza lo que revela cómo funciona el sistema por dentro; se deja pasar lo que le dice a la
+persona qué tiene que hacer.**
+
+**Medición con volumen real, ya sin el techo de URL (2026-09-26, Dev, reciclando los 148 `Fila`
+reales que hay en el entorno — el costo de armar y escribir el `.xlsx` se ejerce entero por cada
+posición de `filaids`, aunque el id se repita; la LECTURA a Dataverse siempre es sobre ≤148 filas
+distintas, porque `FilasDataverse.PorIds` deduplica antes de consultar — la lectura de un volumen
+realmente grande de filas DISTINTAS no se pudo ejercitar en este entorno y queda como riesgo abierto):**
+
+| Filas (`filaids`) | Resultado | Tiempo |
+|---:|---|---:|
+| 500 | OK | 1,8 s |
+| 1.000 | OK | 0,7 s |
+| 2.000 | OK | 0,7 s |
+| 5.000 | OK | 1,1 s |
+| 10.000 | OK | 1,6 s |
+| 20.000 | OK | 2,5 s |
+| 50.000 | OK | 5,8 s |
+| 100.000 | OK | 10,0 s |
+| 200.000 | OK | 21,4 s |
+| 250.000 | OK | 40,6 s |
+| 300.000 | **falla** | ~157–169 s — `SandboxFabricHostCommunicationException` ("no Sandbox Hosts are currently available"), reproducido dos veces |
+| 500.000 | **falla** | 153,4 s — `System.OutOfMemoryException` |
+
+**Conclusión honesta**: para cualquier volumen realista (el propio temor del aprobador era "alguien
+selecciona 50.000 filas algún día") la curva es sana y rapidísima — 50.000 filas tardan 5,8 s, menos
+del 5 % del presupuesto. El **primer límite real** aparece muy por encima de eso, entre 250.000 (sano)
+y 300.000 (revienta): es un **agotamiento de memoria/sandbox de la plataforma**, no el presupuesto de
+2 minutos — de hecho ambas fallas tardaron MÁS de 120 s en manifestarse, porque el crash del proceso
+sandbox (y el reintento/recuperación de la plataforma) ocurre ANTES de que el chequeo de tiempo del
+plugin tenga otra vuelta de loop para cortar con su propio mensaje. Por eso, en esos dos casos
+extremos, lo que llega a quien llama SÍ es un error técnico crudo de la plataforma — exactamente lo
+que `PresupuestoDeExportacionAgotandoseException` busca evitar, pero a un volumen (250.000+) muy por
+encima de cualquier selección real de este negocio. Queda como riesgo abierto, no resuelto en esta
+directriz: un chequeo de memoria (no solo de tiempo) si algún día se necesitara blindar también ese
+extremo.
+
 **Comando *Descargar para digitar*** sobre la grilla de Filas, masivo como todos los demás.
 
 **Lo masivo NO se construye: ya existe.** Seleccionar todas y marcarlas funciona desde el principio
