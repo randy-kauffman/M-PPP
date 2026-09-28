@@ -70,10 +70,11 @@ caso se identifican por su ID, no por el orden en que aparecen en la consola.
 
 **Lo que no se automatiza, y por qué:**
 
-- **M-06** depende del *recurrence* real de `MPPP-VIG` (cada 10 minutos, `recursos/flujos/mppp-vig.json`,
-  fase desconocida desde este script). La espera puede tardar hasta ~11 minutos. Es tiempo real de
-  infraestructura, no un `sleep` inventado — y es la razón por la que correr el set M completo
-  tarda más que los otros sets automatizados.
+- **(Retirado 2026-09-28) M-06 ya no espera el *recurrence* real de `MPPP-VIG`.** La versión
+  anterior de esta nota decía que la espera podía tardar hasta ~11 minutos; en los hechos, tras la
+  corrección del 2026-09-27, ya esperaba ~22 minutos (dos vueltas) y **igual daba FALLA** (ver la
+  sección M-06 más abajo para la evidencia completa y por qué ese tramo del caso se movió a
+  **V-07** en `pruebas/07-vigilancia.md`).
 
 ---
 
@@ -292,10 +293,44 @@ bandeja ya abierta por M-01).
 
 ---
 
-## M-06 · Envío iniciado sin confirmar → revisión humana
+## M-06 · Envío iniciado sin confirmar → arma la precondición real (la espera la cierra V-07)
 
-**Qué prueba.** Que una comunicación a medias **no se reenvíe** y levante bandera (D-21), con el
-`recurrence` REAL de `MPPP-VIG` (cada 10 minutos).
+**Alcance recortado el 2026-09-28 — leé esto antes que el resto de la sección.** Este caso
+verificaba dos cosas, y las dos estaban mal planteadas:
+
+1. **Un evento de Bitácora `Requiere revision` con origen `MPPP-VIG`.** Investigado a fondo por el
+   set V (`pruebas/07-vigilancia.md`, "Hallazgo aparte, sobre el propio caso M-06"): **ningún**
+   bloque de `MPPP-VIG` escribe ese evento al marcar una Solicitud — ni el bloque 2 (reintentos
+   agotados) ni el bloque 4 (`Envios_iniciados_sin_confirmar`, el que le importa a este caso). Ese
+   evento solo lo genera `MPPP-ENV`, en otro escenario (el envío real de una comunicación, no la
+   marca de revisión). Pedirle esto a `MPPP-VIG` era una expectativa mal fundada de este caso, no
+   un defecto del flujo — **se sacó**.
+2. **Que `sanic_requiererevision` pase a `true` dentro de un margen de espera real.** Esto es
+   correcto en principio, pero **V-07** (`pruebas/07-vigilancia.md`) ya lo prueba, mejor, con el
+   *recurrence* real de `MPPP-VIG`: lee el umbral de `vigilancia.minutos.sinresponder` EN VIVO
+   (acá estaba hardcodeado a 40 minutos, asumiendo un valor de `P-06` sin comprobrarlo en cada
+   corrida), corre la MISMA consulta `$filter` que usa el bloque
+   `Envios_iniciados_sin_confirmar` **antes** de esperar nada (para saber si el defecto es de la
+   consulta sin gastar tiempo), y espera con un margen medido con evidencia — **3 vueltas del
+   `recurrence` (30 min) + colchón = 32 minutos**, no las 1-2 vueltas (~11 y ~22 min) que probó
+   este caso el 2026-09-27 y que **ninguna de las dos alcanzó** (ver la nota diagnóstica al final
+   de esta sección, conservada tal cual se escribió). Repetir esa espera acá, con un margen más
+   corto y una precondición hardcodeada, **duplicaría cobertura entre dos prefijos distintos**
+   (`CONVENCIONES.md` §4: un ID por archivo, sin colisiones de qué prueba cada uno) pagando otra
+   vez ~20-32 minutos por corrida del set M por algo que V-07 ya prueba mejor. **Se sacó de acá.**
+
+**D-62 (arreglado el 2026-09-28) es, con evidencia, la explicación más probable de por qué esas
+1-2 vueltas no alcanzaron**: la etapa de arranque de `MPPP-VIG` estaba encadenada solo con
+`runAfter: ["Succeeded"]`, así que un solo `Parametro_*` fallando (frecuente bajo carga de varios
+agentes en paralelo, como pasaba en esa corrida) salteaba los 5 bloques enteros esa vez — ver
+`pruebas/07-vigilancia.md`, "D-62 corregido". El defecto ya se corrigió y viajó al entorno; medir
+si eso alcanza (con el margen correcto) es trabajo de V-07, no de este caso.
+
+**Qué prueba ahora.** Que un correo real llegue hasta "En proceso" con el acuse real enviado, y que
+la plataforma acepte el `PATCH` que arma el escenario "a medias" (`sanic_fechaacuseiniciado` más
+viejo que el umbral real de `vigilancia.minutos.sinresponder`, `sanic_fechaacuseenviado` vacío) —
+la misma precondición de datos que necesita V-07, pero ejercitada acá por el camino de correo REAL
+(`MPPP-ING`), que V-07 no usa (arma la Solicitud por Custom API directa).
 
 **Necesita.** El REMITENTE de este set. La Solicitud En proceso la crea este mismo caso, con su
 propio correo real.
@@ -303,61 +338,53 @@ propio correo real.
 **Cómo.** Correo real (con adjunto válido) → se deja que el pipeline real complete su acuse normal
 (no hay ventana para "interceptar a medias" un envío que el webhook dispara casi al instante: hay
 que dejarlo terminar). Inmediatamente después, se fuerza el escenario a medias con un `PATCH`
-directo: `sanic_fechaacuseiniciado` = hace 40 minutos (> `vigilancia.minutos.sinresponder` = 30,
-`P-06`), `sanic_fechaacuseenviado` = vacío. Se espera al próximo ciclo real de `MPPP-VIG`.
-
-> **Corrección de margen (2026-09-27).** La primera versión de este caso esperaba hasta ~11
-> minutos (un `recurrence` de 10 minutos + 1 de colchón). Con ese margen, **no alcanzó a verse**
-> ni una sola vez, pese a que la condición ya estaba dada (`sanic_fechaacuseiniciado` bien
-> backdateado, `sanic_fechaacuseenviado` vacío, verificado por Web API en el momento). Un
-> `recurrence` trigger de Power Automate en un entorno compartido puede arrancar con demora real,
-> y un solo intervalo de margen no alcanza para distinguir esa demora de un defecto de
-> `MPPP-VIG`. El margen se subió a ~22 minutos (dos vueltas completas de colchón) para poder
-> afirmar una cosa o la otra con evidencia, no con una sola muestra.
+directo: `sanic_fechaacuseiniciado` = más viejo que `vigilancia.minutos.sinresponder` (leído en
+vivo), `sanic_fechaacuseenviado` = vacío. No se espera ningún ciclo de `MPPP-VIG`.
 
 **Qué tiene que pasar.**
 
 | Qué | Valor |
 |---|---|
-| Llega un acuse nuevo | **NO** |
-| `sanic_requiererevision` | pasa a **true** |
-| `sanic_motivorevision` | menciona "sin confirmar" |
-| Bitácora | `Requiere revision`, origen **MPPP-VIG** |
-| `sanic_fechaacuseenviado` | sigue vacío al terminar |
+| El correo real llega a Solicitud "En proceso" con acuse enviado | **sí** |
+| El `PATCH` que arma "a medias" se acepta (HTTP 200/204) | **sí** |
 
-> Éste es el costo aceptado del diseño: ante la duda no se reenvía y lo mira una persona. Si acá
-> llega un correo, la garantía de "como máximo una vez" no existe.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py M` (caso `M-06`; ya no es el más
+lento del set — corre en el orden de 1-3 minutos, dominado por la ingesta real del correo, no por
+el *recurrence* de `MPPP-VIG`).
 
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py M` (caso `M-06`; el más lento del
-set — puede tardar hasta ~22 minutos).
+**Cómo se sabe que falló.** Si el correo real no genera Solicitud o no llega a "En proceso" con
+acuse, es el mismo defecto que rompería M-01 (el camino de ingesta), visto desde acá. Si el
+`PATCH` que arma el escenario a medias es rechazado (HTTP distinto de 200/204), no es simulable
+desde acá NI desde V-07 (la misma precondición): hay un control de plataforma bloqueando la
+escritura directa de esos dos campos, y el caso queda `N-A` con el motivo exacto.
 
-**Cómo se sabe que falló.** Si el `PATCH` que arma el escenario a medias es rechazado (HTTP
-distinto de 200/204), no es simulable desde acá: hay un control de plataforma bloqueando la
-escritura directa de esos dos campos, y el caso queda `N-A` con el motivo exacto (nunca se fuerza
-un forzado). Si el `PATCH` se acepta pero `sanic_requiererevision` nunca pasa a `true` dentro de
-la espera, el defecto está en el bloque `Envios_iniciados_sin_confirmar` de `MPPP-VIG` — o el
-parámetro `vigilancia.minutos.sinresponder` cambió su valor por debajo de los 40 minutos simulados
-(mirar P-06 antes de asumir un defecto). Si llega un correo nuevo, es la misma garantía que rompe
-M-05, vista desde el otro disparador (`MPPP-VIG` en vez de `MPPP-COM`).
+**Automatizable.** API (`correr.py M`, caso `M-06`) — correo real, sin navegador, sin esperar el
+*recurrence* de `MPPP-VIG`.
 
-> **FALLA real, reproducida dos veces el 2026-09-27 (no es un bug del caso).** Con la
-> precondición confirmada por lectura directa (`sanic_fechaacuseiniciado` correctamente
-> backdateado, `sanic_fechaacuseenviado` vacío, `sanic_requiererevision` en `false`),
-> `sanic_requiererevision` **nunca pasó a `true`** ni con ~11 ni con ~22 minutos de margen (dos
-> vueltas completas del `recurrence`). `MPPP-VIG` está vivo y corriendo en ese mismo lapso — se
-> confirmó leyendo la Bitácora del entorno completo: hay decenas de eventos `Error` con
-> `sanic_origen = MPPP-VIG` y detalle `"Fallo la ingesta del correo..."` (del bloque
-> `Correos_que_quedaron_en_la_bandeja`, otro bloque del mismo flujo) fechados en la ventana exacta
-> de la espera. También hay eventos `Requiere revision` reales en el entorno, pero con
-> `sanic_origen = MPPP-COM`, nunca `MPPP-VIG`, en ese lapso. No se pudo determinar desde acá si la
-> causa es (a) un defecto en la condición/consulta de `Envios_iniciados_sin_confirmar`, o (b) que
-> el flujo se corta antes de llegar a ese bloque por los errores del bloque anterior — plausiblemente
-> agravado por tráfico de otros sets corriendo en paralelo sobre el mismo buzón de ingesta
-> compartido. **Queda reportado tal cual para que lo revise quien mantiene `recursos/flujos/mppp-vig.json`**:
-> no es un archivo que este set pueda tocar ni diagnosticar más a fondo.
+---
 
-**Automatizable.** API (`correr.py M`, caso `M-06`) — correo real + espera real de `MPPP-VIG`, sin
-navegador.
+### Nota diagnóstica conservada (versión anterior de este caso, 2026-09-27)
+
+Se conserva tal cual se escribió — es la evidencia de POR QUÉ el margen de V-07 es 3 vueltas + colchón
+en vez de 1 o 2, y de por qué D-62 es la explicación más probable. Esto ya NO corre en este caso;
+lo corre V-07.
+
+> **Corrección de margen (2026-09-27).** La primera versión de este caso esperaba hasta ~11
+> minutos (un `recurrence` de 10 minutos + 1 de colchón). Con ese margen, **no alcanzó a verse**
+> ni una sola vez, pese a que la condición ya estaba dada (`sanic_fechaacuseiniciado` bien
+> backdateado, `sanic_fechaacuseenviado` vacío, verificado por Web API en el momento). El margen se
+> subió a ~22 minutos (dos vueltas completas de colchón) para poder afirmar una cosa o la otra con
+> evidencia, no con una sola muestra.
+>
+> **FALLA real, reproducida dos veces el 2026-09-27 (no fue un bug del caso).** Con la precondición
+> confirmada por lectura directa (`sanic_fechaacuseiniciado` correctamente backdateado,
+> `sanic_fechaacuseenviado` vacío, `sanic_requiererevision` en `false`), `sanic_requiererevision`
+> **nunca pasó a `true`** ni con ~11 ni con ~22 minutos de margen (dos vueltas completas del
+> `recurrence`). `MPPP-VIG` estaba vivo y corriendo en ese mismo lapso — se confirmó leyendo la
+> Bitácora del entorno completo: había decenas de eventos `Error` con `sanic_origen = MPPP-VIG` y
+> detalle `"Fallo la ingesta del correo..."` (del bloque `Correos_que_quedaron_en_la_bandeja`, otro
+> bloque del mismo flujo) fechados en la ventana exacta de la espera — evidencia de apoyo directa
+> de la causa que después confirmó y corrigió D-62 (ver `pruebas/07-vigilancia.md`).
 
 ---
 
@@ -441,7 +468,10 @@ donde corresponde sumarla — hoy no hay ninguna.
 
 Corrida real contra Dev, 2026-09-27/28 (`python3 herramientas/pruebas/correr.py M`, dos corridas:
 la primera detectó el bug de M-03 descrito arriba y se corrigió el código; la segunda es la que
-vale). **6 OK · 1 FALLA · 0 N-A.**
+vale). Esa corrida tenía a M-06 con su alcance viejo: **6 OK · 1 FALLA · 0 N-A.**
+
+**Recorrida el 2026-09-28** (`python3 herramientas/pruebas/correr.py C,R,U,I,M`), ya con el alcance
+de M-06 recortado (ver su sección arriba) y con D-62 corregido: **7 OK · 0 FALLA · 0 N-A.**
 
 | Caso | Solicitud | Resultado | Notas |
 |---|---|---|---|
@@ -450,5 +480,5 @@ vale). **6 OK · 1 FALLA · 0 N-A.**
 | M-03 solo al remitente (correo real con copia) | creada por el caso (correo real) | **OK** | tras corregir el falso FALLA (ver nota arriba) |
 | M-04 respuesta final real (digitar/aprobar por API) | la de M-01 | **OK** | digitar/aprobar por `MSCRMCallerID`, sin navegador |
 | **M-05 nunca dos veces** | la de M-01 | **OK** | segundo disparo de MPPP-COM no reenvía |
-| M-06 a medias → revisión (espera real de MPPP-VIG) | creada por el caso (correo real) | **FALLA** | ver nota diagnóstica arriba — `MPPP-VIG` no marcó `sanic_requiererevision` en ~22 min pese a la precondición confirmada; reportado para quien mantiene `mppp-vig.json` |
+| M-06 precondición real "a medias" (la espera pasó a V-07) | creada por el caso (correo real) | **OK** | 2026-09-28: alcance recortado (ver su sección) — corre en segundos, ya no en ~22 minutos |
 | M-07 cuerpo del código + sin información interna | la de M-01 (+ M-04) | **OK** | ningún término interno encontrado en los correos reales |

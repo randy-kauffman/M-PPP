@@ -39,8 +39,9 @@ cada una la suya.
   siempre es `simulador.BUZON_INGESTA` (el buzón de prueba que ya usan los demás sets) y el
   remitente/copia son `PP_MAIL_BUZON_3`/`PP_MAIL_BUZON_4`, buzones de prueba dedicados. Todo
   asunto empieza con `ZZP-`.
-- M-06 depende del recurrence real de `MPPP-VIG` (cada 10 minutos, fase desconocida): la espera
-  puede tardar hasta ~11 minutos. Es tiempo real de infraestructura, no un `sleep` inventado.
+- M-06 ya NO espera el recurrence real de `MPPP-VIG` (2026-09-28: ese tramo pasó a V-07,
+  `pruebas/07-vigilancia.md` — ver el porqué en `pruebas/04-comunicaciones.md`, sección M-06).
+  Este caso arma el escenario "a medias" con correo real y verifica la precondición; es rápido.
 - Este set NO usa ninguna sesión de navegador (`local/sesion-*.json`) ni pasa por
   `estado_sesiones.py`: esa guarda es para pruebas que manejan un navegador de verdad: acá no
   hay ninguno.
@@ -77,8 +78,6 @@ RECH, ENPROC, PROC, CERR = 159460004, 159460005, 159460006, 159460007          #
 VALIDADA, DIGITADA, APROBADA = 159460003, 159460004, 159460005                 # EstadoDeLaFila
 EVT_ACUSE_INICIADO, EVT_ACUSE_ENVIADO = 159460003, 159460004                   # EventoDeBitacora
 EVT_RESP_INICIADA, EVT_RESP_ENVIADA = 159460010, 159460011
-EVT_REQUIERE_REVISION = 159460016
-ORIGEN_VIG = 159460005                                                         # OrigenDelEvento
 
 CAMPOS_SOLICITUD = (
     "sanic_estadoprocesamiento,sanic_fechaacuseiniciado,sanic_fechaacuseenviado,"
@@ -566,13 +565,44 @@ def m03(ctx):
 
 
 # ===========================================================================
-# M-06 · Envío iniciado sin confirmar → revisión humana
+# M-06 · Envío iniciado sin confirmar → arma el escenario "a medias"
+#
+# **Alcance recortado el 2026-09-28 (dos correcciones, con evidencia real).**
+#
+# 1. **La aserción de Bitácora era una expectativa mal fundada, no un defecto.**
+#    Investigado a fondo por el set V (`pruebas/07-vigilancia.md`, "Hallazgo
+#    aparte, sobre el propio caso M-06"): ningún bloque de `MPPP-VIG` escribe
+#    un evento de Bitácora `Requiere revision` (159460016) al marcar una
+#    Solicitud — eso lo hace `MPPP-ENV`, en otro escenario. Exigirla acá era
+#    el error del caso, no del flujo. Se sacó.
+# 2. **Esperar que `sanic_requiererevision` pase a `true` en tiempo real ya lo
+#    cubre V-07** (`pruebas/07-vigilancia.md`), y mejor: V-07 lee el umbral
+#    REAL de `vigilancia.minutos.sinresponder` en vivo (acá estaba
+#    hardcodeado a 40 min, asumiendo P-06 = 30 sin comprobrarlo), corre la
+#    MISMA consulta que usa el bloque `Envios_iniciados_sin_confirmar` ANTES
+#    de esperar nada (precondición decisiva, sin gastar tiempo si la consulta
+#    está rota), y espera con el margen medido con evidencia — 3 vueltas del
+#    `recurrence` (30 min) + colchón = 32 min, no las 1-2 vueltas (~11 y ~22
+#    min) que este caso probó el 2026-09-27 y que **NINGUNA de las dos
+#    alcanzó** (ver la nota diagnóstica que dejó este caso, conservada en
+#    `pruebas/04-comunicaciones.md`). Repetir esa espera acá — con un margen
+#    encima más corto y una precondición hardcodeada — duplicaría cobertura
+#    entre dos prefijos distintos (`CONVENCIONES.md` §4) pagando otra vez
+#    ~20-32 minutos por corrida del set M, por algo que V-07 ya prueba mejor.
+#
+# **Lo que sigue siendo trabajo de ESTE set** (M = comunicaciones, correo
+# REAL — no lo prueba V, que arma la Solicitud por Custom API directa, sin
+# pasar por un correo real ni por `MPPP-ING`): que un correo real llegue
+# hasta "En proceso" con el acuse real enviado, y que el `PATCH` que arma el
+# escenario "a medias" (precondición de datos de V-07 también) sea aceptado
+# por la plataforma. Si esto último se rechaza, ni este caso ni V-07 pueden
+# simular el escenario, y hay que saberlo rápido, no después de 32 minutos.
 # ===========================================================================
 def m06(ctx):
-    c = pc.Caso("M-06", "Envío iniciado sin confirmar → revisión humana (espera real de MPPP-VIG, hasta ~11 min)")
+    c = pc.Caso("M-06", "Envío iniciado sin confirmar: precondición real de correo + escenario "
+                        "'a medias' (la espera de MPPP-VIG y su detección las prueba V-07, "
+                        "pruebas/07-vigilancia.md — ver el porqué en 04-comunicaciones.md)")
     dv = ctx.dv
-    g = ctx.extra["g"]
-    remitente = ctx.extra["remitente"]
 
     asunto = _enviar(ctx, "M06", adjunto=_bytes_excel("E01-feliz-formato11.xlsx"))
     sol = _esperar_solicitud(ctx, asunto, timeout=240)
@@ -592,48 +622,22 @@ def m06(ctx):
     if not (estado and estado.get("sanic_fechaacuseenviado")):
         return c
 
-    # 2) Forzar el escenario "a medias": acuse iniciado hace 40 min (> vigilancia.minutos.sinresponder,
-    #    30 min según P-06), sin confirmar. Esto reescribe un resultado que ya se dio de verdad
-    #    (el acuse real ya salió); lo que se prueba de acá en más es la garantía de recuperación
-    #    de MPPP-VIG ante un estado "a medias", no el envío en sí (eso ya lo probó M-01).
-    hace_40 = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=40)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # 2) Forzar el escenario "a medias": acuse iniciado más viejo que el umbral REAL de
+    #    `vigilancia.minutos.sinresponder` (leído en vivo, nunca hardcodeado — CONVENCIONES §7,
+    #    mismo criterio que usa V-07), sin confirmar. Esto reescribe un resultado que ya se dio de
+    #    verdad (el acuse real ya salió); lo que se prueba con este PATCH es que la plataforma deja
+    #    escribir el escenario, no la recuperación de MPPP-VIG (eso es V-07).
+    minutos = pc.verificar_parametro_entero_positivo(dv, "vigilancia.minutos.sinresponder")
+    hace = (datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(minutes=minutos + 1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     est, r, _ = dv.call("PATCH", f"{sim.SOLICITUDES}({sid})",
-                         {"sanic_fechaacuseiniciado": hace_40, "sanic_fechaacuseenviado": None})
+                         {"sanic_fechaacuseiniciado": hace, "sanic_fechaacuseenviado": None})
     c.check("se pudo forzar el escenario a medias (PATCH de fechaacuseiniciado/fechaacuseenviado)",
             est in (200, 204),
             f"HTTP {est}: {r} — si esto falla, hay un control de plataforma bloqueando la "
             "escritura directa de estos campos y el caso queda N-A de verdad, no simulable")
     if est not in (200, 204):
         c.na(f"no se pudo preparar el escenario 'a medias' (HTTP {est}): {r}")
-        return c
-
-    bit_antes = len(sim.leer_bitacora(dv, sid))
-    inbox_antes = len(_buscar_inbox(g, remitente, asunto))
-
-    # 3) Esperar a MPPP-VIG (recursos/flujos/mppp-vig.json: recurrence cada 10 minutos, fase
-    #    desconocida desde acá). El margen cubre dos vueltas completas (~20 min) más colchón: un
-    #    recurrence trigger de Power Automate puede arrancar con demora real bajo carga
-    #    compartida, y un solo intervalo de margen no alcanza para distinguir esa demora de un
-    #    defecto real (verificado el 2026-09-27: con 11 min de margen no alcanzó a verse).
-    resultado = _esperar_campo(ctx, sid, lambda x: x.get("sanic_requiererevision") is True,
-                                timeout=1320, intervalo=20)
-    c.check("sanic_requiererevision pasa a true (MPPP-VIG lo detectó)",
-            bool(resultado and resultado.get("sanic_requiererevision")), str(resultado))
-    if resultado and resultado.get("sanic_motivorevision"):
-        motivo = resultado["sanic_motivorevision"]
-        c.check("sanic_motivorevision explica 'envío iniciado sin confirmar'",
-                "sin confirmar" in motivo.lower(), motivo)
-
-    bit = sim.leer_bitacora(dv, sid)
-    c.check("hay un evento 'Requiere revision' con origen MPPP-VIG",
-            any(b["sanic_evento"] == EVT_REQUIERE_REVISION and b.get("sanic_origen") == ORIGEN_VIG for b in bit),
-            str([(b["sanic_evento"], b.get("sanic_origen")) for b in bit]))
-    c.check("no llegó un segundo acuse (bandeja sin novedades nuevas)",
-            len(_buscar_inbox(g, remitente, asunto)) == inbox_antes)
-
-    est2, r2, _ = dv.call("GET", f"{sim.SOLICITUDES}({sid})?$select=sanic_fechaacuseenviado")
-    c.check("sanic_fechaacuseenviado sigue vacío (no se completó un envío nuevo)",
-            est2 == 200 and not r2.get("sanic_fechaacuseenviado"))
     return c
 
 
