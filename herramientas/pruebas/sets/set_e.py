@@ -98,8 +98,10 @@ def preparar(ctx):
       y después de CADA set, no cada set por separado. `exportacion.columnas`
       es uno de los DOS parámetros no-simples que ese canon automático NO
       toca (`preparacion_comun.PARAMETROS_NO_SIMPLES`): si E-03 siembra una
-      versión de prueba, es E-03 quien la desactiva al cerrar (try/finally),
-      nunca el canon genérico.
+      versión de prueba, la limpieza es del propio set, en DOS pasos —
+      desactivarla de inmediato en el `finally` de E-03, y borrarla por GUID
+      en `cerrar()` (§8.2: "desactivar no es limpiar") — nunca el canon
+      genérico.
     """
     pc.verificar_datos_negocio(ctx.dv, REMITENTE)
     pc.verificar_excels()
@@ -119,8 +121,16 @@ def preparar(ctx):
 def cerrar(ctx):
     """Borra, por GUID, la Solicitud simulada que este set creó en `preparar()`
     (y cualquier otra que un caso hubiera creado). No toca el fixture
-    compartido `PR*`: eso no se borra nunca desde un set."""
-    return ctx.limpiar_solicitudes()
+    compartido `PR*`: eso no se borra nunca desde un set.
+
+    También borra, por GUID, la versión de PRUEBA de `exportacion.columnas`
+    que E-03 haya sembrado en esta corrida (CONVENCIONES §8.2: "desactivar no
+    es limpiar" — un set borra lo que creó, en dos pasos: E-03 la desactiva de
+    inmediato para devolver la precedencia al canon, y acá se borra de
+    verdad). Un set nunca edita ni borra una versión que no sembró él."""
+    errores = ctx.limpiar_solicitudes()
+    errores += _limpiar_parametro_de_prueba(ctx)
+    return errores
 
 
 # ===========================================================================
@@ -166,6 +176,37 @@ def _decodificar_xlsx(archivo_base64):
 
 def _exportar(ctx, filaids, cabeceras=None, timeout=180):
     return ctx.dv.call("POST", CUSTOM_API, {"filaids": filaids}, cabeceras=cabeceras, timeout=timeout)
+
+
+def _limpiar_parametro_de_prueba(ctx):
+    """Borra, por GUID (NUNCA por nombre ni por número de versión — así fue
+    como se borraron datos ajenos el 2026-09-27, CONVENCIONES §5), la versión
+    de prueba de `exportacion.columnas` que `e03()` haya sembrado en esta
+    corrida. Antes de cada DELETE relee la fila y confirma que sigue siendo la
+    de este set: si no lo es (activa, o sin la marca `ZZP -` de E-03), NO la
+    borra — junta el motivo y sigue, para que un residuo inesperado no tumbe
+    el resto del cierre, pero tampoco se arriesgue a borrar algo que no es
+    nuestro."""
+    idp = ctx.extra.get("parametro_prueba_id")
+    if not idp:
+        return []
+    est, r, _ = ctx.dv.call(
+        "GET", f"{PARAMETROS}({idp})?$select=sanic_nombre,sanic_version,statecode,sanic_descripcion")
+    if est != 200:
+        return [f"no se pudo releer la versión de prueba {idp} de exportacion.columnas antes de "
+                f"borrarla (HTTP {est}): {r} — NO se borró"]
+    marcada = "ZZP - version de PRUEBA de set E" in (r.get("sanic_descripcion") or "")
+    desactivada = r.get("statecode") == 1
+    es_la_esperada = r.get("sanic_nombre") == "exportacion.columnas" and marcada
+    if not (es_la_esperada and desactivada):
+        return [f"la fila {idp} no pasa las verificaciones antes de borrar (nombre/marca="
+                f"{es_la_esperada} desactivada={desactivada}, statecode={r.get('statecode')!r}): "
+                f"NO se borró — esto no debería pasar nunca, revisar a mano"]
+    est2, r2, _ = ctx.dv.call("DELETE", f"{PARAMETROS}({idp})")
+    if est2 not in (200, 204):
+        return [f"no se pudo borrar la versión de prueba {idp} (sanic_version={r.get('sanic_version')}) "
+                f"de exportacion.columnas (HTTP {est2}): {r2}"]
+    return []
 
 
 def _usuario_por_alias(ctx, alias):
@@ -301,7 +342,8 @@ def e03(ctx):
             "sanic_nombre": "exportacion.columnas", "sanic_version": version_nueva,
             "sanic_valor": valor_nuevo, "sanic_tipo": tipo,
             "sanic_descripcion": "ZZP - version de PRUEBA de set E (E-03): dos columnas intercambiadas. "
-                                  "Se desactiva al cerrar el caso, nunca se edita ni se borra.",
+                                  "Se desactiva de inmediato acá y se borra por GUID en cerrar() "
+                                  "(CONVENCIONES §8.2: desactivar no es limpiar).",
         }
         est2, r2, cab2 = ctx.dv.call("POST", PARAMETROS, cuerpo)
         c.check("se pudo sembrar una versión NUEVA de exportacion.columnas (versionar, nunca editar)",
@@ -309,6 +351,10 @@ def e03(ctx):
         if est2 not in (200, 201, 204):
             return c
         idp_nuevo = Dataverse.id_creado(cab2)
+        # Se guarda YA, antes de cualquier chequeo que pueda cortar el caso:
+        # `cerrar()` tiene que encontrar este GUID pase lo que pase de acá en
+        # adelante (CONVENCIONES §8.2, "borrarla en cerrar()").
+        ctx.extra["parametro_prueba_id"] = idp_nuevo
 
         est3, r3, _ = _exportar(ctx, [filaid])
         c.check("exportación con el orden NUEVO", est3 == 200, f"HTTP {est3}: {r3}")
@@ -328,13 +374,19 @@ def e03(ctx):
                 and encabezados_2[1] == columnas_nuevas[1]["encabezado"],
                 f"encabezados={encabezados_2!r}")
     finally:
-        # Canon §8.2: nunca se edita ni se borra una versión ya sembrada — se
-        # DESACTIVA la de prueba, la anterior queda intacta y vuelve a ser la
-        # activa más alta (statecode=0), que es el canon real.
+        # Canon §8.2, PASO 1 de 2: nunca se edita una versión ya sembrada — se
+        # DESACTIVA la de prueba DE INMEDIATO (sea cual sea el resultado de
+        # arriba), para devolver la precedencia al canon sin esperar a que el
+        # set entero termine. La anterior queda intacta y vuelve a ser la
+        # activa más alta (statecode=0). PASO 2 (borrarla por GUID) es tarea
+        # de `cerrar()` — "desactivar no es limpiar" (CONVENCIONES §8.2): tres
+        # corridas de este caso sin el paso 2 dejaron tres filas colgando en
+        # Dev y la cuarta chocó con la clave alterna (HTTP 412).
         if idp_nuevo:
             ctx.dv.call("PATCH", f"{PARAMETROS}({idp_nuevo})", {"statecode": 1, "statuscode": 2})
             _, ract, _ = ctx.dv.call("GET", f"{PARAMETROS}({idp_nuevo})?$select=statecode")
-            c.check("la versión de PRUEBA quedó DESACTIVADA al cerrar (nunca editada ni borrada)",
+            c.check("la versión de PRUEBA quedó DESACTIVADA de inmediato (paso 1 de 2; el paso 2, "
+                    "borrarla por GUID, lo hace cerrar())",
                     ract.get("statecode") == 1, f"statecode={ract.get('statecode')!r}")
     return c
 

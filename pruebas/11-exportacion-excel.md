@@ -89,28 +89,48 @@ a un `.xlsx` válido.
 **Necesita.** El valor de la versión ACTIVA actual de `exportacion.columnas` (lo lee el propio caso).
 El caso siembra su propia versión de prueba, con las dos primeras columnas intercambiadas, en
 `sanic_version` = la MÁXIMA versión ya sembrada (activa o no) + 1 — nunca edita ni borra ninguna fila
-existente, mismo criterio de versionado que `12-obligatoriedad-gestion.md` O-08 y que CONVENCIONES
-§8.2. Usar la máxima sembrada (no solo la activa) importa: una corrida anterior de este caso deja una
-versión de prueba DESACTIVADA (nunca borrada), y "activa + 1" volvería a chocar con esa fila y la
-clave alterna `KEY - MPPP - Parámetro - Nombre y versión` rechazaría el alta con HTTP 412.
+que no sembró él, mismo criterio de versionado que `12-obligatoriedad-gestion.md` O-08 y que
+CONVENCIONES §8.2. Usar la máxima sembrada (no solo la activa) importa: si una corrida murió antes de
+limpiar y dejó una versión de prueba colgando, "activa + 1" volvería a chocar con esa fila y la clave
+alterna `KEY - MPPP - Parámetro - Nombre y versión` rechazaría el alta con HTTP 412.
 
-**Cómo (lo hace el caso, `e03()` de `set_e.py`).**
+**Limpieza en DOS pasos (CONVENCIONES §8.2: "desactivar no es limpiar").** El 2026-09-27, tres
+corridas de este caso solo desactivaban la versión de prueba y nunca la borraban: quedaron tres
+filas colgando en Dev, y la cuarta corrida chocó con la clave alterna (HTTP 412) porque calculaba
+la versión nueva contra la activa en vez de contra el máximo sembrado. Basura que se acumula no es
+inofensiva. Por eso la limpieza real son dos pasos, en dos momentos distintos:
+
+1. **Desactivarla de inmediato**, en el `finally` de `e03()` — devuelve la precedencia al canon sin
+   esperar a que el set entero termine, pase lo que pase con el resto del caso.
+2. **Borrarla por GUID**, en `cerrar()` — nunca por nombre ni por versión (así fue como se borraron
+   datos ajenos el 2026-09-27, CONVENCIONES §5). `cerrar()` relee la fila antes de cada DELETE y
+   confirma que sigue desactivada y que trae la marca `ZZP -` de este caso; si no, NO la borra y
+   reporta el motivo en vez de arriesgar borrar algo que no es de este set.
+
+**Cómo (lo hace el caso, `e03()` + `cerrar()` de `set_e.py`).**
 1. Exportar 1 fila del fixture propio con el orden actual, anotar los encabezados del `.xlsx`.
 2. Sembrar una versión NUEVA de `exportacion.columnas` (máxima sembrada + 1) con las dos primeras
    columnas intercambiadas — nunca tocar ninguna fila existente.
 3. Exportar la misma fila de nuevo.
-4. En `finally`, sea cual sea el resultado: DESACTIVAR (`statecode=1`) la versión de prueba que
-   sembró en el paso 2. La versión anterior queda intacta y vuelve a ser la activa más alta — ese
-   es el canon real de este parámetro, y por eso no hace falta "restaurar" ningún valor.
+4. En el `finally` de `e03()`, sea cual sea el resultado: DESACTIVAR (`statecode=1`) la versión de
+   prueba que sembró en el paso 2 (paso 1 de la limpieza). La versión anterior queda intacta y
+   vuelve a ser la activa más alta — ese es el canon real de este parámetro, y por eso no hace falta
+   "restaurar" ningún valor.
+5. En `cerrar()` (corre siempre, al final del set): releer esa misma fila por GUID, confirmar que
+   sigue desactivada y marcada, y BORRARLA (paso 2 de la limpieza).
 
 **Qué tiene que pasar.** El orden de columnas del paso 3 refleja el cambio del paso 2, sin haber
-tocado el ensamblado, y al terminar la versión de prueba quedó desactivada (nunca editada ni
-borrada).
+tocado el ensamblado. Al terminar el SET (no el caso: la fila vive hasta `cerrar()`), no queda
+ninguna versión de prueba de `exportacion.columnas` en el entorno — ni activa ni desactivada.
 
-**Cómo se verifica.** Comparar los encabezados del `.xlsx` de los pasos 1 y 3.
+**Cómo se verifica.** Comparar los encabezados del `.xlsx` de los pasos 1 y 3; y, después de correr
+el set completo (`correr.py`, no solo este caso), que `sanic_mppp_tbl_parametros` filtrado por
+`sanic_nombre eq 'exportacion.columnas'` solo devuelve la versión canónica.
 
 **Cómo se sabe que falló.** El orden no cambia (el código está usando un orden fijo en vez de leer
-el parámetro).
+el parámetro). Aparte, si después de una corrida completa del set queda una fila de PRUEBA (activa o
+desactivada) de `exportacion.columnas`: la limpieza de dos pasos no funcionó — ver `cerrar()` en
+`set_e.py`, que reporta el motivo en vez de fallar en silencio.
 
 **Automatizable.** API.
 
