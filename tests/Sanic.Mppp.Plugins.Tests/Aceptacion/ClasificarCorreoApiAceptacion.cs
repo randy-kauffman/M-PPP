@@ -48,7 +48,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             // Un ejecutivo habilitado con su rol, para que el aviso de DA-08 tenga a quién ir.
             var rol = svc.Sembrar(new Entity(TablasNativas.Rol) { ["name"] = TablasNativas.RolEjecutivo });
             var usuario = svc.Sembrar(new Entity(TablasNativas.Usuario) { ["fullname"] = "Eje Cutivo", ["isdisabled"] = false });
-            svc.Sembrar(new Entity(TablasNativas.UsuarioRol) { ["roleid"] = new EntityReference(TablasNativas.Rol, rol), ["systemuserid"] = new EntityReference(TablasNativas.Usuario, usuario) });
+            // `systemuserroles` es una intersect entity: sus columnas son `Uniqueidentifier` crudos en Dataverse
+            // REAL, no lookups (D-59; confirmado en el `plugintracelog` de Dev).
+            svc.Sembrar(new Entity(TablasNativas.UsuarioRol) { ["roleid"] = rol, ["systemuserid"] = usuario });
 
             var solicitudId = svc.Sembrar(new Entity(TablasHistorico.Solicitud)
             {

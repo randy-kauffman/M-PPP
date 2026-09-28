@@ -45,7 +45,11 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             public void Asignar(Guid usuario, Guid rol)
             {
-                Svc.Sembrar(new Entity(TablasNativas.UsuarioRol) { ["systemuserid"] = new EntityReference(TablasNativas.Usuario, usuario), ["roleid"] = new EntityReference(TablasNativas.Rol, rol) });
+                // `systemuserroles` es una intersect entity: en Dataverse REAL sus columnas son `Uniqueidentifier`
+                // crudos, no lookups (confirmado en el `plugintracelog` de Dev, D-59; mismo hallazgo que
+                // `StepsDeFilaAceptacion.cs` para `roleid`). Sembrar acá un `EntityReference` es lo que escondió
+                // D-59 durante toda la construcción: el doble modelaba algo distinto de la plataforma.
+                Svc.Sembrar(new Entity(TablasNativas.UsuarioRol) { ["systemuserid"] = usuario, ["roleid"] = rol });
             }
 
             public void Avisar(string titulo = "Correo sin procesar: solicitud MPPP-00000123", string cuerpo = "Motivo: es una respuesta.")

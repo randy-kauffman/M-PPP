@@ -105,8 +105,14 @@ namespace Sanic.Mppp.Plugins.Datos
             // Consulta 2: quiénes tienen ese rol asignado (repetido o no).
             var consultaAsignaciones = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet(ColumnaIdUsuario) };
             consultaAsignaciones.Criteria.AddCondition("roleid", ConditionOperator.In, rolesEjecutivo.Cast<object>().ToArray());
+            // `systemuserroles` es una intersect entity: en Dataverse real sus columnas son `Uniqueidentifier`
+            // crudos, no lookups. Leerla como `EntityReference` revienta con
+            // "Unable to cast object of type 'System.Guid' to type 'Microsoft.Xrm.Sdk.EntityReference'" SIEMPRE
+            // que exista al menos un destinatario (D-59, confirmado en el `plugintracelog` de Dev: el correo real
+            // trae la fila con `systemuserid` como `Guid`, nunca como `EntityReference`). Mismo defecto y misma
+            // corrección que `StepsDeFila.IdDeLaAsignacion` para `roleid` (2026-09-23).
             var usuariosConRol = _servicio.RetrieveMultiple(consultaAsignaciones).Entities
-                .Select(e => e.GetAttributeValue<EntityReference>(ColumnaIdUsuario).Id)
+                .Select(e => e.GetAttributeValue<Guid>(ColumnaIdUsuario))
                 .Distinct()
                 .ToList();
             if (usuariosConRol.Count == 0)
