@@ -65,6 +65,7 @@ por el aprobador ese mismo día:
 """
 import json
 import os
+import re
 import sys
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -78,7 +79,15 @@ import semaforo  # noqa: E402
 CLIENTE_BASE = "Pruebas MPPP SA"
 CLIENTE = marca_agua.nombre_de_prueba(CLIENTE_BASE)  # "ZZP-Pruebas MPPP SA"
 CIF_BAC = "900100200"      # `sanic_cifbac` admite 9, y usa los 9
-CIF_COM = "PRUEBASMPPP"    # `sanic_cifcom` admite 12: NO pasarse (antes decía 13 y fallaba)
+# `sanic_cifcom` exige EXACTAMENTE 12 caracteres, con una forma concreta que
+# valida Dataverse (no solo el largo): 9 alfanuméricos o espacio + 3 dígitos.
+# Mensaje real de la plataforma: "El CIF COM tiene que tener 12 caracteres: 9
+# alfanuméricos o espacio y 3 dígitos." "PRUEBASMPPP" (11, todo letras) no
+# cumplía ni el largo ni la forma — quedó dormido porque el Cliente del
+# fixture ya existía en Dev, y saltó recién al migrar la marca de agua a
+# `ZZP-` (commit d8fb94e), cuando hubo que crearlo por primera vez.
+CIF_COM = "PRUEBASMP001"   # 9 alfanuméricos ("PRUEBASMP") + 3 dígitos ("001")
+CIF_COM_FORMA = re.compile(r"^[A-Za-z0-9 ]{9}[0-9]{3}$")
 
 # Largos máximos reales, leídos de la metadata el 2026-09-22. Se comprueban
 # ANTES de tocar la red: un 400 de la plataforma a mitad de la preparación deja
@@ -120,8 +129,16 @@ def crear(dv, conjunto, cuerpo, sol="sanic_mppp_sol_mantenimientoppp"):
 
 
 def comprobar_largos(remitente):
-    """Sin red. Un largo pasado se ve acá y no a mitad de la preparación."""
+    """Sin red. Un largo (o una forma) pasada se ve acá y no a mitad de la
+    preparación con un HTTP 400 de la plataforma. El largo solo no alcanza:
+    `sanic_cifcom` exige además una forma concreta (9 alfanuméricos o espacio
+    + 3 dígitos) que un CIF_COM del largo correcto igual puede incumplir."""
     malos = [f"{k}={v!r} usa {len(v)} y el máximo es {n}" for k, (v, n) in LARGOS.items() if len(v) > n]
+    if not CIF_COM_FORMA.match(CIF_COM):
+        malos.append(
+            f"CIF_COM={CIF_COM!r} no cumple la forma que exige Dataverse: 9 alfanuméricos "
+            "o espacio + 3 dígitos (\"El CIF COM tiene que tener 12 caracteres: 9 "
+            "alfanuméricos o espacio y 3 dígitos.\")")
     if len(remitente) > 320:
         malos.append(f"el remitente usa {len(remitente)} y el máximo es 320")
     for p in PLANES:
