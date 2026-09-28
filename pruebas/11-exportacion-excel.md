@@ -9,10 +9,20 @@ Convención de IDs: prefijo `E-` (**E**xportación), ver el encabezado de `09-rp
 
 ## Preparativos comunes a este archivo
 
-- Parámetro `exportacion.columnas` sembrado (JSON, lista ordenada de campos — ver
-  `playbooks/datos/parametros.md`).
-- Al menos 2 Filas reales (cualquier estado: la Custom API no filtra por estado, exporta lo que se
-  le pida por id) con datos ficticios `zz`/`ZZ`.
+Este set es autocontenido (CONVENCIONES §8): no supone ninguna Fila, Solicitud ni configuración que
+haya dejado otro set. `herramientas/pruebas/sets/set_e.py` deja listo, en su propio `preparar()`:
+
+- El fixture `PR*` compartido (create-if-missing) y su propio remitente de prueba autorizado sobre
+  `PR11` (mismo criterio que `set_s.py`/`set_i.py`).
+- Los 15 Excel + el adjunto que no es Excel, en `pruebas/adjuntos/`.
+- Que `exportacion.columnas` tenga al menos una versión activa (si no existe ninguna, el set no
+  arranca: sembrar el CONJUNTO de columnas es una decisión de negocio, no algo que un set de pruebas
+  deba inventar — ver `playbooks/datos/parametros.md`).
+- **Su propio fixture de Filas reales**: una Solicitud simulada con `E01-feliz-formato11.xlsx` (tres
+  filas válidas — Inclusión, Exclusión, Modificación — que pasan todas las reglas y quedan en
+  Validada), creada con `ctx.procesar()`. Todos los casos de API que necesitan `filaid`s reales usan
+  ESTE fixture, nunca datos de otro set ni una fila cualquiera del entorno.
+
 - `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) o `local/sesion-supervisor.json`
   (rol `SR - MPPP - Supervisor`) para el caso de GUI — generadas por el aprobador, ver
   `pruebas/gui/README.md`; confirmarlas con `estado_sesiones.py`. El arnés de Playwright de
@@ -76,18 +86,26 @@ a un `.xlsx` válido.
 
 **Qué prueba.** El parámetro decide el orden; cambiarlo cambia el Excel sin ningún despliegue.
 
-**Necesita.** El valor actual de `exportacion.columnas`; posibilidad de sembrar una versión nueva
-con un orden distinto (nunca editar la vigente — mismo criterio de versionado que
-`12-obligatoriedad-gestion.md` O-08).
+**Necesita.** El valor de la versión ACTIVA actual de `exportacion.columnas` (lo lee el propio caso).
+El caso siembra su propia versión de prueba, con las dos primeras columnas intercambiadas, en
+`sanic_version` = la MÁXIMA versión ya sembrada (activa o no) + 1 — nunca edita ni borra ninguna fila
+existente, mismo criterio de versionado que `12-obligatoriedad-gestion.md` O-08 y que CONVENCIONES
+§8.2. Usar la máxima sembrada (no solo la activa) importa: una corrida anterior de este caso deja una
+versión de prueba DESACTIVADA (nunca borrada), y "activa + 1" volvería a chocar con esa fila y la
+clave alterna `KEY - MPPP - Parámetro - Nombre y versión` rechazaría el alta con HTTP 412.
 
-**Cómo.**
-1. Exportar 1 fila con el orden actual, anotar el orden de columnas del `.xlsx`.
-2. Sembrar una nueva versión de `exportacion.columnas` con dos columnas intercambiadas.
+**Cómo (lo hace el caso, `e03()` de `set_e.py`).**
+1. Exportar 1 fila del fixture propio con el orden actual, anotar los encabezados del `.xlsx`.
+2. Sembrar una versión NUEVA de `exportacion.columnas` (máxima sembrada + 1) con las dos primeras
+   columnas intercambiadas — nunca tocar ninguna fila existente.
 3. Exportar la misma fila de nuevo.
-4. Restaurar la versión anterior si el entorno la necesita para otras pruebas.
+4. En `finally`, sea cual sea el resultado: DESACTIVAR (`statecode=1`) la versión de prueba que
+   sembró en el paso 2. La versión anterior queda intacta y vuelve a ser la activa más alta — ese
+   es el canon real de este parámetro, y por eso no hace falta "restaurar" ningún valor.
 
 **Qué tiene que pasar.** El orden de columnas del paso 3 refleja el cambio del paso 2, sin haber
-tocado el ensamblado.
+tocado el ensamblado, y al terminar la versión de prueba quedó desactivada (nunca editada ni
+borrada).
 
 **Cómo se verifica.** Comparar los encabezados del `.xlsx` de los pasos 1 y 3.
 
@@ -192,7 +210,11 @@ filas alcanzó a preparar y pide volver a seleccionar menos.
 técnico crudo (ver E-08: a partir de cierto volumen, es justamente lo que pasa, y es un riesgo
 aceptado, no una regresión de este caso).
 
-**Automatizable.** Unit (confiable, ya existe) / API (caro, alto riesgo — ver E-08 antes de correrlo).
+**Automatizable.** Unit (confiable, ya existe: `tests/Sanic.Mppp.Plugins.Tests/Aceptacion/ExportarParaDigitarApiAceptacion.cs`,
+seam `RelojParaPruebas`) / API — pero en `set_e.py` este caso queda **SIEMPRE N-A, sin excepción ni
+bandera**: no hay hoy un volumen conocido que dispare el mensaje elegante sin correr el mismo riesgo
+de E-08 (arriba de ~250k, antes de llegar a los 100s del corte propio, el sandbox puede morir por
+memoria — ver E-08). Forzarlo por API no agrega cobertura real sobre la unitaria, solo riesgo.
 
 ---
 
@@ -212,8 +234,22 @@ cambia de forma que pudiera afectar este límite (por ejemplo, si se agrega el c
 que quedó como riesgo abierto). Si se corre: avisar a todo el equipo, y NO en horario de otras
 pruebas.
 
-**Cómo (solo si se decide repetir la medición).** Repetir un `filaid` real 300.000 veces en el
-arreglo `filaids` de una sola llamada a `exportarparadigitar`.
+En `set_e.py`, `e08()` está detrás de una bandera explícita: por default da **N-A** con el motivo y
+el comando exacto para correrlo a propósito. Solo ejecuta la llamada real con la variable de entorno
+puesta ANTES de invocar al motor:
+
+```bash
+MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+```
+
+Sin esa variable (una corrida normal, `--todos` incluido), el caso NUNCA hace la llamada de 300.000
+`filaids`: un set que degrada el entorno cada vez que alguien lo corre es un set que nadie va a
+correr.
+
+**Cómo (solo si se decide repetir la medición, con la bandera de arriba).** Repite un `filaid` real
+(del fixture propio de este set) 300.000 veces en el arreglo `filaids` de una sola llamada a
+`exportarparadigitar` (el costo se paga por POSICIÓN, no por fila distinta: `FilasDataverse.PorIds`
+deduplica antes de leer).
 
 **Qué tiene que pasar hoy.** Falla con un error de plataforma (no el mensaje elegante de E-07): eso
 es lo ESPERADO y documentado, no un hallazgo nuevo.
@@ -224,7 +260,8 @@ es lo ESPERADO y documentado, no un hallazgo nuevo.
 significativamente respecto de la medición de referencia (250k sano / 300k+ revienta): indicaría
 una regresión de memoria en el código nuevo, y ahí sí amerita investigar.
 
-**Automatizable.** Manual, alto costo — no forma parte de una corrida de regresión habitual.
+**Automatizable.** API, pero detrás de la bandera `MPPP_E08_ALTO_RIESGO=si` (ver "Necesita" arriba) —
+alto costo, no forma parte de una corrida de regresión habitual ni de `--todos`.
 
 ---
 
@@ -234,17 +271,24 @@ una regresión de memoria en el código nuevo, y ahí sí amerita investigar.
 `ExecutePrivilegeName = prvReadsanic_mppp_tbl_fila` — un privilegio de plataforma que YA tienen
 Ejecutivo y Supervisor, y que Administrador de planes/técnico NO tienen.
 
-**Necesita.** No hace falta abrir un navegador: `herramientas/pruebas/comportamiento_roles.py` ya
-resuelve y verifica los 4 usuarios de prueba por su alias (`admin_planes` = `User3`, rol `SR - MPPP
-- Administrador de planes`; `admin_tecnico` = `User4`, rol `SR - MPPP - Administrador tecnico`) e
-impersona por `MSCRMCallerID` — el mismo mecanismo ya usado por esa suite para probar privilegios
-sin sesión de navegador. **Este caso NO es GUI**: no usa `local/sesion-*.json` (esos son
-`storageState` de Playwright, para el arnés de `pruebas/gui/`), sino la impersonación por API de
-`comportamiento_roles.py`.
+**Necesita.** No hace falta abrir un navegador: se resuelve cada usuario de prueba por su alias
+(`admin_planes` = `User3`, rol `SR - MPPP - Administrador de planes`; `admin_tecnico` = `User4`, rol
+`SR - MPPP - Administrador tecnico`), se verifica el rol contra `systemuserroles_association` (nunca
+supuesto — CONVENCIONES §8) y se impersona por `MSCRMCallerID`, el mismo mecanismo de
+`comportamiento_roles.py` y de `set_i.py` (`_usuario_por_alias` + `pc.verificar_roles`, igual que
+I-13). **Este caso NO es GUI**: no usa `local/sesion-*.json` (esos son `storageState` de Playwright,
+para el arnés de `pruebas/gui/`), sino impersonación por API.
 
-**Cómo.** Con un script que importe `Entorno` de `comportamiento_roles.py`:
-`ent.como("admin_planes", "POST", "sanic_mppp_capi_exportarparadigitar", {"filaids": []})` y lo
-mismo con `"admin_tecnico"`.
+**Importante:** la llamada impersonada usa un `filaid` REAL, pero del fixture propio de este set (el
+mismo que crea `preparar()` con `E01-feliz-formato11.xlsx`) — nunca una fila cualquiera del entorno.
+El privilegio se evalúa a nivel de MENSAJE antes de tocar ningún registro (`ExecutePrivilegeName`),
+así que usar un id real y propio prueba lo mismo que un arreglo vacío, pero además confirma que el
+rechazo llega ANTES de leer la fila, sin depender de datos de otro set.
+
+**Cómo (`e09()` de `set_e.py`).** Por cada papel (`admin_planes`, `admin_tecnico`): resolver su
+`systemuserid` por alias, verificar su rol, y llamar
+`sanic_mppp_capi_exportarparadigitar` con `MSCRMCallerID` de ese usuario y
+`{"filaids": ["<filaid propio del fixture>"]}`.
 
 **Qué tiene que pasar.** Las dos llamadas rechazadas por falta de privilegio (error de plataforma,
 no del plugin).
@@ -293,7 +337,7 @@ de cientos de ids seleccionados en la grilla, encontrar el culpable a mano serí
 | E-04 `filaids` vacío | | |
 | E-05 `filaid` inexistente revienta entero | | |
 | E-06 columnas protegidas salen en claro | | |
-| E-07 corte por presupuesto de tiempo | | preferir la cobertura unitaria |
-| E-08 riesgo de memoria a ~300k | | NO correr de rutina |
+| E-07 corte por presupuesto de tiempo | | siempre N-A en `set_e.py`; cobertura real es la unitaria |
+| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` |
 | E-09 privilegio de la Custom API | | |
 | E-10 `filaids` StringArray, posición del error | | |
