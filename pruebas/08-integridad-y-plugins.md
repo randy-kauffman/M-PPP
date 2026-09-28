@@ -1,223 +1,501 @@
-# 08 — Integridad, plugins y claves
+# 08 — Integridad y plugins
 
-Cubre los **steps de plugin** que corren al guardar, y que son la red que impide dejar el sistema
-en un estado imposible. Son los que protegen contra alguien que escribe por el Web API sin pasar
-por la app.
+Set **I** (`CONVENCIONES.md` §4). Cubre los **steps de plugin** que corren al guardar (la red que
+impide dejar el sistema en un estado imposible), el **catálogo de Reglas**, las **dos claves
+alternativas de autorización** (por plan y, desde fase 2, por cliente — DN-01) y la **puerta de
+las Custom API del RPA** (D-9/D-44).
 
-**Corregido: la tabla de abajo tenía un step que nunca se construyó y le faltaba uno que sí
-existe.** Verificado contra el código (`src/Sanic.Mppp.Plugins/Steps/*.cs`) y en vivo contra Dev
-(`plugintypes` filtrado por `Sanic.Mppp`): hay **13 tipos de plugin registrados en total** — estos
-8 steps más las 5 Custom API (`ClasificarCorreoApi`, `ExportarParaDigitarApi`,
-`ObtenerFilasPendientesApi`, `RegistrarResultadoRpaApi`, `ValidarSolicitudApi`, que no son steps y
-no se prueban en este archivo). `IntegridadAutorizacionPlanStep` **no existe como clase en el
-código** — nunca se construyó así; la integridad de una autorización duplicada (I-05) la hace la
-**clave alternativa** `sanic_mppp_key_autorizacionplan_autorizado_plan`, no un plugin. En cambio
-faltaba `RevisionAtendidaStep` (el que atiende el comando "Revisado", `diseno/05-app-model-driven.md`
-§5): existe desde el 2026-09-23 y quedó fuera de esta tabla por error.
+**Reescrito el 2026-09-27.** La versión anterior de este archivo tenía las afirmaciones falsas más
+graves de todo el plan, y las tres se corrigen acá:
 
-Los ocho steps registrados:
+1. **La tabla de "8 steps registrados" listaba un step que nunca existió** (`IntegridadAutorizacionPlanStep`)
+   **y le faltaba uno que sí existe** (`RevisionAtendidaStep`). Verificado contra el código
+   (`src/Sanic.Mppp.Plugins/Steps/*.cs`) y en vivo contra Dev el 2026-09-27: la integridad de una
+   autorización duplicada la hace una **clave alternativa** (`sanic_mppp_key_autorizacionplan_autorizado_plan`),
+   nunca un plugin — no existe ni existió ningún `IntegridadAutorizacionPlanStep`. Ver I-05.
+2. **I-09 decía "10 tipos"; en vivo, el 2026-09-27, son 13** (8 clases de step + 5 Custom API,
+   `GET plugintypes` filtrado por el ensamblado). Ver I-09.
+3. **Dos casos citaban un archivo ajeno** (`pruebas/README.md`, la deuda declarada del
+   2026-09-27: "cuatro en `04`, **dos en `08`** y uno en `07`"): I-05 decía "una autorización
+   existente (P-03, `00-preparacion.md`)" e I-07 decía "una Fila existente (la de C-01 alcanza,
+   `01-clasificacion-del-correo.md`)". El **código** de los dos casos ya usaba su propio fixture
+   (`sets/set_i.py::preparar()`); lo que estaba mal era solo la prosa de este MD, que ya no cita
+   ningún otro archivo (CONVENCIONES §8).
 
-| Step | Qué protege |
+**Además, siguiendo CONVENCIONES §7 ("nombrar, no contar")**: en vez de repetir la vieja tabla de
+prosa "8 steps con su función", este archivo **nombra los 20 registros de step, uno por uno**, con
+su mensaje, su etapa y su tabla, y los verifica contra `sdkmessageprocessingsteps` EN VIVO (I-10).
+Un conteo envejece con cada step nuevo; una lista de nombres, no.
+
+**Los 13 tipos de plugin registrados** (8 clases de step + 5 Custom API — las Custom API no son
+steps y no se prueban en este archivo, las cubre `simulador.py`/`02`/`03`):
+
+| Clase | Qué protege |
 |---|---|
-| `NombreCalculadoStep` | el nombre de las tablas que no lo digita nadie |
-| `NormalizarYValidarStep` | normaliza y valida al guardar |
-| `ListaBlancaStep` | que solo se escriba lo que se puede escribir |
-| `TransicionDeFilaStep` | que una transición de estado sea legal |
-| `PostTransicionDeFilaStep` | los efectos posteriores (Bitácora, estado de la Solicitud) |
-| `AtenderPorClasificarStep` | Atendido y Descartar |
+| `NombreCalculadoStep` | el nombre de las tablas que no lo digita nadie (hoy 4: Plan, AutorizacionPlan, AutorizacionCliente, Fila — I-06) |
+| `NormalizarYValidarStep` | normaliza y valida al guardar (Cliente, Plan, Autorizado, Parametro) |
+| `ListaBlancaStep` | que solo se escriba lo que se puede escribir (Fila, Solicitud) |
+| `TransicionDeFilaStep` | que una transición de estado sea legal, y el step de claim (03 §2) |
+| `PostTransicionDeFilaStep` | los efectos posteriores (Bitácora, cierre de la Solicitud) |
+| `AtenderPorClasificarStep` | Atendido y Descartar sobre una Solicitud por clasificar |
 | `IntegridadDeReglaStep` | que el catálogo de reglas sea coherente |
 | `RevisionAtendidaStep` | deja en Bitácora el motivo que escribió la máquina, al usar "Revisado" |
 
-> La integridad de una autorización duplicada (antes atribuida acá a
-> `IntegridadAutorizacionPlanStep`) la prueba la **clave alternativa** sobre AutorizacionPlan, no
-> un step: ver I-05 más abajo.
+**Fase 2** agregó, y este set ya los cubre: la 4ª tabla de `NombreCalculadoStep`
+(`AutorizacionCliente`, I-06), la clave alternativa nueva `sanic_mppp_key_autorizacioncliente_autorizado_cliente`
+(I-11, DN-01), la puerta de las Custom API del RPA (`PuertaDelRpa.cs`, I-12, D-9/D-44) y el
+comportamiento del claim dentro de `TransicionDeFilaStep` (I-13, `03` §2).
 
-**Cómo se prueban.** Casi todos se prueban **haciendo algo prohibido** y verificando que el sistema
-se niegue con un mensaje claro. Un plugin que deja pasar lo prohibido es peor que no tenerlo.
+**Cómo se prueban.** Casi todos, **haciendo algo prohibido** y verificando que el sistema se niegue
+con un mensaje claro. Un plugin que deja pasar lo prohibido es peor que no tenerlo.
+
+**Set autocontenido** (`CONVENCIONES.md` §8). Este archivo no depende de ningún otro: prepara sus
+propios datos y no supone lo que dejó otro set. La preparación exacta que hace `preparar()`, y
+por qué no hace otras cosas (roles de Ejecutivo/Supervisor, canon), está documentada en
+`herramientas/pruebas/sets/set_i.py::preparar()` — acá solo el resumen:
+
+| Qué prepara | Cómo |
+|---|---|
+| Datos de negocio (`PR*`, fixture compartido, `REMITENTE` autorizado sobre PR11/PR06/PR10/PRIN) | `preparacion_comun.verificar_datos_negocio()` |
+| Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
+| Roles de Ejecutivo (User1) y Supervisor (User2) — SOLO los necesita I-13 | resueltos y verificados DENTRO de I-13, no en `preparar()` (si un día cambiaran, el resto de los 12 casos sigue corriendo igual) |
+
+**Corré este set con**:
+
+```bash
+python3 herramientas/pruebas/correr.py I
+```
 
 ---
 
 ## I-01 · El catálogo de reglas: una regla activa sin evaluador
 
-**Qué prueba.** `IntegridadDeReglaStep` (D-13): una regla activa cuyo código no sabe evaluar.
+**Qué prueba.** `IntegridadDeReglaStep` (D-13): una regla activa cuyo código no tiene un evaluador
+programado para su nivel.
 
-**Necesita.** Sesión `admin_tecnico` (Configuración → Reglas).
+**Necesita.** Nada además de lo que `preparar()` de este set ya deja listo: el service principal
+de Dev (System Administrator) alcanza para crear y borrar una Regla.
 
-**Cómo.** En **Configuración → Reglas**, creá una regla nueva:
+**Cómo.** `POST sanic_mppp_tbl_reglas` con `sanic_codigo = "ZZ_REGLA_QUE_NO_EXISTE"`, `sanic_nivel =
+Registro`, `sanic_efecto = Rechaza`, `sanic_orden = 90`.
 
-- Código: `REGLA_QUE_NO_EXISTE`
-- Nivel: Registro · Efecto: Rechaza · Orden: 90
+**Qué tiene que pasar.** El `POST` **no se guarda**: HTTP distinto de 200/201/204. El mensaje dice
+que ese código no tiene evaluador programado para ese nivel.
 
-**Esperado.** **No deja guardar.** El mensaje dice que esa regla no tiene evaluador programado
-para su nivel.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-01`).
 
-**FALLA si** guarda. La próxima validación reventaría con una excepción y todas las Solicitudes
-quedarían en Ingresada.
+**Cómo se sabe que falló.** Si el `POST` da 200/201/204, `IntegridadDeReglaStep` no está frenando
+este caso — el caso lo detecta y **borra la regla inventada de inmediato**, antes de que una
+validación real la evalúe y reviente con una excepción real (todas las Solicitudes quedarían en
+Ingresada).
 
-**Automatizable.** API (`corredor.py`, caso I-01).
+**Automatizable.** API (`correr.py I`, caso `I-01`).
 
 ---
 
 ## I-02 · Una regla que depende de otra inactiva
 
-**Qué prueba.** `IntegridadDeReglaStep`, segundo caso de D-13.
+**Qué prueba.** `IntegridadDeReglaStep`, el segundo caso de D-13: no se puede desactivar una regla
+de la que dependen otras reglas activas.
 
-**Necesita.** Sesión `admin_tecnico`.
+**Necesita.** La regla `PLAN_EXISTE` del catálogo sembrado (`playbooks/datos/reglas.md`), de la
+que dependen cuatro reglas activas.
 
-**Cómo.** Desactivá `PLAN_EXISTE` (que es de la que dependen cuatro reglas).
+**Cómo.** `PATCH sanic_mppp_tbl_reglas(<PLAN_EXISTE>)` con `statecode = Inactivo`.
 
-**Esperado.** **No deja desactivarla**, o no deja guardar la que queda colgando. El mensaje nombra
-la dependencia rota.
+**Qué tiene que pasar.** **No deja desactivarla**: HTTP distinto de 200/204. El mensaje nombra las
+reglas que dependen de ella. Al terminar, `PLAN_EXISTE` queda **activa** (el caso la revierte en
+un `finally`, pase lo que pase: de esto depende cualquier otra validación que corra en paralelo,
+incluida la del otro agente en `pruebas/gui/`).
 
-> Acordate de dejar `PLAN_EXISTE` **activa** al terminar.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-02`).
 
-**Automatizable.** API (`corredor.py`, caso I-02).
+**Cómo se sabe que falló.** Si el `PATCH` da 200/204, el catálogo compartido de Reglas quedó con
+`PLAN_EXISTE` inactiva — **hay que reactivarla a mano de inmediato** (`sanic_codigo eq
+'PLAN_EXISTE'`, `statecode = 0`) antes de que cualquier otra validación la evalúe, porque el propio
+caso reintenta reactivarla en su `finally` pero un FALLA acá significa que esa reactivación también
+podría estar fallando.
+
+**Automatizable.** API (`correr.py I`, caso `I-02`).
 
 ---
 
 ## I-03 · Una regla de nivel Registro con efecto "Envía a revisión"
 
-**Qué prueba.** D-20: ese efecto solo tiene sentido a nivel Solicitud o Correo.
+**Qué prueba.** D-20: ese efecto solo es válido en las reglas del sobre (niveles Correo y
+Solicitud), nunca en Registro.
 
-**Necesita.** Sesión `admin_tecnico`.
+**Necesita.** La regla `MONEDA_DEL_PLAN` (nivel Registro, efecto Rechaza) del catálogo sembrado.
 
-**Cómo.** Editá `MONEDA_DEL_PLAN` (nivel Registro) y ponele efecto **Envía a revisión**.
+**Cómo.** `PATCH sanic_mppp_tbl_reglas(<MONEDA_DEL_PLAN>)` con `sanic_efecto = Envía a revisión`.
 
-**Esperado.** **No deja guardar**, con un mensaje que explique por qué.
+**Qué tiene que pasar.** **No deja guardar**: HTTP distinto de 200/204, con un mensaje que nombra
+el motivo. Al terminar, `MONEDA_DEL_PLAN` queda con efecto **Rechaza** (revertido en `finally`).
 
-> Dejá `MONEDA_DEL_PLAN` con efecto **Rechaza** al terminar.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-03`).
 
-**Automatizable.** API (`corredor.py`, caso I-03).
+**Cómo se sabe que falló.** Si el `PATCH` da 200/204, `MONEDA_DEL_PLAN` quedó con un efecto que el
+motor de validación (D-20) no sabe interpretar en nivel Registro — **hay que revertirla a mano**
+(`sanic_efecto = Rechaza`) antes de correr cualquier caso de `03-reglas-de-registro.md` que la use.
+
+**Automatizable.** API (`correr.py I`, caso `I-03`).
 
 ---
 
 ## I-04 · Una regla que depende de sí misma
 
-**Qué prueba.** El defecto que encontró la revisión de código: la autodependencia se rechaza
-**por el código**, antes de mirar ningún orden.
+**Qué prueba.** La autodependencia se rechaza **por el código** (comparación de `sanic_codigo`),
+antes de mirar ningún `sanic_orden` — el defecto que encontró la revisión de código del
+2026-09-22: un `Update` que sube el orden Y agrega la autodependencia en el mismo guardado no podía
+usar "orden estrictamente menor" como única defensa, porque el catálogo leído todavía trae el orden
+VIEJO de esa misma regla.
 
-**Necesita.** Sesión `admin_tecnico`.
+**Necesita.** La regla `MONEDA_DEL_PLAN` del catálogo sembrado.
 
-**Cómo.** Editá cualquier regla y poné en `sanic_dependede` **su propio código**.
+**Cómo.** `PATCH sanic_mppp_tbl_reglas(<MONEDA_DEL_PLAN>)` con `sanic_dependede =
+"MONEDA_DEL_PLAN"` (su propio código).
 
-**Esperado.** **No deja guardar**: *"No se puede guardar la regla 'X': no puede depender de sí
-misma."*
+**Qué tiene que pasar.** **No deja guardar**: *"No se puede guardar la regla 'MONEDA_DEL_PLAN': no
+puede depender de sí misma."* Al terminar, `sanic_dependede` queda como estaba (revertido en
+`finally`).
 
-> Probalo con una regla cuyo `orden` sea el mismo que tendría su "dependencia" — es el caso que una
-> prueba mal escrita dejaba pasar por coincidencia.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-04`).
 
-**Automatizable.** API (`corredor.py`, caso I-04).
+**Cómo se sabe que falló.** Si el `PATCH` da 200/204, la regla quedó con un ciclo de tamaño uno en
+`sanic_dependede` — **hay que revertirla a mano** a su valor original antes de que el motor de
+validación intente resolver sus dependencias y entre en un ciclo.
 
----
-
-## I-05 · Integridad de una autorización
-
-**Qué prueba.** **Corregido**: no hay un `IntegridadAutorizacionPlanStep` (esa clase no existe en
-el código, ver la nota de arriba). Lo que realmente prueba este caso es la **clave alternativa**
-`sanic_mppp_key_autorizacionplan_autorizado_plan` sobre AutorizacionPlan.
-
-**Necesita.** Sesión `admin_planes` (Catálogos → Autorizaciones - Planes); una autorización
-existente (P-03, TU-CORREO → PR11).
-
-**Cómo.** En **Catálogos → Autorizaciones - Planes**, creá una autorización duplicada: el
-**mismo** autorizado sobre el **mismo** plan que ya tiene (`TU-CORREO → PR11`).
-
-**Esperado.** **No deja guardar** (por la clave alternativa), con un mensaje entendible y
-**no** un volcado técnico de la plataforma.
-
-**Automatizable.** API (`corredor.py`, caso I-05).
+**Automatizable.** API (`correr.py I`, caso `I-04`).
 
 ---
 
-## I-06 · El nombre calculado
+## I-05 · Integridad de una autorización por PLAN (duplicada)
 
-**Qué prueba.** `NombreCalculadoStep`.
+**Qué prueba.** La **clave alternativa** `sanic_mppp_key_autorizacionplan_autorizado_plan` sobre
+AutorizacionPlan. **No hay ningún `IntegridadAutorizacionPlanStep`** (esa clase nunca existió en el
+código: ver la corrección al principio de este archivo) — la integridad de una autorización
+duplicada la garantiza la clave, no un plugin.
 
-**Necesita.** Sesión `admin_planes`.
+**Necesita.** El `REMITENTE` de este set, ya autorizado sobre `PR11` por `preparar()` de este mismo
+set (`preparacion_comun.verificar_datos_negocio`, que siembra el fixture `PR*` — no depende de
+ningún otro archivo del plan).
 
-**Cómo.** Creá una **Autorización** nueva (autorizado `TU-CORREO`, plan `PR06` si no existe ya) y
-**no toques el campo Nombre**.
+**Cómo.** `POST sanic_mppp_tbl_autorizacionplans` con el **mismo** autorizado (`REMITENTE`) y el
+**mismo** plan (`PR11`) que ya tiene autorizado.
 
-**Esperado.** Al guardar, el nombre queda calculado solo: **`correo → CODIGO`**.
+**Qué tiene que pasar.** **No deja guardar** (por la clave alternativa): HTTP distinto de
+200/201/204, con un mensaje entendible y **no** un volcado técnico de la plataforma
+(`Microsoft.Crm.CrmException` no debería aparecer en el texto).
 
-Lo mismo con un **Plan**: el nombre se arma con su código y su cliente.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-05`).
 
-**Automatizable.** API (`corredor.py`, caso I-06).
+**Cómo se sabe que falló.** Si el `POST` da 200/201/204, la clave alternativa no está frenando el
+duplicado — el caso la borra de inmediato. Si el `POST` se rechaza pero el mensaje trae
+`Microsoft.Crm.CrmException` (o un volcado similar), el rechazo funciona pero expone un mensaje que
+un Administrador de planes no puede leer.
 
----
-
-## I-07 · Lista blanca de escrituras
-
-**Qué prueba.** `ListaBlancaStep`: que no se pueda escribir a mano lo que escribe el sistema.
-
-**Necesita.** Acceso al Web API con permiso de escritura sobre Fila (credenciales de servicio, o
-una sesión con un rol que tenga `W` sobre Fila — Ejecutivo o Supervisor, `04`); una Fila existente
-(la de C-01 alcanza). Para el lado de la app: sesión `ejecutivo` o `supervisor`.
-
-**Cómo.** Abrí una **Fila** en la app e intentá editar a mano una columna que llena la validación
-—por ejemplo `sanic_referencia`— y guardar. Además, probá un `PATCH` directo a esa columna por Web
-API.
-
-**Esperado.** **No deja**, o el campo está de solo lectura en el formulario **y** el plugin lo
-rechaza si se intenta por API.
-
-> **DEFECTO CONFIRMADO, no advertencia teórica.** Este archivo ya avisaba del riesgo; hoy está
-> demostrado y automatizado en `herramientas/pruebas/corredor.py` (caso I-07): un `PATCH` directo a
-> `sanic_referencia` por Web API se guarda con **HTTP 204** (éxito) en lugar de ser rechazado.
-> `ListaBlancaStep` **no** bloquea esta columna. El formulario puede estar bien (de solo lectura),
-> pero eso no alcanza: cualquiera con acceso al Web API y privilegio de escritura sobre Fila puede
-> pisar una referencia que va a AS400. **Queda pendiente de decisión del aprobador**: si
-> `ListaBlancaStep` tiene que extender su lista a `sanic_referencia` (y probablemente a las demás
-> columnas que solo escribe la validación), o si el riesgo se acepta porque el privilegio de
-> escritura ya está acotado a Ejecutivo/Supervisor por la matriz de `04`. No lo des por OK ni por
-> FALLA vos mismo: es un hallazgo para que el aprobador decida, anotalo como tal en Resultados.
-
-**Automatizable.** API (corredor.py, caso I-07 — ya demostrado; no hace falta correrlo de nuevo a
-mano para confirmar el defecto).
+**Automatizable.** API (`correr.py I`, caso `I-05`).
 
 ---
 
-## I-08 · Transición de estado ilegal
+## I-06 · El nombre calculado: Plan, AutorizacionPlan, AutorizacionCliente y Fila
 
-**Qué prueba.** `TransicionDeFilaStep`, que es lo que hace cierto DA-07.
+**Qué prueba.** `NombreCalculadoStep`, en **las cuatro tablas que cubre hoy** — nombradas, no
+contadas (CONVENCIONES §7): `Plan`, `AutorizacionPlan`, `AutorizacionCliente` (agregada en fase 2,
+DN-01) y `Fila`.
 
-**Necesita.** Acceso al Web API con permiso de escritura sobre Fila (o una sesión con rol
-Ejecutivo/Supervisor) y una fila en Validada.
+**Necesita.** El Cliente (`prep.CLIENTE`) y el Autorizado (`REMITENTE`) que `preparar()` de este
+set deja listos; el plan `PRNA` del fixture (existe, pero el `REMITENTE` de este set **no** está
+autorizado sobre él — a propósito, por `preparar_datos.py`); una Solicitud propia de este caso
+(`ctx.procesar()` con `E01-feliz-formato11.xlsx`) para la Fila.
 
-**Cómo.** Sobre una fila en **Validada**, intentá ponerla directo en **Aprobada** (saltándose
-Digitada). Hacelo desde el formulario, no con el botón.
+**Cómo.**
 
-**Esperado.** **No deja**: el mensaje dice que esa transición no es válida desde ese estado.
+1. Crea un **Plan** (`sanic_codigo = "ZZNM"`) sin tocar `sanic_nombre`.
+2. Crea una **AutorizacionPlan** (`REMITENTE` → `PRNA`) sin tocar `sanic_nombre`.
+3. Crea una **AutorizacionCliente** (`REMITENTE` → `prep.CLIENTE`) sin tocar `sanic_nombre`.
+4. Procesa una Solicitud con 3 filas (`E01-feliz-formato11.xlsx`) y lee el `sanic_nombre` de cada
+   Fila.
 
-**Este es el caso que demuestra que la seguridad no está en el botón.** Si pasa, alguien con el
-Web API puede aprobar lo que quiera.
+**Qué tiene que pasar.**
 
-**Automatizable.** API (`corredor.py`, caso I-08 — **este es el caso que demuestra que la
-seguridad no está en el botón**).
+| Tabla | Nombre calculado esperado |
+|---|---|
+| Plan | `ZNM - PR - Pruebas MPPP SA` (`CODIGO - Cliente`) |
+| AutorizacionPlan | `<REMITENTE> → PRNA` (`correo → CODIGO del plan`) |
+| AutorizacionCliente | `<REMITENTE> → PR - Pruebas MPPP SA` (`correo → NOMBRE del cliente`, no el código: no tiene) |
+| Fila (cada una de las 3) | `<MPPP-########>-F01`, `-F02`, `-F03` (`<solicitud>-F<NN>`, dos dígitos como mínimo) |
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-06`).
+
+**Cómo se sabe que falló.** Distinguí CUÁL de las cuatro tablas falló por el nombre del check (cada
+una se reporta por separado, con el valor obtenido): si es **Plan** o **AutorizacionPlan**, es una
+regresión en código ya viejo (fase 1); si es **AutorizacionCliente**, es la parte nueva de fase 2
+(DN-01) la que no quedó bien enchufada al step; si es **Fila**, el problema no es de esta fase — es
+el mismo cálculo que usa TODO el resto del plan para citar el número de fila.
+
+**Automatizable.** API (`correr.py I`, caso `I-06`).
+
+---
+
+## I-07 · Lista blanca de escrituras (columna calculada por PATCH directo)
+
+**Qué prueba.** `ListaBlancaStep`: que no se pueda escribir a mano, por Web API, una columna que
+solo llena la validación.
+
+**Necesita.** Una Fila propia de este caso (`ctx.procesar()` con `E01-feliz-formato11.xlsx`, 3
+filas Validadas) — este set ya no depende de la Fila de otro archivo (ver la corrección al
+principio de este documento).
+
+**Cómo.** `PATCH` directo por Web API a `sanic_referencia` de una Fila recién validada, con un
+valor arbitrario (`"ZZ-INTENTO-DIRECTO"`).
+
+**Qué tiene que pasar en el DISEÑO.** El `PATCH` debería rechazarse: HTTP 400, con un mensaje que
+nombre `sanic_referencia` como columna no permitida.
+
+> **DEFECTO CONFIRMADO — este caso da FALLA a propósito, hasta que el aprobador decida.** El
+> `PATCH` se guarda con **HTTP 204** (éxito) en vez de ser rechazado: `ListaBlancaStep` **no**
+> bloquea esta columna. Registrado en `diseno/PENDIENTES.md`, entrada `I-07`: **ABIERTA, pospuesta
+> por el aprobador (2026-09-27), requiere su decisión** — o el step extiende su lista a
+> `sanic_referencia` (y probablemente a las demás columnas que solo escribe la validación), o el
+> riesgo se acepta porque el privilegio de escritura sobre Fila ya está acotado a Ejecutivo/
+> Supervisor por la matriz de `04`. **Este caso NO se apaga ni se "arregla" apagando la prueba que
+> lo detecta**: un defecto conocido, pospuesto a propósito, se sigue viendo en rojo hasta que se
+> resuelva — un FALLA que desaparece solo porque se dejó de mirar es peor que uno que se ve.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-07`) — hoy tiene que dar
+**FALLA**, con el detalle `HTTP 204` (no 400).
+
+**Cómo se sabe que falló *de la forma esperada*.** El síntoma correcto es `HTTP 204` en el detalle
+del check (el `PATCH` se guardó). Si algún día aparece `HTTP 400` en su lugar, **este caso pasa a
+OK** y hay que actualizar `diseno/PENDIENTES.md` (cerrar la entrada `I-07`) y esta nota, porque el
+defecto se corrigió. Si aparece cualquier otro HTTP (500, timeout), eso sí es un defecto NUEVO —
+distinto del conocido — y hay que investigarlo aparte.
+
+**Automatizable.** API (`correr.py I`, caso `I-07` — ya demostrado; no hace falta correrlo a mano
+para confirmar el defecto).
+
+---
+
+## I-08 · Transición de estado ilegal (Validada → Aprobada, saltando Digitada)
+
+**Qué prueba.** `TransicionDeFilaStep`: un salto que no existe en la tabla de transiciones
+(`Dominio/TransicionesDeFila.cs`) se rechaza **siempre**, sea cual sea el rol de quien lo intenta —
+`(Validada, Aprobada)` no es una clave de esa tabla, así que la respuesta es "Transición no
+permitida" antes incluso de mirar roles.
+
+**Necesita.** Una Fila propia de este caso, en Validada (`ctx.procesar()` con
+`E01-feliz-formato11.xlsx`).
+
+**Cómo.** `PATCH` directo por Web API a `sanic_estado = Aprobada` sobre una Fila en Validada
+(saltando Digitada), sin pasar por ningún botón.
+
+**Qué tiene que pasar.** **No deja**: HTTP 400, con un mensaje que dice que esa transición no es
+válida desde ese estado.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-08`).
+
+**Cómo se sabe que falló.** Si el `PATCH` da 200/204, **la seguridad no estaba en el botón**:
+cualquiera con acceso al Web API y privilegio de escritura sobre Fila puede aprobar lo que quiera,
+saltándose el circuito completo de digitación. Es el caso más grave de todo este archivo si falla.
+
+**Automatizable.** API (`correr.py I`, caso `I-08` — el caso que demuestra que la seguridad no está
+en el botón).
 
 ---
 
 ## I-09 · El paquete de plugins está al día
 
-**Qué prueba.** Que el ensamblado en el sandbox sea el del repositorio, y no una versión vieja.
+**Qué prueba.** Que el ensamblado en el sandbox tenga registrados exactamente los tipos de plugin
+del repositorio — **nombrados, no contados** (CONVENCIONES §7: la versión anterior de este caso
+decía "10 tipos"; hoy hay 13).
 
-**Necesita.** Credenciales de lectura en Dataverse (o de servicio).
+**Necesita.** Credenciales de lectura en Dataverse (las que ya usa `preparar()` de este set).
 
 **Cómo.**
 
 ```bash
-python3 herramientas/construir/paquete_plugins.py playbooks/paquete-plugins/*.md --solo-verificar
+python3 herramientas/construir/paquete_plugins.py playbooks/paquete-plugins/sanic_mppp_pkg_plugins.md --solo-verificar
 ```
 
-**Esperado.** **Corregido: decía "10 tipos", hoy son 13** (verificado en vivo el 2026-09-27, este
-mismo comando: `"13 tipos de plugin registrados"` — 8 steps + 5 Custom API). `"estado":
-"ya_existia"` con los **13 tipos** registrados.
+y además, dentro del caso, `GET plugintypes` filtrado por el ensamblado, para nombrar cada uno.
 
-> Cuidado con la trampa conocida: el sandbox puede seguir corriendo el binario viejo si no se
-> subió el número de build. El síntoma es *"The plug-in type could not be found in the plug-in
-> assembly"*, y la señal temprana es un `.nupkg` del mismo tamaño exacto que el anterior.
+**Qué tiene que pasar.** `"estado": "ya_existia"` (la herramienta ya compara por NOMBRE lo que
+falta y lo que sobra — D-57 c, no un conteo), **y** cada uno de estos 13 tipos presente en
+`plugintypes`, **sin ninguno de más**:
 
-**Automatizable.** API (`paquete_plugins.py --solo-verificar`; `corredor.py`, caso I-09).
+`Sanic.Mppp.Plugins.Steps.ListaBlancaStep` · `NormalizarYValidarStep` · `NombreCalculadoStep` ·
+`TransicionDeFilaStep` · `PostTransicionDeFilaStep` · `AtenderPorClasificarStep` ·
+`RevisionAtendidaStep` · `IntegridadDeReglaStep` — y `Sanic.Mppp.Plugins.Api.ClasificarCorreoApi` ·
+`ExportarParaDigitarApi` · `ObtenerFilasPendientesApi` · `RegistrarResultadoRpaApi` ·
+`ValidarSolicitudApi`.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-09`).
+
+**Cómo se sabe que falló.** Si falta un nombre puntual, ESE es el tipo que no se subió al sandbox
+(revisar el `.nupkg`, no todo el paquete). Si "sobra" un nombre, es una derivación que el playbook
+no declara (D-57 c: pasó una vez con `RevisionAtendidaStep`) — no es necesariamente un defecto,
+pero hay que decidir si se agrega al playbook o se borra del entorno. **Cuidado con la trampa
+conocida**: el sandbox puede seguir corriendo el binario viejo si no se subió el número de build; el
+síntoma es *"The plug-in type could not be found in the plug-in assembly"*.
+
+**Automatizable.** API (`paquete_plugins.py --solo-verificar`; `correr.py I`, caso `I-09`).
+
+---
+
+## I-10 · Los 20 registros de step de plugin, uno por uno
+
+**Qué prueba.** Que los **20 registros** de `playbooks/steps/sanic_mppp_pkg_plugins.md` (inventario
+8.2) existan en vivo, **nombrados uno por uno**, cada uno con su mensaje, su tabla y su etapa
+exactos — no un conteo (CONVENCIONES §7). Reemplaza a la vieja tabla de prosa "8 steps registrados"
+de este archivo, que solo describía qué protege cada CLASE sin verificar nada contra el entorno.
+
+**Necesita.** Credenciales de lectura en Dataverse.
+
+**Cómo.** Por cada uno de los 20 nombres de `playbooks/steps/sanic_mppp_pkg_plugins.md` §2, `GET
+sdkmessageprocessingsteps?$filter=name eq '<nombre>'` con `$expand` de `sdkmessageid` (el mensaje) y
+`sdkmessagefilterid` (la tabla).
+
+**Qué tiene que pasar.** Los 20, cada uno **habilitado** (`statecode = 0`) y con su mensaje, su
+tabla y su etapa exactos:
+
+| Step (nombre exacto) | Mensaje | Tabla | Etapa |
+|---|---|---|---|
+| `MPPP - Lista blanca - Update de Fila` | Update | `sanic_mppp_tbl_fila` | PreOperation |
+| `MPPP - Lista blanca - Update de Solicitud` | Update | `sanic_mppp_tbl_solicitud` | PreOperation |
+| `MPPP - Normalizar y validar - Create de Cliente` | Create | `sanic_mppp_tbl_cliente` | PreOperation |
+| `MPPP - Normalizar y validar - Update de Cliente` | Update | `sanic_mppp_tbl_cliente` | PreOperation |
+| `MPPP - Normalizar y validar - Create de Plan` | Create | `sanic_mppp_tbl_plan` | PreOperation |
+| `MPPP - Normalizar y validar - Update de Plan` | Update | `sanic_mppp_tbl_plan` | PreOperation |
+| `MPPP - Normalizar y validar - Create de Autorizado` | Create | `sanic_mppp_tbl_autorizado` | PreOperation |
+| `MPPP - Normalizar y validar - Update de Autorizado` | Update | `sanic_mppp_tbl_autorizado` | PreOperation |
+| `MPPP - Normalizar y validar - Create de Parametro` | Create | `sanic_mppp_tbl_parametro` | PreOperation |
+| `MPPP - Normalizar y validar - Update de Parametro` | Update | `sanic_mppp_tbl_parametro` | PreOperation |
+| `MPPP - Nombre calculado - Create de Plan` | Create | `sanic_mppp_tbl_plan` | PreOperation |
+| `MPPP - Nombre calculado - Create de Autorizacionplan` | Create | `sanic_mppp_tbl_autorizacionplan` | PreOperation |
+| `MPPP - Nombre calculado - Create de Autorizacioncliente` | Create | `sanic_mppp_tbl_autorizacioncliente` | PreOperation |
+| `MPPP - Nombre calculado - Create de Fila` | Create | `sanic_mppp_tbl_fila` | PreOperation |
+| `MPPP - Transicion de Fila - Update` | Update | `sanic_mppp_tbl_fila` | PreOperation |
+| `MPPP - Post transicion de Fila - Update` | Update | `sanic_mppp_tbl_fila` | **PostOperation** |
+| `MPPP - Atender correo por clasificar - Update de Solicitud` | Update | `sanic_mppp_tbl_solicitud` | PreOperation |
+| `MPPP - Revision atendida - Update de Solicitud` | Update | `sanic_mppp_tbl_solicitud` | PreOperation |
+| `MPPP - Integridad de Regla - Create` | Create | `sanic_mppp_tbl_regla` | PreOperation |
+| `MPPP - Integridad de Regla - Update` | Update | `sanic_mppp_tbl_regla` | PreOperation |
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-10`).
+
+**Cómo se sabe que falló.** El check nombra el step exacto que no coincide (no aparece, o aparece
+con otro mensaje/tabla/etapa/deshabilitado): ESE es el que hay que revisar en el entorno, sin tener
+que adivinar cuál de los 20.
+
+**Automatizable.** API (`correr.py I`, caso `I-10`).
+
+---
+
+## I-11 · Integridad de una autorización por CLIENTE (duplicada, fase 2 DN-01)
+
+**Qué prueba.** La clave alternativa nueva `sanic_mppp_key_autorizacioncliente_autorizado_cliente`
+sobre AutorizacionCliente (inventario 5.11, DN-01) — la vía por cliente agregada en fase 2, hermana
+de la que prueba I-05 para AutorizacionPlan.
+
+**Necesita.** El Cliente (`prep.CLIENTE`) y el Autorizado (`REMITENTE`) que `preparar()` de este set
+deja listos.
+
+**Cómo.** Crea una **AutorizacionCliente** (`REMITENTE` → `prep.CLIENTE`); después intenta crear
+una **segunda**, con el mismo autorizado y el mismo cliente.
+
+**Qué tiene que pasar.** La primera se crea sin problema. La segunda **no deja guardar** (por la
+clave alternativa): HTTP distinto de 200/201/204, con un mensaje entendible y **no** un volcado
+técnico de la plataforma.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-11`).
+
+**Cómo se sabe que falló.** Si la precondición (la primera AutorizacionCliente) no se pudo crear,
+el caso lo reporta como tal, sin llegar a probar nada más. Si la SEGUNDA se guarda (HTTP
+200/201/204), la clave alternativa de fase 2 no está frenando el duplicado — el caso la borra de
+inmediato. Si se rechaza pero con un volcado técnico crudo, el rechazo funciona pero el mensaje no
+sirve para un Administrador de planes.
+
+**Automatizable.** API (`correr.py I`, caso `I-11`).
+
+---
+
+## I-12 · La puerta del RPA rechaza a quien no es el bot (fase 2, D-9/D-44)
+
+**Qué prueba.** `PuertaDelRpa.Exigir` (`src/Sanic.Mppp.Plugins/Steps/PuertaDelRpa.cs`): las dos
+Custom API de fase 2 (`sanic_mppp_capi_obtenerfilaspendientes`,
+`sanic_mppp_capi_registrarresultadorpa`) llevan `ExecutePrivilegeName` **vacío a propósito** (D-9);
+la puerta es el código, con dos condiciones obligatorias: identidad de aplicación **y** rol `SR -
+MPPP - RPA`.
+
+**Necesita.** Nada además de las credenciales que ya usa este set. El service principal de Dev (`#
+PowerPlatform-Dev`) **es** una identidad de aplicación (tiene `applicationid`), pero **solo tiene
+el rol `System Administrator`** — verificado en vivo el 2026-09-27 contra
+`systemuserroles_association` — así que es exactamente el llamador que la puerta tiene que
+rechazar. No hace falta (ni se usan) las credenciales reales del bot (`local/rpa_cred.env`).
+
+**Cómo.** `GET sanic_mppp_capi_obtenerfilaspendientes(claimminutos=5)` con las credenciales del
+service principal de este set.
+
+**Qué tiene que pasar.** **No deja pasar**: HTTP 400, con un mensaje que trae el código
+`MPPP-RPA-006` (identidad de aplicación sin el rol) — o `MPPP-RPA-007` si algún día el rol no
+existiera en el entorno. Ninguna Fila se toca: la puerta corre antes de cualquier lógica de
+negocio.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-12`).
+
+**Cómo se sabe que falló.** Si el `GET` da 200 (la Custom API respondió filas), la puerta no está
+frenando y **cualquier identidad de aplicación sin el rol puede reservar y leer filas pendientes de
+digitar** — hay que revisar de inmediato si además reservó un claim sobre filas reales (columna
+`sanic_claimhasta`) y liberarlas a mano. Si el HTTP es 400 pero el mensaje no trae ninguno de los
+dos códigos `MPPP-RPA-0*`, el rechazo funciona pero por otro motivo (por ejemplo, un parámetro mal
+formado) — no confirma que la puerta sea la que frenó.
+
+**Automatizable.** API (`correr.py I`, caso `I-12`).
+
+---
+
+## I-13 · El claim se libera en un estado terminal, y no antes (fase 2, `03` §2)
+
+**Qué prueba.** El comportamiento del claim dentro de `TransicionDeFilaStep`: mientras la Fila
+sigue en un estado "abierto" (Validada, Digitada) el claim **no se toca**; al llegar a un estado
+terminal (Aprobada, Rechazada en AS400, Anulada) el claim **se libera** (`sanic_claimhasta =
+null`), sea cual sea quien hizo la transición.
+
+**Necesita.** Los roles de Ejecutivo (`User1`) y Supervisor (`User2`), verificados EN VIVO contra
+`systemuserroles_association` dentro de este mismo caso (no en `preparar()`: es el único caso de
+todo el set que impersona un rol de negocio — CONVENCIONES §8, "no supuesto"); una Fila propia de
+este caso, en Validada (`ctx.procesar()` con `E01-feliz-formato11.xlsx`).
+
+**Cómo.**
+
+1. `PATCH` directo (service principal, sin impersonar) de `sanic_claimhasta` a un instante **5
+   minutos en el pasado** (ya vencido) — esta columna no está en la lista blanca de una persona,
+   solo la escribe código de servidor.
+2. Impersonando a **Ejecutivo** (`MSCRMCallerID`), `PATCH sanic_estado = Digitada` (Validada →
+   Digitada).
+3. Impersonando a **Supervisor** (otro usuario: segregación de funciones), `PATCH sanic_estado =
+   Aprobada` (Digitada → Aprobada).
+4. Lee `sanic_claimhasta` después de cada paso.
+
+**Qué tiene que pasar.**
+
+| Paso | `sanic_claimhasta` |
+|---|---|
+| Después de sembrar el claim vencido | el valor sembrado (pasado) |
+| Después de Validada → Digitada | **el mismo valor** (sin tocar: sigue "abierta") |
+| Después de Digitada → Aprobada | **vacío** (liberado: es terminal) |
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-13`).
+
+**Cómo se sabe que falló.** Si el claim se BORRA en Validada → Digitada, el step está liberando de
+más (un bot que reservó una fila para trabajarla perdería la reserva a mitad de camino). Si el
+claim SIGUE presente después de Digitada → Aprobada, el step no libera en un estado terminal, y una
+fila ya aprobada quedaría "reservada" para siempre, bloqueando cualquier lectura futura del bot
+sobre esa fila. Si User1/User2 no tienen los roles esperados, el caso da **N-A** (no FALLA): con
+otros roles dan 400 por falta de rol y el resultado mentiría sobre lo que en realidad se probó.
+
+**Automatizable.** API (`correr.py I`, caso `I-13`).
 
 ---
 
@@ -229,11 +507,16 @@ mismo comando: `"13 tipos de plugin registrados"` — 8 steps + 5 Custom API). `
 | I-02 dependencia inactiva | | |
 | I-03 efecto inválido por nivel | | |
 | I-04 autodependencia | | |
-| I-05 autorización duplicada | | |
-| I-06 nombre calculado | | |
-| I-07 lista blanca | | |
+| I-05 autorización por plan duplicada | | |
+| I-06 nombre calculado (4 tablas) | | |
+| **I-07 lista blanca** | | **FALLA esperado — defecto abierto, `diseno/PENDIENTES.md` entrada I-07** |
 | **I-08 transición ilegal** | | |
-| I-09 paquete al día | | |
+| I-09 paquete al día (13 tipos) | | |
+| I-10 los 20 steps, uno por uno | | |
+| I-11 autorización por cliente duplicada (fase 2) | | |
+| I-12 puerta del RPA (fase 2) | | |
+| I-13 claim: no toca / libera (fase 2) | | |
 
 > Dejá el catálogo de **Reglas** como estaba: `PLAN_EXISTE` activa, `MONEDA_DEL_PLAN` con efecto
-> Rechaza, y sin la regla inventada de I-01.
+> Rechaza, y sin la regla inventada de I-01. Los propios casos lo revierten en `finally`; esta nota
+> es para quien inspeccione el entorno después de una corrida interrumpida (`Ctrl-C`, timeout).
