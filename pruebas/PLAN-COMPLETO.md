@@ -1,7 +1,7 @@
 # Plan de pruebas funcionales — MPPP
-Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · generado el 2026-09-27 por `herramientas/pruebas/armar_plan_completo.py`
+Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · generado el 2026-09-28 por `herramientas/pruebas/armar_plan_completo.py`
 
-Este documento junta `README.md` y los 14 archivos de `pruebas/` en uno solo, para
+Este documento junta `README.md` y los 12 archivos de `pruebas/` en uno solo, para
 leerlo de corrido. Los archivos separados (y los Excel) están en el repositorio, en
 `pruebas/`. **No lo edites a mano**: si editás algo, editalo en el archivo separado y
 volvé a correr `python3 herramientas/pruebas/armar_plan_completo.py`.
@@ -27,25 +27,61 @@ archivo, prepara por su cuenta todo lo que necesita) con su letra, corrido por
 |---|---|---|---|
 | C | [`01-clasificacion-del-correo.md`](01-clasificacion-del-correo.md) | `MPPP-REC`/`MPPP-ING`, el plugin liviano, reglas de nivel **Correo**, y DN-01 (autorización por cliente) en la clasificación | 11 |
 | S | [`02-reglas-de-solicitud.md`](02-reglas-de-solicitud.md) | Reglas de nivel **Solicitud**: adjunto, Excel, estructura, filas | 7 |
-| R | [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las que deciden fila por fila, más DN-01/DN-03 | 18 |
+| R | [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las que deciden fila por fila, más DN-01, y DN-03 completo (absorbió el set O) | 28 |
 | M | [`04-comunicaciones.md`](04-comunicaciones.md) | `MPPP-COM`/`MPPP-ENV`: acuse y respuesta final, correo **real** de punta a punta | 7 |
-| A | [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los comandos de la barra y el diálogo de motivo, por API con `MSCRMCallerID` | 14 |
-| G | [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, privilegios efectivos, sitemap, vistas, formularios | 14 |
+| A | [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los comandos de la barra y el diálogo de motivo, por API con `MSCRMCallerID`, y la lección del botón fantasma (ex H-06) | 15 |
+| G | [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, privilegios efectivos, sitemap, vistas, formularios (absorbió el resto del set H) | 20 |
 | V | [`07-vigilancia.md`](07-vigilancia.md) | `MPPP-VIG`: los 5 bloques de recuperación | 7 |
 | I | [`08-integridad-y-plugins.md`](08-integridad-y-plugins.md) | Steps de plugin, catálogo de reglas, claves únicas, la puerta del RPA | 13 |
 | B | [`09-rpa-fase2.md`](09-rpa-fase2.md) | El bot RPA: Custom API, claim, orden FIFO, catálogo de errores | 20 |
 | U | [`10-autorizacion-cliente.md`](10-autorizacion-cliente.md) | DN-01: autorización por cliente, con interruptor a plan | 11 |
 | E | [`11-exportacion-excel.md`](11-exportacion-excel.md) | DN-02: descargar a Excel lo que hay que digitar | 10 |
-| O | [`12-obligatoriedad-gestion.md`](12-obligatoriedad-gestion.md) | DN-03: la obligatoriedad se define por gestión | 10 |
-| H | [`13-construido-hoy.md`](13-construido-hoy.md) | Lo construido el 2026-09-27: sitemap, vistas, formulario, la lección del ribbon | 7 |
 
-**149 casos** (contados de los encabezados `### X-NN` de cada archivo el 2026-09-27, no de un número
-viejo). Cada uno trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
+**149 casos** (contados de los encabezados de caso de cada archivo el 2026-09-28, no de un número
+viejo — el reagrupamiento de sets solo movió casos, no agregó ni sacó ninguno: el total es el mismo
+que el 2026-09-27, cuando todavía eran 13 archivos). Cada uno trae: qué prueba, cómo hacerlo, **qué
+tiene que pasar** y cómo verificarlo.
 
-> **Set G, nota al 2026-09-27.** El archivo documenta 14 casos (`G-06` quedó fusionada en `G-00`/
-> `G-00b`, así que no cuenta como caso aparte); `set_g.py` está en migración activa en paralelo a
-> este cierre, así que la cantidad de casos que corren HOY por `correr.py G` puede ser menor a 14
-> por un rato — `correr.py --listar` siempre dice la verdad del momento, más que este número.
+> **Set G, nota al 2026-09-28.** El archivo documenta 20 casos (`G-06` quedó fusionada en `G-00`/
+> `G-00b`, así que no cuenta como caso aparte). De esos 20, tres siguen siendo GUI sin arnés todavía
+> (`G-02` íconos, `G-07` recorte del sitemap por rol, `G-11` multiidioma — documentados con el
+> comando exacto, sin función en `CASOS`): no es una migración a medias, es un hueco de cobertura
+> conocido. `correr.py --listar` siempre dice la verdad del momento, más que este número.
+
+### Tabla de equivalencias — el reagrupamiento de sets del 2026-09-28
+
+Trece sets se reagruparon en once (`CONVENCIONES.md` §4, "La regla del nombre": el nombre de un set
+dice QUÉ prueba, nunca cuándo se escribió ni qué pedido lo originó). `12-obligatoriedad-gestion.md`
+y `13-construido-hoy.md` desaparecieron. Un reporte o una nota vieja que cite un ID de antes del
+2026-09-28 se sigue leyendo con esta tabla:
+
+| ID viejo | Archivo viejo | → | ID nuevo | Archivo nuevo |
+|---|---|---|---|---|
+| `O-01` | `12-obligatoriedad-gestion.md` | → | `R-19` | `03-reglas-de-registro.md` |
+| `O-02` | `12-obligatoriedad-gestion.md` | → | `R-20` | `03-reglas-de-registro.md` |
+| `O-03` | `12-obligatoriedad-gestion.md` | → | `R-21` | `03-reglas-de-registro.md` |
+| `O-04` | `12-obligatoriedad-gestion.md` | → | `R-22` | `03-reglas-de-registro.md` |
+| `O-05` | `12-obligatoriedad-gestion.md` | → | `R-23` | `03-reglas-de-registro.md` |
+| `O-06` | `12-obligatoriedad-gestion.md` | → | `R-24` | `03-reglas-de-registro.md` |
+| `O-07` | `12-obligatoriedad-gestion.md` | → | `R-25` | `03-reglas-de-registro.md` |
+| `O-08` | `12-obligatoriedad-gestion.md` | → | `R-26` | `03-reglas-de-registro.md` |
+| `O-09` | `12-obligatoriedad-gestion.md` | → | `R-27` | `03-reglas-de-registro.md` |
+| `O-10` | `12-obligatoriedad-gestion.md` | → | `R-28` | `03-reglas-de-registro.md` |
+| `H-01` | `13-construido-hoy.md` | → | `G-14` | `06-seguridad-vistas-formularios.md` |
+| `H-02` | `13-construido-hoy.md` | → | `G-15` | `06-seguridad-vistas-formularios.md` |
+| `H-03` | `13-construido-hoy.md` | → | `G-16` | `06-seguridad-vistas-formularios.md` |
+| `H-04` | `13-construido-hoy.md` | → | `G-17` | `06-seguridad-vistas-formularios.md` |
+| `H-05` | `13-construido-hoy.md` | → | `G-18` | `06-seguridad-vistas-formularios.md` |
+| `H-06` | `13-construido-hoy.md` | → | `A-15` | `05-app-y-comandos.md` |
+| `H-07` | `13-construido-hoy.md` | → | `G-19` | `06-seguridad-vistas-formularios.md` |
+
+**Por qué `O` entra entero en `R` y `H` se reparte entre `A` y `G`, y por qué `U` no se tocó**: la
+obligatoriedad por gestión (`O`) **ES** una de las ocho reglas de Registro — un tema, un archivo.
+Los siete casos de `H` no compartían un solo tema entre sí: seis eran de sitemap/vistas/formulario
+(el tema de `G`) y uno era de un comando de la barra (el tema de `A`), así que cada uno fue a donde
+correspondía por TEMA, no los siete juntos a un archivo por fecha. `U` (autorización por cliente)
+sigue aparte porque es transversal a dos niveles (Correo y Registro), no porque no se haya
+revisado — ver `CONVENCIONES.md` §4 para el detalle completo de los tres casos.
 
 ### El set P desapareció
 
@@ -70,6 +106,7 @@ python3 herramientas/pruebas/correr.py S            # un set
 python3 herramientas/pruebas/correr.py A,B,C        # varios, en ESE orden (no el canónico)
 python3 herramientas/pruebas/correr.py --todos      # todos los sets descubiertos, en orden canónico
 python3 herramientas/pruebas/correr.py --listar     # qué sets hay y cuántos casos, sin tocar Dev
+python3 herramientas/pruebas/correr.py --todos --full   # TODO prendido: ver la sección de abajo
 ```
 
 `correr.py` toma el semáforo (`semaforo.py`), aplica el canon de parámetros de `CONVENCIONES.md` §8.2
@@ -116,18 +153,20 @@ corriendo en paralelo (`CONVENCIONES.md` §5).
 
 ---
 
-## Casos de alto riesgo, apagados por default
+## Casos de alto riesgo, apagados por default — y el modo `--full`
 
-Dos banderas de entorno prenden casos que por default quedan `N-A` porque su costo (tiempo real,
-degradar el sandbox compartido de Dev para cualquier otro usuario) no se paga en cada corrida:
+Tres banderas de entorno prenden casos que por default quedan `N-A` porque su costo (tiempo real) o
+su riesgo (degradar el sandbox compartido de Dev, tocar un flujo real) no se paga en cada corrida:
 
 | Bandera | Qué prende | Por qué está apagada por default |
 |---|---|---|
 | `MPPP_E08_ALTO_RIESGO=si` | `E-08` (set E): ~300.000 filas hasta el límite real de memoria del sandbox | La llamada real tarda 150-170s y puede degradar el sandbox de Dataverse Dev para cualquier otro usuario mientras corre. Es un riesgo ya medido y aceptado, no un defecto — correrlo de nuevo no agrega cobertura, solo riesgo. |
+| `MPPP_V02_ALTO_RIESGO=si` | `V-02` (set V): apaga `Cloud Flow - MPPP - REC` DE VERDAD, corre la prueba, lo vuelve a encender | Es la única excepción de todo el arnés a "nunca se toca el estado de un flujo" — autorizada puntualmente por el aprobador el 2026-09-28, con dos redes de seguridad (`CONVENCIONES.md`, "Excepción V-02"). |
 | `MPPP_V_LENTOS=si` | `V-03` a `V-07` (set V): los bloques que dependen del schedule real de `MPPP-VIG` (recurrence de 10 minutos) | Con el margen que necesita este set (3 vueltas completas + colchón), los cinco casos juntos superan las dos horas y media. |
 
 ```bash
 MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+MPPP_V02_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py V
 MPPP_V_LENTOS=si python3 herramientas/pruebas/correr.py V
 ```
 
@@ -135,6 +174,37 @@ MPPP_V_LENTOS=si python3 herramientas/pruebas/correr.py V
 la medición real ya mostró que ni 250.000 posiciones de `filaids` se acercan al umbral, y forzar más
 volumen por API es el mismo riesgo de `E-08` sin agregar cobertura — esa cobertura puntual la da la
 prueba unitaria con reloj inyectado (`Aceptacion/ExportarParaDigitarApiAceptacion.cs`).
+
+### `--full` — un solo interruptor para "corré todas, todas sin importar nada"
+
+Decisión del aprobador (2026-09-28): en vez de tener que acordarse de las banderas sueltas de
+arriba, un solo parámetro las prende todas de una:
+
+```bash
+python3 herramientas/pruebas/correr.py --todos --full   # todo, con TODO prendido
+python3 herramientas/pruebas/correr.py V --full          # solo el set V, con lo suyo prendido
+python3 herramientas/pruebas/correr.py E --full          # solo el set E, con lo suyo prendido
+```
+
+`--full` es la forma **recomendada** de prender `MPPP_E08_ALTO_RIESGO`, `MPPP_V02_ALTO_RIESGO` y
+`MPPP_V_LENTOS` a la vez — pero no reemplaza a las banderas sueltas, las incluye: quien ya las usa
+por separado sigue funcionando exactamente igual.
+
+**Antes de arrancar, `--full` grita un banner** con qué casos extra va a correr, cuánto tarda de
+más y qué riesgos asume — nadie se tiene que enterar cuarenta minutos después de que el arnés está
+haciendo algo caro o riesgoso. `python3 herramientas/pruebas/correr.py --listar` también distingue,
+set por set, qué corre siempre y qué solo corre con `--full`.
+
+**Qué cuesta un `--full` completo (`--todos --full`):** además de los ~150-170s de `E-08`, el set V
+con TODO prendido (`V-02` + `V-03`..`V-07`) supera las **3 horas** — el schedule real de `MPPP-VIG`
+(10 minutos) no se puede acelerar desde afuera. Correr `V --full` o `E --full` por separado, para
+verificar un cambio puntual, es mucho más rápido que un `--todos --full` completo.
+
+**`B-01` (set B) queda afuera de `--full`, A PROPÓSITO.** No es un olvido: `B-01` renombra el rol
+`SR - MPPP - RPA` y rompe la puerta del bot para TODO el entorno mientras dura el renombre. El
+aprobador confirmó explícitamente que sigue `N-A` incluso con `--full` (`pruebas/09-rpa-fase2.md`);
+ya está cubierto por 8 pruebas unitarias (7 de rechazo). `--full` no tiene ninguna bandera que lo
+prenda — no existe.
 
 ---
 
@@ -446,6 +516,8 @@ está documentada en `herramientas/pruebas/sets/set_c.py::preparar()` — acá s
 | Datos de negocio (`PR*`, fixture compartido) y `REMITENTE` autorizado sobre `PR11` | `preparacion_comun.verificar_datos_negocio()` (antiguo P-03) |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` (antiguo P-04); este archivo solo usa `E01-feliz-formato11.xlsx` |
 | `autorizacion.modo` activo (DN-01) | `preparacion_comun.verificar_parametro_activo()` — ya sembrado en Dev desde el 2026-09-26, no hace falta crearlo |
+| `correo.prefijos.reenvio`, CONTENIDO (no solo que exista): lista no vacía y trae `FW:` | `preparacion_comun.verificar_prefijos_reenvio()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
+| `servicio.cuenta`, CONTENIDO (no solo que exista): tiene forma de UPN/correo | `preparacion_comun.verificar_servicio_cuenta()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
 | Autorizado + `AutorizacionCliente` privados de DN-01 (`REMITENTE_DN01`, autorizado SOLO por cliente, cero `AutorizacionPlan`) | `sets/set_c.py::_preparar_autorizacion_por_cliente()` (función local, no está en `preparacion_comun.py` — ver "Funciones para consolidar" al final) |
 
 **Corré este set con**:
@@ -533,7 +605,10 @@ síntomas.
 `In-Reply-To`/`References` (un reenvío también las trae).
 
 **Necesita.** El `REMITENTE` de este set; el adjunto `E01-feliz-formato11.xlsx`; un
-`In-Reply-To` simulado (igual que C-02, a propósito: para aislar que lo que decide es el prefijo).
+`In-Reply-To` simulado (igual que C-02, a propósito: para aislar que lo que decide es el prefijo);
+que `correo.prefijos.reenvio` traiga, en su CONTENIDO (no solo que la fila exista), el prefijo
+`FW:` — verificado en `preparar()` (`preparacion_comun.verificar_prefijos_reenvio()`, 2026-09-28):
+sin ese prefijo en la lista, este caso da No es correo nuevo por una razón de datos, no del sistema.
 
 **Cómo.** Correo con asunto `FW: Prueba C-03 reenvio`, mismas cabeceras de "respuesta" que C-02,
 adjuntando `E01-feliz-formato11.xlsx`.
@@ -975,6 +1050,8 @@ acá solo el resumen:
 | Datos de negocio (`PR*`, fixture compartido) | `preparacion_comun.verificar_datos_negocio()` (antiguo P-03) |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` (antiguo P-04) |
 | `plantilla.estructura` con la forma esperada | `preparacion_comun.verificar_estructura_plantilla()` (antiguo P-06, parcial) |
+| `lectura.limites`, CONTENIDO (no solo que exista): las dos claves de tope de bytes | `preparacion_comun.verificar_lectura_limites()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
+| `plantilla.listas`, CONTENIDO — banco BAC = código `007` (no solo que exista) | `preparacion_comun.verificar_bac_codigo_007()` — recupera la cobertura del antiguo P-06 (2026-09-28); el mismo chequeo corre también en el set **R**, que es quien de verdad construye y compara la referencia (caso R-10) |
 
 **Corré este set con**:
 
@@ -1306,8 +1383,10 @@ PLAN_EXISTE ─────┼─→ OBLIGATORIEDAD ───────┘
 cambiar de código, orden, nivel ni efecto (`diseno/DIRECTRICES-NUEVAS.md`). R-15..R-18 cubren esas
 dos reglas bajo el comportamiento nuevo, automatizadas por API con el mismo arnés que R-01..R-14; la
 sección "Fase 2 — investigación y conclusión" explica exactamente qué agrega este archivo y qué
-queda a cargo de los sets dedicados `10-autorizacion-cliente.md` (`U`) y
-`12-obligatoriedad-gestion.md` (`O`), para no duplicar los mismos casos con otro nombre.
+queda a cargo del set dedicado `10-autorizacion-cliente.md` (`U`), para no duplicar los mismos casos
+con otro nombre. **R-19..R-28** son la cobertura exhaustiva de DN-03 (el ex set `O`,
+`12-obligatoriedad-gestion.md`, fusionado acá el 2026-09-28 — `CONVENCIONES.md` §4, "La regla del
+nombre"): ver la sección propia más abajo, justo después de R-18.
 
 **Set autocontenido** (`CONVENCIONES.md` §8). Prepara sus propios datos (el fixture compartido `PR*`
 más, para DN-01, un Autorizado y una `AutorizacionCliente` que `preparar_datos.py` **no** crea), no
@@ -1319,6 +1398,7 @@ completo, y por qué, está en `herramientas/pruebas/sets/set_r.py::preparar()` 
 | Datos de negocio (`PR*`, fixture compartido, remitente autorizado por plan) | `preparacion_comun.verificar_datos_negocio()` |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
 | `plantilla.estructura` con la forma esperada | `preparacion_comun.verificar_estructura_plantilla()` |
+| `plantilla.listas`, CONTENIDO — banco BAC = código `007` (no solo que exista) | `preparacion_comun.verificar_bac_codigo_007()` — recupera la cobertura del antiguo P-06 (2026-09-28): es el código con el que R-10 construye y compara la referencia de formato 11 |
 | `plantilla.obligatoriedad` y `autorizacion.modo` activos (sin forzar valor: el canon de ambos es "la versión activa", DN-01/DN-03) | `preparacion_comun.verificar_parametro_activo()` |
 | Un Autorizado + una `AutorizacionCliente` (borrados por GUID en `cerrar()`, no por `marca_agua`: su nombre lo calcula un step y lo pisa — ver R-16), para R-16/R-17 (DN-01) | Web API directa (`preparar_datos.py` no la crea) |
 
@@ -1477,7 +1557,7 @@ desactivó a propósito).
 
 > **Nota DN-03 (2026-09-27).** Las 4 filas de `E06-obligatoriedad.xlsx` usan gestión **`Inclusion`**
 > (el valor por defecto de `generar_excel.fila()`), que **no** tiene entrada en `porGestion` (solo
-> `Exclusion` la tiene hoy, versión 2, PROVISIONAL — ver R-18). Por eso este caso sigue probando
+> `Exclusion` la tiene hoy, versión 2, confirmada por el aprobador el 2026-09-28 — ver R-18). Por eso este caso sigue probando
 > exactamente "todo obligatorio salvo referencia" **sin importar si la versión activa de
 > `plantilla.obligatoriedad` es la 1 o la 2**: es, de hecho, la evidencia de compatibilidad hacia
 > atrás que pide DN-03 ("un parámetro sin `porGestion`, o una gestión sin entrada en `porGestion`, se
@@ -1556,7 +1636,13 @@ no hace falta tocarlo a mano).
 
 **Qué prueba.** `REFERENCIA_FORMATO_11` con D-17 y DD-10, y que la recibida se guarde aparte.
 
-**Necesita.** La Solicitud de C-01 ya creada.
+**Necesita.** El `REMITENTE` de este set (autorizado sobre `PR11`); el adjunto
+`E01-feliz-formato11.xlsx` (este caso arma su propia Solicitud con `ctx.procesar()`, no depende de
+otro set ni de otro caso — `CONVENCIONES.md` §8); que `plantilla.listas` traiga, en su CONTENIDO
+(no solo que la fila exista), el banco `BAC` con código `007` — verificado en `preparar()`
+(`preparacion_comun.verificar_bac_codigo_007()`, 2026-09-28): con un código distinto de `007` (aunque
+también tenga 3 dígitos, como el `102` que documenta `diseno/PENDIENTES.md` sección B) la referencia
+esperada abajo no coincidiría, y este caso daría FALLA por una razón de datos, no del sistema.
 
 **Cómo.** Usá la Solicitud de **C-01** (`E01-feliz-formato11.xlsx`).
 
@@ -1810,13 +1896,14 @@ de arriba).
 
 ---
 
-### R-18 · DN-03: `Exclusion` afloja `numeroCuenta`, `banco` y `moneda` (marcado PROVISIONAL)
+### R-18 · DN-03: `Exclusion` afloja `numeroCuenta`, `banco` y `moneda`
 
 **Qué prueba.** La versión 2 de `plantilla.obligatoriedad`, sembrada en Dev el 2026-09-27
 (`playbooks/datos/parametros.md`): una fila de gestión `Exclusion` puede omitir cuenta, banco y
-moneda sin que `OBLIGATORIEDAD` la rechace. **Este criterio está marcado PROVISIONAL en el propio
-playbook, pendiente de confirmación de negocio del aprobador** — la dependencia queda anotada acá a
-propósito, tal como pide `diseno/DIRECTRICES-NUEVAS.md`.
+moneda sin que `OBLIGATORIEDAD` la rechace. **El criterio lo confirmó el aprobador el 2026-09-28**
+(`playbooks/datos/parametros.md`): ya no es tentativo. Sigue habiendo una dependencia de ENTORNO —
+que la versión activa hoy traiga `porGestion.Exclusion` sembrado— y ese caso se reporta `N-A`, no
+FALLA, si no está (ver abajo).
 
 **Necesita.** La versión activa más alta de `plantilla.obligatoriedad` con `porGestion.Exclusion`
 trayendo `numeroCuenta`, `banco` y `moneda` como opcionales (lo confirma `preparar()`, sin sembrar
@@ -1832,10 +1919,11 @@ caso con `generar_excel.fila()` + `ctx.excel_ad_hoc()`, igual que R-09/R-14).
 **Qué tiene que pasar.** La fila queda **Validada**: `OBLIGATORIEDAD` no la rechaza por
 `numeroCuenta`, `banco` ni `moneda` vacíos.
 
-**Si el parámetro activo HOY no trae `porGestion.Exclusion`** (por ejemplo, si el aprobador todavía
-no confirmó el criterio y alguien sembró una versión 3 que lo saca): el caso se reporta **N-A**, con
-el motivo exacto, en vez de FALLA — no es un defecto de la regla, es una dependencia de negocio
-todavía abierta (`CONVENCIONES.md` §3, "todo N-A se reporta explícitamente, con su motivo").
+**Si el parámetro activo HOY no trae `porGestion.Exclusion`** (por ejemplo, en un entorno donde
+todavía no se sembró esa versión, o si alguien sembró una versión 3 que lo saca): el caso se reporta
+**N-A**, con el motivo exacto, en vez de FALLA — no es un defecto de la regla, es una precondición de
+entorno, no una duda sobre el criterio (que ya está confirmado, `CONVENCIONES.md` §3, "todo N-A se
+reporta explícitamente, con su motivo").
 
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py R` (caso `R-18`); a mano,
 `ver_solicitud.py <MPPP-########>` sobre la fila creada.
@@ -1846,6 +1934,360 @@ FALLA — si dio FALLA con esos tres campos citados y el parámetro SÍ trae `po
 motor no lo está aplicando).
 
 **Automatizable.** API (`correr.py R`, caso `R-18`).
+
+---
+
+### Obligatoriedad por gestión, exhaustivo — casos R-19 a R-28 (fusionado del ex set O)
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): estos diez casos eran
+el set `O` (`12-obligatoriedad-gestion.md`, prefijo `O-`), un archivo aparte nombrado por la
+directiva que lo originó (DN-03) en vez de por lo que prueba. La obligatoriedad por gestión **ES**
+una de las ocho reglas de este mismo archivo (`OBLIGATORIEDAD`) — tenerla en otro archivo partía el
+motor de reglas en dos sin necesidad. El archivo `12-obligatoriedad-gestion.md` desapareció; la
+tabla de equivalencias completa (`O-01`→`R-19` … `O-10`→`R-28`) vive en `pruebas/README.md`.
+
+**`plantilla.obligatoriedad` es un parámetro GLOBAL** (§8.2 de `CONVENCIONES.md`): sembrar una
+versión nueva la vuelve la ACTIVA de inmediato, para toda Solicitud que se valide mientras esté
+activa, en TODO el entorno. **Ninguno de estos diez casos siembra una versión nueva.** Ni un solo
+`POST`/`PATCH` sobre `sanic_mppp_tbl_parametros`:
+
+- R-19, R-20 y R-26 leen lo YA sembrado (versión 1 y versión 2 activas hoy), nunca lo cambian.
+- R-21, R-23 y R-27 mandan Excel contra las Custom API, pero ejercitan gestiones/escenarios que la
+  versión YA activa cubre (nunca siembran una versión nueva para forzar un escenario).
+- R-22 (precedencia), R-24 (claves de `porGestion` sin distinguir caja/tildes) y R-25 (clave
+  desconocida dentro de `porGestion`) son los tres escenarios de mayor riesgo del diseño: los tres
+  se verifican corriendo `dotnet test` contra la suite ya construida con TDD
+  (`tests/Sanic.Mppp.Plugins.Tests/Aceptacion/ParametrosDePlantillaAceptacion.cs`), nunca sembrando
+  nada en Dev. Necesitan `dotnet` disponible en el PATH.
+- R-28 lee el catálogo de Reglas (`sanic_mppp_tbl_reglas`), no toca nada tampoco.
+
+**Frontera con R-18 (arriba), ahora dentro del mismo archivo.** R-18 ya manda un Excel real con
+`gestion=Exclusion` y `numeroCuenta`/`banco`/`moneda` en blanco contra las Custom API en vivo, y
+confirma que la fila queda Validada — la prueba EN VIVO, dentro del motor de las ocho reglas, de que
+`porGestion.Exclusion` funciona. Estos diez casos NO repiten ese envío (sería el mismo Excel, el
+mismo resultado, la misma evidencia con otro ID): son la cobertura **exhaustiva** de DN-03, lo que
+R-18 no cubre — R-20 verifica de solo lectura que el CONTENIDO sembrado es exactamente el que pidió
+el aprobador; R-21/R-23/R-27 ejercitan escenarios en vivo que R-18 no toca
+(`Inclusion`/`Modificacion` sin aflojar, una gestión inválida en la FILA, el mensaje al cliente);
+R-22/R-24/R-25 son de alto riesgo o de precedencia, nunca sembrados en Dev; R-26 es la evidencia de
+que versionar agrega una fila y nunca edita la vigente; R-19, R-28 cierran la compatibilidad y el
+catálogo.
+
+**Necesita, en general** (además de lo que ya deja listo `preparar()` de este set, arriba): `dotnet`
+disponible en el PATH para R-22, R-24 y R-25 (`dotnet test tests/Sanic.Mppp.Plugins.Tests --filter
+<FullyQualifiedName>`).
+
+---
+
+### R-19 · Compatibilidad: un parámetro SIN `porGestion` se comporta igual que antes de DN-03
+
+**Qué prueba.** La garantía explícita del diseño: "un parámetro sin `porGestion` se comporta
+EXACTAMENTE como hoy". Es la condición bajo la que lo ya sembrado en los tres entornos sigue siendo
+válido sin migrar nada. La prueba EN VIVO de una gestión sin ajuste ya existe en el propio motor de
+las ocho reglas (R-06, gestión `Inclusion`, estable v1/v2); este caso no la repite (ver la frontera
+de arriba) — verifica la garantía general a nivel unitario más la integridad de lo sembrado.
+
+**Necesita.** Confirmar que la versión 1 de `plantilla.obligatoriedad` (`{"porDefecto":
+"obligatorio","opcionales":[{"campo":"referencia"}]}`, sin `porGestion`) sigue existiendo intacta
+(no hace falta que sea la ACTIVA para este caso: alcanza con que la fila exista — ver R-26 para el
+chequeo de que ninguna versión se edita). `dotnet` en el PATH.
+
+**Cómo.** (1) `dotnet test` con `--filter` exacto sobre
+`ParametrosDePlantillaAceptacion.DN03_un_parametro_sin_porGestion_se_comporta_exactamente_como_hoy`
+(la garantía general: con y sin `reglas`, ninguna combinación cambia). (2) `GET` de solo lectura
+sobre `sanic_mppp_tbl_parametros` filtrando `sanic_nombre eq 'plantilla.obligatoriedad' and
+sanic_version eq 1`.
+
+**Qué tiene que pasar.** (1) La prueba unitaria pasa, y el filtro encontró exactamente 1 prueba (si
+encontrara 0, el filtro está mal escrito y el caso mentiría "OK" sin haber corrido nada). (2) La
+fila de la versión 1 existe y su `sanic_valor`, interpretado como JSON, es idéntico al de DD-16.
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total) y la respuesta de
+esa consulta `GET`.
+
+**Cómo se sabe que falló.** La prueba unitaria falla (una regresión real en el dominio), el filtro
+encontró 0 o más de 1 prueba (el nombre del `[Fact]` cambió sin actualizar este caso), o la versión
+1 no existe o su valor cambió (alguien la editó en vez de agregar una versión nueva — ver R-26).
+
+**Automatizable.** Unit (`dotnet test`) + API de solo lectura.
+
+---
+
+### R-20 · El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido
+
+**Qué prueba.** Que la versión ACTIVA hoy de `plantilla.obligatoriedad` trae, dentro de
+`porGestion.Exclusion`, exactamente los tres campos que pidió el aprobador (`numeroCuenta`, `banco`,
+`moneda`) como `opcionales`, y ninguno como `obligatorios` — ni de más ni de menos. **La prueba EN
+VIVO de que ese aflojamiento funciona contra una Solicitud real ya la hace R-18** (arriba): este
+caso es sobre el CONTENIDO del parámetro sembrado, de solo lectura, no vuelve a mandar un Excel.
+
+**Necesita.** `plantilla.obligatoriedad` en su versión activa más alta (§8.2: no se siembra nada
+acá). **El criterio lo confirmó el aprobador el 2026-09-28** (`playbooks/datos/parametros.md`): ya
+no es tentativo. Si en el entorno que se está corriendo `porGestion.Exclusion` no está sembrado
+(por ejemplo, todavía no se sembró en Test o Producción), este caso reporta `N-A` en vez de asumir
+un valor que no existe — esa sigue siendo una precondición legítima de entorno, no una duda sobre el
+criterio.
+
+**Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` (versión activa más alta de
+`plantilla.obligatoriedad`, la misma consulta que ya hace `preparacion_comun.verificar_parametro_activo`),
+parseando su `sanic_valor` como JSON y mirando `porGestion.Exclusion`.
+
+**Qué tiene que pasar.** `porGestion.Exclusion.opcionales` es EXACTAMENTE el conjunto
+`{numeroCuenta, banco, moneda}` (nombrados, no contados: CONVENCIONES §7), sin `obligatorios`, y
+ninguna otra gestión (`Inclusion`, `Modificacion`) tiene entrada todavía (ver R-21).
+
+**Cómo se verifica.** La respuesta de esa consulta `GET`, ya parseada.
+
+**Cómo se sabe que falló.** Falta alguno de los tres campos, sobra alguno, o `Exclusion` trae
+`obligatorios`: el parámetro sembrado no es el que el aprobador pidió, y R-18 (que sí manda un
+Excel real) podría estar pasando por una razón distinta a la documentada.
+
+**Automatizable.** API de solo lectura.
+
+---
+
+### R-21 · `Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía
+
+**Qué prueba.** Solo `Exclusion` está sembrada en `porGestion` hoy; `Inclusion` y `Modificacion`
+siguen bajo el bloque global sin ningún ajuste.
+
+**Necesita.** La misma versión activa que R-20 (se relee, no se asume el resultado de R-20: si
+mientras tanto `Inclusion`/`Modificacion` ganaron una entrada en `porGestion`, este caso lo detecta
+y reporta `N-A` en vez de mentir un `FALLA` contra una forma del parámetro que ya cambió).
+
+**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`, no a mano) con dos filas: `gestion=Inclusion` y
+`gestion=Modificacion`, las dos con `numeroCuenta`/`banco`/`moneda` en blanco.
+
+**Qué tiene que pasar.** Las dos filas se rechazan por `OBLIGATORIEDAD` (esos campos siguen siendo
+obligatorios para estas dos gestiones): comportamiento idéntico al de antes de DN-03.
+
+**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de las dos filas (cita al menos uno de
+`numeroCuenta`/`banco`/`moneda`).
+
+**Cómo se sabe que falló.** Alguna fila NO se rechaza, o se rechaza sin citar ninguno de esos tres
+campos: `porGestion` se estaría aplicando a una gestión que no tiene entrada sembrada (contagio
+entre gestiones que el diseño no pide).
+
+**Automatizable.** API.
+
+---
+
+### R-22 · Precedencia `obligatorios` sobre `opcionales` (cobertura unitaria, no sembrar en Dev)
+
+**Qué prueba.** "`opcionales` afloja, `obligatorios` endurece: si un campo queda en las dos listas
+de la MISMA entrada, gana `obligatorios`" — la mitad "endurece" de esta regla no está sembrada hoy
+en ningún entorno (el ejemplo de `Modificacion` con `obligatorios` en `DIRECTRICES-NUEVAS.md` es
+ilustrativo, no está en Dev).
+
+**Necesita.** **No sembrar una versión nueva en Dev solo para este caso**: crear una entrada con
+`obligatorios` cambiaría la versión ACTIVA para todo el entorno de forma permanente (agregar
+versiones es fácil; "deshacer" es sembrar otra versión más, nunca vuelve sola a la anterior). La
+cobertura confiable es `ParametrosDePlantillaAceptacion` (unitaria, ya construida con TDD según
+`DIRECTRICES-NUEVAS.md`).
+
+**Cómo.** Revisar que existan casos unitarios para: (a) un campo en `opcionales` de `porGestion`
+sin estar en `obligatorios`, (b) un campo en `obligatorios` sin estar en `opcionales`, (c) el mismo
+campo en las dos listas de la misma entrada (gana `obligatorios`). Los tres viven en
+`ParametrosDePlantillaAceptacion.cs`: (a)+(b) en
+`DN03_porGestion_afloja_con_opcionales_y_endurece_con_obligatorios_la_gestion_gana_sobre_lo_global`
+(gestión `Exclusion` = solo opcionales, gestión `Modificacion` = solo obligatorios) y (c) en
+`DN03_si_un_campo_esta_en_opcionales_y_en_obligatorios_de_la_misma_gestion_gana_obligatorios`.
+
+**Qué tiene que pasar.** Los tres escenarios ya están cubiertos en la suite de plugins, y las dos
+pruebas pasan.
+
+**Cómo se verifica.** (1) Que el código fuente de `ParametrosDePlantillaAceptacion.cs` siga
+declarando esos dos nombres de `[Fact]` (si se renombraron, este caso lo detecta en vez de correr un
+filtro que no encuentra nada y "pasa" en falso). (2) `dotnet test
+tests/Sanic.Mppp.Plugins.Tests --filter "FullyQualifiedName=<FQN1>|FullyQualifiedName=<FQN2>"`
+sobre esos dos nombres exactos — el filtro tiene que encontrar EXACTAMENTE 2 pruebas.
+
+**Cómo se sabe que falló.** Falta alguno de los dos `[Fact]` en el archivo, el filtro encuentra un
+número de pruebas distinto de 2 (nombre cambiado sin avisar), o alguna de las dos falla.
+
+**Automatizable.** Unit (no Dev).
+
+---
+
+### R-23 · Gestión inválida en la FILA: `OBLIGATORIEDAD` ni siquiera se evalúa
+
+**Qué prueba.** "Una fila cuyo valor de gestión no es válido SOLO calza con `*` en `reglas`, y NUNCA
+mira `porGestion`" — y, más preciso todavía: `OBLIGATORIEDAD` **depende de `LISTAS_VALIDAS`**
+(`playbooks/datos/reglas.md`, `sanic_dependede` de `OBLIGATORIEDAD` =
+`"AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"`; DD-13, "las reglas de registro guardan los motivos de
+lo que falló, sin historial por regla"). Con una gestión inválida, `LISTAS_VALIDAS` YA rechaza esa
+fila, así que `OBLIGATORIEDAD` **no se evalúa en absoluto** — no es que se evalúe "con el bloque
+global": directamente no corre, y por eso no puede sumar ningún motivo derivado de `porGestion` (ni
+aflojado ni endurecido).
+
+**Necesita.** Un Excel con una fila con un valor de `gestion` que no es
+`Inclusion`/`Exclusion`/`Modificacion` (p. ej. `"Baja"`), y ADEMÁS con `numeroCuenta`/`banco` en
+blanco (para poder distinguir, por el mensaje, si `OBLIGATORIEDAD` corrió o no).
+
+**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`) con esa única fila, mandado contra las Custom API.
+
+**Qué tiene que pasar.** La fila se rechaza citando el campo `gestión` (el único motivo:
+`LISTAS_VALIDAS`); el mensaje NO cita `numeroCuenta` ni `banco` — la prueba de que `OBLIGATORIEDAD`
+nunca llegó a correr, con o sin `porGestion`.
+
+**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de esa fila.
+
+**Cómo se sabe que falló.** El mensaje cita `numeroCuenta` o `banco` (señal de que `OBLIGATORIEDAD`
+sí corrió pese a la dependencia declarada — un cambio de comportamiento no documentado), o no cita
+`gestión` en absoluto.
+
+**Automatizable.** API.
+
+---
+
+### R-24 · Las CLAVES de `porGestion` (dentro del parámetro) no distinguen caja ni tildes (unitario, no Dev)
+
+**Qué prueba.** Cuidado con una trampa de redacción: esto **no** es sobre lo que un cliente escribe
+en la columna `Gestión` del Excel — eso ya lo normaliza `ListasPlantilla` (D-18a) ANTES de llegar a
+`ObligatoriedadPlantilla`, así que un Excel con `"exclusión"` en la celda se comporta igual con o sin
+DN-03 y no ejercitaría nada nuevo. Lo que DN-03 agrega es la comparación sin distinguir caja ni
+tildes de las **claves del propio JSON** sembrado en `plantilla.obligatoriedad` (p. ej. que
+`"porGestion":{"EXCLUSION":{...}}` se reconozca como la gestión `Exclusion`) — y eso solo se puede
+ejercitar con una forma de parámetro que hoy NO está sembrada en ningún entorno.
+
+**Necesita.** **No sembrar una versión nueva en Dev para esto**: cambiar la CLAVE con la que está
+sembrado `porGestion` en Dev no aporta nada que un Excel no pueda ya probar con la forma actual, y sí
+suma el mismo riesgo de R-22/R-25 (tocar la versión activa de todo el entorno) sin necesidad. `dotnet`
+en el PATH.
+
+**Cómo.** `dotnet test` con `--filter` sobre
+`ParametrosDePlantillaAceptacion.DN03_los_nombres_de_gestion_de_porGestion_se_comparan_sin_distinguir_caja_ni_tildes`
+(un `[Theory]` con las variantes `"  exclusión  "`, `"EXCLUSION"` y `"ExclusioN"` como CLAVE del
+JSON, no como valor de fila).
+
+**Qué tiene que pasar.** El filtro encuentra al menos una prueba y todas pasan: las tres variantes
+de clave resuelven a la misma gestión (`Exclusion`) y aplican el mismo aflojamiento.
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
+
+**Cómo se sabe que falló.** El filtro no encuentra ninguna prueba (el nombre cambió y este caso
+quedó "verde" sin haber corrido nada), o alguna variante falla.
+
+**Automatizable.** Unit (`dotnet test`), no Dev.
+
+---
+
+### R-25 · Gestión desconocida DENTRO de `porGestion` es error de configuración (alto riesgo, no sembrar en Dev)
+
+**Qué prueba.** Un typo en la CLAVE del parámetro (p. ej. `"Exclusio"` en vez de `"Exclusion"`) es
+un `FormatException` al leer el parámetro — error ruidoso de configuración, distinto de R-23 (que es
+sobre el VALOR de la fila, no sobre el parámetro).
+
+**Necesita.** **NO sembrar esto en Dev de rutina**: un `plantilla.obligatoriedad` con esta clave
+mal escrita, si se convierte en la versión activa, rompe la validación de TODA Solicitud del
+entorno hasta que alguien lo note y siembre una versión corregida (más alta). Es exactamente el
+"falla cerrado a propósito" del diseño, pero contra un entorno compartido el costo es alto.
+
+**Cómo.** Lo que corre `herramientas/pruebas/sets/set_r.py` (arnés API, sin navegador) es SOLO la
+mitad unitaria, a propósito: (1) confirma que el archivo de pruebas sigue trayendo un caso con una
+gestión desconocida DENTRO de `porGestion` (distinto de R-23, que es sobre el valor de la FILA), y
+(2) corre con `dotnet test --filter` el `[Theory]`
+`ParametrosDePlantillaAceptacion.Una_obligatoriedad_mal_cargada_revienta_con_el_motivo` completo (la
+clase entera de "parámetro mal cargado", que incluye esa fila de datos). **La mitad de alto riesgo
+contra Dev de verdad (sembrar `"porGestion":{"Exclusioon":{...}}` y mandar una Solicitud) NO se
+automatiza acá**: si algún día hace falta la confirmación contra un entorno real, se hace a mano, en
+una ventana coordinada, con una versión corregida lista para sembrar de inmediato después — y se
+documenta el resultado en la tabla de Resultados con la fecha y quién la corrió.
+
+**Qué tiene que pasar.** El `[Theory]` completo pasa (incluida la fila de la gestión desconocida): un
+parámetro con una clave de `porGestion` que no es ninguna gestión válida revienta con
+`FormatException` y un motivo que nombra la clave, nunca una lista "vacía pero válida".
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
+
+**Cómo se sabe que falló.** El caso de la gestión desconocida desapareció del archivo de pruebas
+(la búsqueda del literal no lo encuentra), o el `[Theory]` completo (o esa fila en particular) falla.
+
+**Automatizable.** Unit (`dotnet test`, lo que corre este archivo) / manual de alto riesgo contra
+Dev (fuera de este arnés, ver "Cómo").
+
+---
+
+### R-26 · Versionar es AGREGAR una fila, nunca editar la vigente
+
+**Qué prueba.** DD-02/la nota de `playbooks/datos/parametros.md`: cambiar una regla de negocio
+siembra `sanic_version` más alto como fila NUEVA; la anterior queda intacta, de respaldo/histórico,
+y el motor resuelve la activa por `sanic_version` descendente con `statecode` activo.
+
+**Necesita.** Nada que crear: alcanza con leer lo ya sembrado.
+
+**Cómo.** `GET sanic_mppp_tbl_parametros?$select=sanic_version,sanic_valor,statecode&$filter=sanic_nombre
+eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc` (mismo patrón de lectura que usa
+`preparacion_comun.py`, sin ningún `POST`/`PATCH`).
+
+**Qué tiene que pasar.** Aparecen AL MENOS dos filas (`sanic_version=1` y `sanic_version=2`), las
+dos activas, con `sanic_valor` distinto entre sí, y la versión 1 sigue exactamente como la
+documenta `DD-16` (sin `porGestion`).
+
+**Cómo se verifica.** La respuesta de esa consulta.
+
+**Cómo se sabe que falló.** Solo aparece una fila (la versión 1 se editó en vez de agregar la 2:
+rompería `sanic_versionparametros` de Solicitudes ya procesadas con la versión anterior, que
+dejaría de decir la verdad), o la versión 1 tiene un `sanic_valor` distinto al original.
+
+**Automatizable.** API.
+
+---
+
+### R-27 · El mensaje al cliente no cambia con DN-03
+
+**Qué prueba.** El texto de rechazo de `OBLIGATORIEDAD` sigue nombrando el CAMPO, sin citar su
+valor (D-41) — que la obligatoriedad ahora dependa de la gestión no puede filtrarse al texto que
+lee el cliente (no tiene por qué deducir la configuración interna del banco).
+
+**Necesita.** Una fila de gestión `Inclusion` con `numeroCuenta` vacío (sigue siendo obligatoria
+para esa gestión — R-21): la fila 2 ("Sin Cuenta") de `E06-obligatoriedad.xlsx`, que
+`generar_excel.py` YA genera para R-06 — se reutiliza tal cual, sin armar un Excel nuevo
+(CONVENCIONES §9).
+
+**Cómo.** Mandar ese Excel (`E06-obligatoriedad.xlsx`) y leer `sanic_mensaje` de la fila 2.
+
+**Qué tiene que pasar.** El mensaje nombra el campo (`numeroCuenta`) exactamente como antes de
+DN-03, sin mencionar "gestión", "Exclusion" ni ninguna palabra de configuración interna.
+
+**Cómo se verifica.** `ver_solicitud.py --ultima`.
+
+**Cómo se sabe que falló.** El mensaje cambió de forma, o menciona la gestión o el hecho de que
+otra gestión no exigiría este campo.
+
+**Automatizable.** API.
+
+---
+
+### R-28 · La regla `OBLIGATORIEDAD` no cambia de código, orden, nivel ni dependencias
+
+**Qué prueba.** DN-03 es explícito: "No cambia de código, de orden, de nivel ni de efecto. Solo
+cambia qué considera obligatorio" — mismo principio que DN-01 sobre `AUTORIZACION_CORREO_PLAN`.
+DD-13 (`diseno/02-diccionario-datos.md`) dice que las reglas de REGISTRO (las ocho de
+`ReglasDeRegistro.cs`, `OBLIGATORIEDAD` entre ellas) NO dejan un `ResultadoRegla` propio ni un
+evento de Bitácora por regla — "la fila guarda los motivos de lo que falló, sin historial por
+regla". No hay ninguna Bitácora de la que leer "el orden en que se evaluaron las reglas de una
+fila": eso solo existe para las cinco reglas de nivel Solicitud (set `S`). Lo que SÍ tiene código,
+nivel, orden y dependencias declarados, en vivo, es el catálogo `sanic_mppp_tbl_reglas` — la misma
+tabla que ya lee `sets/set_i.py` (I-01..I-04) — y es contra eso que se verifica este caso, no contra
+una Solicitud procesada.
+
+**Necesita.** Nada que crear: el catálogo de Reglas ya existe (`preparar_datos.py`/playbooks).
+
+**Cómo.** `GET sanic_mppp_tbl_reglas?$select=sanic_codigo,sanic_nivel,sanic_efecto,sanic_orden,
+sanic_dependede,statecode&$filter=sanic_codigo eq 'OBLIGATORIEDAD'`.
+
+**Qué tiene que pasar.** Una única fila, activa, con `sanic_nivel=Registro`, `sanic_efecto=Rechaza`,
+`sanic_orden=60` y `sanic_dependede='AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS'` — exactamente lo que
+ya trae `playbooks/datos/reglas.md` desde antes de DN-03.
+
+**Cómo se verifica.** La respuesta de esa consulta `GET`.
+
+**Cómo se sabe que falló.** Cualquiera de esos cinco valores cambió, o hay más de una fila con ese
+código: señal de que se reimplementó (otro código, otro orden) en vez de ajustarse, contra la
+instrucción explícita del diseño.
+
+**Automatizable.** API de solo lectura.
 
 ---
 
@@ -1892,20 +2334,24 @@ existen.
    ya tenía un caso en este archivo (R-06) antes de que existiera DN-03. La nota agregada a R-06 deja
    escrito por qué ese caso, sin cambiarle una línea de código, sigue siendo la evidencia de
    compatibilidad hacia atrás (gestión `Inclusion`, sin entrada en `porGestion`). Se agregó R-18 para
-   el aflojamiento nuevo de `Exclusion` (marcado PROVISIONAL, con su dependencia anotada tal como
-   pide la consigna de este trabajo).
+   el aflojamiento nuevo de `Exclusion`, confirmado por el aprobador el 2026-09-28.
 
-   **Lo que este archivo NO duplica.** `12-obligatoriedad-gestion.md` (set `O`) es la cobertura
-   exhaustiva de DN-03: la precedencia `obligatorios`/`opcionales` (`O-04`, deliberadamente **unitaria**,
-   nunca sembrada en Dev), la gestión inválida DENTRO del parámetro (`O-07`, alto riesgo, no se
-   siembra de rutina), el versionado agrega-nunca-edita (`O-08`) y el mensaje al cliente sin cambios
-   (`O-09`). R-06 y R-18 son el subconjunto que este archivo ya automatizaba por API dentro de su
-   propio arnés de las ocho reglas; `O` sigue siendo el dueño de la cobertura completa (incluida la
-   unitaria y la de alto riesgo, que no se automatizan contra Dev a propósito).
+   **Lo que este archivo ya NO separa en otro archivo.** Hasta el 2026-09-28, `12-obligatoriedad-
+   gestion.md` (set `O`) era la cobertura exhaustiva de DN-03 en un archivo aparte, nombrado por la
+   directiva que lo originó. Ese día se fusionó ACÁ (`CONVENCIONES.md` §4, "La regla del nombre"):
+   la precedencia `obligatorios`/`opcionales` (ahora `R-22`, deliberadamente **unitaria**, nunca
+   sembrada en Dev), la gestión inválida DENTRO del parámetro (`R-25`, alto riesgo, no se siembra de
+   rutina), el versionado agrega-nunca-edita (`R-26`) y el mensaje al cliente sin cambios (`R-27`)
+   — ver la sección "R-19 a R-28" arriba. R-06 y R-18 siguen siendo el subconjunto que se ejercita
+   EN VIVO dentro del motor de las ocho reglas; R-19..R-28 son la cobertura exhaustiva completa
+   (incluida la unitaria y la de alto riesgo, que no se automatizan contra Dev a propósito), ahora en
+   el mismo archivo en vez de en uno separado.
 
-**Conclusión**: el set R suma cuatro casos de fase 2 (R-15..R-18) sobre dos de sus ocho reglas
-(`AUTORIZACION_CORREO_PLAN`, `OBLIGATORIEDAD`), sin duplicar la cobertura exhaustiva que ya tienen
-`U` y `O`. DN-02 no aplica a este archivo: tiene su propio dueño (`E`).
+**Conclusión**: el set R suma catorce casos de fase 2 (R-15..R-28) sobre dos de sus ocho reglas
+(`AUTORIZACION_CORREO_PLAN`, `OBLIGATORIEDAD`) — cuatro (R-15..R-18) automatizados en vivo dentro del
+propio motor de reglas, diez (R-19..R-28, el ex set O) como cobertura exhaustiva de DN-03 — sin
+duplicar la cobertura que sigue teniendo `U` para DN-01. DN-02 no aplica a este archivo: tiene su
+propio dueño (`E`).
 
 ---
 
@@ -1930,7 +2376,17 @@ existen.
 | R-15 DN-01 canon `plan` | | | |
 | R-16 DN-01 modo `cliente` | | | |
 | R-17 DN-01 valor basura degrada | | | **FALLA, bloqueado por D-59** (ya ABIERTA, pospuesta) |
-| R-18 DN-03 `Exclusion` afloja tres campos | | | PROVISIONAL, confirmar con aprobador |
+| R-18 DN-03 `Exclusion` afloja tres campos | | | confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
+| R-19 compatibilidad sin `porGestion` | | | ex O-01 |
+| R-20 `Exclusion` afloja los tres campos | | | ex O-02; confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
+| R-21 `Inclusion`/`Modificacion` sin cambios | | | ex O-03 |
+| R-22 precedencia `obligatorios` | | | ex O-04; unitario, no sembrar |
+| R-23 gestión inválida en la fila | | | ex O-05 |
+| R-24 sin distinguir caja/tildes | | | ex O-06 |
+| R-25 gestión desconocida en el parámetro | | | ex O-07; alto riesgo, preferir unitario |
+| R-26 versionar agrega, no edita | | | ex O-08 |
+| R-27 mensaje al cliente sin cambios | | | ex O-09 |
+| R-28 regla sin cambio de código/orden/nivel | | | ex O-10 |
 
 ---
 ## 04 — Comunicaciones al cliente
@@ -2005,10 +2461,11 @@ caso se identifican por su ID, no por el orden en que aparecen en la consola.
 
 **Lo que no se automatiza, y por qué:**
 
-- **M-06** depende del *recurrence* real de `MPPP-VIG` (cada 10 minutos, `recursos/flujos/mppp-vig.json`,
-  fase desconocida desde este script). La espera puede tardar hasta ~11 minutos. Es tiempo real de
-  infraestructura, no un `sleep` inventado — y es la razón por la que correr el set M completo
-  tarda más que los otros sets automatizados.
+- **(Retirado 2026-09-28) M-06 ya no espera el *recurrence* real de `MPPP-VIG`.** La versión
+  anterior de esta nota decía que la espera podía tardar hasta ~11 minutos; en los hechos, tras la
+  corrección del 2026-09-27, ya esperaba ~22 minutos (dos vueltas) y **igual daba FALLA** (ver la
+  sección M-06 más abajo para la evidencia completa y por qué ese tramo del caso se movió a
+  **V-07** en `pruebas/07-vigilancia.md`).
 
 ---
 
@@ -2227,10 +2684,44 @@ bandeja ya abierta por M-01).
 
 ---
 
-### M-06 · Envío iniciado sin confirmar → revisión humana
+### M-06 · Envío iniciado sin confirmar → arma la precondición real (la espera la cierra V-07)
 
-**Qué prueba.** Que una comunicación a medias **no se reenvíe** y levante bandera (D-21), con el
-`recurrence` REAL de `MPPP-VIG` (cada 10 minutos).
+**Alcance recortado el 2026-09-28 — leé esto antes que el resto de la sección.** Este caso
+verificaba dos cosas, y las dos estaban mal planteadas:
+
+1. **Un evento de Bitácora `Requiere revision` con origen `MPPP-VIG`.** Investigado a fondo por el
+   set V (`pruebas/07-vigilancia.md`, "Hallazgo aparte, sobre el propio caso M-06"): **ningún**
+   bloque de `MPPP-VIG` escribe ese evento al marcar una Solicitud — ni el bloque 2 (reintentos
+   agotados) ni el bloque 4 (`Envios_iniciados_sin_confirmar`, el que le importa a este caso). Ese
+   evento solo lo genera `MPPP-ENV`, en otro escenario (el envío real de una comunicación, no la
+   marca de revisión). Pedirle esto a `MPPP-VIG` era una expectativa mal fundada de este caso, no
+   un defecto del flujo — **se sacó**.
+2. **Que `sanic_requiererevision` pase a `true` dentro de un margen de espera real.** Esto es
+   correcto en principio, pero **V-07** (`pruebas/07-vigilancia.md`) ya lo prueba, mejor, con el
+   *recurrence* real de `MPPP-VIG`: lee el umbral de `vigilancia.minutos.sinresponder` EN VIVO
+   (acá estaba hardcodeado a 40 minutos, asumiendo un valor de `P-06` sin comprobrarlo en cada
+   corrida), corre la MISMA consulta `$filter` que usa el bloque
+   `Envios_iniciados_sin_confirmar` **antes** de esperar nada (para saber si el defecto es de la
+   consulta sin gastar tiempo), y espera con un margen medido con evidencia — **3 vueltas del
+   `recurrence` (30 min) + colchón = 32 minutos**, no las 1-2 vueltas (~11 y ~22 min) que probó
+   este caso el 2026-09-27 y que **ninguna de las dos alcanzó** (ver la nota diagnóstica al final
+   de esta sección, conservada tal cual se escribió). Repetir esa espera acá, con un margen más
+   corto y una precondición hardcodeada, **duplicaría cobertura entre dos prefijos distintos**
+   (`CONVENCIONES.md` §4: un ID por archivo, sin colisiones de qué prueba cada uno) pagando otra
+   vez ~20-32 minutos por corrida del set M por algo que V-07 ya prueba mejor. **Se sacó de acá.**
+
+**D-62 (arreglado el 2026-09-28) es, con evidencia, la explicación más probable de por qué esas
+1-2 vueltas no alcanzaron**: la etapa de arranque de `MPPP-VIG` estaba encadenada solo con
+`runAfter: ["Succeeded"]`, así que un solo `Parametro_*` fallando (frecuente bajo carga de varios
+agentes en paralelo, como pasaba en esa corrida) salteaba los 5 bloques enteros esa vez — ver
+`pruebas/07-vigilancia.md`, "D-62 corregido". El defecto ya se corrigió y viajó al entorno; medir
+si eso alcanza (con el margen correcto) es trabajo de V-07, no de este caso.
+
+**Qué prueba ahora.** Que un correo real llegue hasta "En proceso" con el acuse real enviado, y que
+la plataforma acepte el `PATCH` que arma el escenario "a medias" (`sanic_fechaacuseiniciado` más
+viejo que el umbral real de `vigilancia.minutos.sinresponder`, `sanic_fechaacuseenviado` vacío) —
+la misma precondición de datos que necesita V-07, pero ejercitada acá por el camino de correo REAL
+(`MPPP-ING`), que V-07 no usa (arma la Solicitud por Custom API directa).
 
 **Necesita.** El REMITENTE de este set. La Solicitud En proceso la crea este mismo caso, con su
 propio correo real.
@@ -2238,61 +2729,53 @@ propio correo real.
 **Cómo.** Correo real (con adjunto válido) → se deja que el pipeline real complete su acuse normal
 (no hay ventana para "interceptar a medias" un envío que el webhook dispara casi al instante: hay
 que dejarlo terminar). Inmediatamente después, se fuerza el escenario a medias con un `PATCH`
-directo: `sanic_fechaacuseiniciado` = hace 40 minutos (> `vigilancia.minutos.sinresponder` = 30,
-`P-06`), `sanic_fechaacuseenviado` = vacío. Se espera al próximo ciclo real de `MPPP-VIG`.
-
-> **Corrección de margen (2026-09-27).** La primera versión de este caso esperaba hasta ~11
-> minutos (un `recurrence` de 10 minutos + 1 de colchón). Con ese margen, **no alcanzó a verse**
-> ni una sola vez, pese a que la condición ya estaba dada (`sanic_fechaacuseiniciado` bien
-> backdateado, `sanic_fechaacuseenviado` vacío, verificado por Web API en el momento). Un
-> `recurrence` trigger de Power Automate en un entorno compartido puede arrancar con demora real,
-> y un solo intervalo de margen no alcanza para distinguir esa demora de un defecto de
-> `MPPP-VIG`. El margen se subió a ~22 minutos (dos vueltas completas de colchón) para poder
-> afirmar una cosa o la otra con evidencia, no con una sola muestra.
+directo: `sanic_fechaacuseiniciado` = más viejo que `vigilancia.minutos.sinresponder` (leído en
+vivo), `sanic_fechaacuseenviado` = vacío. No se espera ningún ciclo de `MPPP-VIG`.
 
 **Qué tiene que pasar.**
 
 | Qué | Valor |
 |---|---|
-| Llega un acuse nuevo | **NO** |
-| `sanic_requiererevision` | pasa a **true** |
-| `sanic_motivorevision` | menciona "sin confirmar" |
-| Bitácora | `Requiere revision`, origen **MPPP-VIG** |
-| `sanic_fechaacuseenviado` | sigue vacío al terminar |
+| El correo real llega a Solicitud "En proceso" con acuse enviado | **sí** |
+| El `PATCH` que arma "a medias" se acepta (HTTP 200/204) | **sí** |
 
-> Éste es el costo aceptado del diseño: ante la duda no se reenvía y lo mira una persona. Si acá
-> llega un correo, la garantía de "como máximo una vez" no existe.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py M` (caso `M-06`; ya no es el más
+lento del set — corre en el orden de 1-3 minutos, dominado por la ingesta real del correo, no por
+el *recurrence* de `MPPP-VIG`).
 
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py M` (caso `M-06`; el más lento del
-set — puede tardar hasta ~22 minutos).
+**Cómo se sabe que falló.** Si el correo real no genera Solicitud o no llega a "En proceso" con
+acuse, es el mismo defecto que rompería M-01 (el camino de ingesta), visto desde acá. Si el
+`PATCH` que arma el escenario a medias es rechazado (HTTP distinto de 200/204), no es simulable
+desde acá NI desde V-07 (la misma precondición): hay un control de plataforma bloqueando la
+escritura directa de esos dos campos, y el caso queda `N-A` con el motivo exacto.
 
-**Cómo se sabe que falló.** Si el `PATCH` que arma el escenario a medias es rechazado (HTTP
-distinto de 200/204), no es simulable desde acá: hay un control de plataforma bloqueando la
-escritura directa de esos dos campos, y el caso queda `N-A` con el motivo exacto (nunca se fuerza
-un forzado). Si el `PATCH` se acepta pero `sanic_requiererevision` nunca pasa a `true` dentro de
-la espera, el defecto está en el bloque `Envios_iniciados_sin_confirmar` de `MPPP-VIG` — o el
-parámetro `vigilancia.minutos.sinresponder` cambió su valor por debajo de los 40 minutos simulados
-(mirar P-06 antes de asumir un defecto). Si llega un correo nuevo, es la misma garantía que rompe
-M-05, vista desde el otro disparador (`MPPP-VIG` en vez de `MPPP-COM`).
+**Automatizable.** API (`correr.py M`, caso `M-06`) — correo real, sin navegador, sin esperar el
+*recurrence* de `MPPP-VIG`.
 
-> **FALLA real, reproducida dos veces el 2026-09-27 (no es un bug del caso).** Con la
-> precondición confirmada por lectura directa (`sanic_fechaacuseiniciado` correctamente
-> backdateado, `sanic_fechaacuseenviado` vacío, `sanic_requiererevision` en `false`),
-> `sanic_requiererevision` **nunca pasó a `true`** ni con ~11 ni con ~22 minutos de margen (dos
-> vueltas completas del `recurrence`). `MPPP-VIG` está vivo y corriendo en ese mismo lapso — se
-> confirmó leyendo la Bitácora del entorno completo: hay decenas de eventos `Error` con
-> `sanic_origen = MPPP-VIG` y detalle `"Fallo la ingesta del correo..."` (del bloque
-> `Correos_que_quedaron_en_la_bandeja`, otro bloque del mismo flujo) fechados en la ventana exacta
-> de la espera. También hay eventos `Requiere revision` reales en el entorno, pero con
-> `sanic_origen = MPPP-COM`, nunca `MPPP-VIG`, en ese lapso. No se pudo determinar desde acá si la
-> causa es (a) un defecto en la condición/consulta de `Envios_iniciados_sin_confirmar`, o (b) que
-> el flujo se corta antes de llegar a ese bloque por los errores del bloque anterior — plausiblemente
-> agravado por tráfico de otros sets corriendo en paralelo sobre el mismo buzón de ingesta
-> compartido. **Queda reportado tal cual para que lo revise quien mantiene `recursos/flujos/mppp-vig.json`**:
-> no es un archivo que este set pueda tocar ni diagnosticar más a fondo.
+---
 
-**Automatizable.** API (`correr.py M`, caso `M-06`) — correo real + espera real de `MPPP-VIG`, sin
-navegador.
+#### Nota diagnóstica conservada (versión anterior de este caso, 2026-09-27)
+
+Se conserva tal cual se escribió — es la evidencia de POR QUÉ el margen de V-07 es 3 vueltas + colchón
+en vez de 1 o 2, y de por qué D-62 es la explicación más probable. Esto ya NO corre en este caso;
+lo corre V-07.
+
+> **Corrección de margen (2026-09-27).** La primera versión de este caso esperaba hasta ~11
+> minutos (un `recurrence` de 10 minutos + 1 de colchón). Con ese margen, **no alcanzó a verse**
+> ni una sola vez, pese a que la condición ya estaba dada (`sanic_fechaacuseiniciado` bien
+> backdateado, `sanic_fechaacuseenviado` vacío, verificado por Web API en el momento). El margen se
+> subió a ~22 minutos (dos vueltas completas de colchón) para poder afirmar una cosa o la otra con
+> evidencia, no con una sola muestra.
+>
+> **FALLA real, reproducida dos veces el 2026-09-27 (no fue un bug del caso).** Con la precondición
+> confirmada por lectura directa (`sanic_fechaacuseiniciado` correctamente backdateado,
+> `sanic_fechaacuseenviado` vacío, `sanic_requiererevision` en `false`), `sanic_requiererevision`
+> **nunca pasó a `true`** ni con ~11 ni con ~22 minutos de margen (dos vueltas completas del
+> `recurrence`). `MPPP-VIG` estaba vivo y corriendo en ese mismo lapso — se confirmó leyendo la
+> Bitácora del entorno completo: había decenas de eventos `Error` con `sanic_origen = MPPP-VIG` y
+> detalle `"Fallo la ingesta del correo..."` (del bloque `Correos_que_quedaron_en_la_bandeja`, otro
+> bloque del mismo flujo) fechados en la ventana exacta de la espera — evidencia de apoyo directa
+> de la causa que después confirmó y corrigió D-62 (ver `pruebas/07-vigilancia.md`).
 
 ---
 
@@ -2376,7 +2859,10 @@ donde corresponde sumarla — hoy no hay ninguna.
 
 Corrida real contra Dev, 2026-09-27/28 (`python3 herramientas/pruebas/correr.py M`, dos corridas:
 la primera detectó el bug de M-03 descrito arriba y se corrigió el código; la segunda es la que
-vale). **6 OK · 1 FALLA · 0 N-A.**
+vale). Esa corrida tenía a M-06 con su alcance viejo: **6 OK · 1 FALLA · 0 N-A.**
+
+**Recorrida el 2026-09-28** (`python3 herramientas/pruebas/correr.py C,R,U,I,M`), ya con el alcance
+de M-06 recortado (ver su sección arriba) y con D-62 corregido: **7 OK · 0 FALLA · 0 N-A.**
 
 | Caso | Solicitud | Resultado | Notas |
 |---|---|---|---|
@@ -2385,7 +2871,7 @@ vale). **6 OK · 1 FALLA · 0 N-A.**
 | M-03 solo al remitente (correo real con copia) | creada por el caso (correo real) | **OK** | tras corregir el falso FALLA (ver nota arriba) |
 | M-04 respuesta final real (digitar/aprobar por API) | la de M-01 | **OK** | digitar/aprobar por `MSCRMCallerID`, sin navegador |
 | **M-05 nunca dos veces** | la de M-01 | **OK** | segundo disparo de MPPP-COM no reenvía |
-| M-06 a medias → revisión (espera real de MPPP-VIG) | creada por el caso (correo real) | **FALLA** | ver nota diagnóstica arriba — `MPPP-VIG` no marcó `sanic_requiererevision` en ~22 min pese a la precondición confirmada; reportado para quien mantiene `mppp-vig.json` |
+| M-06 precondición real "a medias" (la espera pasó a V-07) | creada por el caso (correo real) | **OK** | 2026-09-28: alcance recortado (ver su sección) — corre en segundos, ya no en ~22 minutos |
 | M-07 cuerpo del código + sin información interna | la de M-01 (+ M-04) | **OK** | ningún término interno encontrado en los correos reales |
 
 ---
@@ -2425,8 +2911,9 @@ dibujaba en el cliente**. Costó dos días. La causa era la metadata compilada d
 regenera desde el Command Checker (`&ribbondebug=true`). Y el diagnóstico clave: en el Command
 Checker, un botón `(hidden)` es problema de **REGLAS**; un botón **AUSENTE de la lista** es problema
 de **METADATA COMPILADA**. Mismo síntoma en pantalla, causas opuestas. El procedimiento completo de
-diagnóstico está documentado, con evidencia, en `H-06` (`pruebas/13-construido-hoy.md`) — acá se
-cita esa distinción en los casos donde aplica (A-01, A-02), sin repetirla entera.
+diagnóstico está documentado, con evidencia, en `A-15` (fusionado acá el 2026-09-28 desde el ex set
+H, `13-construido-hoy.md` — `CONVENCIONES.md` §4, "La regla del nombre") — acá se cita esa
+distinción en los casos donde aplica (A-01, A-02), sin repetirla entera.
 
 #### Por qué esto NO usa `comportamiento_roles.py --con-escritura`
 
@@ -2506,7 +2993,7 @@ vista — comportamiento correcto, no un defecto). Sin selección, ningún botó
 (`pruebas/gui/casos/ribbon-fila.spec.mjs`, ya escrito y con sus selectores verificados en vivo el
 2026-09-27 — falta correrlo de punta a punta con sesión real).
 
-**Cómo se sabe que falló.** Ver la distinción de `H-06` (`pruebas/13-construido-hoy.md`): en el
+**Cómo se sabe que falló.** Ver la distinción de `A-15` (este mismo archivo): en el
 Command Checker (`&ribbondebug=true`), un botón que aparece **`(hidden)`** es un problema de
 **REGLAS** (`EnableRule` contra la selección actual, revisar `TRANSICIONES_VALIDAS`); un botón
 **AUSENTE de la lista entera** es un problema de **METADATA COMPILADA** (regenerar desde el maker
@@ -2545,7 +3032,7 @@ Bitácora (sí en los catálogos, donde el alta es de una persona).
 **Cómo se verifica.** Recorrido manual del sitemap con las 4 sesiones (no hay caso `.spec.mjs`
 todavía — punto de extensión, `pruebas/gui/README.md` §6).
 
-**Cómo se sabe que falló.** Mismo diagnóstico REGLA-vs-METADATA de A-01/`H-06` si un
+**Cómo se sabe que falló.** Mismo diagnóstico REGLA-vs-METADATA de A-01/`A-15` si un
 `HideCustomAction` no surtiera efecto en alguna tabla puntual. **No alcanza con `RetrieveEntityRibbon`
 por Web API** (la misma llamada que usa `herramientas/construir/importar_solucion.py` para publicar):
 es uno de los "tres caminos de API" que el 2026-09-27 confirmaron que el botón de DN-02 **existía**
@@ -2984,12 +3471,78 @@ migración: no existía en el archivo antes del 2026-09-27.
 
 ---
 
+### A-15 · La lección del botón fantasma: distinguir REGLAS de METADATA COMPILADA
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): este caso era `H-06`
+del set `H` (`13-construido-hoy.md`, prefijo `H-`), un archivo aparte nombrado por la fecha en que
+se escribió, no por lo que prueba. `H-06` es sobre un comando de la barra — el tema de ESTE
+archivo—, así que quedó acá con el mismo cuerpo, solo cambió el ID. `13-construido-hoy.md`
+desapareció; la tabla de equivalencias completa vive en `pruebas/README.md`.
+
+**Qué prueba.** El hallazgo real del 2026-09-27: el botón "Descargar para digitar" existía en el
+servidor —verificado por API por TRES caminos distintos (`RetrieveEntityRibbon`, los `ribbondiff` con
+sus LocLabels en 1033/3082, y el verificador del proyecto)— y NO se dibujaba en el navegador: la causa
+era la metadata de ribbon **compilada**, no una regla de habilitación. Este caso documenta el
+PROCEDIMIENTO DE DIAGNÓSTICO para la próxima vez que un botón nuevo "no aparezca", sea cual sea, y que
+quien lo encuentre sepa en minutos —no en dos días, como esta vez— si el problema es de REGLAS o de
+METADATA COMPILADA: son diagnósticos opuestos con el mismo síntoma superficial ("no lo veo").
+
+**Necesita.** Acceso de **customización de la solución** en `make.powerapps.com` sobre
+`sanic_mppp_sol_mantenimientoppp` — privilegio de PLATAFORMA (System Administrator/System Customizer
+de Dataverse), **no** el rol de negocio `SR - MPPP - Administrador tecnico` que prueban
+`local/sesion-admin_tecnico.json` y `estado_sesiones.py`: ese rol está acotado a las tablas Parámetro
+y Reglas dentro de la app (`04-matriz-privilegios.md`) y no da acceso al maker portal para regenerar
+metadata. Además: `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`), confirmada viva y con
+ese rol por `python3 herramientas/pruebas/estado_sesiones.py` ANTES de correr nada; el parámetro de
+URL `&ribbondebug=true` agregado a la URL de la app model-driven.
+
+**Cómo.**
+1. Abrir la vista de Filas en la app con `&ribbondebug=true` en la URL, y usar el **Command
+   Checker** sobre el comando en cuestión.
+2. Leer la lista de comandos que devuelve el Command Checker:
+   - Si el botón aparece marcado **`(hidden)`**: es un problema de **REGLAS** (`EnableRule`/
+     `DisplayRule`) — revisar contra la selección actual, la metadata está bien.
+   - Si el botón está **AUSENTE de la lista entera**: es un problema de **METADATA COMPILADA** del
+     ribbon — ningún ajuste de reglas lo va a arreglar.
+3. Para el segundo caso: en el maker portal, sobre la tabla/app correspondiente, usar **"Regenerate
+   ribbon metadata"** (o volver a publicar la personalización completa) y repetir el paso 1.
+
+**Qué tiene que pasar.** Después de "Regenerate ribbon metadata", un botón que estaba AUSENTE de la
+lista del Command Checker pasa a aparecer (visible o `(hidden)`, según la selección actual).
+
+**Cómo se verifica.** La lista del Command Checker antes y después. Para la confirmación en el DOM
+real (con sesión y sin depender del maker portal): `cd pruebas/gui && MPPP_USUARIO=ejecutivo npx
+playwright test ribbon-fila` (ver `pruebas/gui/ayudantes/ribbon.mjs`, que codifica esta misma
+distinción: **AUSENTE** → "Sospechar metadata de ribbon (regenerar desde Command Checker) antes que el
+EnableRule"; **presente pero DESHABILITADO** → "revisar el EnableRule contra la selección actual, la
+metadata está bien"). Este set nunca duplica ese arnés (`CONVENCIONES` §9).
+
+**Cómo se sabe que falló (es decir, que se erró el diagnóstico).** Se pasaron minutos u horas
+ajustando `EnableRule`/`DisplayRule` sobre un botón que en realidad estaba AUSENTE de la lista del
+Command Checker (metadata compilada) — o al revés, se regeneró metadata sobre un botón que SÍ estaba
+en la lista pero `(hidden)` por una regla. Confundirlos es exactamente lo que costó dos días este
+mismo día.
+
+**Automatizable.** Manual (el diagnóstico y la reparación en el maker portal). El síntoma
+"presente vs. ausente" en el DOM real ya lo automatiza `pruebas/gui/ayudantes/ribbon.mjs`
+(GUI, con sesión), pero la ACCIÓN de "Regenerate ribbon metadata" es manual, en el maker portal — por
+eso el caso queda `N-A` en este set de API y no se corre desde acá.
+
+> **Nota para quien mantenga el documento de instalación en otro entorno** (fuera del alcance de este
+> archivo de pruebas, pero registrado acá porque de acá sale la lección): después de importar la
+> solución y publicar (`PublishAllXml`), hay que **regenerar la metadata del ribbon** desde el Command
+> Checker, o los botones custom no aparecen — aunque la publicación haya terminado sin ningún error.
+
+---
+
 ### Resultados
 
 Última corrida real: `python3 herramientas/pruebas/correr.py A`, 2026-09-27. **6 OK · 2 FALLA · 6
 N-A.** Los 2 `FALLA` son defectos reales confirmados (no fallas de datos de prueba); ninguno tiene
 ID todavía en `diseno/PENDIENTES.md` — pendiente de abrir. Formato por caso: OK / FALLA (con el
-motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3.
+motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3. **A-15** se agregó el
+2026-09-28 (fusión del ex `H-06`, `13-construido-hoy.md`); su resultado (`N-A`, a propósito) es el
+mismo que ya tenía como `H-06`.
 
 | Caso | Resultado | Notas |
 |---|---|---|
@@ -3007,6 +3560,7 @@ motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3.
 | A-12 Revisado | OK | |
 | A-13 multiidioma | N-A | GUI, sin caso de arnés todavía |
 | A-14 Atendida (fase 2) | **FALLA** | defecto real: lista blanca de Fila no incluye `sanic_requiereatencionmanual` (ver el caso arriba). Falta ID en PENDIENTES.md |
+| A-15 diagnóstico REGLAS vs. METADATA COMPILADA | N-A | ex `H-06`; maker portal (System Administrator/Customizer de plataforma, NO `admin_tecnico`), manual — motivo completo en el caso |
 
 ---
 ## 06 — Seguridad, sitemap, vistas y formularios
@@ -3736,6 +4290,219 @@ que es exactamente lo que el aprobador descartó el 2026-09-25).
 
 ---
 
+### Sitemap, vistas y formulario, casos G-14 a G-19 (fusionado del ex set H)
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): estos seis casos
+eran el set `H` (`13-construido-hoy.md`, prefijo `H-`), un archivo aparte nombrado por la fecha en
+que se escribió — "Construido el 2026-09-27" — no por lo que prueba. Seis de sus siete casos son
+sobre sitemap, columna de trabajo, formulario y componentes de la app: exactamente el tema de ESTE
+archivo, así que pasaron acá como `G-14`..`G-19` (`H-01`→`G-14` … `H-05`→`G-18`, `H-07`→`G-19`,
+saltando `H-06`, que es sobre un comando de la barra y pasó a `A-15` en `05-app-y-comandos.md`).
+`13-construido-hoy.md` desapareció; la tabla de equivalencias completa vive en `pruebas/README.md`.
+
+**Corrección que ya traían estos casos contra `CONVENCIONES.md` (§1, §2, §7, §8).** La versión
+original de este archivo (`13-construido-hoy.md`) marcaba `H-01` a `H-05` como `Automatizable: GUI`
+(inspección visual con sesión de navegador). Eso estaba mal por partida doble: (1) el sitemap, el
+`layoutxml`/`fetchxml` de una vista y el `formxml` de un formulario son metadata **publicada**,
+legible por Web API con el mismo service principal que usa cualquier otro set de este archivo —
+mismo criterio que ya aplican G-01/G-03/G-08 arriba; (2) una inspección visual no es lo que pide
+`CONVENCIONES` §2 ("la verificación va contra la plataforma, no contra la salida del constructor" —
+ni contra el ojo de quien mira). Por eso corren como `API`, contra la plataforma en vivo, igual que
+el resto de este set.
+
+**Ninguna sesión de navegador para G-14 a G-18 y G-19**: se verifican contra Web API directo, con el
+mismo service principal `# PowerPlatform-Dev` que usa el resto de este archivo. No crean ningún
+dato: es lectura de metadata ya publicada (sitemap, vistas, formulario, componentes de la app) —
+nada que `cerrar()` tenga que borrar por estos seis casos en particular.
+
+---
+
+### G-14 · Sitemap: "Para atención manual" en el área Trabajo, en su posición exacta
+
+**Qué prueba.** El olvido corregido el 2026-09-27: la vista "Para atencion manual" existía desde
+fase 2 pero no tenía entrada propia en el sitemap. Ahora `subarea_paraatencionmanual` está,
+EXACTAMENTE, entre `subarea_poraprobar` y `subarea_porclasificar` dentro del área con título 1033
+"Trabajo", con sus títulos en 1033 y 3082, y abre la vista real "Para atención manual" (no una vista
+distinta ni una `Url` inventada).
+
+**Necesita.** Nada del navegador: conexión a Dataverse por Web API (el mismo service principal que
+usan los demás sets). Ningún dato previo — es lectura de metadata ya publicada.
+
+**Cómo.** `GET sitemaps?$select=sitemapxml&$filter=sitemapnameunique eq 'sanic_mppp_sm_mantenimientoppp'`;
+parsear el XML devuelto; ubicar el `Area` cuyo `Titles/Title[@LCID='1033']` sea "Trabajo"; leer, en
+orden de documento, los `Id` de sus `SubArea`; ubicar `subarea_paraatencionmanual` y confirmar que su
+`Url` apunta al `savedqueryid` real de la vista "Para atencion manual" sobre `sanic_mppp_tbl_fila`
+(`GET savedqueries?$select=savedqueryid&$filter=name eq 'Para atencion manual' and returnedtypecode eq 'sanic_mppp_tbl_fila'`).
+
+**Qué tiene que pasar.** `subarea_paraatencionmanual` aparece consecutiva entre `subarea_poraprobar` y
+`subarea_porclasificar` (sin ninguna otra entrada en el medio), con título 1033 y 3082 = "Para
+atencion manual", y su `Url` contiene `etn=sanic_mppp_tbl_fila` y el `savedqueryid` real de esa vista.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-14) — las dos consultas
+`GET` de arriba, comparadas en código, no a mano.
+
+**Cómo se sabe que falló.** Alguna de estas, todas objetivas y distinguibles entre sí: la entrada no
+existe (regresión del arreglo); existe pero no está pegada entre `poraprobar` y `porclasificar`
+(alguien la movió); le falta el título en 1033 o en 3082 (`playbooks/app/mantenimientoppp.md`
+§"Cada titulo lleva etiqueta por cada idioma"); o su `Url` apunta a un `savedqueryid` que no es el
+de "Para atencion manual" (abre otra vista sin que se note a simple vista).
+
+**Automatizable.** API (Web API directo, sin sesión de navegador).
+
+---
+
+### G-15 · Columna "Requiere atención manual" en las 4 vistas de trabajo, y en ninguna otra
+
+**Qué prueba.** El hallazgo del aprobador: sin esta columna, un ejecutivo no podía ver de un vistazo
+si el bot marcó la fila en las vistas donde ya trabaja todos los días. Se agregó a **Mis clientes —
+por digitar**, **Todos — por digitar**, **Por aprobar** y **Mis clientes — devueltas** — y a NINGUNA
+otra vista de Fila (ni **Filas**, ni **Terminadas**, ni **Tomadas por el bot**).
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.** Para cada una de las 7 vistas nombradas arriba:
+`GET savedqueries?$select=fetchxml,layoutxml&$filter=name eq '<nombre>' and returnedtypecode eq 'sanic_mppp_tbl_fila'`;
+parsear el `layoutxml` (`<row>/<cell name=...>`) y el `fetchxml` (`<entity>/<attribute name=...>`).
+
+**Qué tiene que pasar.** En **Mis clientes - por digitar**, **Todos - por digitar**, **Por aprobar** y
+**Mis clientes - devueltas**: el `layoutxml` trae una `<cell name="sanic_requiereatencionmanual">`
+inmediatamente después de `sanic_numerofila`, y el `fetchxml` trae su `<attribute>`. En **Filas**,
+**Terminadas** y **Tomadas por el bot**: la celda NO está.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-15).
+
+**Cómo se sabe que falló.** Falta la celda o el atributo en alguna de las 4 vistas de trabajo (el
+ejecutivo sigue sin ver la marca donde más la necesita); está pero no pegada a `sanic_numerofila`
+(queda perdida entre las demás columnas, contra el motivo de diseño de cada playbook de vista); o
+SOBRA en Filas/Terminadas/Tomadas por el bot (ruido en vistas que el diseño dejó explícitamente
+afuera).
+
+**Automatizable.** API (`layoutxml`/`fetchxml` reales vía Web API).
+
+---
+
+### G-16 · Catálogos: "Correos Autorizados", "Autorizaciones - Planes" y "Autorizaciones - Clientes"
+
+**Qué prueba.** Los dos renombres del 2026-09-27 ("Autorizados" → "Correos Autorizados",
+"Autorizaciones" → "Autorizaciones - Planes") y la entrada nueva de DN-01 ("Autorizaciones -
+Clientes"), las tres en el sitemap en vivo, cada una abriendo la vista por defecto de su propia
+tabla.
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.** Sobre el mismo `sitemapxml` de G-14, ubicar el `Area` con título 1033 "Catalogos" y sus
+`SubArea` `subarea_autorizados`, `subarea_autorizaciones` y `subarea_autorizacionescliente`; leer
+título 1033/3082 y el atributo `Entity` de cada una; y confirmar la vista por defecto real de cada
+tabla con
+`GET savedqueries?$select=name&$filter=returnedtypecode eq '<tabla>' and isdefault eq true and querytype eq 0`.
+
+**Qué tiene que pasar.** `subarea_autorizados`: título "Correos Autorizados", `Entity` =
+`sanic_mppp_tbl_autorizado`. `subarea_autorizaciones`: título "Autorizaciones - Planes", `Entity` =
+`sanic_mppp_tbl_autorizacionplan`, cuya vista por defecto es "Autorizaciones activas".
+`subarea_autorizacionescliente`: título "Autorizaciones - Clientes", `Entity` =
+`sanic_mppp_tbl_autorizacioncliente`, cuya vista por defecto es "Autorizaciones por cliente activas".
+Las dos últimas son entradas DISTINTAS que abren tablas DISTINTAS.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-16).
+
+**Cómo se sabe que falló.** Falta alguna de las tres entradas; algún título quedó con el nombre viejo
+("Autorizados"/"Autorizaciones" a secas); las dos entradas de autorización abren la MISMA tabla (no
+se diferenciaron); o la vista por defecto de alguna de las dos tablas no es la esperada (el sitemap
+"apunta bien" pero la vista que se abre no es la correcta).
+
+**Automatizable.** API.
+
+---
+
+### G-17 · Formulario "Autorizacion por cliente": encabezado (2 lookups) + evidencia
+
+**Qué prueba.** El formulario nuevo (DN-01, 2026-09-27), leyendo su `formxml` real de
+`systemforms`: el encabezado con los 3 campos (`sanic_nombre`, y los lookups
+`sanic_autorizadoid`/`sanic_clienteid`) y la sección separada "Evidencia de la autorizacion" con
+`sanic_documentofirmado` y `sanic_fechadocumento` (ver también `10-autorizacion-cliente.md` U-10, que
+prueba el guardado; este caso es solo de estructura del formulario).
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.**
+`GET systemforms?$select=formxml&$filter=objecttypecode eq 'sanic_mppp_tbl_autorizacioncliente' and type eq 2`
+(2 = Main); parsear el `formxml`: los `<control datafieldname="...">` del `<header>`, y los de la
+`<section>` cuya `<label description="Evidencia de la autorizacion">` coincide.
+
+**Qué tiene que pasar.** El encabezado trae `sanic_nombre`, `sanic_autorizadoid` y `sanic_clienteid`,
+y los dos últimos son controles de tipo Lookup (`classid` `{270BD3DB-D9AF-4782-9025-509E298DEC0A}`).
+Existe una sección separada "Evidencia de la autorizacion" con `sanic_documentofirmado` y
+`sanic_fechadocumento`.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-17).
+
+**Cómo se sabe que falló.** Falta algún campo del encabezado, o alguno de los dos lookups no es un
+control Lookup real (`classid` distinto); o falta la sección de evidencia, o sus campos están
+mezclados con el encabezado en vez de en su propia sección (el hueco que señaló el aprobador seguiría
+sin cerrarse en la interfaz, aunque las columnas ya existan en la tabla).
+
+**Automatizable.** API (`formxml` real vía Web API).
+
+---
+
+### G-18 · El ícono reutilizado, no uno nuevo
+
+**Qué prueba.** "Para atención manual" reusa el SVG de "Para revisar" (mismo patrón de negocio);
+"Autorizaciones - Clientes" reusa el ícono de "Autorizaciones - Planes". Ninguna de las dos generó un
+web resource nuevo.
+
+**Necesita.** Nada del navegador: reusa el mismo `sitemapxml` de G-14/G-16. Ningún dato previo.
+
+**Cómo.** Sobre el `sitemapxml` en vivo, comparar el atributo `Icon` de `subarea_paraatencionmanual`
+contra el de `subarea_pararevisar`, y el de `subarea_autorizacionescliente` contra el de
+`subarea_autorizaciones`.
+
+**Qué tiene que pasar.** Los dos pares de `Icon` son, cada uno, el MISMO valor
+(`/WebResources/sanic_mppp_wr_svg_pararevisar` y `/WebResources/sanic_mppp_wr_svg_autorizaciones`
+respectivamente) — nada de un web resource nuevo.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-18).
+
+**Cómo se sabe que falló.** El `Icon` de alguna de las dos entradas nuevas difiere del de su par (se
+habría creado o asignado un web resource distinto sin necesidad).
+
+**Automatizable.** API (mismo `sitemapxml` de G-14/G-16, sin navegador).
+
+---
+
+### G-19 · `sanic_mppp_tbl_autorizacioncliente` como componente real de la app
+
+**Qué prueba.** El hueco que dejó resolver esta tabla con un **import manual de la solución** en vez
+de con la herramienta del proyecto en modo escritura: que la tabla sea un componente REAL de la app
+`MDA - MPPP - Mantenimiento PPP` (`RetrieveAppComponents` en vivo), no solo algo que el sitemap
+menciona (G-16) sin que la tabla misma viaje con la app.
+
+**Necesita.** Nada del navegador: Web API directo, más una corrida de solo lectura de
+`herramientas/construir/app.py` (con `--solo-verificar` nunca escribe). Ningún dato previo.
+
+**Cómo.**
+1. `python3 herramientas/construir/app.py playbooks/app/mantenimientoppp.md --solo-verificar`.
+2. Releer, en el propio caso (no confiar solo en la salida del paso 1 — `CONVENCIONES` §2):
+   `GET appmodules/Microsoft.Dynamics.CRM.RetrieveUnpublishedMultiple()?$select=appmoduleid&$filter=uniquename eq 'sanic_mppp_mda_mantenimientoppp'`,
+   después `GET RetrieveAppComponents(AppModuleId=<id>)` y, para cada componente de tabla
+   (`componenttype eq 1`), `GET EntityDefinitions(<objectid>)?$select=LogicalName`.
+
+**Qué tiene que pasar.** El paso 1 termina en `ya_existia` (nunca `difiere`/`error`/`bloqueado`), y
+entre los nombres lógicos que trae el paso 2 aparece, POR NOMBRE, `sanic_mppp_tbl_autorizacioncliente`
+— no se afirma un total de tablas (`CONVENCIONES` §7): ese número puede cambiar sin que nada esté
+roto.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-19).
+
+**Cómo se sabe que falló.** El paso 1 no da `ya_existia` (el sitemap o los componentes en vivo se
+despegaron del playbook); o `sanic_mppp_tbl_autorizacioncliente` no aparece por nombre en
+`RetrieveAppComponents` (la tabla no viaja con la app, aunque el sitemap la mencione — exactamente el
+síntoma que motivó este caso: un import manual que quedó a medias).
+
+**Automatizable.** API.
+
+---
+
 ### Resultados
 
 | Caso | Resultado | Notas |
@@ -3755,6 +4522,12 @@ que es exactamente lo que el aprobador descartó el 2026-09-25).
 | G-11 multiidioma | | GUI, sin arnés |
 | G-12 ValidateApp | | |
 | G-13 frontera con el RPA | | nuevo |
+| G-14 sitemap "Para atención manual", en su posición | OK | ex H-01, API, sin sesión |
+| G-15 columna en las 4 vistas de trabajo, y en ninguna más | OK | ex H-02, API, sin sesión |
+| G-16 "Correos Autorizados" / "Autorizaciones - Planes" / "Autorizaciones - Clientes" | OK | ex H-03, API, sin sesión |
+| G-17 formulario AutorizacionCliente: encabezado + evidencia | OK | ex H-04, API, sin sesión |
+| G-18 íconos reutilizados, no nuevos | OK | ex H-05, API, sin sesión |
+| G-19 la tabla AutorizacionCliente es componente real de la app | OK | ex H-07, API, sin sesión |
 
 ---
 ## 07 — MPPP-VIG, la red de seguridad
@@ -3794,6 +4567,23 @@ de colchón = 32 minutos por caso.** No es un número arbitrario:
 - Si con 3 vueltas también da FALLA de forma sistemática, **no es cuestión de agrandar el margen**:
   es evidencia de que el defecto de arranque (o algo peor) es más frecuente de lo esperado, y hay que
   mirar `diseno/PENDIENTES.md`, no este número.
+
+### D-62 corregido (2026-09-28) — la etapa de arranque ya blinda con Failed
+
+**El defecto que describe esta sección ya se corrigió.** `recursos/flujos/mppp-vig.json` y
+`playbooks/flujo/mppp-vig.md` (razonamiento completo del alcance ahí) quedaron con `"Failed"`
+agregado al `runAfter` de los cinco eslabones de la etapa de arranque, desplegado contra el
+entorno con `herramientas/construir/flujo.py playbooks/flujo/mppp-vig.md --completar` y
+verificado leyendo `workflows?$select=clientdata` (no el repo) el 2026-09-28: `statecode=1`
+(activo), `recurrence` intacto (10 minutos), los cinco eslabones de arranque Y los cuatro entre
+bloques con `["Succeeded","Failed"]`, y repo == desplegado en `runAfter`/`type` de cada acción de
+nivel superior. De paso se agregó `runtimeConfiguration.concurrency.runs = 1` al trigger
+(parte (b) de D-62, ver la sección de concurrencia más abajo), también verificado desplegado.
+
+El texto que sigue (el hallazgo original, el razonamiento de M-06, las tablas de V-01) se conserva
+tal cual se escribió durante la investigación — es la evidencia de POR QUÉ el arreglo es el que
+es. **V-01 pasó de estar en rojo a propósito a verificar que el blindaje sigue puesto**; ver su
+sección más abajo para la tabla actualizada y el síntoma que delataría un revert.
 
 ### La pregunta que dejó abierta M-06 (set M, `04-comunicaciones.md`)
 
@@ -3844,13 +4634,65 @@ a ese bloque por los errores del bloque anterior.
    probaba algo que `MPPP-VIG` nunca prometió — es una expectativa mal fundada del propio caso M-06,
    no un defecto de `MPPP-VIG`. **V-07** no repite ese error.
 
-**Para quien registre esto en `diseno/PENDIENTES.md`:** el defecto verificable y accionable es el del
-punto 3 — agregar `"Failed"` (y evaluar `"TimedOut"`/`"Skipped"` también, para blindar del todo) al
-`runAfter` de `Parametro_sin_responder`, `Parametro_reintentos`, `Parametro_vencimiento`, `Umbrales` y
-`Correos_que_quedaron_en_la_bandeja`; investigar por qué `"Fallo la ingesta del correo"` es tan
-frecuente (backlog no drenado, reintentos agotados); y considerar `Concurrency Control` en el trigger
-recurrente para evitar corridas superpuestas. No se toca el flujo desde este set — es de quien lo
+**Para quien registre esto en `diseno/PENDIENTES.md`:** el defecto verificable y accionable del punto 3
+(el `runAfter` sin `Failed`) **ya se corrigió el 2026-09-28** — ver la sección "D-62 corregido" arriba.
+La `Concurrency Control` en el trigger recurrente **también se aplicó** (`runs: 1`), para evitar
+corridas superpuestas. Lo que sigue abierto, sin tocar, es la causa de fondo: por qué
+`"Fallo la ingesta del correo"` es tan frecuente. No se toca el flujo desde este set — es de quien lo
 diseñó.
+
+### Investigación de la causa de fondo de "Fallo la ingesta del correo" (2026-09-28, SIN corregir)
+
+Parte (c) de D-62: investigar, no arreglar. Evidencia recolectada el 2026-09-28 contra el entorno,
+por consulta directa a la Bitácora (`sanic_mppp_tbl_bitacoras`), sin esperar ningún schedule:
+
+- **898 eventos `Error` (159460017) con origen MPPP-VIG (159460005)** en las 2 horas previas a
+  ~06:26 UTC del 2026-09-28 (`$filter=sanic_evento eq 159460017 and sanic_origen eq 159460005 and
+  sanic_fechaevento ge <hace 2h>&$count=true`). Es MUCHO más que "decenas": es un incidente activo,
+  no un ruido de fondo ocasional.
+- **Ritmo continuo, no en ráfagas de 10 minutos.** Entre 06:15:06 y 06:26:42 UTC se registraron 76
+  eventos, a un ritmo de ~1 cada 8-9 segundos, DISTRIBUIDOS a lo largo de toda la ventana — no
+  agrupados en una sola ráfaga de hasta 25 (el tope de `Leer_la_bandeja`) cada 10 minutos. Una sola
+  corrida secuencial de `MPPP-VIG` (con `concurrency.repetitions: 1` en su `Foreach` interno) no
+  puede producir más de 25 fallos cada 10 minutos (~2,5/min) si procesa un solo lote; el ritmo medido
+  (~7/min) triplica ese máximo teórico. Esto es consistente con **corridas superpuestas de
+  `MPPP-VIG`** (el hallazgo de la parte (b) de este mismo D-62, sin Concurrency Control hasta este
+  arreglo) reintentando el mismo backlog en simultáneo, no con una sola corrida bien comportada.
+- **0% de éxito en la misma ventana.** En las mismas 2 horas, **cero** eventos `Ingresada` (159460001)
+  con origen MPPP-VIG (`Bitacora_ingresada` de `mppp-ing.json`, que se escribe SOLO si la ingesta
+  llega al final). Ningún intento de reingesta vía VIG terminó bien en esa ventana.
+- **No es un problema general de Outlook/Graph.** En la misma ventana, **cero** eventos `Error` con
+  origen MPPP-REC (159460001): la ingesta normal (correo nuevo, disparada por `MPPP-REC`) no muestra
+  el mismo síntoma — de hecho no hubo ninguna Solicitud nueva creada por ningún origen en esa ventana
+  (entorno de prueba, sin tráfico real). El problema es específico de la RE-ingesta que dispara VIG
+  sobre correos que ya estaban en la bandeja, no de leer un correo nuevo.
+- **La Bitácora no alcanza para saber QUÉ acción de `MPPP-ING` falla.** El propio texto que graba
+  `Si_algo_fallo/Bitacora_error` en `recursos/flujos/mppp-vig.json` lo dice: *"El detalle de que accion
+  fallo esta en el historial de ejecuciones del flujo, no aca"*. Ese historial de ejecuciones vive en
+  la API de administración de Power Automate (`service.flow.microsoft.com`), no en el Web API de
+  Dataverse — `herramientas/dataverse_api.py` solo tiene un token para el recurso de Dataverse, no
+  para ese scope, y este set no tiene credenciales para leerlo. Tampoco hay acceso directo al buzón de
+  ingesta (API de Outlook/Graph) desde acá. **Por eso lo que sigue es una hipótesis con evidencia
+  circunstancial, no un diagnóstico confirmado — no se afirma como hecho.**
+
+**Hipótesis más consistente con la evidencia (a confirmar por quien tenga acceso al historial de
+ejecuciones o al buzón):** IDs de mensaje de Outlook que dejan de ser válidos entre que
+`Correos_que_quedaron_en_la_bandeja` los lee (`GetEmailsV3`) y que `Reingerir`/`MPPP-ING` los vuelve a
+leer (`GetEmailV2` por `messageId`). Si el tenant no tiene habilitado "Immutable Id" para el conector
+de Outlook/Graph, mover un mensaje de carpeta (`MoveV2`, el último paso de `MPPP-ING` antes de
+clasificar) **cambia su ID** salvo que se pida explícitamente el ID inmutable. Con corridas
+superpuestas de VIG (parte (b), antes de este arreglo) leyendo la MISMA bandeja casi al mismo tiempo,
+es plausible que una corrida ya haya movido un correo (cambiándole el ID) cuando otra corrida, que lo
+leyó un instante antes con el ID viejo, intenta `Leer_el_correo` con ese ID y reciba 404 — lo que
+haría fallar `Ingerir` completo y dispararía exactamente este evento. **Esto explicaría por qué el
+ritmo bajó por primera vez a analizarse recién después de aplicar el Concurrency Control** (parte
+(b): si las corridas dejan de superponerse, dejan de pisarse los IDs), pero **no explica un backlog
+que nunca se drena si además hay mensajes genuinamente rotos** (adjunto corrupto, remitente con
+formato inválido, etc.) — ambas causas pueden convivir. **Reportado, no corregido**: no es un defecto
+de `mppp-vig.json` (que ya hace lo que puede: reintenta y, con el arreglo de D-62, ya no se apaga
+entero cuando algo falla), sino de `mppp-ing.json` y/o de la configuración del conector de Outlook, o
+de mensajes concretos en la bandeja — **merece su propio ID en `diseno/PENDIENTES.md`**, a criterio
+de quien lo diseñó.
 
 ### Qué bloque prueba cada caso (nombrado, no contado)
 
@@ -3871,14 +4713,22 @@ cobertura.
 
 ### Qué corre por default y qué no
 
-Cinco de los siete casos (V-03, V-04, V-05, V-06, V-07) dependen del schedule real de `MPPP-VIG`: con
-el margen de 32 minutos cada uno, los cinco juntos superan las **2 horas y media**. Un set así **no lo
-corre nadie de rutina** (mismo criterio que el set E con E-08). Por eso:
+Seis de los siete casos (V-02, V-03, V-04, V-05, V-06, V-07) dependen del schedule real de
+`MPPP-VIG` (V-02 de una sola vuelta; los otros cinco, de tres): un set con los seis prendidos
+supera las **3 horas**. Nadie corre eso de rutina (mismo criterio que el set E con E-08). Por eso:
 
-- **V-01 y V-02 corren siempre.** V-01 es 100% API, sin esperar nada (activo, recurrence real,
-  encadenamiento de los 5 bloques, el hallazgo de la etapa de arranque, comparación repo↔desplegado,
-  y los 4 parámetros nombrados). V-02 es manual por una razón distinta (ver su sección): siempre
-  queda `N-A` con el motivo.
+- **V-01 corre siempre.** Es 100% API, sin esperar nada (activo, recurrence real, encadenamiento de
+  los 5 bloques, el hallazgo de la etapa de arranque, comparación repo↔desplegado, y los 4
+  parámetros nombrados).
+- **V-02 queda `N-A` por default**, con el comando exacto para correrlo a propósito:
+
+  ```bash
+  MPPP_V02_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py V
+  ```
+
+  **Corrección 2026-09-28.** Hasta esta fecha V-02 era 100% manual: el arnés nunca tocaba el estado
+  de un flujo. El aprobador autorizó una excepción puntual — ver la sección de V-02 más abajo y
+  `CONVENCIONES.md` ("Excepción V-02") para las dos redes de seguridad con las que corre.
 - **V-03, V-04, V-05, V-06 y V-07 quedan `N-A` por default**, con el comando exacto para correrlos a
   propósito:
 
@@ -3889,17 +4739,24 @@ corre nadie de rutina** (mismo criterio que el set E con E-08). Por eso:
   Se corren así cuando `mppp-vig.json` cambió de forma que pudiera afectar alguno de los 5 bloques,
   avisando al equipo y fuera de horario de otras pruebas (comparten el mismo entorno con S/I/M/etc.).
 
+**`correr.py --full`** (2026-09-28, decisión del aprobador: "corré todas, todas sin importar nada")
+prende `MPPP_V02_ALTO_RIESGO` y `MPPP_V_LENTOS` a la vez, con un banner previo que avisa el costo y
+el riesgo antes de arrancar — ver `herramientas/pruebas/correr.py --listar` y su docstring.
+
 ---
 
 ### V-01 · El flujo está vivo y bien armado (sin esperar el schedule)
 
 **Qué prueba.** Que `MPPP-VIG` esté activo, que su recurrence real sea la que se documenta acá, que
-los 5 bloques existan y estén encadenados de forma que uno que falle no tumbe a los que siguen, y
-deja registrado (a propósito, en rojo) el defecto de la etapa de arranque que explica la pregunta
-abierta de M-06.
+los 5 bloques existan y estén encadenados de forma que uno que falle no tumbe a los que siguen, que
+la etapa de arranque tenga el mismo blindaje (D-62, corregido el 2026-09-28 — este caso pasó de dar
+FALLA a propósito a verificar que el blindaje sigue puesto), y que el trigger tenga Concurrency
+Control en 1 (parte (b) de D-62).
 
 **Necesita.** Nada de negocio: solo lectura de la definición del flujo (`workflows.clientdata`, Web
-API) y de `recursos/flujos/mppp-vig.json` (solo lectura, nunca se edita desde este set).
+API) y de `recursos/flujos/mppp-vig.json` (solo lectura, nunca se edita desde este set); los 4
+umbrales y, desde el 2026-09-28, `retencion.dias.general`/`retencion.dias.noreconocidas` con una
+versión activa y CONTENIDO válido (entero positivo) — verificado en `preparar()`.
 
 **Cómo.** `GET workflows?$select=name,statecode,clientdata&$filter=name eq 'Cloud Flow - MPPP - VIG
 - Vigilar pendientes'`, se parsea `clientdata` (JSON) y se compara contra el JSON del repo y contra
@@ -3916,18 +4773,25 @@ lo documentado acá.
 | `Comunicaciones_sin_enviar` depende de `Solicitudes_sin_validar` | con `Succeeded` y `Failed` |
 | `Envios_iniciados_sin_confirmar` depende de `Comunicaciones_sin_enviar` | con `Succeeded` y `Failed` |
 | `Por_clasificar_vencidos` depende de `Envios_iniciados_sin_confirmar` | con `Succeeded` y `Failed` |
+| `Parametro_sin_responder` depende de `Parametro_sin_validar` | con `Succeeded` y `Failed` (D-62) |
+| `Parametro_reintentos` depende de `Parametro_sin_responder` | ídem (D-62) |
+| `Parametro_vencimiento` depende de `Parametro_reintentos` | ídem (D-62) |
+| `Umbrales` depende de `Parametro_vencimiento` | ídem (D-62) |
+| `Correos_que_quedaron_en_la_bandeja` depende de `Umbrales` | ídem (D-62) |
+| `triggers.Cada_10_minutos.runtimeConfiguration.concurrency.runs` | `1` (D-62, parte b) |
 | Lo desplegado == el repo | mismo `runAfter` y `type` en cada acción de nivel superior |
 | Los 4 parámetros (`vigilancia.minutos.sinvalidar`, `vigilancia.minutos.sinresponder`, `vigilancia.reintentos.maximo`, `clasificacion.dias.vencimiento`) | cada uno con una versión activa |
+| `retencion.dias.general` y `retencion.dias.noreconocidas`, CONTENIDO (no solo que existan, 2026-09-28) | cada uno con una versión activa y un valor entero positivo (`preparacion_comun.verificar_parametro_entero_positivo()`) — recupera la cobertura del antiguo P-06; ningún bloque de `MPPP-VIG` los consume hoy (los usa el futuro job de purga de fase 3), pero es el hogar más cercano que existe entre los parámetros numéricos de fase 1 |
 
-**Y lo que HOY no cumple, a propósito, para que quede visible (CONVENCIONES §3):**
-
-| Qué | Valor esperado | Hoy |
-|---|---|---|
-| `Parametro_sin_responder` depende de `Parametro_sin_validar` | con `Succeeded` y `Failed` | solo `Succeeded` |
-| `Parametro_reintentos` depende de `Parametro_sin_responder` | ídem | solo `Succeeded` |
-| `Parametro_vencimiento` depende de `Parametro_reintentos` | ídem | solo `Succeeded` |
-| `Umbrales` depende de `Parametro_vencimiento` | ídem | solo `Succeeded` |
-| `Correos_que_quedaron_en_la_bandeja` depende de `Umbrales` | ídem | solo `Succeeded` |
+**D-62, corregido el 2026-09-28 (histórico: así estaba antes).** Hasta esa fecha, los cinco checks de
+la "etapa de arranque" de la tabla de arriba (`Parametro_sin_responder`...`Correos_que_quedaron_en_la_bandeja`)
+daban **FALLA a propósito** (CONVENCIONES §3, "un defecto conocido no es N-A"): la etapa de arranque
+común de los 5 bloques estaba encadenada solo con `["Succeeded"]`, así que un `Parametro_*` que
+fallaba saltaba los CINCO bloques de recuperación esa corrida. Se corrigió agregando `"Failed"` a esos
+cinco `runAfter` (igual que ya tenían los 5 bloques entre sí) y agregando Concurrency Control (`runs:
+1`) al trigger — razonamiento completo del alcance en `playbooks/flujo/mppp-vig.md`, sección
+"D-62 — blindaje de la etapa de arranque". Este caso ahora verifica que ese blindaje **sigue puesto**,
+no que esté roto.
 
 **Cómo se verifica.** `GET workflows?$select=name,statecode,clientdata&$filter=name eq 'Cloud Flow -
 MPPP - VIG - Vigilar pendientes'`, parseando `clientdata.properties.definition` (o `clientdata`
@@ -3936,11 +4800,20 @@ directo si no trae `properties`), comparado campo a campo contra
 
 **Cómo se sabe que falló.** Si `statecode != 1` o el recurrence no es `10` minutos, es un cambio de
 configuración real (alguien lo apagó o le cambió el schedule) — mirar quién lo tocó. Si falta un
-bloque o un `runAfter` entre los 5 bloques no trae `Failed`, es un cambio real en el diseño del flujo
-— no un capricho de esta prueba. Los 5 checks de la "etapa de arranque" están **FALLA a propósito**
-hasta que alguien corrija `recursos/flujos/mppp-vig.json` (que no es este set) y lo despliegue: no se
-apaga esta parte del caso para "verlo todo en verde" (CONVENCIONES §3, "un defecto conocido no es
-N-A").
+bloque o un `runAfter` (entre los 5 bloques O en la etapa de arranque) no trae `Failed`, es un cambio
+real en el diseño del flujo — no un capricho de esta prueba.
+
+**Síntoma de un revert de D-62 (si alguien lo pisa).** Si alguien vuelve a dejar la etapa de arranque
+con solo `["Succeeded"]` (a mano en el portal, o reimportando una versión vieja del JSON), este caso
+vuelve a FALLAR exactamente en los checks de `Parametro_sin_responder`...`Correos_que_quedaron_en_la_bandeja`,
+sin esperar nada — no hace falta que el defecto se manifieste en producción para detectarlo. Si
+además se saca el Concurrency Control, el check de `runtimeConfiguration.concurrency.runs` falla
+también. El síntoma EN PRODUCCIÓN de un revert (si V-01 no se corre) es el mismo que originó este
+hallazgo: los cinco bloques de recuperación dejan de actuar TODOS JUNTOS en corridas puntuales
+(no uno solo), coincidiendo con eventos `Error` de origen MPPP-VIG en la Bitácora en esa misma
+ventana — y, si además se pierde el Concurrency Control, vuelve a verse más de un evento `Error` en
+la misma franja de pocos segundos (ver la sección "Investigación de la causa de fondo" más arriba
+para el patrón real medido).
 
 **Automatizable.** `API` (Dataverse Web API contra `workflows`, sin esperar el schedule real — mejora
 sobre la versión anterior de este caso, que era 100% manual).
@@ -3951,41 +4824,59 @@ sobre la versión anterior de este caso, que era 100% manual).
 
 **Qué prueba.** Que un correo que `MPPP-REC` no llegó a procesar se ingiera igual, por `MPPP-VIG`.
 
-**Necesita.** Apagar de verdad `Cloud Flow - MPPP - REC - Recibir correo nuevo` (rol de
-Maker/administrador de Power Automate); el REMITENTE; el adjunto `E01-feliz-formato11.xlsx`.
+**Corrección 2026-09-28 — de manual a automatizado, con excepción autorizada.** Hasta esta fecha
+este caso era 100% manual: la regla del proyecto era que el arnés nunca desactiva un flujo, sin
+excepción. El aprobador autorizó una excepción puntual, única en todo el arnés, para poder probar
+justo este escenario de verdad — ver `CONVENCIONES.md`, sección "Excepción V-02", para las dos
+redes de seguridad con las que `set_v.py::v02()` corre esto ahora. El texto que sigue describe el
+comportamiento AUTOMATIZADO actual; el procedimiento manual anterior queda reemplazado, no
+documentado aparte (era exactamente estos mismos pasos, hechos a mano).
 
-**Cómo.**
-1. **Apagá** `Cloud Flow - MPPP - REC` (Turn off) — a mano, en el portal.
-2. Mandá un correo nuevo con `E01-feliz-formato11.xlsx` al buzón de ingesta.
-3. Comprobá que **no** se creó ninguna Solicitud (REC está apagado).
-4. Esperá a que pasen los minutos de `vigilancia.minutos.sinvalidar` (leído en vivo por V-01) + una
-   corrida de VIG.
-5. **Volvé a prender** `MPPP-REC` al terminar.
+**Necesita.** El buzón de prueba real de Graph (`PP_MAIL_BUZON_3`, mismo que usa `set_m.py` como
+remitente — los sets no corren en paralelo, no hay colisión), autorizado sobre PR11; el adjunto
+`E01-feliz-formato11.xlsx`; `MPPP_V02_ALTO_RIESGO=si` (o `--full`); y que `MPPP-REC` esté
+**ACTIVO** antes de empezar — lo garantiza la RED 2 (`_verificar_y_recuperar_rec()`, corre siempre
+al arrancar `preparar()` del set, con o sin `MPPP_V02_ALTO_RIESGO`).
+
+**Cómo (`v02()` de `set_v.py`).**
+1. Confirma que `MPPP-REC` está Activo (precondición) y lo **apaga de verdad** (`PATCH
+   statecode=0`), releyendo el estado para confirmar que quedó apagado — nunca se confía en el
+   HTTP 200/204 del PATCH solo.
+2. Manda un correo REAL, por Graph, desde el buzón de prueba hacia `simulador.BUZON_INGESTA`, con
+   `E01-feliz-formato11.xlsx` adjunto y un asunto único (`ZZP-V02-<nonce>`).
+3. Espera 60s y comprueba que **no** se creó ninguna Solicitud (confirma que el apagado de MPPP-REC
+   es real, no un PATCH que la plataforma ignoró).
+4. Espera hasta que pasen los minutos de `vigilancia.minutos.sinvalidar` (leído en vivo) + 1 vuelta
+   de `MPPP-VIG` (~10 min) + colchón, poll por el asunto único.
+5. En el `finally` (corre SIEMPRE, incluso si algo de arriba reventó): **vuelve a encender**
+   `MPPP-REC` (`PATCH statecode=1`) y **relee el estado** para confirmar que quedó Activado. Si no
+   pudo, es un FALLA ruidoso del propio caso — RED 1 de la excepción, ver `CONVENCIONES.md`.
 
 **Qué tiene que pasar.**
 
 | Qué | Valor |
 |---|---|
-| Se crea la Solicitud | **sí**, la ingirió VIG |
+| MPPP-REC queda desactivado, verificado | **sí**, antes de mandar el correo |
+| Con REC apagado, no se crea sola ninguna Solicitud en el primer minuto | **confirmado** |
+| Se crea la Solicitud | **sí**, la ingirió VIG (dentro del margen: umbral + 1 vuelta + colchón) |
 | Bitácora `Ingresada` | origen **MPPP-VIG** (no MPPP-REC) |
 | El resto | igual que C-01: En proceso, 3 filas Validadas, acuse enviado |
+| MPPP-REC queda reencendido, verificado (RED 1) | **sí**, pase lo que pase arriba |
 
-**Cómo se verifica.** `ver_solicitud.py <numero>` después del paso 4, mirando el origen de la entrada
-`Ingresada` en la Bitácora.
+**Cómo se verifica.** `ver_solicitud.py <numero>` después del margen, mirando el origen de la
+entrada `Ingresada` en la Bitácora; el propio caso ya deja el estado final de `MPPP-REC` en su
+último `check`.
 
-**Cómo se sabe que falló.** No aparece ninguna Solicitud después del margen completo (32 min): o el
-correo no llegó de verdad a la bandeja (revisar el envío), o el bloque 1 no lo está viendo (mirar
-`vigilancia.minutos.sinvalidar` con V-01, y si el problema persiste, el hallazgo del arranque común
-de esta misma sección).
+**Cómo se sabe que falló.** No aparece ninguna Solicitud después del margen completo: o el correo
+no llegó de verdad a la bandeja (revisar el envío por Graph), o el bloque 1 no lo está viendo
+(mirar `vigilancia.minutos.sinvalidar` con V-01, y si el problema persiste, el hallazgo del
+arranque común de esta misma sección). Si el ÚLTIMO check (RED 1, reencendido y verificado) da
+FALSE, es la alarma más seria de todo el set: **hay que reencender `MPPP-REC` a mano YA** — los
+correos del banco no están entrando mientras siga apagado.
 
-**Automatizable.** Manual, **a propósito, por regla del proyecto**: el service principal
-`# PowerPlatform-Dev` SÍ tiene privilegio para apagar/prender un flujo por Web API (tiene System
-Administrator) — pero este set (como ningún otro) **nunca desactiva ni modifica un flujo de Power
-Automate**, sea cual sea el motivo. Se corre a mano, con el procedimiento de arriba, y se anota el
-resultado en la tabla de Resultados. (Atajo para no esperar el umbral completo: bajar
-`vigilancia.minutos.sinvalidar` a `1` antes del paso 4 y devolverlo a su valor original al terminar
-— anotarlo en las notas si se usa: cambia lo que se está probando, igual que documentaba la versión
-anterior de este archivo.)
+**Automatizable.** `API`, detrás de `MPPP_V02_ALTO_RIESGO=si` (o `--full`) — excepción autorizada,
+única en todo el arnés, a que "el arnés nunca desactiva un flujo" (`CONVENCIONES.md`). En modo
+normal (sin la bandera) sigue `N-A`, con el comando exacto para correrlo a propósito.
 
 ---
 
@@ -4173,8 +5064,10 @@ igual que sus hermanos).
 | V-06 vencimiento | | | |
 | V-07 envío iniciado sin confirmar (M-06) | | | |
 
-> **Acordate de dejar todo como estaba**: `MPPP-REC` prendido si V-02 lo apagó, y los parámetros con
-> sus valores originales si los bajaste para no esperar (V-02).
+> **V-02 (2026-09-28) ya deja `MPPP-REC` prendido solo, verificado, en su propio `finally`** — no
+> hace falta acordarse a mano. Si de todos modos algo raro pasó, comprobalo:
+> `python3 herramientas/dataverse_api.py GET "workflows?\$select=name,statecode&\$filter=name eq 'Cloud Flow - MPPP - REC - Recibir correo nuevo'"`
+> — tiene que decir `statecode: 1`.
 
 ---
 ## 08 — Integridad y plugins
@@ -4200,6 +5093,13 @@ graves de todo el plan, y las tres se corrigen acá:
    `01-clasificacion-del-correo.md`)". El **código** de los dos casos ya usaba su propio fixture
    (`sets/set_i.py::preparar()`); lo que estaba mal era solo la prosa de este MD, que ya no cita
    ningún otro archivo (CONVENCIONES §8).
+4. **I-07 estaba mal PLANTEADO, no solo mal escrito** (corregido más tarde el mismo 2026-09-27):
+   el "defecto confirmado" que este archivo declaraba se medía con el **service principal**
+   (`applicationid`), una identidad **exenta de `ListaBlancaStep` por diseño** (`04` §1, código de
+   servidor) — nunca con un humano. Probado en vivo con `User1` (Ejecutivo, impersonado con
+   `MSCRMCallerID`): el `PATCH` a `sanic_referencia` **se rechaza** (HTTP 400). **No hay defecto.**
+   Ver el detalle completo en I-07; `diseno/PENDIENTES.md` (entrada `I-07`) queda pendiente de que
+   su dueño la cierre con esta evidencia.
 
 **Además, siguiendo CONVENCIONES §7 ("nombrar, no contar")**: en vez de repetir la vieja tabla de
 prosa "8 steps con su función", este archivo **nombra los 20 registros de step, uno por uno**, con
@@ -4237,7 +5137,7 @@ por qué no hace otras cosas (roles de Ejecutivo/Supervisor, canon), está docum
 |---|---|
 | Datos de negocio (`PR*`, fixture compartido, `REMITENTE` autorizado sobre PR11/PR06/PR10/PRIN) | `preparacion_comun.verificar_datos_negocio()` |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
-| Roles de Ejecutivo (User1) y Supervisor (User2) — SOLO los necesita I-13 | resueltos y verificados DENTRO de I-13, no en `preparar()` (si un día cambiaran, el resto de los 12 casos sigue corriendo igual) |
+| Roles de Ejecutivo (User1) y Supervisor (User2) — SOLO los necesita I-13; Ejecutivo (User1) y Administrador de planes (User3) — SOLO los necesita I-07 | resueltos y verificados DENTRO de cada caso, no en `preparar()` (si un día cambiaran, el resto de los 11 casos sigue corriendo igual) |
 
 **Corré este set con**:
 
@@ -4419,40 +5319,80 @@ el mismo cálculo que usa TODO el resto del plan para citar el número de fila.
 
 ### I-07 · Lista blanca de escrituras (columna calculada por PATCH directo)
 
-**Qué prueba.** `ListaBlancaStep`: que no se pueda escribir a mano, por Web API, una columna que
-solo llena la validación.
+**Reescrito el 2026-09-27: el diagnóstico viejo medía la identidad equivocada, no es un defecto.**
+Ver el detalle completo de la investigación y la evidencia abajo. **`diseno/PENDIENTES.md` (entrada
+`I-07`) todavía dice "ABIERTA": ese archivo es de otro dueño en esta ronda y no se tocó — hace
+falta que quien lo mantiene la cierre con la evidencia de acá.**
 
-**Necesita.** Una Fila propia de este caso (`ctx.procesar()` con `E01-feliz-formato11.xlsx`, 3
-filas Validadas) — este set ya no depende de la Fila de otro archivo (ver la corrección al
-principio de este documento).
+**Qué prueba.** `ListaBlancaStep` (`04` §1): que un **humano**, con su rol de negocio, no pueda
+escribir a mano por Web API una columna que solo llena la validación (`sanic_referencia`) —
+saltándose el formulario de solo lectura. Y de paso, sus dos bordes: que la protección que en
+verdad frena a un rol sin privilegio de escritura sobre Fila es otra (04 §2, no la lista blanca), y
+que una columna que SÍ está permitida (`sanic_notainterna`) no se vea afectada.
 
-**Cómo.** `PATCH` directo por Web API a `sanic_referencia` de una Fila recién validada, con un
-valor arbitrario (`"ZZ-INTENTO-DIRECTO"`).
+**Por qué el planteo viejo estaba mal.** La versión anterior de este caso hacía el `PATCH`
+prohibido con el **service principal** de este set (`# PowerPlatform-Dev`, `dataverse_api.py`),
+que tiene `applicationid`. `ListaBlancaStep.Execute` (`src/Sanic.Mppp.Plugins/Steps/StepsDePlataforma.cs`)
+empieza así:
 
-**Qué tiene que pasar en el DISEÑO.** El `PATCH` debería rechazarse: HTTP 400, con un mensaje que
-nombre `sanic_referencia` como columna no permitida.
+```csharp
+if (BaseDeStep.EsCodigoDeServidor(contexto, servicio))
+{
+    // 04 §1: el código de servidor no pasa por la lista blanca.
+    return;
+}
+```
 
-> **DEFECTO CONFIRMADO — este caso da FALLA a propósito, hasta que el aprobador decida.** El
-> `PATCH` se guarda con **HTTP 204** (éxito) en vez de ser rechazado: `ListaBlancaStep` **no**
-> bloquea esta columna. Registrado en `diseno/PENDIENTES.md`, entrada `I-07`: **ABIERTA, pospuesta
-> por el aprobador (2026-09-27), requiere su decisión** — o el step extiende su lista a
-> `sanic_referencia` (y probablemente a las demás columnas que solo escribe la validación), o el
-> riesgo se acepta porque el privilegio de escritura sobre Fila ya está acotado a Ejecutivo/
-> Supervisor por la matriz de `04`. **Este caso NO se apaga ni se "arregla" apagando la prueba que
-> lo detecta**: un defecto conocido, pospuesto a propósito, se sigue viendo en rojo hasta que se
-> resuelva — un FALLA que desaparece solo porque se dejó de mirar es peor que uno que se ve.
+y `BaseDeStep.EsCodigoDeServidor` trata como "código de servidor" a **toda identidad con
+`applicationid`**, no solo a SYSTEM — es exactamente lo que dice `diseno/04-matriz-privilegios.md`
+§1 ("Las dos claves alternativas..." — la exención de identidad de aplicación es la misma que ya
+usa I-12 para la puerta del RPA). El `HTTP 204` que el caso viejo registraba como "defecto" era
+el sistema haciendo lo que el diseño pide: el service principal **tiene que** poder escribir
+cualquier columna, porque es código de servidor a todos los efectos. El diagnóstico viejo nunca
+midió lo que decía medir. Y `ReglasDeSteps.cs` ya lo advertía desde el 2026-09-23 (comentario sobre
+`PermitidasEnFila`): *"todos los actores probados hasta entonces quedaban exentos de la lista
+blanca (el service principal por su `applicationid`, el administrador por ser `servicio.cuenta`,
+los plugins por su `Depth`). El primer humano que escribió una Fila desde la app chocó con esto de
+entrada."* Nadie había probado la lista blanca con un humano hasta ahora.
 
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-07`) — hoy tiene que dar
-**FALLA**, con el detalle `HTTP 204` (no 400).
+**Necesita.** Una Fila propia de este caso (`ctx.procesar()` con `E01-feliz-formato11.xlsx`) y los
+roles de Ejecutivo (`User1`) y Administrador de planes (`User3`), verificados EN VIVO contra
+`systemuserroles_association` dentro del propio caso (mismo criterio que I-13: si el rol no
+coincide, el caso da **N-A**, no un resultado que mentiría sobre lo que se probó).
 
-**Cómo se sabe que falló *de la forma esperada*.** El síntoma correcto es `HTTP 204` en el detalle
-del check (el `PATCH` se guardó). Si algún día aparece `HTTP 400` en su lugar, **este caso pasa a
-OK** y hay que actualizar `diseno/PENDIENTES.md` (cerrar la entrada `I-07`) y esta nota, porque el
-defecto se corrigió. Si aparece cualquier otro HTTP (500, timeout), eso sí es un defecto NUEVO —
-distinto del conocido — y hay que investigarlo aparte.
+**Cómo (4 pasos, verificados en el entorno el 2026-09-27, `MSCRMCallerID` para impersonar).**
 
-**Automatizable.** API (`correr.py I`, caso `I-07` — ya demostrado; no hace falta correrlo a mano
-para confirmar el defecto).
+| # | Quién | Qué | Qué pasó | Interpretación |
+|---|---|---|---|---|
+| 1 | Service principal (`applicationid`, sin impersonar) | `PATCH sanic_referencia` = `"ZZ-INTENTO-SP"` | **HTTP 204** — se guardó | Esperado: exento por diseño (código de servidor). **No mide la lista blanca.** |
+| 2 | **`User1` (Ejecutivo, humano)** | `PATCH sanic_referencia` = `"ZZ-INTENTO-DIRECTO"` | **HTTP 400**: *"No se puede guardar: la(s) columna(s) sanic_referencia no está(n) permitida(s) para este usuario."* | **La lista blanca FUNCIONA.** Un humano no puede saltarse el formulario. |
+| 3 | `User3` (Administrador de planes, borde 1) | `PATCH sanic_notainterna` = `"prueba de borde I-07"` | **HTTP 403**: *"...is missing prvReadsanic_mppp_tbl_fila privilege..."* | Lo frena la **falta de privilegio** (04 §2) — nunca llega a `ListaBlancaStep`. Protección distinta, y actúa antes. |
+| 4 | `User1` (Ejecutivo, borde 2) | `PATCH sanic_notainterna` = `"prueba I-07 columna permitida"` | **HTTP 204** — se guardó | La columna permitida **sí** pasa: el step no es más restrictivo que lo que dice el diseño. |
+
+**Qué tiene que pasar.** El paso 2 (el que en verdad mide `ListaBlancaStep` contra un humano) tiene
+que dar HTTP 400 con un mensaje que nombre `sanic_referencia`. Los pasos 1, 3 y 4 son de control:
+confirman que la exención de diseño existe, que el borde de privilegio actúa antes que la lista
+blanca, y que la columna permitida no se ve afectada.
+
+**Conclusión: NO ES UN DEFECTO. I-07 pasa a OK.** `ListaBlancaStep` protege exactamente lo que
+`04` §1 dice que protege, contra la identidad que en verdad importa (un humano con rol de negocio).
+El defecto que se había registrado en `diseno/PENDIENTES.md` (entrada `I-07`) era un artefacto de
+probar con la identidad equivocada — corresponde cerrar esa entrada con esta evidencia.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-07`) — tiene que dar
+**OK**. Cuatro checks: el service principal exento (204, informativo), el Ejecutivo humano
+rechazado (400, con `sanic_referencia` en el mensaje), el Administrador de planes frenado por
+privilegio (401/403) y el Ejecutivo escribiendo la columna permitida (204).
+
+**Cómo se sabe que falló.** Si el paso 2 (Ejecutivo) da 200/201/204, la lista blanca **sí** tiene
+un agujero real con un humano — eso sería grave (cualquier Ejecutivo con acceso al Web API podría
+escribir `sanic_referencia` a mano) y hay que reabrir la investigación con el `plugintracelog`. Si
+el paso 3 (Administrador de planes) da otro HTTP que no sea 401/403 (por ejemplo 400 con el mensaje
+de la lista blanca), significa que SÍ tiene privilegio de escritura sobre Fila cuando no debería
+(revisar la matriz `04` §2 contra el entorno). Si el paso 4 (columna permitida) se rechaza, el step
+es más restrictivo que el diseño y hay que revisar `ReglasDeSteps.PermitidasEnFila`.
+
+**Automatizable.** API (`correr.py I`, caso `I-07`).
 
 ---
 
@@ -4688,7 +5628,7 @@ otros roles dan 400 por falta de rol y el resultado mentiría sobre lo que en re
 | I-04 autodependencia | | |
 | I-05 autorización por plan duplicada | | |
 | I-06 nombre calculado (4 tablas) | | |
-| **I-07 lista blanca** | | **FALLA esperado — defecto abierto, `diseno/PENDIENTES.md` entrada I-07** |
+| **I-07 lista blanca (humano vs. identidad exenta)** | | **OK — no es defecto (reescrito 2026-09-27); falta que se cierre `diseno/PENDIENTES.md` entrada I-07** |
 | **I-08 transición ilegal** | | |
 | I-09 paquete al día (13 tipos) | | |
 | I-10 los 20 steps, uno por uno | | |
@@ -4714,16 +5654,22 @@ la marca de atención manual. Fuente: `diseno/03-contratos-custom-api.md` §2-§
 ### Convención de IDs de este archivo y de los que siguen
 
 Prefijos ya usados por `00`–`08` (verificado el 2026-09-27 con
-`rg -o --no-filename '^## [A-Z]+-[0-9]+' pruebas/0*.md`): **A, C, G, I, M, P, R, S, V**. Los cinco
-archivos nuevos (`09`–`13`) usan prefijos que no colisionan con esos ni entre sí:
+`rg -o --no-filename '^## [A-Z]+-[0-9]+' pruebas/0*.md`): **A, C, G, I, M, P, R, S, V**. Los archivos
+nuevos (`09`–`11`) usan prefijos que no colisionan con esos ni entre sí:
 
 | Prefijo | Archivo | Tema |
 |---|---|---|
 | `B-` (**B**ot) | `09-rpa-fase2.md` | este archivo |
 | `U-` (a**U**torización) | `10-autorizacion-cliente.md` | DN-01 |
 | `E-` (**E**xportación) | `11-exportacion-excel.md` | DN-02 |
-| `O-` (**O**bligatoriedad) | `12-obligatoriedad-gestion.md` | DN-03 |
-| `H-` (**H**oy) | `13-construido-hoy.md` | lo construido el 2026-09-27 |
+
+Hasta el 2026-09-28 había, además, un set `O-` (Obligatoriedad, DN-03,
+`12-obligatoriedad-gestion.md`) y un set `H-` (Hoy, `13-construido-hoy.md`) — los dos nombrados por
+la directiva o la fecha que los originó, no por lo que probaban. Ese día se fusionaron: `O` dentro
+de `03-reglas-de-registro.md` (set `R`, casos `R-19`..`R-28` — la obligatoriedad por gestión ES una
+de las ocho reglas de Registro) y `H` repartido entre `05-app-y-comandos.md` (`A-15`) y
+`06-seguridad-vistas-formularios.md` (`G-14`..`G-19`). Ver `CONVENCIONES.md` §4, "La regla del
+nombre", y la tabla de equivalencias en `pruebas/README.md`.
 
 ### Herramientas de este archivo
 
@@ -4966,13 +5912,21 @@ tiene defecto solo para `maximo`).
    `claimminutos` no tiene defecto)
 5. `GET sanic_mppp_capi_obtenerfilaspendientes(maximo=5,claimminutos=0)`
 
-**Qué tiene que pasar.** 1, 2, 4 y 5 rechazan con un mensaje que nombra el parámetro y exige
-"entero mayor que cero"; 3 responde 200 con el defecto de 100.
+**Qué tiene que pasar.** 1, 2 y 5 rechazan con **HTTP 400** y un mensaje que nombra el parámetro y
+exige "entero mayor que cero"; 3 responde 200 con el defecto de 100; **4 rechaza con HTTP 404**
+("Resource not found for the segment"), NO 400 — verificado en vivo contra Dev el 2026-09-28
+(diagnóstico de D-60): `claimminutos` está declarado `isoptional: false` en
+`customapirequestparameters`, así que sin él el ruteo OData rechaza el segmento del recurso ANTES
+de resolver la Function — la llamada nunca llega al plugin, nunca pasa por D-9. No es un defecto
+del sistema: la plataforma actúa correctamente, solo que más temprano de lo que esta ficha asumía
+originalmente (que esperaba 400 para los cinco sub-casos por igual).
 
 **Cómo se verifica.** Código HTTP y mensaje de cada llamada.
 
-**Cómo se sabe que falló.** Si 3 rechaza (el defecto de `maximo` dejó de aplicarse), o si 4/5
-aceptan silenciosamente un valor sin sentido.
+**Cómo se sabe que falló.** Si 3 rechaza (el defecto de `maximo` dejó de aplicarse), si 1/2/5
+aceptan silenciosamente un valor sin sentido, o si 4 deja de dar 404 (por ejemplo, si un cambio de
+registro vuelve `claimminutos` opcional: ahí sí pasaría a valer 400 desde el plugin y esta ficha
+tendría que actualizarse de nuevo).
 
 **Automatizable.** API.
 
@@ -5107,7 +6061,7 @@ original apenas termine el caso.
 **Cómo.**
 1. Dejar una Fila en Digitada por el propio bot (`probar_rpa.py --confirmar`).
 2. Cambiar `rpa.puedeaprobar` a `no` (nueva versión del parámetro, nunca editar la vigente — ver
-   `12-obligatoriedad-gestion.md` O-08 para el mismo criterio de versionado).
+   `03-reglas-de-registro.md` R-26 para el mismo criterio de versionado).
 3. `probar_rpa.py` de nuevo (sin `--confirmar` alcanza para ver el lote).
 4. Restaurar `rpa.puedeaprobar` a su valor original.
 
@@ -5344,8 +6298,8 @@ bot volvería a intentar algo que ya se determinó que no sabe resolver), o el c
 #### B-20 — La marca de atención manual se apaga sola con cualquier transición exitosa
 
 **Qué prueba.** Nadie tiene que acordarse de apagarla a mano (aunque también existe el botón
-*Atendida* — ver `13-construido-hoy.md` H-01/H-07): CUALQUIER transición exitosa de la fila la
-limpia, sin importar quién la hizo ni a qué estado fue.
+*Atendida* — ver `06-seguridad-vistas-formularios.md` G-14/G-19): CUALQUIER transición exitosa de la
+fila la limpia, sin importar quién la hizo ni a qué estado fue.
 
 **Necesita.** Una Fila marcada `sanic_requiereatencionmanual = sí` (repetir B-19, o seguir su
 resultado si corrió antes en el mismo set); un usuario real con el rol `SR - MPPP - Ejecutivo`
@@ -5717,7 +6671,7 @@ fila.
 **Cómo se sabe que falló.** El `formxml` no trae ningún control con ese `TargetEntityType` (nunca se
 agregó al formulario), la relación o la vista no coinciden (subgrilla mal armada), o el paso 5
 devuelve cero filas con datos que sí existen (filtro mal configurado — confundir esto con "no hay
-autorizaciones" es el mismo tipo de error que motivó H-06 en `13-construido-hoy.md`).
+autorizaciones" es el mismo tipo de error que motivó A-15 en `05-app-y-comandos.md`).
 
 **Automatizable.** API.
 
@@ -5891,7 +6845,7 @@ haya dejado otro set. `herramientas/pruebas/sets/set_e.py` deja listo, en su pro
 #### E-01 — El comando "Descargar para digitar" se dibuja en el ribbon
 
 **Qué prueba.** Que el botón exista de verdad en el DOM, no solo en el servidor — la lección cara
-del 2026-09-27 (ver `13-construido-hoy.md` H-06): un comando puede estar publicado y no dibujarse.
+del 2026-09-27 (ver `05-app-y-comandos.md` A-15): un comando puede estar publicado y no dibujarse.
 
 **Necesita.** `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) o
 `local/sesion-supervisor.json` (rol `SR - MPPP - Supervisor`) — cualquiera de las dos sirve, ambas
@@ -5906,8 +6860,8 @@ seleccionadas.
 
 **Cómo se verifica.** El resultado de esa corrida de Playwright.
 
-**Cómo se sabe que falló.** Ver H-06: distinguir AUSENTE (metadata de ribbon) de DESHABILITADO
-(regla de habilitación) — son diagnósticos opuestos.
+**Cómo se sabe que falló.** Ver A-15 (`05-app-y-comandos.md`): distinguir AUSENTE (metadata de
+ribbon) de DESHABILITADO (regla de habilitación) — son diagnósticos opuestos.
 
 **Automatizable.** GUI — ya construido en `pruebas/gui/casos/`, no se reescribe acá.
 
@@ -5944,7 +6898,7 @@ a un `.xlsx` válido.
 **Necesita.** El valor de la versión ACTIVA actual de `exportacion.columnas` (lo lee el propio caso).
 El caso siembra su propia versión de prueba, con las dos primeras columnas intercambiadas, en
 `sanic_version` = la MÁXIMA versión ya sembrada (activa o no) + 1 — nunca edita ni borra ninguna fila
-que no sembró él, mismo criterio de versionado que `12-obligatoriedad-gestion.md` O-08 y que
+que no sembró él, mismo criterio de versionado que `03-reglas-de-registro.md` R-26 y que
 CONVENCIONES §8.2. Usar la máxima sembrada (no solo la activa) importa: si una corrida murió antes de
 limpiar y dejó una versión de prueba colgando, "activa + 1" volvería a chocar con esa fila y la clave
 alterna `KEY - MPPP - Parámetro - Nombre y versión` rechazaría el alta con HTTP 412.
@@ -6101,7 +7055,15 @@ agotamiento de memoria/hosts ANTES de que el chequeo de tiempo del plugin tenga 
 para cortar con su propio mensaje. A 300.000 el error real fue
 `SandboxFabricHostCommunicationException`; a 500.000, `System.OutOfMemoryException`. **Esto es un
 riesgo ACEPTADO, no un defecto a corregir en esta fase**: ninguna selección real de este negocio se
-acerca a ese volumen (7.500 filas/mes en producción).
+acerca a ese volumen (7.500 filas/mes en producción). Resumen del borde medido: **100.000 filas OK
+· 250.000 OK en 40,6s · 300.000 revienta por memoria del sandbox**, y revienta ANTES de que el
+plugin llegue a su propio corte de 100s — por eso el mensaje elegante de E-07 no sale a ese
+volumen. E-08 documenta ese borde, no lo descubre.
+
+**Corrección 2026-09-28.** Decisión del aprobador: *"no importa que degrade el ambiente, en el modo
+FULL debería correr esta prueba"*. `correr.py --full` prende `MPPP_E08_ALTO_RIESGO` junto con las
+banderas de V — ver `herramientas/pruebas/correr.py --listar` y su docstring. La bandera suelta
+sigue funcionando igual: `--full` no la rompe, solo la reemplaza como forma recomendada.
 
 **Necesita.** **NO CORRER DE RUTINA.** Esta llamada tarda ~150-170 s y puede degradar el sandbox de
 Dataverse para otros usuarios de Dev mientras corre. Solo se repite si `ExportarParaDigitar.cs`
@@ -6115,6 +7077,7 @@ puesta ANTES de invocar al motor:
 
 ```bash
 MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+python3 herramientas/pruebas/correr.py E --full   # equivalente, y la forma recomendada desde 2026-09-28
 ```
 
 Sin esa variable (una corrida normal, `--todos` incluido), el caso NUNCA hace la llamada de 300.000
@@ -6135,8 +7098,9 @@ es lo ESPERADO y documentado, no un hallazgo nuevo.
 significativamente respecto de la medición de referencia (250k sano / 300k+ revienta): indicaría
 una regresión de memoria en el código nuevo, y ahí sí amerita investigar.
 
-**Automatizable.** API, pero detrás de la bandera `MPPP_E08_ALTO_RIESGO=si` (ver "Necesita" arriba) —
-alto costo, no forma parte de una corrida de regresión habitual ni de `--todos`.
+**Automatizable.** API, pero detrás de la bandera `MPPP_E08_ALTO_RIESGO=si` (o `--full`, ver
+"Necesita" arriba) — alto costo, no forma parte de una corrida de regresión habitual ni de
+`--todos` (`--todos` solo, sin `--full`, tampoco la prende).
 
 ---
 
@@ -6213,709 +7177,6 @@ de cientos de ids seleccionados en la grilla, encontrar el culpable a mano serí
 | E-05 `filaid` inexistente revienta entero | | |
 | E-06 columnas protegidas salen en claro | | |
 | E-07 corte por presupuesto de tiempo | | siempre N-A en `set_e.py`; cobertura real es la unitaria |
-| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` |
+| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` (o `--full`) |
 | E-09 privilegio de la Custom API | | |
 | E-10 `filaids` StringArray, posición del error | | |
-
----
-## 12 — DN-03: la obligatoriedad se define por gestión
-
-Cubre `plantilla.obligatoriedad` con `porGestion` (`Inclusion`/`Exclusion`/`Modificacion`), la
-compatibilidad con lo sembrado antes de DN-03, y el versionado de parámetros (agregar fila, nunca
-editar). Fuente: `diseno/DIRECTRICES-NUEVAS.md` DN-03,
-`src/Sanic.Mppp.Plugins/Validacion/ParametrosDePlantilla.cs` (`ObligatoriedadPlantilla`),
-`playbooks/datos/parametros.md`.
-
-Convención de IDs: prefijo `O-` (**O**bligatoriedad), ver el encabezado de `09-rpa-fase2.md`.
-
-**Advertencia general de este archivo.** `plantilla.obligatoriedad` decide, en TODA Solicitud que
-se valide mientras esté activa esa versión, qué campos son obligatorios. Sembrar una versión nueva
-en Dev la vuelve la ACTIVA de inmediato (la más alta gana) para absolutamente todo el entorno. **Este
-archivo NUNCA siembra una versión nueva de `plantilla.obligatoriedad` en Dev**: ningún caso de
-`sets/set_o.py` escribe sobre esa tabla. Lo que hoy está sembrado (`sanic_version=1` y `=2`) se lee,
-nunca se edita ni se versiona de nuevo; O-04, O-06 y O-07 (los de mayor riesgo: precedencia, y dos
-formas de gestión mal escrita) se resuelven contra la cobertura unitaria ya construida con TDD
-(`tests/Sanic.Mppp.Plugins.Tests/Aceptacion/ParametrosDePlantillaAceptacion.cs`, clase
-`ParametrosDePlantillaAceptacion`), corrida en vivo con `dotnet test --filter`. El riesgo que este
-archivo describía ("sembrar una versión con precedencia real, o con un typo, la vuelve la activa
-para todo el entorno") queda en **cero** porque el código de este set jamás ejecuta ese `POST`.
-
-### Frontera con el set R (R-18)
-
-`03-reglas-de-registro.md` (set `R`) ya tiene, desde fase 2, el caso **R-18**: manda un Excel real
-con una fila `gestion=Exclusion` y `numeroCuenta`/`banco`/`moneda` en blanco contra las Custom API
-en vivo, y confirma que la fila queda Validada — es la prueba EN VIVO, dentro del motor de las ocho
-reglas, de que `porGestion.Exclusion` funciona. Ese caso no se repite acá (CONVENCIONES §8 dice "un
-set no supone nada" de otro set, pero tampoco pide volver a probar en vivo lo que otro set YA
-prueba en vivo con el mismo arnés): repetirlo sería el mismo error que
-`03-reglas-de-registro.md` §"Fase 2" ya evitó frente a `10-autorizacion-cliente.md`.
-
-Este archivo (`O`) es el dueño de la cobertura **exhaustiva** de DN-03, y cubre exactamente lo que
-R-18 NO cubre:
-
-- **O-01/O-02** — de solo lectura: que el CONTENIDO sembrado en Dev (versión 1 intacta, versión 2
-  con `porGestion.Exclusion` trayendo exactamente los tres campos pedidos) es el correcto. Es la
-  prueba de que la configuración que R-18 ejercita en vivo es la que el aprobador pidió, no solo que
-  "algo" pasó al mandar un Excel.
-- **O-03, O-05, O-09, O-10** — escenarios en vivo que R-18 no ejercita: `Inclusion`/`Modificacion`
-  sin aflojar, una gestión inválida en la FILA (no en el parámetro), el texto exacto del mensaje al
-  cliente y la metadata de la regla en el catálogo.
-- **O-04, O-06, O-07** — alto riesgo o de precedencia: nunca se siembran en Dev (cambiarían la
-  versión activa para todo el entorno); se verifican corriendo `dotnet test` contra
-  `ParametrosDePlantillaAceptacion`, que ya cubre estos tres escenarios con TDD.
-- **O-08** — de solo lectura: la evidencia de que versionar agrega una fila y no edita la anterior.
-
-### Preparativos comunes a este archivo
-
-- El fixture compartido `PR*` (`preparar_datos.py`) y el `REMITENTE` de siempre, autorizado sobre
-  `PR11` — igual que `sets/set_r.py` y `sets/set_s.py`.
-- Los 15 Excel de fase 1 (`generar_excel.py`; ya trae `E06-obligatoriedad.xlsx`, que O-09 reutiliza
-  tal cual). Los Excel de gestión `Exclusion`/`Inclusion`/`Modificacion` con `numeroCuenta`/`banco`/
-  `moneda` en blanco que hacen falta para O-03 y O-05 se arman con `ctx.excel_ad_hoc()` (el mismo
-  mecanismo que ya usan R-09/R-14/R-18), NO a mano: quedan en `pruebas/adjuntos/` como insumo
-  reutilizable.
-- Confirmar que exista una versión ACTIVA de `plantilla.obligatoriedad` (§8.2: su canon es "la
-  versión activa más alta", no un valor fijo — este archivo solo lo COMPRUEBA, nunca lo siembra).
-  Al momento de escribir esto (`ver_solicitud.py --parametros`, 2026-09-27): `sanic_version=2`, con
-  `porGestion.Exclusion` sembrado y marcado **PROVISIONAL** — pendiente de confirmación del
-  aprobador (O-02 reporta `N-A` si esto cambiara y `porGestion.Exclusion` dejara de estar).
-- `dotnet` disponible en el PATH, para los casos unitarios (O-04, O-06, O-07): `dotnet test
-  tests/Sanic.Mppp.Plugins.Tests --filter <FullyQualifiedName>`.
-
----
-
-#### O-01 — Compatibilidad: un parámetro SIN `porGestion` se comporta igual que antes de DN-03
-
-**Qué prueba.** La garantía explícita del diseño: "un parámetro sin `porGestion` se comporta
-EXACTAMENTE como hoy". Es la condición bajo la que lo ya sembrado en los tres entornos sigue siendo
-válido sin migrar nada. La prueba EN VIVO de una gestión sin ajuste ya existe en el propio motor de
-las ocho reglas (R-06, `03-reglas-de-registro.md`, gestión `Inclusion`, estable v1/v2); este caso no
-la repite (ver "Frontera con el set R") — verifica la garantía general a nivel unitario más la
-integridad de lo sembrado.
-
-**Necesita.** Confirmar que la versión 1 de `plantilla.obligatoriedad` (`{"porDefecto":
-"obligatorio","opcionales":[{"campo":"referencia"}]}`, sin `porGestion`) sigue existiendo intacta
-(no hace falta que sea la ACTIVA para este caso: alcanza con que la fila exista — ver O-08 para el
-chequeo de que ninguna versión se edita). `dotnet` en el PATH (ver "Preparativos comunes").
-
-**Cómo.** (1) `dotnet test` con `--filter` exacto sobre
-`ParametrosDePlantillaAceptacion.DN03_un_parametro_sin_porGestion_se_comporta_exactamente_como_hoy`
-(la garantía general: con y sin `reglas`, ninguna combinación cambia). (2) `GET` de solo lectura
-sobre `sanic_mppp_tbl_parametros` filtrando `sanic_nombre eq 'plantilla.obligatoriedad' and
-sanic_version eq 1`.
-
-**Qué tiene que pasar.** (1) La prueba unitaria pasa, y el filtro encontró exactamente 1 prueba (si
-encontrara 0, el filtro está mal escrito y el caso mentiría "OK" sin haber corrido nada). (2) La
-fila de la versión 1 existe y su `sanic_valor`, interpretado como JSON, es idéntico al de DD-16.
-
-**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total) y la respuesta de
-esa consulta `GET`.
-
-**Cómo se sabe que falló.** La prueba unitaria falla (una regresión real en el dominio), el filtro
-encontró 0 o más de 1 prueba (el nombre del `[Fact]` cambió sin actualizar este caso), o la versión
-1 no existe o su valor cambió (alguien la editó en vez de agregar una versión nueva — ver O-08).
-
-**Automatizable.** Unit (`dotnet test`) + API de solo lectura.
-
----
-
-#### O-02 — El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido (marcado PROVISIONAL)
-
-**Qué prueba.** Que la versión ACTIVA hoy de `plantilla.obligatoriedad` trae, dentro de
-`porGestion.Exclusion`, exactamente los tres campos que pidió el aprobador (`numeroCuenta`, `banco`,
-`moneda`) como `opcionales`, y ninguno como `obligatorios` — ni de más ni de menos. **La prueba EN
-VIVO de que ese aflojamiento funciona contra una Solicitud real ya la hace R-18**
-(`03-reglas-de-registro.md`): este caso es sobre el CONTENIDO del parámetro sembrado, de solo
-lectura, no vuelve a mandar un Excel (ver "Frontera con el set R").
-
-**Necesita.** `plantilla.obligatoriedad` en su versión activa más alta (§8.2: no se siembra nada
-acá). **Este criterio está marcado PROVISIONAL en el propio playbook**
-(`playbooks/datos/parametros.md`): pendiente de confirmación de negocio del aprobador. Si el
-aprobador todavía no confirmó o `porGestion.Exclusion` dejó de estar sembrado, este caso reporta
-`N-A` en vez de asumir un valor que ya no existe.
-
-**Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` (versión activa más alta de
-`plantilla.obligatoriedad`, la misma consulta que ya hace `preparacion_comun.verificar_parametro_activo`),
-parseando su `sanic_valor` como JSON y mirando `porGestion.Exclusion`.
-
-**Qué tiene que pasar.** `porGestion.Exclusion.opcionales` es EXACTAMENTE el conjunto
-`{numeroCuenta, banco, moneda}` (nombrados, no contados: CONVENCIONES §7), sin `obligatorios`, y
-ninguna otra gestión (`Inclusion`, `Modificacion`) tiene entrada todavía (ver O-03).
-
-**Cómo se verifica.** La respuesta de esa consulta `GET`, ya parseada.
-
-**Cómo se sabe que falló.** Falta alguno de los tres campos, sobra alguno, o `Exclusion` trae
-`obligatorios`: el parámetro sembrado no es el que el aprobador pidió, y R-18 (que sí manda un
-Excel real) podría estar pasando por una razón distinta a la documentada.
-
-**Automatizable.** API de solo lectura.
-
----
-
-#### O-03 — `Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía
-
-**Qué prueba.** Solo `Exclusion` está sembrada en `porGestion` hoy; `Inclusion` y `Modificacion`
-siguen bajo el bloque global sin ningún ajuste.
-
-**Necesita.** La misma versión activa que O-02 (se relee, no se asume el resultado de O-02: si mientras
-tanto `Inclusion`/`Modificacion` ganaron una entrada en `porGestion`, este caso lo detecta y reporta
-`N-A` en vez de mentir un `FALLA` contra una forma del parámetro que ya cambió).
-
-**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`, no a mano) con dos filas: `gestion=Inclusion` y
-`gestion=Modificacion`, las dos con `numeroCuenta`/`banco`/`moneda` en blanco.
-
-**Qué tiene que pasar.** Las dos filas se rechazan por `OBLIGATORIEDAD` (esos campos siguen siendo
-obligatorios para estas dos gestiones): comportamiento idéntico al de antes de DN-03.
-
-**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de las dos filas (cita al menos uno de
-`numeroCuenta`/`banco`/`moneda`).
-
-**Cómo se sabe que falló.** Alguna fila NO se rechaza, o se rechaza sin citar ninguno de esos tres
-campos: `porGestion` se estaría aplicando a una gestión que no tiene entrada sembrada (contagio
-entre gestiones que el diseño no pide).
-
-**Automatizable.** API.
-
----
-
-#### O-04 — Precedencia `obligatorios` sobre `opcionales` (cobertura unitaria, no sembrar en Dev)
-
-**Qué prueba.** "`opcionales` afloja, `obligatorios` endurece: si un campo queda en las dos listas
-de la MISMA entrada, gana `obligatorios`" — la mitad "endurece" de esta regla no está sembrada hoy
-en ningún entorno (el ejemplo de `Modificacion` con `obligatorios` en `DIRECTRICES-NUEVAS.md` es
-ilustrativo, no está en Dev).
-
-**Necesita.** **No sembrar una versión nueva en Dev solo para este caso**: crear una entrada con
-`obligatorios` cambiaría la versión ACTIVA para todo el entorno de forma permanente (agregar
-versiones es fácil; "deshacer" es sembrar otra versión más, nunca vuelve sola a la anterior). La
-cobertura confiable es `ParametrosDePlantillaAceptacion` (unitaria, ya construida con TDD según
-`DIRECTRICES-NUEVAS.md`).
-
-**Cómo.** Revisar que existan casos unitarios para: (a) un campo en `opcionales` de `porGestion`
-sin estar en `obligatorios`, (b) un campo en `obligatorios` sin estar en `opcionales`, (c) el mismo
-campo en las dos listas de la misma entrada (gana `obligatorios`). Los tres viven en
-`ParametrosDePlantillaAceptacion.cs`: (a)+(b) en
-`DN03_porGestion_afloja_con_opcionales_y_endurece_con_obligatorios_la_gestion_gana_sobre_lo_global`
-(gestión `Exclusion` = solo opcionales, gestión `Modificacion` = solo obligatorios) y (c) en
-`DN03_si_un_campo_esta_en_opcionales_y_en_obligatorios_de_la_misma_gestion_gana_obligatorios`.
-
-**Qué tiene que pasar.** Los tres escenarios ya están cubiertos en la suite de plugins, y las dos
-pruebas pasan.
-
-**Cómo se verifica.** (1) Que el código fuente de `ParametrosDePlantillaAceptacion.cs` siga
-declarando esos dos nombres de `[Fact]` (si se renombraron, este caso lo detecta en vez de correr un
-filtro que no encuentra nada y "pasa" en falso). (2) `dotnet test
-tests/Sanic.Mppp.Plugins.Tests --filter "FullyQualifiedName=<FQN1>|FullyQualifiedName=<FQN2>"`
-sobre esos dos nombres exactos — el filtro tiene que encontrar EXACTAMENTE 2 pruebas.
-
-**Cómo se sabe que falló.** Falta alguno de los dos `[Fact]` en el archivo, el filtro encuentra un
-número de pruebas distinto de 2 (nombre cambiado sin avisar), o alguna de las dos falla.
-
-**Automatizable.** Unit (no Dev).
-
----
-
-#### O-05 — Gestión inválida en la FILA: `OBLIGATORIEDAD` ni siquiera se evalúa
-
-**Qué prueba.** "Una fila cuyo valor de gestión no es válido SOLO calza con `*` en `reglas`, y NUNCA
-mira `porGestion`" — y, más preciso todavía que la redacción original de este caso:
-`OBLIGATORIEDAD` **depende de `LISTAS_VALIDAS`** (`playbooks/datos/reglas.md`, `sanic_dependede` de
-`OBLIGATORIEDAD` = `"AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"`; DD-13, "las reglas de registro
-guardan los motivos de lo que falló, sin historial por regla"). Con una gestión inválida,
-`LISTAS_VALIDAS` YA rechaza esa fila, así que `OBLIGATORIEDAD` **no se evalúa en absoluto** — no es
-que se evalúe "con el bloque global": directamente no corre, y por eso no puede sumar ningún motivo
-derivado de `porGestion` (ni aflojado ni endurecido).
-
-**Necesita.** Un Excel con una fila con un valor de `gestion` que no es
-`Inclusion`/`Exclusion`/`Modificacion` (p. ej. `"Baja"`), y ADEMÁS con `numeroCuenta`/`banco` en
-blanco (para poder distinguir, por el mensaje, si `OBLIGATORIEDAD` corrió o no).
-
-**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`) con esa única fila, mandado contra las Custom API.
-
-**Qué tiene que pasar.** La fila se rechaza citando el campo `gestión` (el único motivo:
-`LISTAS_VALIDAS`); el mensaje NO cita `numeroCuenta` ni `banco` — la prueba de que `OBLIGATORIEDAD`
-nunca llegó a correr, con o sin `porGestion`.
-
-**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de esa fila.
-
-**Cómo se sabe que falló.** El mensaje cita `numeroCuenta` o `banco` (señal de que `OBLIGATORIEDAD`
-sí corrió pese a la dependencia declarada — un cambio de comportamiento no documentado), o no cita
-`gestión` en absoluto.
-
-**Automatizable.** API.
-
----
-
-#### O-06 — Las CLAVES de `porGestion` (dentro del parámetro) no distinguen caja ni tildes (unitario, no Dev)
-
-**Qué prueba.** Cuidado con una trampa de redacción que tenía la versión anterior de este caso: esto
-**no** es sobre lo que un cliente escribe en la columna `Gestión` del Excel — eso ya lo normaliza
-`ListasPlantilla` (D-18a) ANTES de llegar a `ObligatoriedadPlantilla`, así que un Excel con
-`"exclusión"` en la celda se comporta igual con o sin DN-03 y no ejercitaría nada nuevo. Lo que
-DN-03 agrega es la comparación sin distinguir caja ni tildes de las **claves del propio JSON**
-sembrado en `plantilla.obligatoriedad` (p. ej. que `"porGestion":{"EXCLUSION":{...}}` se reconozca
-como la gestión `Exclusion`) — y eso solo se puede ejercitar con una forma de parámetro que hoy NO
-está sembrada en ningún entorno.
-
-**Necesita.** **No sembrar una versión nueva en Dev para esto**: cambiar la CLAVE con la que está
-sembrado `porGestion` en Dev no aporta nada que un Excel no pueda ya probar con la forma actual, y sí
-suma el mismo riesgo de O-04/O-07 (tocar la versión activa de todo el entorno) sin necesidad. `dotnet`
-en el PATH.
-
-**Cómo.** `dotnet test` con `--filter` sobre
-`ParametrosDePlantillaAceptacion.DN03_los_nombres_de_gestion_de_porGestion_se_comparan_sin_distinguir_caja_ni_tildes`
-(un `[Theory]` con las variantes `"  exclusión  "`, `"EXCLUSION"` y `"ExclusioN"` como CLAVE del
-JSON, no como valor de fila).
-
-**Qué tiene que pasar.** El filtro encuentra al menos una prueba y todas pasan: las tres variantes
-de clave resuelven a la misma gestión (`Exclusion`) y aplican el mismo aflojamiento.
-
-**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
-
-**Cómo se sabe que falló.** El filtro no encuentra ninguna prueba (el nombre cambió y este caso
-quedó "verde" sin haber corrido nada), o alguna variante falla.
-
-**Automatizable.** Unit (`dotnet test`), no Dev.
-
----
-
-#### O-07 — Gestión desconocida DENTRO de `porGestion` es error de configuración (alto riesgo, no sembrar en Dev)
-
-**Qué prueba.** Un typo en la CLAVE del parámetro (p. ej. `"Exclusio"` en vez de `"Exclusion"`) es
-un `FormatException` al leer el parámetro — error ruidoso de configuración, distinto de O-05 (que es
-sobre el VALOR de la fila, no sobre el parámetro).
-
-**Necesita.** **NO sembrar esto en Dev de rutina**: un `plantilla.obligatoriedad` con esta clave
-mal escrita, si se convierte en la versión activa, rompe la validación de TODA Solicitud del
-entorno hasta que alguien lo note y siembre una versión corregida (más alta). Es exactamente el
-"falla cerrado a propósito" del diseño, pero contra un entorno compartido el costo es alto.
-
-**Cómo.** Lo que corre `herramientas/pruebas/sets/set_o.py` (arnés API, sin navegador) es SOLO la
-mitad unitaria, a propósito: (1) confirma que el archivo de pruebas sigue trayendo un caso con una
-gestión desconocida DENTRO de `porGestion` (distinto de O-05, que es sobre el valor de la FILA), y
-(2) corre con `dotnet test --filter` el `[Theory]`
-`ParametrosDePlantillaAceptacion.Una_obligatoriedad_mal_cargada_revienta_con_el_motivo` completo (la
-clase entera de "parámetro mal cargado", que incluye esa fila de datos). **La mitad de alto riesgo
-contra Dev de verdad (sembrar `"porGestion":{"Exclusioon":{...}}` y mandar una Solicitud) NO se
-automatiza acá**: si algún día hace falta la confirmación contra un entorno real, se hace a mano, en
-una ventana coordinada, con una versión corregida lista para sembrar de inmediato después — y se
-documenta el resultado en la tabla de abajo con la fecha y quién la corrió.
-
-**Qué tiene que pasar.** El `[Theory]` completo pasa (incluida la fila de la gestión desconocida): un
-parámetro con una clave de `porGestion` que no es ninguna gestión válida revienta con
-`FormatException` y un motivo que nombra la clave, nunca una lista "vacía pero válida".
-
-**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
-
-**Cómo se sabe que falló.** El caso de la gestión desconocida desapareció del archivo de pruebas
-(la búsqueda del literal no lo encuentra), o el `[Theory]` completo (o esa fila en particular) falla.
-
-**Automatizable.** Unit (`dotnet test`, lo que corre este archivo) / manual de alto riesgo contra
-Dev (fuera de este arnés, ver "Cómo").
-
----
-
-#### O-08 — Versionar es AGREGAR una fila, nunca editar la vigente
-
-**Qué prueba.** DD-02/la nota de `playbooks/datos/parametros.md`: cambiar una regla de negocio
-siembra `sanic_version` más alto como fila NUEVA; la anterior queda intacta, de respaldo/histórico,
-y el motor resuelve la activa por `sanic_version` descendente con `statecode` activo.
-
-**Necesita.** Nada que crear: alcanza con leer lo ya sembrado.
-
-**Cómo.** `GET sanic_mppp_tbl_parametros?$select=sanic_version,sanic_valor,statecode&$filter=sanic_nombre
-eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc` (mismo patrón de lectura que usa
-`preparacion_comun.py`, sin ningún `POST`/`PATCH`).
-
-**Qué tiene que pasar.** Aparecen AL MENOS dos filas (`sanic_version=1` y `sanic_version=2`), las
-dos activas, con `sanic_valor` distinto entre sí, y la versión 1 sigue exactamente como la
-documenta `DD-16` (sin `porGestion`).
-
-**Cómo se verifica.** La respuesta de esa consulta.
-
-**Cómo se sabe que falló.** Solo aparece una fila (la versión 1 se editó en vez de agregar la 2:
-rompería `sanic_versionparametros` de Solicitudes ya procesadas con la versión anterior, que
-dejaría de decir la verdad), o la versión 1 tiene un `sanic_valor` distinto al original.
-
-**Automatizable.** API.
-
----
-
-#### O-09 — El mensaje al cliente no cambia con DN-03
-
-**Qué prueba.** El texto de rechazo de `OBLIGATORIEDAD` sigue nombrando el CAMPO, sin citar su
-valor (D-41) — que la obligatoriedad ahora dependa de la gestión no puede filtrarse al texto que
-lee el cliente (no tiene por qué deducir la configuración interna del banco).
-
-**Necesita.** Una fila de gestión `Inclusion` con `numeroCuenta` vacío (sigue siendo obligatoria
-para esa gestión — O-03): la fila 2 ("Sin Cuenta") de `E06-obligatoriedad.xlsx`, que
-`generar_excel.py` YA genera para R-06 — se reutiliza tal cual, sin armar un Excel nuevo
-(CONVENCIONES §9).
-
-**Cómo.** Mandar ese Excel (`E06-obligatoriedad.xlsx`) y leer `sanic_mensaje` de la fila 2.
-
-**Qué tiene que pasar.** El mensaje nombra el campo (`numeroCuenta`) exactamente como antes de
-DN-03, sin mencionar "gestión", "Exclusion" ni ninguna palabra de configuración interna.
-
-**Cómo se verifica.** `ver_solicitud.py --ultima`.
-
-**Cómo se sabe que falló.** El mensaje cambió de forma, o menciona la gestión o el hecho de que
-otra gestión no exigiría este campo.
-
-**Automatizable.** API.
-
----
-
-#### O-10 — La regla `OBLIGATORIEDAD` no cambia de código, orden, nivel ni dependencias
-
-**Qué prueba.** DN-03 es explícito: "No cambia de código, de orden, de nivel ni de efecto. Solo
-cambia qué considera obligatorio" — mismo principio que DN-01 sobre `AUTORIZACION_CORREO_PLAN`.
-**Corrección sobre la redacción original de este caso**: DD-13 (`diseno/02-diccionario-datos.md`)
-dice que las reglas de REGISTRO (las ocho de `ReglasDeRegistro.cs`, `OBLIGATORIEDAD` entre ellas) NO
-dejan un `ResultadoRegla` propio ni un evento de Bitácora por regla — "la fila guarda los motivos de
-lo que falló, sin historial por regla". No hay ninguna Bitácora de la que leer "el orden en que se
-evaluaron las reglas de una fila": eso solo existe para las cinco reglas de nivel Solicitud (set
-`S`). Lo que SÍ tiene código, nivel, orden y dependencias declarados, en vivo, es el catálogo
-`sanic_mppp_tbl_reglas` — la misma tabla que ya lee `sets/set_i.py` (I-01..I-04) — y es contra eso
-que se verifica este caso, no contra una Solicitud procesada.
-
-**Necesita.** Nada que crear: el catálogo de Reglas ya existe (`preparar_datos.py`/playbooks).
-
-**Cómo.** `GET sanic_mppp_tbl_reglas?$select=sanic_codigo,sanic_nivel,sanic_efecto,sanic_orden,
-sanic_dependede,statecode&$filter=sanic_codigo eq 'OBLIGATORIEDAD'`.
-
-**Qué tiene que pasar.** Una única fila, activa, con `sanic_nivel=Registro`, `sanic_efecto=Rechaza`,
-`sanic_orden=60` y `sanic_dependede='AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS'` — exactamente lo que
-ya trae `playbooks/datos/reglas.md` desde antes de DN-03.
-
-**Cómo se verifica.** La respuesta de esa consulta `GET`.
-
-**Cómo se sabe que falló.** Cualquiera de esos cinco valores cambió, o hay más de una fila con ese
-código: señal de que se reimplementó (otro código, otro orden) en vez de ajustarse, contra la
-instrucción explícita del diseño.
-
-**Automatizable.** API de solo lectura.
-
----
-
-### Resultados
-
-| Caso | Resultado | Notas |
-|---|---|---|
-| O-01 compatibilidad sin `porGestion` | | |
-| O-02 `Exclusion` afloja los tres campos | | PROVISIONAL, confirmar con aprobador |
-| O-03 `Inclusion`/`Modificacion` sin cambios | | |
-| O-04 precedencia `obligatorios` | | unitario, no sembrar |
-| O-05 gestión inválida en la fila | | |
-| O-06 sin distinguir caja/tildes | | |
-| O-07 gestión desconocida en el parámetro | | alto riesgo, preferir unitario |
-| O-08 versionar agrega, no edita | | |
-| O-09 mensaje al cliente sin cambios | | |
-| O-10 regla sin cambio de código/orden/nivel | | |
-
----
-## 13 — Lo construido el 2026-09-27: sitemap, vistas, formulario y la lección del ribbon
-
-Cubre los hallazgos y correcciones del propio 2026-09-27 que todavía no tenían un caso de prueba:
-la entrada de sitemap nueva `subarea_paraatencionmanual`, los renombres y la entrada nueva del grupo
-Catálogos, la columna `sanic_requiereatencionmanual` en las vistas de trabajo, el formulario nuevo de
-`AutorizacionCliente`, la tabla `sanic_mppp_tbl_autorizacioncliente` como componente real de la app
-(no solo del sitemap), y el diagnóstico correcto de un botón que existe en el servidor pero no se
-dibuja. Fuente: `diseno/05-app-model-driven.md` §2-§3, `diseno/06-inventario-componentes.md`
-12.2/12.7/12.8, `playbooks/app/mantenimientoppp.md`, los playbooks de `playbooks/vista/` y
-`playbooks/formulario/autorizacioncliente.md`, y `pruebas/gui/README.md` +
-`pruebas/gui/ayudantes/ribbon.mjs` (solo lectura, no se tocan).
-
-Convención de IDs: prefijo `H-` (**H**oy), ver `CONVENCIONES.md` §4.
-
-**Corrección de este set contra `CONVENCIONES.md`** (§1, §2, §7, §8, versión anterior de este
-archivo): H-01 a H-05 estaban marcadas `Automatizable: GUI` (inspección visual con sesión de
-navegador). Eso estaba mal — el sitemap, el `layoutxml`/`fetchxml` de una vista y el `formxml` de un
-formulario son metadata **publicada**, legible por Web API con el mismo service principal que usa
-cualquier otro set (mismo criterio que ya aplicó el set U para lo que el diseño original dejaba como
-"GUI, sesión admin_planes" en `10-autorizacion-cliente.md`). Se corrigen acá a `API`, contra la
-plataforma en vivo, no contra el ojo de quien mira ni contra la salida de ninguna herramienta
-(§2: "la verificación va contra la plataforma, no contra la salida del constructor"). La única
-excepción real es **H-06**: es la lección del día, y su punto central es que ninguna prueba de API la
-detecta — se deja `N-A` (Manual) a propósito, con el comando exacto del arnés que sí mira el DOM real.
-
-Se agrega **H-07**, caso nuevo: la tabla `sanic_mppp_tbl_autorizacioncliente` como componente de la
-app se resolvió con un **import manual de la solución** (no con la herramienta del proyecto en modo
-escritura), así que merece su propio caso verificado en vivo contra `RetrieveAppComponents` —
-**nombrada, no contada** (§7): no se afirma un total de tablas (ese número puede cambiar sin que nada
-esté roto, es el mismo error que ya costó caro con "12 parámetros activos" y "13 entradas de
-sitemap"), se afirma que ESTA tabla puntual aparece.
-
-Este set **no crea ningún dato**: es lectura de metadata ya publicada. No hay ninguna Solicitud, Fila,
-Cliente ni Autorizado que sembrar, y por lo tanto nada que `cerrar()` tenga que borrar con marca
-`ZZP-`.
-
-### Preparativos comunes a este archivo
-
-- Ninguna sesión de navegador para H-01 a H-05 y H-07: se verifican contra Web API directo, con el
-  service principal `# PowerPlatform-Dev` (System Administrator), igual que cualquier otro set de
-  `herramientas/pruebas/sets/`.
-- Solo **H-06** necesita sesión real y acceso de plataforma — ver su campo `Necesita`.
-
----
-
-#### H-01 — Sitemap: "Para atención manual" en el área Trabajo, en su posición exacta
-
-**Qué prueba.** El olvido corregido el 2026-09-27: la vista "Para atencion manual" existía desde
-fase 2 pero no tenía entrada propia en el sitemap. Ahora `subarea_paraatencionmanual` está,
-EXACTAMENTE, entre `subarea_poraprobar` y `subarea_porclasificar` dentro del área con título 1033
-"Trabajo", con sus títulos en 1033 y 3082, y abre la vista real "Para atención manual" (no una vista
-distinta ni una `Url` inventada).
-
-**Necesita.** Nada del navegador: conexión a Dataverse por Web API (el mismo service principal que
-usan los demás sets). Ningún dato previo — es lectura de metadata ya publicada.
-
-**Cómo.** `GET sitemaps?$select=sitemapxml&$filter=sitemapnameunique eq 'sanic_mppp_sm_mantenimientoppp'`;
-parsear el XML devuelto; ubicar el `Area` cuyo `Titles/Title[@LCID='1033']` sea "Trabajo"; leer, en
-orden de documento, los `Id` de sus `SubArea`; ubicar `subarea_paraatencionmanual` y confirmar que su
-`Url` apunta al `savedqueryid` real de la vista "Para atencion manual" sobre `sanic_mppp_tbl_fila`
-(`GET savedqueries?$select=savedqueryid&$filter=name eq 'Para atencion manual' and returnedtypecode eq 'sanic_mppp_tbl_fila'`).
-
-**Qué tiene que pasar.** `subarea_paraatencionmanual` aparece consecutiva entre `subarea_poraprobar` y
-`subarea_porclasificar` (sin ninguna otra entrada en el medio), con título 1033 y 3082 = "Para
-atencion manual", y su `Url` contiene `etn=sanic_mppp_tbl_fila` y el `savedqueryid` real de esa vista.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-01) — las dos consultas
-`GET` de arriba, comparadas en código, no a mano.
-
-**Cómo se sabe que falló.** Alguna de estas, todas objetivas y distinguibles entre sí: la entrada no
-existe (regresión del arreglo); existe pero no está pegada entre `poraprobar` y `porclasificar`
-(alguien la movió); le falta el título en 1033 o en 3082 (`CONVENCIONES` sobre etiquetas embebidas,
-`playbooks/app/mantenimientoppp.md` §"Cada titulo lleva etiqueta por cada idioma"); o su `Url` apunta
-a un `savedqueryid` que no es el de "Para atencion manual" (abre otra vista sin que se note a simple
-vista).
-
-**Automatizable.** API (Web API directo, sin sesión de navegador; corregido desde `GUI` — ver la nota
-de corrección al inicio del archivo).
-
----
-
-#### H-02 — Columna "Requiere atención manual" en las 4 vistas de trabajo, y en ninguna otra
-
-**Qué prueba.** El hallazgo del aprobador: sin esta columna, un ejecutivo no podía ver de un vistazo
-si el bot marcó la fila en las vistas donde ya trabaja todos los días. Se agregó a **Mis clientes —
-por digitar**, **Todos — por digitar**, **Por aprobar** y **Mis clientes — devueltas** — y a NINGUNA
-otra vista de Fila (ni **Filas**, ni **Terminadas**, ni **Tomadas por el bot**).
-
-**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
-
-**Cómo.** Para cada una de las 7 vistas nombradas arriba:
-`GET savedqueries?$select=fetchxml,layoutxml&$filter=name eq '<nombre>' and returnedtypecode eq 'sanic_mppp_tbl_fila'`;
-parsear el `layoutxml` (`<row>/<cell name=...>`) y el `fetchxml` (`<entity>/<attribute name=...>`).
-
-**Qué tiene que pasar.** En **Mis clientes - por digitar**, **Todos - por digitar**, **Por aprobar** y
-**Mis clientes - devueltas**: el `layoutxml` trae una `<cell name="sanic_requiereatencionmanual">`
-inmediatamente después de `sanic_numerofila`, y el `fetchxml` trae su `<attribute>`. En **Filas**,
-**Terminadas** y **Tomadas por el bot**: la celda NO está.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-02).
-
-**Cómo se sabe que falló.** Falta la celda o el atributo en alguna de las 4 vistas de trabajo (el
-ejecutivo sigue sin ver la marca donde más la necesita); está pero no pegada a `sanic_numerofila`
-(queda perdida entre las demás columnas, contra el motivo de diseño de cada playbook de vista); o
-SOBRA en Filas/Terminadas/Tomadas por el bot (ruido en vistas que el diseño dejó explícitamente
-afuera).
-
-**Automatizable.** API (`layoutxml`/`fetchxml` reales vía Web API; corregido desde `GUI`).
-
----
-
-#### H-03 — Catálogos: "Correos Autorizados", "Autorizaciones - Planes" y "Autorizaciones - Clientes"
-
-**Qué prueba.** Los dos renombres del 2026-09-27 ("Autorizados" → "Correos Autorizados",
-"Autorizaciones" → "Autorizaciones - Planes") y la entrada nueva de DN-01 ("Autorizaciones -
-Clientes"), las tres en el sitemap en vivo, cada una abriendo la vista por defecto de su propia
-tabla.
-
-**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
-
-**Cómo.** Sobre el mismo `sitemapxml` de H-01, ubicar el `Area` con título 1033 "Catalogos" y sus
-`SubArea` `subarea_autorizados`, `subarea_autorizaciones` y `subarea_autorizacionescliente`; leer
-título 1033/3082 y el atributo `Entity` de cada una; y confirmar la vista por defecto real de cada
-tabla con
-`GET savedqueries?$select=name&$filter=returnedtypecode eq '<tabla>' and isdefault eq true and querytype eq 0`.
-
-**Qué tiene que pasar.** `subarea_autorizados`: título "Correos Autorizados", `Entity` =
-`sanic_mppp_tbl_autorizado`. `subarea_autorizaciones`: título "Autorizaciones - Planes", `Entity` =
-`sanic_mppp_tbl_autorizacionplan`, cuya vista por defecto es "Autorizaciones activas".
-`subarea_autorizacionescliente`: título "Autorizaciones - Clientes", `Entity` =
-`sanic_mppp_tbl_autorizacioncliente`, cuya vista por defecto es "Autorizaciones por cliente activas".
-Las dos últimas son entradas DISTINTAS que abren tablas DISTINTAS.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-03).
-
-**Cómo se sabe que falló.** Falta alguna de las tres entradas; algún título quedó con el nombre viejo
-("Autorizados"/"Autorizaciones" a secas); las dos entradas de autorización abren la MISMA tabla (no
-se diferenciaron); o la vista por defecto de alguna de las dos tablas no es la esperada (el sitemap
-"apunta bien" pero la vista que se abre no es la correcta).
-
-**Automatizable.** API (corregido desde `GUI`).
-
----
-
-#### H-04 — Formulario "Autorizacion por cliente": encabezado (2 lookups) + evidencia
-
-**Qué prueba.** El formulario nuevo (DN-01, 2026-09-27), leyendo su `formxml` real de
-`systemforms`: el encabezado con los 3 campos (`sanic_nombre`, y los lookups
-`sanic_autorizadoid`/`sanic_clienteid`) y la sección separada "Evidencia de la autorizacion" con
-`sanic_documentofirmado` y `sanic_fechadocumento` (ver también `10-autorizacion-cliente.md` U-10, que
-prueba el guardado; este caso es solo de estructura del formulario).
-
-**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
-
-**Cómo.**
-`GET systemforms?$select=formxml&$filter=objecttypecode eq 'sanic_mppp_tbl_autorizacioncliente' and type eq 2`
-(2 = Main); parsear el `formxml`: los `<control datafieldname="...">` del `<header>`, y los de la
-`<section>` cuya `<label description="Evidencia de la autorizacion">` coincide.
-
-**Qué tiene que pasar.** El encabezado trae `sanic_nombre`, `sanic_autorizadoid` y `sanic_clienteid`,
-y los dos últimos son controles de tipo Lookup (`classid` `{270BD3DB-D9AF-4782-9025-509E298DEC0A}`).
-Existe una sección separada "Evidencia de la autorizacion" con `sanic_documentofirmado` y
-`sanic_fechadocumento`.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-04).
-
-**Cómo se sabe que falló.** Falta algún campo del encabezado, o alguno de los dos lookups no es un
-control Lookup real (`classid` distinto); o falta la sección de evidencia, o sus campos están
-mezclados con el encabezado en vez de en su propia sección (el hueco que señaló el aprobador seguiría
-sin cerrarse en la interfaz, aunque las columnas ya existan en la tabla).
-
-**Automatizable.** API (`formxml` real vía Web API; corregido desde `GUI`).
-
----
-
-#### H-05 — El ícono reutilizado, no uno nuevo
-
-**Qué prueba.** "Para atención manual" reusa el SVG de "Para revisar" (mismo patrón de negocio);
-"Autorizaciones - Clientes" reusa el ícono de "Autorizaciones - Planes". Ninguna de las dos generó un
-web resource nuevo.
-
-**Necesita.** Nada del navegador: reusa el mismo `sitemapxml` de H-01/H-03. Ningún dato previo.
-
-**Cómo.** Sobre el `sitemapxml` en vivo, comparar el atributo `Icon` de `subarea_paraatencionmanual`
-contra el de `subarea_pararevisar`, y el de `subarea_autorizacionescliente` contra el de
-`subarea_autorizaciones`.
-
-**Qué tiene que pasar.** Los dos pares de `Icon` son, cada uno, el MISMO valor
-(`/WebResources/sanic_mppp_wr_svg_pararevisar` y `/WebResources/sanic_mppp_wr_svg_autorizaciones`
-respectivamente) — nada de un web resource nuevo.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-05).
-
-**Cómo se sabe que falló.** El `Icon` de alguna de las dos entradas nuevas difiere del de su par (se
-habría creado o asignado un web resource distinto sin necesidad).
-
-**Automatizable.** API (mismo `sitemapxml` de H-01/H-03, sin navegador; corregido desde `GUI`).
-
----
-
-#### H-06 — La lección del botón fantasma: distinguir REGLAS de METADATA COMPILADA
-
-**Qué prueba.** El hallazgo real del 2026-09-27: el botón "Descargar para digitar" existía en el
-servidor —verificado por API por TRES caminos distintos (`RetrieveEntityRibbon`, los `ribbondiff` con
-sus LocLabels en 1033/3082, y el verificador del proyecto)— y NO se dibujaba en el navegador: la causa
-era la metadata de ribbon **compilada**, no una regla de habilitación. Este caso documenta el
-PROCEDIMIENTO DE DIAGNÓSTICO para la próxima vez que un botón nuevo "no aparezca", sea cual sea, y que
-quien lo encuentre sepa en minutos —no en dos días, como esta vez— si el problema es de REGLAS o de
-METADATA COMPILADA: son diagnósticos opuestos con el mismo síntoma superficial ("no lo veo").
-
-**Necesita.** Acceso de **customización de la solución** en `make.powerapps.com` sobre
-`sanic_mppp_sol_mantenimientoppp` — privilegio de PLATAFORMA (System Administrator/System Customizer
-de Dataverse), **no** el rol de negocio `SR - MPPP - Administrador tecnico` que prueban
-`local/sesion-admin_tecnico.json` y `estado_sesiones.py`: ese rol está acotado a las tablas Parámetro
-y Reglas dentro de la app (`04-matriz-privilegios.md`) y no da acceso al maker portal para regenerar
-metadata. Además: `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`), confirmada viva y con
-ese rol por `python3 herramientas/pruebas/estado_sesiones.py` ANTES de correr nada; el parámetro de
-URL `&ribbondebug=true` agregado a la URL de la app model-driven.
-
-**Cómo.**
-1. Abrir la vista de Filas en la app con `&ribbondebug=true` en la URL, y usar el **Command
-   Checker** sobre el comando en cuestión.
-2. Leer la lista de comandos que devuelve el Command Checker:
-   - Si el botón aparece marcado **`(hidden)`**: es un problema de **REGLAS** (`EnableRule`/
-     `DisplayRule`) — revisar contra la selección actual, la metadata está bien.
-   - Si el botón está **AUSENTE de la lista entera**: es un problema de **METADATA COMPILADA** del
-     ribbon — ningún ajuste de reglas lo va a arreglar.
-3. Para el segundo caso: en el maker portal, sobre la tabla/app correspondiente, usar **"Regenerate
-   ribbon metadata"** (o volver a publicar la personalización completa) y repetir el paso 1.
-
-**Qué tiene que pasar.** Después de "Regenerate ribbon metadata", un botón que estaba AUSENTE de la
-lista del Command Checker pasa a aparecer (visible o `(hidden)`, según la selección actual).
-
-**Cómo se verifica.** La lista del Command Checker antes y después. Para la confirmación en el DOM
-real (con sesión y sin depender del maker portal): `cd pruebas/gui && MPPP_USUARIO=ejecutivo npx
-playwright test ribbon-fila` (ver `pruebas/gui/ayudantes/ribbon.mjs`, que codifica esta misma
-distinción: **AUSENTE** → "Sospechar metadata de ribbon (regenerar desde Command Checker) antes que el
-EnableRule"; **presente pero DESHABILITADO** → "revisar el EnableRule contra la selección actual, la
-metadata está bien"). Este set nunca duplica ese arnés (`CONVENCIONES` §9).
-
-**Cómo se sabe que falló (es decir, que se erró el diagnóstico).** Se pasaron minutos u horas
-ajustando `EnableRule`/`DisplayRule` sobre un botón que en realidad estaba AUSENTE de la lista del
-Command Checker (metadata compilada) — o al revés, se regeneró metadata sobre un botón que SÍ estaba
-en la lista pero `(hidden)` por una regla. Confundirlos es exactamente lo que costó dos días este
-mismo día.
-
-**Automatizable.** Manual (el diagnóstico y la reparación en el maker portal). El síntoma
-"presente vs. ausente" en el DOM real ya lo automatiza `pruebas/gui/ayudantes/ribbon.mjs`
-(GUI, con sesión), pero la ACCIÓN de "Regenerate ribbon metadata" es manual, en el maker portal — por
-eso el caso queda `N-A` en este set de API y no se corre desde acá.
-
-> **Nota para quien mantenga el documento de instalación en otro entorno** (fuera del alcance de este
-> archivo de pruebas, pero registrado acá porque de acá sale la lección): después de importar la
-> solución y publicar (`PublishAllXml`), hay que **regenerar la metadata del ribbon** desde el Command
-> Checker, o los botones custom no aparecen — aunque la publicación haya terminado sin ningún error.
-
----
-
-#### H-07 — `sanic_mppp_tbl_autorizacioncliente` como componente real de la app
-
-**Qué prueba.** El hueco que dejó resolver esta tabla con un **import manual de la solución** en vez
-de con la herramienta del proyecto en modo escritura: que la tabla sea un componente REAL de la app
-`MDA - MPPP - Mantenimiento PPP` (`RetrieveAppComponents` en vivo), no solo algo que el sitemap
-menciona (H-03) sin que la tabla misma viaje con la app.
-
-**Necesita.** Nada del navegador: Web API directo, más una corrida de solo lectura de
-`herramientas/construir/app.py` (con `--solo-verificar` nunca escribe). Ningún dato previo.
-
-**Cómo.**
-1. `python3 herramientas/construir/app.py playbooks/app/mantenimientoppp.md --solo-verificar`.
-2. Releer, en el propio caso (no confiar solo en la salida del paso 1 — `CONVENCIONES` §2):
-   `GET appmodules/Microsoft.Dynamics.CRM.RetrieveUnpublishedMultiple()?$select=appmoduleid&$filter=uniquename eq 'sanic_mppp_mda_mantenimientoppp'`,
-   después `GET RetrieveAppComponents(AppModuleId=<id>)` y, para cada componente de tabla
-   (`componenttype eq 1`), `GET EntityDefinitions(<objectid>)?$select=LogicalName`.
-
-**Qué tiene que pasar.** El paso 1 termina en `ya_existia` (nunca `difiere`/`error`/`bloqueado`), y
-entre los nombres lógicos que trae el paso 2 aparece, POR NOMBRE, `sanic_mppp_tbl_autorizacioncliente`
-— no se afirma un total de tablas (`CONVENCIONES` §7): ese número puede cambiar sin que nada esté
-roto.
-
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py H` (caso H-07).
-
-**Cómo se sabe que falló.** El paso 1 no da `ya_existia` (el sitemap o los componentes en vivo se
-despegaron del playbook); o `sanic_mppp_tbl_autorizacioncliente` no aparece por nombre en
-`RetrieveAppComponents` (la tabla no viaja con la app, aunque el sitemap la mencione — exactamente el
-síntoma que motivó este caso: un import manual que quedó a medias).
-
-**Automatizable.** API.
-
----
-
-### Resultados
-
-Corrida real, `python3 herramientas/pruebas/correr.py H`, 2026-09-27: **6 OK · 0 FALLA · 1 N-A**
-(código de salida 0).
-
-| Caso | Resultado | Notas |
-|---|---|---|
-| H-01 sitemap "Para atención manual", en su posición | OK | API, sin sesión |
-| H-02 columna en las 4 vistas de trabajo, y en ninguna más | OK | API, sin sesión |
-| H-03 "Correos Autorizados" / "Autorizaciones - Planes" / "Autorizaciones - Clientes" | OK | API, sin sesión |
-| H-04 formulario AutorizacionCliente: encabezado + evidencia | OK | API, sin sesión |
-| H-05 íconos reutilizados, no nuevos | OK | API, sin sesión |
-| H-06 diagnóstico REGLAS vs. METADATA COMPILADA | N-A | maker portal (System Administrator/Customizer de plataforma, NO `admin_tecnico`), manual — motivo completo en el caso |
-| H-07 la tabla AutorizacionCliente es componente real de la app | OK | API, sin sesión |

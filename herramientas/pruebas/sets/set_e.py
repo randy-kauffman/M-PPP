@@ -247,7 +247,7 @@ def e01(ctx):
         "automatizado en pruebas/gui/ y este set NUNCA lo duplica (CONVENCIONES §9). Guarda previa "
         "obligatoria: 'python3 herramientas/pruebas/estado_sesiones.py'. Si la sesión vive y el rol "
         "coincide, correr desde pruebas/gui/: 'MPPP_USUARIO=ejecutivo npx playwright test dn-02' (o "
-        "'ribbon-fila' para los 7 botones del ribbon de Fila). LECCIÓN cara (H-06, 2026-09-27): este "
+        "'ribbon-fila' para los 7 botones del ribbon de Fila). LECCIÓN cara (A-15, set A, 2026-09-27): este "
         "comando estuvo definido y PUBLICADO en el servidor y NO se dibujaba en el cliente — la causa "
         "era la metadata compilada del ribbon. Tres caminos de API distintos lo confirmaron 'publicado' "
         "y NINGUNO detectó que no se veía; costó dos días de diagnóstico. Por eso este caso, aunque acá "

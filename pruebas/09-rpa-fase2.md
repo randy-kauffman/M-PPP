@@ -11,16 +11,22 @@ la marca de atención manual. Fuente: `diseno/03-contratos-custom-api.md` §2-§
 ## Convención de IDs de este archivo y de los que siguen
 
 Prefijos ya usados por `00`–`08` (verificado el 2026-09-27 con
-`rg -o --no-filename '^## [A-Z]+-[0-9]+' pruebas/0*.md`): **A, C, G, I, M, P, R, S, V**. Los cinco
-archivos nuevos (`09`–`13`) usan prefijos que no colisionan con esos ni entre sí:
+`rg -o --no-filename '^## [A-Z]+-[0-9]+' pruebas/0*.md`): **A, C, G, I, M, P, R, S, V**. Los archivos
+nuevos (`09`–`11`) usan prefijos que no colisionan con esos ni entre sí:
 
 | Prefijo | Archivo | Tema |
 |---|---|---|
 | `B-` (**B**ot) | `09-rpa-fase2.md` | este archivo |
 | `U-` (a**U**torización) | `10-autorizacion-cliente.md` | DN-01 |
 | `E-` (**E**xportación) | `11-exportacion-excel.md` | DN-02 |
-| `O-` (**O**bligatoriedad) | `12-obligatoriedad-gestion.md` | DN-03 |
-| `H-` (**H**oy) | `13-construido-hoy.md` | lo construido el 2026-09-27 |
+
+Hasta el 2026-09-28 había, además, un set `O-` (Obligatoriedad, DN-03,
+`12-obligatoriedad-gestion.md`) y un set `H-` (Hoy, `13-construido-hoy.md`) — los dos nombrados por
+la directiva o la fecha que los originó, no por lo que probaban. Ese día se fusionaron: `O` dentro
+de `03-reglas-de-registro.md` (set `R`, casos `R-19`..`R-28` — la obligatoriedad por gestión ES una
+de las ocho reglas de Registro) y `H` repartido entre `05-app-y-comandos.md` (`A-15`) y
+`06-seguridad-vistas-formularios.md` (`G-14`..`G-19`). Ver `CONVENCIONES.md` §4, "La regla del
+nombre", y la tabla de equivalencias en `pruebas/README.md`.
 
 ## Herramientas de este archivo
 
@@ -412,7 +418,7 @@ original apenas termine el caso.
 **Cómo.**
 1. Dejar una Fila en Digitada por el propio bot (`probar_rpa.py --confirmar`).
 2. Cambiar `rpa.puedeaprobar` a `no` (nueva versión del parámetro, nunca editar la vigente — ver
-   `12-obligatoriedad-gestion.md` O-08 para el mismo criterio de versionado).
+   `03-reglas-de-registro.md` R-26 para el mismo criterio de versionado).
 3. `probar_rpa.py` de nuevo (sin `--confirmar` alcanza para ver el lote).
 4. Restaurar `rpa.puedeaprobar` a su valor original.
 
@@ -649,8 +655,8 @@ bot volvería a intentar algo que ya se determinó que no sabe resolver), o el c
 ### B-20 — La marca de atención manual se apaga sola con cualquier transición exitosa
 
 **Qué prueba.** Nadie tiene que acordarse de apagarla a mano (aunque también existe el botón
-*Atendida* — ver `13-construido-hoy.md` H-01/H-07): CUALQUIER transición exitosa de la fila la
-limpia, sin importar quién la hizo ni a qué estado fue.
+*Atendida* — ver `06-seguridad-vistas-formularios.md` G-14/G-19): CUALQUIER transición exitosa de la
+fila la limpia, sin importar quién la hizo ni a qué estado fue.
 
 **Necesita.** Una Fila marcada `sanic_requiereatencionmanual = sí` (repetir B-19, o seguir su
 resultado si corrió antes en el mismo set); un usuario real con el rol `SR - MPPP - Ejecutivo`

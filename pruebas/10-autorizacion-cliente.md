@@ -321,7 +321,7 @@ fila.
 **Cómo se sabe que falló.** El `formxml` no trae ningún control con ese `TargetEntityType` (nunca se
 agregó al formulario), la relación o la vista no coinciden (subgrilla mal armada), o el paso 5
 devuelve cero filas con datos que sí existen (filtro mal configurado — confundir esto con "no hay
-autorizaciones" es el mismo tipo de error que motivó H-06 en `13-construido-hoy.md`).
+autorizaciones" es el mismo tipo de error que motivó A-15 en `05-app-y-comandos.md`).
 
 **Automatizable.** API.
 

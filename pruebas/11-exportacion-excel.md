@@ -36,7 +36,7 @@ haya dejado otro set. `herramientas/pruebas/sets/set_e.py` deja listo, en su pro
 ### E-01 — El comando "Descargar para digitar" se dibuja en el ribbon
 
 **Qué prueba.** Que el botón exista de verdad en el DOM, no solo en el servidor — la lección cara
-del 2026-09-27 (ver `13-construido-hoy.md` H-06): un comando puede estar publicado y no dibujarse.
+del 2026-09-27 (ver `05-app-y-comandos.md` A-15): un comando puede estar publicado y no dibujarse.
 
 **Necesita.** `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`) o
 `local/sesion-supervisor.json` (rol `SR - MPPP - Supervisor`) — cualquiera de las dos sirve, ambas
@@ -51,8 +51,8 @@ seleccionadas.
 
 **Cómo se verifica.** El resultado de esa corrida de Playwright.
 
-**Cómo se sabe que falló.** Ver H-06: distinguir AUSENTE (metadata de ribbon) de DESHABILITADO
-(regla de habilitación) — son diagnósticos opuestos.
+**Cómo se sabe que falló.** Ver A-15 (`05-app-y-comandos.md`): distinguir AUSENTE (metadata de
+ribbon) de DESHABILITADO (regla de habilitación) — son diagnósticos opuestos.
 
 **Automatizable.** GUI — ya construido en `pruebas/gui/casos/`, no se reescribe acá.
 
@@ -89,7 +89,7 @@ a un `.xlsx` válido.
 **Necesita.** El valor de la versión ACTIVA actual de `exportacion.columnas` (lo lee el propio caso).
 El caso siembra su propia versión de prueba, con las dos primeras columnas intercambiadas, en
 `sanic_version` = la MÁXIMA versión ya sembrada (activa o no) + 1 — nunca edita ni borra ninguna fila
-que no sembró él, mismo criterio de versionado que `12-obligatoriedad-gestion.md` O-08 y que
+que no sembró él, mismo criterio de versionado que `03-reglas-de-registro.md` R-26 y que
 CONVENCIONES §8.2. Usar la máxima sembrada (no solo la activa) importa: si una corrida murió antes de
 limpiar y dejó una versión de prueba colgando, "activa + 1" volvería a chocar con esa fila y la clave
 alterna `KEY - MPPP - Parámetro - Nombre y versión` rechazaría el alta con HTTP 412.

@@ -18,25 +18,61 @@ archivo, prepara por su cuenta todo lo que necesita) con su letra, corrido por
 |---|---|---|---|
 | C | [`01-clasificacion-del-correo.md`](01-clasificacion-del-correo.md) | `MPPP-REC`/`MPPP-ING`, el plugin liviano, reglas de nivel **Correo**, y DN-01 (autorización por cliente) en la clasificación | 11 |
 | S | [`02-reglas-de-solicitud.md`](02-reglas-de-solicitud.md) | Reglas de nivel **Solicitud**: adjunto, Excel, estructura, filas | 7 |
-| R | [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las que deciden fila por fila, más DN-01/DN-03 | 18 |
+| R | [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las que deciden fila por fila, más DN-01, y DN-03 completo (absorbió el set O) | 28 |
 | M | [`04-comunicaciones.md`](04-comunicaciones.md) | `MPPP-COM`/`MPPP-ENV`: acuse y respuesta final, correo **real** de punta a punta | 7 |
-| A | [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los comandos de la barra y el diálogo de motivo, por API con `MSCRMCallerID` | 14 |
-| G | [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, privilegios efectivos, sitemap, vistas, formularios | 14 |
+| A | [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los comandos de la barra y el diálogo de motivo, por API con `MSCRMCallerID`, y la lección del botón fantasma (ex H-06) | 15 |
+| G | [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, privilegios efectivos, sitemap, vistas, formularios (absorbió el resto del set H) | 20 |
 | V | [`07-vigilancia.md`](07-vigilancia.md) | `MPPP-VIG`: los 5 bloques de recuperación | 7 |
 | I | [`08-integridad-y-plugins.md`](08-integridad-y-plugins.md) | Steps de plugin, catálogo de reglas, claves únicas, la puerta del RPA | 13 |
 | B | [`09-rpa-fase2.md`](09-rpa-fase2.md) | El bot RPA: Custom API, claim, orden FIFO, catálogo de errores | 20 |
 | U | [`10-autorizacion-cliente.md`](10-autorizacion-cliente.md) | DN-01: autorización por cliente, con interruptor a plan | 11 |
 | E | [`11-exportacion-excel.md`](11-exportacion-excel.md) | DN-02: descargar a Excel lo que hay que digitar | 10 |
-| O | [`12-obligatoriedad-gestion.md`](12-obligatoriedad-gestion.md) | DN-03: la obligatoriedad se define por gestión | 10 |
-| H | [`13-construido-hoy.md`](13-construido-hoy.md) | Lo construido el 2026-09-27: sitemap, vistas, formulario, la lección del ribbon | 7 |
 
-**149 casos** (contados de los encabezados `### X-NN` de cada archivo el 2026-09-27, no de un número
-viejo). Cada uno trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
+**149 casos** (contados de los encabezados de caso de cada archivo el 2026-09-28, no de un número
+viejo — el reagrupamiento de sets solo movió casos, no agregó ni sacó ninguno: el total es el mismo
+que el 2026-09-27, cuando todavía eran 13 archivos). Cada uno trae: qué prueba, cómo hacerlo, **qué
+tiene que pasar** y cómo verificarlo.
 
-> **Set G, nota al 2026-09-27.** El archivo documenta 14 casos (`G-06` quedó fusionada en `G-00`/
-> `G-00b`, así que no cuenta como caso aparte); `set_g.py` está en migración activa en paralelo a
-> este cierre, así que la cantidad de casos que corren HOY por `correr.py G` puede ser menor a 14
-> por un rato — `correr.py --listar` siempre dice la verdad del momento, más que este número.
+> **Set G, nota al 2026-09-28.** El archivo documenta 20 casos (`G-06` quedó fusionada en `G-00`/
+> `G-00b`, así que no cuenta como caso aparte). De esos 20, tres siguen siendo GUI sin arnés todavía
+> (`G-02` íconos, `G-07` recorte del sitemap por rol, `G-11` multiidioma — documentados con el
+> comando exacto, sin función en `CASOS`): no es una migración a medias, es un hueco de cobertura
+> conocido. `correr.py --listar` siempre dice la verdad del momento, más que este número.
+
+### Tabla de equivalencias — el reagrupamiento de sets del 2026-09-28
+
+Trece sets se reagruparon en once (`CONVENCIONES.md` §4, "La regla del nombre": el nombre de un set
+dice QUÉ prueba, nunca cuándo se escribió ni qué pedido lo originó). `12-obligatoriedad-gestion.md`
+y `13-construido-hoy.md` desaparecieron. Un reporte o una nota vieja que cite un ID de antes del
+2026-09-28 se sigue leyendo con esta tabla:
+
+| ID viejo | Archivo viejo | → | ID nuevo | Archivo nuevo |
+|---|---|---|---|---|
+| `O-01` | `12-obligatoriedad-gestion.md` | → | `R-19` | `03-reglas-de-registro.md` |
+| `O-02` | `12-obligatoriedad-gestion.md` | → | `R-20` | `03-reglas-de-registro.md` |
+| `O-03` | `12-obligatoriedad-gestion.md` | → | `R-21` | `03-reglas-de-registro.md` |
+| `O-04` | `12-obligatoriedad-gestion.md` | → | `R-22` | `03-reglas-de-registro.md` |
+| `O-05` | `12-obligatoriedad-gestion.md` | → | `R-23` | `03-reglas-de-registro.md` |
+| `O-06` | `12-obligatoriedad-gestion.md` | → | `R-24` | `03-reglas-de-registro.md` |
+| `O-07` | `12-obligatoriedad-gestion.md` | → | `R-25` | `03-reglas-de-registro.md` |
+| `O-08` | `12-obligatoriedad-gestion.md` | → | `R-26` | `03-reglas-de-registro.md` |
+| `O-09` | `12-obligatoriedad-gestion.md` | → | `R-27` | `03-reglas-de-registro.md` |
+| `O-10` | `12-obligatoriedad-gestion.md` | → | `R-28` | `03-reglas-de-registro.md` |
+| `H-01` | `13-construido-hoy.md` | → | `G-14` | `06-seguridad-vistas-formularios.md` |
+| `H-02` | `13-construido-hoy.md` | → | `G-15` | `06-seguridad-vistas-formularios.md` |
+| `H-03` | `13-construido-hoy.md` | → | `G-16` | `06-seguridad-vistas-formularios.md` |
+| `H-04` | `13-construido-hoy.md` | → | `G-17` | `06-seguridad-vistas-formularios.md` |
+| `H-05` | `13-construido-hoy.md` | → | `G-18` | `06-seguridad-vistas-formularios.md` |
+| `H-06` | `13-construido-hoy.md` | → | `A-15` | `05-app-y-comandos.md` |
+| `H-07` | `13-construido-hoy.md` | → | `G-19` | `06-seguridad-vistas-formularios.md` |
+
+**Por qué `O` entra entero en `R` y `H` se reparte entre `A` y `G`, y por qué `U` no se tocó**: la
+obligatoriedad por gestión (`O`) **ES** una de las ocho reglas de Registro — un tema, un archivo.
+Los siete casos de `H` no compartían un solo tema entre sí: seis eran de sitemap/vistas/formulario
+(el tema de `G`) y uno era de un comando de la barra (el tema de `A`), así que cada uno fue a donde
+correspondía por TEMA, no los siete juntos a un archivo por fecha. `U` (autorización por cliente)
+sigue aparte porque es transversal a dos niveles (Correo y Registro), no porque no se haya
+revisado — ver `CONVENCIONES.md` §4 para el detalle completo de los tres casos.
 
 ### El set P desapareció
 
