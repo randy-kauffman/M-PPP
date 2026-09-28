@@ -23,7 +23,11 @@ namespace Sanic.Mppp.Plugins.Steps
         // diseno/04 §1: lo único que un humano puede mandar en el Target de cada tabla controlada.
         // `sanic_notainterna` es la nota del supervisor al ejecutivo al devolver (2026-09-24). La escribe una
         // persona desde el botón, así que tiene que estar acá; no sale nunca en el correo al cliente.
-        private static readonly string[] PermitidasEnFila = { "sanic_estado", "sanic_mensaje", "sanic_notainterna" };
+        // `sanic_requiereatencionmanual` entra desde la FASE 2 (D-63, diseno/04 §1): es el cerrojo del RPA
+        // (mientras esté prendida, `Dominio/SeleccionParaElRpa` no deja que el bot vuelva a tomar la fila), y el
+        // botón "Atendida" es el único mecanismo para que un humano la apague SIN cambiar el estado. Igual que
+        // `sanic_requiererevision` en Solicitud apaga con el botón "Revisado".
+        private static readonly string[] PermitidasEnFila = { "sanic_estado", "sanic_mensaje", "sanic_notainterna", "sanic_requiereatencionmanual" };
         private static readonly string[] PermitidasEnSolicitud = { "sanic_requiererevision", "sanic_estadoprocesamiento" };
 
         /// <summary>

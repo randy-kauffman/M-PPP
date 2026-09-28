@@ -19,6 +19,25 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 ListaBlancaDeColumnas.ColumnasNoPermitidas(ListaBlancaDeColumnas.Fila, new[] { "sanic_planid", "sanic_estado", "sanic_numerocuenta" }));
         }
 
+        /// <summary>
+        /// D-63: el botón "Atendida" escribe `sanic_requiereatencionmanual` y hoy da HTTP 400 real contra Dev
+        /// porque la columna no está en la lista blanca. `diseno/04-matriz-privilegios.md` §1 ya la permite
+        /// "desde la fase 2" (es el cerrojo del RPA: con la marca prendida, el bot no puede tomar la fila, y
+        /// el botón es el único mecanismo para que un humano la apague sin cambiar el estado). El arreglo no
+        /// tiene que abrir de más: una columna no permitida, como `sanic_referencia`, sigue rechazándose.
+        /// </summary>
+        [Fact]
+        public void Sanic_requiereatencionmanual_esta_permitida_en_fila_desde_fase_2()
+        {
+            Assert.Empty(ListaBlancaDeColumnas.ColumnasNoPermitidas(ListaBlancaDeColumnas.Fila, new[] { "sanic_estado", "sanic_requiereatencionmanual" }));
+            Assert.Empty(ListaBlancaDeColumnas.ColumnasNoPermitidas(ListaBlancaDeColumnas.Fila, new[] { "sanic_requiereatencionmanual" }));
+
+            // El arreglo no abre de más: una columna no permitida sigue rechazándose.
+            Assert.Equal(
+                new[] { "sanic_referencia" },
+                ListaBlancaDeColumnas.ColumnasNoPermitidas(ListaBlancaDeColumnas.Fila, new[] { "sanic_referencia" }));
+        }
+
         [Fact]
         public void En_solicitud_una_persona_solo_puede_mandar_requiere_revision_y_el_estado()
         {
