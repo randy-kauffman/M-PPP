@@ -199,7 +199,7 @@ desactivó a propósito).
 
 > **Nota DN-03 (2026-09-27).** Las 4 filas de `E06-obligatoriedad.xlsx` usan gestión **`Inclusion`**
 > (el valor por defecto de `generar_excel.fila()`), que **no** tiene entrada en `porGestion` (solo
-> `Exclusion` la tiene hoy, versión 2, PROVISIONAL — ver R-18). Por eso este caso sigue probando
+> `Exclusion` la tiene hoy, versión 2, confirmada por el aprobador el 2026-09-28 — ver R-18). Por eso este caso sigue probando
 > exactamente "todo obligatorio salvo referencia" **sin importar si la versión activa de
 > `plantilla.obligatoriedad` es la 1 o la 2**: es, de hecho, la evidencia de compatibilidad hacia
 > atrás que pide DN-03 ("un parámetro sin `porGestion`, o una gestión sin entrada en `porGestion`, se
@@ -532,13 +532,14 @@ de arriba).
 
 ---
 
-## R-18 · DN-03: `Exclusion` afloja `numeroCuenta`, `banco` y `moneda` (marcado PROVISIONAL)
+## R-18 · DN-03: `Exclusion` afloja `numeroCuenta`, `banco` y `moneda`
 
 **Qué prueba.** La versión 2 de `plantilla.obligatoriedad`, sembrada en Dev el 2026-09-27
 (`playbooks/datos/parametros.md`): una fila de gestión `Exclusion` puede omitir cuenta, banco y
-moneda sin que `OBLIGATORIEDAD` la rechace. **Este criterio está marcado PROVISIONAL en el propio
-playbook, pendiente de confirmación de negocio del aprobador** — la dependencia queda anotada acá a
-propósito, tal como pide `diseno/DIRECTRICES-NUEVAS.md`.
+moneda sin que `OBLIGATORIEDAD` la rechace. **El criterio lo confirmó el aprobador el 2026-09-28**
+(`playbooks/datos/parametros.md`): ya no es tentativo. Sigue habiendo una dependencia de ENTORNO —
+que la versión activa hoy traiga `porGestion.Exclusion` sembrado— y ese caso se reporta `N-A`, no
+FALLA, si no está (ver abajo).
 
 **Necesita.** La versión activa más alta de `plantilla.obligatoriedad` con `porGestion.Exclusion`
 trayendo `numeroCuenta`, `banco` y `moneda` como opcionales (lo confirma `preparar()`, sin sembrar
@@ -554,10 +555,11 @@ caso con `generar_excel.fila()` + `ctx.excel_ad_hoc()`, igual que R-09/R-14).
 **Qué tiene que pasar.** La fila queda **Validada**: `OBLIGATORIEDAD` no la rechaza por
 `numeroCuenta`, `banco` ni `moneda` vacíos.
 
-**Si el parámetro activo HOY no trae `porGestion.Exclusion`** (por ejemplo, si el aprobador todavía
-no confirmó el criterio y alguien sembró una versión 3 que lo saca): el caso se reporta **N-A**, con
-el motivo exacto, en vez de FALLA — no es un defecto de la regla, es una dependencia de negocio
-todavía abierta (`CONVENCIONES.md` §3, "todo N-A se reporta explícitamente, con su motivo").
+**Si el parámetro activo HOY no trae `porGestion.Exclusion`** (por ejemplo, en un entorno donde
+todavía no se sembró esa versión, o si alguien sembró una versión 3 que lo saca): el caso se reporta
+**N-A**, con el motivo exacto, en vez de FALLA — no es un defecto de la regla, es una precondición de
+entorno, no una duda sobre el criterio (que ya está confirmado, `CONVENCIONES.md` §3, "todo N-A se
+reporta explícitamente, con su motivo").
 
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py R` (caso `R-18`); a mano,
 `ver_solicitud.py <MPPP-########>` sobre la fila creada.
@@ -614,8 +616,7 @@ existen.
    ya tenía un caso en este archivo (R-06) antes de que existiera DN-03. La nota agregada a R-06 deja
    escrito por qué ese caso, sin cambiarle una línea de código, sigue siendo la evidencia de
    compatibilidad hacia atrás (gestión `Inclusion`, sin entrada en `porGestion`). Se agregó R-18 para
-   el aflojamiento nuevo de `Exclusion` (marcado PROVISIONAL, con su dependencia anotada tal como
-   pide la consigna de este trabajo).
+   el aflojamiento nuevo de `Exclusion`, confirmado por el aprobador el 2026-09-28.
 
    **Lo que este archivo NO duplica.** `12-obligatoriedad-gestion.md` (set `O`) es la cobertura
    exhaustiva de DN-03: la precedencia `obligatorios`/`opcionales` (`O-04`, deliberadamente **unitaria**,
@@ -652,4 +653,4 @@ existen.
 | R-15 DN-01 canon `plan` | | | |
 | R-16 DN-01 modo `cliente` | | | |
 | R-17 DN-01 valor basura degrada | | | **FALLA, bloqueado por D-59** (ya ABIERTA, pospuesta) |
-| R-18 DN-03 `Exclusion` afloja tres campos | | | PROVISIONAL, confirmar con aprobador |
+| R-18 DN-03 `Exclusion` afloja tres campos | | | confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |

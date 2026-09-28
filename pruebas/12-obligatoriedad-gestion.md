@@ -57,8 +57,10 @@ R-18 NO cubre:
 - Confirmar que exista una versión ACTIVA de `plantilla.obligatoriedad` (§8.2: su canon es "la
   versión activa más alta", no un valor fijo — este archivo solo lo COMPRUEBA, nunca lo siembra).
   Al momento de escribir esto (`ver_solicitud.py --parametros`, 2026-09-27): `sanic_version=2`, con
-  `porGestion.Exclusion` sembrado y marcado **PROVISIONAL** — pendiente de confirmación del
-  aprobador (O-02 reporta `N-A` si esto cambiara y `porGestion.Exclusion` dejara de estar).
+  `porGestion.Exclusion` sembrado. El criterio lo **confirmó el aprobador el 2026-09-28** (ya no es
+  tentativo); O-02 sigue reportando `N-A`, no FALLA, si el entorno que se está corriendo no lo tiene
+  sembrado — esa es una precondición legítima de entorno (podría faltar sembrar en Test/Producción),
+  no una duda sobre el criterio en sí.
 - `dotnet` disponible en el PATH, para los casos unitarios (O-04, O-06, O-07): `dotnet test
   tests/Sanic.Mppp.Plugins.Tests --filter <FullyQualifiedName>`.
 
@@ -99,7 +101,7 @@ encontró 0 o más de 1 prueba (el nombre del `[Fact]` cambió sin actualizar es
 
 ---
 
-### O-02 — El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido (marcado PROVISIONAL)
+### O-02 — El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido
 
 **Qué prueba.** Que la versión ACTIVA hoy de `plantilla.obligatoriedad` trae, dentro de
 `porGestion.Exclusion`, exactamente los tres campos que pidió el aprobador (`numeroCuenta`, `banco`,
@@ -109,10 +111,11 @@ VIVO de que ese aflojamiento funciona contra una Solicitud real ya la hace R-18*
 lectura, no vuelve a mandar un Excel (ver "Frontera con el set R").
 
 **Necesita.** `plantilla.obligatoriedad` en su versión activa más alta (§8.2: no se siembra nada
-acá). **Este criterio está marcado PROVISIONAL en el propio playbook**
-(`playbooks/datos/parametros.md`): pendiente de confirmación de negocio del aprobador. Si el
-aprobador todavía no confirmó o `porGestion.Exclusion` dejó de estar sembrado, este caso reporta
-`N-A` en vez de asumir un valor que ya no existe.
+acá). **El criterio lo confirmó el aprobador el 2026-09-28** (`playbooks/datos/parametros.md`): ya
+no es tentativo. Si en el entorno que se está corriendo `porGestion.Exclusion` no está sembrado
+(por ejemplo, todavía no se sembró en Test o Producción), este caso reporta `N-A` en vez de asumir
+un valor que no existe — esa sigue siendo una precondición legítima de entorno, no una duda sobre el
+criterio.
 
 **Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` (versión activa más alta de
 `plantilla.obligatoriedad`, la misma consulta que ya hace `preparacion_comun.verificar_parametro_activo`),
@@ -383,7 +386,7 @@ instrucción explícita del diseño.
 | Caso | Resultado | Notas |
 |---|---|---|
 | O-01 compatibilidad sin `porGestion` | | |
-| O-02 `Exclusion` afloja los tres campos | | PROVISIONAL, confirmar con aprobador |
+| O-02 `Exclusion` afloja los tres campos | | confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
 | O-03 `Inclusion`/`Modificacion` sin cambios | | |
 | O-04 precedencia `obligatorios` | | unitario, no sembrar |
 | O-05 gestión inválida en la fila | | |

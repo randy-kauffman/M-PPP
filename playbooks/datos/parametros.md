@@ -52,10 +52,11 @@ maneja una versión nueva"), esto es una fila NUEVA: `plantilla.obligatoriedad` 
 `Datos/Catalogos.cs` (`CatalogosDataverse.Parametro`) resuelve el parámetro activo por
 `sanic_nombre` + `statecode=Activo`, ordenando por `sanic_version` DESCENDENTE con `TopCount=1`: en
 cuanto la versión 2 quede sembrada (activa, que es el estado por defecto al crear), pasa a ser la
-que lee el motor sin tocar la versión 1, que queda de respaldo/histórico. Su descripción se marcó
-**PROVISIONAL**: es una regla de negocio que el aprobador todavía tiene que confirmar, y si cambia
-se siembra una `sanic_version=3`, nunca se edita la 2. Ver `diseno/02-diccionario-datos.md` §2.5 y
-`Validacion/ParametrosDePlantilla.cs` (`ObligatoriedadPlantilla`).
+que lee el motor sin tocar la versión 1, que queda de respaldo/histórico. **El criterio lo confirmó
+el aprobador el 2026-09-28**: ya no es una regla de negocio provisoria. Si el negocio pidiera
+cambiarla más adelante, se siembra una `sanic_version=3`, nunca se edita la 2. Ver
+`diseno/02-diccionario-datos.md` §2.5 y `Validacion/ParametrosDePlantilla.cs`
+(`ObligatoriedadPlantilla`).
 
 **`exportacion.columnas` se agregó el 2026-09-26 (DN-02, `diseno/DIRECTRICES-NUEVAS.md`)**, orden
 explícita del aprobador de construir en Dev. Trae `numeroSolicitud` y `numeroFila` (trazabilidad,
@@ -120,12 +121,21 @@ CORTA que la de este archivo — a este archivo se le agregó el resultado de la
 (no es el playbook editado a mano, es el playbook adelantado al entorno) — queda para quien lo decida,
 con `datos.py playbooks/datos/parametros.md --completar` sobre esa única fila.
 
+**Deriva esperada tras la confirmación de `porGestion.Exclusion` (2026-09-28)**: este archivo ya
+actualizó el texto de `sanic_descripcion` de `plantilla.obligatoriedad` `sanic_version=2` de
+"PROVISIONAL" a "CONFIRMADO" (arriba y en el bloque JSON de la fila). Lo sembrado en Dev el
+2026-09-27 todavía trae la redacción vieja ("PROVISIONAL... falta su confirmación de negocio") hasta
+que alguien corra `datos.py playbooks/datos/parametros.md --completar` sobre esa fila — el
+`sanic_valor` (el JSON de negocio, lo único que evalúa el motor) no cambió, solo el texto
+explicativo, así que no hay urgencia funcional; queda igual que la deriva de `rpa.lote.maximo` de
+arriba.
+
 Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
 - `plantilla.obligatoriedad` `sanic_version=1`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
-- `plantilla.obligatoriedad` `sanic_version=2`: `porGestion.Exclusion` agregado por orden del aprobador (2026-09-27, DN-03) — PROVISIONAL, falta su confirmación de negocio.
+- `plantilla.obligatoriedad` `sanic_version=2`: `porGestion.Exclusion` agregado por orden del aprobador (2026-09-27, DN-03) — confirmado por el aprobador el 2026-09-28.
 - Los tres de `vigilancia.*` y los dos de `retencion.dias.*`: **decididos por el aprobador el 2026-09-22** (D-45); no estaban en ningun archivo.
 
 Ojo: los fixtures de prueba (`ParametrosDePlantillaAceptacion`) y el mockup
@@ -220,7 +230,7 @@ coinciden con la plantilla real del cliente.
         "etiqueta": "JSON"
       },
       "sanic_valor": "{\"porDefecto\":\"obligatorio\",\"opcionales\":[{\"campo\":\"referencia\"}],\"porGestion\":{\"Exclusion\":{\"opcionales\":[{\"campo\":\"numeroCuenta\"},{\"campo\":\"banco\"},{\"campo\":\"moneda\"}]}}}",
-      "sanic_descripcion": "PROVISIONAL (DN-03, sembrado 2026-09-27 por orden del aprobador): agrega porGestion.Exclusion con numeroCuenta, banco y moneda opcionales -- una exclusion solo necesita identificar a quien dar de baja (plan, identificacion y referencia). Inclusion y Modificacion no tienen entrada en porGestion todavia (siguen bajo el bloque global). Es una regla de negocio que el aprobador tiene que confirmar; se cambia sembrando una version nueva, nunca editando esta fila."
+      "sanic_descripcion": "CONFIRMADO por el aprobador el 2026-09-28 (DN-03, sembrado 2026-09-27): agrega porGestion.Exclusion con numeroCuenta, banco y moneda opcionales -- una exclusion solo necesita identificar a quien dar de baja (plan, identificacion y referencia). Inclusion y Modificacion no tienen entrada en porGestion todavia (siguen bajo el bloque global). Si el negocio pidiera cambiarla, se siembra una version nueva, nunca se edita esta fila."
     },
     {
       "sanic_nombre": "rpa.puedeaprobar",

@@ -195,13 +195,14 @@ def o01(ctx):
 # O-02 — El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido.
 # ===========================================================================
 def o02(ctx):
-    c = pc.Caso("O-02", "El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido (marcado PROVISIONAL)")
+    c = pc.Caso("O-02", "El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido")
     activo = ctx.extra["obligatoriedad_activa"]
     valor_crudo = activo.get("sanic_valor") or ""
     if "porGestion" not in valor_crudo or '"Exclusion"' not in valor_crudo:
-        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion': está marcado PROVISIONAL "
-             "en playbooks/datos/parametros.md, pendiente de confirmación de negocio del aprobador "
-             f"(DN-03) — no se puede evaluar hoy. Valor activo: {valor_crudo!r}")
+        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno "
+             "(el criterio ya está confirmado por el aprobador, 2026-09-28; esto es una precondición "
+             f"de entorno, no una duda sobre el criterio, DN-03) — no se puede evaluar hoy. "
+             f"Valor activo: {valor_crudo!r}")
         return c
     try:
         datos = json.loads(valor_crudo)
