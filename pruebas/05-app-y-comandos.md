@@ -789,8 +789,8 @@ Los 2 `FALLA` quedan en rojo con su causa, sin maquillar:
 | A-08 diálogo de motivo (Rechazada en AS400) | OK | corregido: `sanic_motivo` no lo exige la plataforma, solo el formulario |
 | A-09 cancelar diálogo | OK | GUI, `a-09-cancelar-dialogo-motivo.spec.mjs` invocado por `set_a.py::a09()` |
 | A-10 Anular y Devolver | OK | |
-| A-11 Atendido y Descartar | OK | |
+| A-11 Atendido y Descartar | OK | Estuvo en FALLA hasta el 2026-09-28 por **D-59** (`Avisos.cs`: `GetAttributeValue<EntityReference>` sobre `systemuserroles`, donde `systemuserid` viaja como `Guid`). Reparado y desplegado en `1.0.16.0`; el caso pasó a verde sin tocarse |
 | A-12 Revisado | OK | |
 | A-13 multiidioma | **FALLA** | limpio con `ejecutivo`/1033 (x3); `supervisor`/3082 nunca confirmó limpio — no determinado si es defecto de sistema o de prueba |
-| A-14 Atendida (fase 2) | OK | |
+| A-14 Atendida (fase 2) | OK | Estuvo en FALLA hasta el 2026-09-28 por **D-63**: faltaba `sanic_requiereatencionmanual` en la lista blanca de Fila, así que el botón daba HTTP 400 y dejaba la fila trabada (el bot no la podía tomar y la persona no la podía liberar). Reparado y desplegado en `1.0.17.0` |
 | A-15 diagnóstico REGLAS vs. METADATA COMPILADA | OK | ex `H-06`; GUI, misma corrida de Playwright que A-01 (`set_a.py::a15()`) — la acción de reparación ante una falla sigue siendo manual, en el maker portal |
