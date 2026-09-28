@@ -524,15 +524,59 @@ igual que sus hermanos).
 
 | Caso | Solicitud | Resultado | Notas |
 |---|---|---|---|
-| V-01 configuración y hallazgo de arranque | | | |
-| V-02 correo en la bandeja | | | |
-| V-03 reintento | | | |
-| V-04 se acaban los reintentos | | | |
-| V-05 comunicación nunca iniciada | | | |
-| V-06 vencimiento | | | |
-| V-07 envío iniciado sin confirmar (M-06) | | | |
+| V-01 configuración y hallazgo de arranque | | OK | |
+| V-02 correo en la bandeja | (ninguna: nunca se creó) | **FALLA** | corrida real, 2026-09-28 ~15:53-16:22 UTC (`MPPP_V02_ALTO_RIESGO=si`). Ver la sección "V-02, primera corrida real (2026-09-28) — FALLA" más abajo. |
+| V-03 reintento | | N-A | no corrido esta vez (requiere `MPPP_V_LENTOS=si`) |
+| V-04 se acaban los reintentos | | N-A | ídem |
+| V-05 comunicación nunca iniciada | | N-A | ídem |
+| V-06 vencimiento | | N-A | ídem |
+| V-07 envío iniciado sin confirmar (M-06) | | N-A | ídem |
 
 > **V-02 (2026-09-28) ya deja `MPPP-REC` prendido solo, verificado, en su propio `finally`** — no
 > hace falta acordarse a mano. Si de todos modos algo raro pasó, comprobalo:
 > `python3 herramientas/dataverse_api.py GET "workflows?\$select=name,statecode&\$filter=name eq 'Cloud Flow - MPPP - REC - Recibir correo nuevo'"`
 > — tiene que decir `statecode: 1`.
+
+### V-02, primera corrida real (2026-09-28) — FALLA
+
+**Primera vez que se ejercitó el mecanismo de punta a punta** desde que se escribió (el agente que
+lo escribió fue detenido durante la verificación). Comando: `MPPP_V02_ALTO_RIESGO=si python3
+herramientas/pruebas/correr.py V`.
+
+**Las dos redes de seguridad funcionaron.** `MPPP-REC` quedó DESACTIVADO, verificado; el correo real
+se mandó (HTTP 202, Graph); con `MPPP-REC` apagado no se creó ninguna Solicitud sola en el primer
+minuto (confirma que el apagado fue real). Al terminar (por el `finally`, RED 1), `MPPP-REC` quedó
+REENCENDIDO y VERIFICADO — confirmado además de forma independiente, releyendo la plataforma después
+de que `correr.py` terminó (`statecode=1`), no solo confiando en el check del propio caso.
+
+**El único check que dio FALLA:** "MPPP-VIG (bloque 'Correos_que_quedaron_en_la_bandeja') terminó
+creando la Solicitud" — no se creó dentro del margen (15 min de umbral + 1 vuelta + colchón = 28
+min), ni tampoco después: a las 16:24 UTC (más de 30 min después de mandado el correo) seguía sin
+existir ninguna Solicitud con el asunto `ZZP-V02-9033d81f`.
+
+**No es un defecto de la consulta ni del envío.** El correo llegó de verdad a la bandeja
+(`mppp@55xljh.onmicrosoft.com`, recibido `2026-09-28T15:53:03Z`, confirmado leyendo el buzón por
+Graph directamente — y era el ÚNICO mensaje en la bandeja, sin backlog que lo tapara). `V-01` (misma
+corrida) dio OK: el flujo está Activado, con el recurrence de 10 minutos, los 5 bloques y la etapa de
+arranque (D-62) bien encadenados, y lo desplegado coincide con el repo.
+
+**Evidencia que sí apunta a un defecto real: `MPPP-VIG` no dejó NINGUNA marca de haberse ejecutado en
+más de 5 horas.** Consultando la Bitácora por origen `MPPP-VIG` (159460005), el evento más reciente
+de cualquier tipo es de `2026-09-28T10:59:12Z`; la corrida de V-02 terminó de esperar a las
+`~16:22Z` y esta verificación se hizo a las `16:24:58Z` — más de 5 horas sin un solo evento
+`Ingresada`, `Reintento`, `Error` ni `Vencida` con ese origen, pese a que el flujo figura `statecode=1`
+(Activado) en Dataverse y `V-01` valida su definición. Esto es consistente con que el TRIGGER del
+flujo no se está disparando de verdad en Power Automate (recurrencia pausada del lado de Flow,
+problema de conexión/autenticación, DLP, licencia, throttling), no con un defecto de la consulta del
+bloque 1 ni de este caso. **No se pudo confirmar la causa exacta**: el historial de ejecuciones de
+Power Automate vive en `service.flow.microsoft.com`, fuera del alcance de las credenciales de
+Dataverse que usa este arnés (mismo límite documentado en la sección "Investigación de la causa de
+fondo" más arriba). **Merece su propio ID en `diseno/PENDIENTES.md`**, a criterio de quien diseñó el
+flujo — no se corrige desde acá.
+
+**La segunda red (verificar al arrancar) no se pudo ejercitar en esta sesión.** El intento de apagar
+`MPPP-REC` A MANO (con `dataverse_api.py`, fuera de `v02()`) para simular una corrida anterior que
+murió a la mitad fue bloqueado por el sistema de permisos del entorno (clasificador de modo
+automático: "Modify Shared Resources"). Se paró de inmediato sin reintentar ni buscar otra vía; se
+confirmó releyendo la plataforma que `MPPP-REC` quedó intacto (`statecode=1`), sin efecto del intento
+bloqueado. Queda pendiente para quien tenga el permiso habilitado.
