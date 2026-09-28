@@ -92,6 +92,34 @@ agregar la fila nueva al playbook: no hay que borrar ni desactivar la anterior p
 tome efecto, y **nunca se edita `sanic_valor` de una fila ya sembrada** para cambiar una regla de
 negocio (eso es lo que exige DN-03 con `plantilla.obligatoriedad`).
 
+**Cómo se cambia un parámetro desde la línea de comandos (D-53, 2026-09-28).** La auditoría probó 7 UPDATE
+a mano sobre esta tabla el 2026-09-24 (D-53/D-55, `PENDIENTES.md`): no por malicia, por comodidad — editar
+el valor en el portal es más corto que editar a mano el JSON de este archivo sin romper nada. En vez de
+repetir la advertencia, se armó `herramientas/construir/parametro.py`: un comando agrega la fila nueva
+(nunca edita la sembrada, versión = máximo sembrado en el ENTORNO + 1) tanto en Dataverse como acá:
+
+```bash
+python3 herramientas/construir/parametro.py <nombre> "<valor>" --tipo=Texto|Numero|JSON --descripcion="..."
+# --solo-verificar: solo muestra que versión se crearia, no toca el entorno ni este archivo.
+```
+
+Después de correr esto queda a mano, a propósito, UNA sola cosa (es criterio, no mecánica): el párrafo que
+explica el PORQUÉ arriba del bloque json (quién lo aprobó, qué reemplaza) y una línea en "Valores con
+fuente", como el resto de los parámetros de acá abajo.
+
+**No confundir con `retencion.dias.general` / `retencion.dias.noreconocidas` (más abajo) con la retención
+de AUDITORÍA de la organización**: son cosas distintas. La retención de auditoría no es una fila de esta
+tabla — está en `02-diccionario-datos.md` §2.5-bis (DD-21) — y por eso ni `datos.py` ni `parametro.py` la
+tocan.
+
+**Deriva encontrada al construir `parametro.py` (2026-09-28), sin corregir a propósito**: `datos.py
+--solo-verificar` contra Dev marca `rpa.lote.maximo` (versión 1) con la `sanic_descripcion` sembrada más
+CORTA que la de este archivo — a este archivo se le agregó el resultado de la medición del 2026-09-26
+("MEDIDO en Dev... 0,33 s por item...") y nunca se corrió `--completar` para llevarlo a Dev. El `sanic_valor`
+(100) coincide en los dos lados; solo difiere el texto. No se corrigió acá porque excede el alcance de D-53
+(no es el playbook editado a mano, es el playbook adelantado al entorno) — queda para quien lo decida,
+con `datos.py playbooks/datos/parametros.md --completar` sobre esa única fila.
+
 Valores con fuente:
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
