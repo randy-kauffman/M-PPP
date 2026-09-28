@@ -61,6 +61,43 @@ por el aprobador ese mismo día:
 | Autorizado = el remitente | `REMITENTE_RECONOCIDO` (su `sanic_nombre` ES el correo real: no lleva `ZZP-`, ver `limpiar()`) |
 | Autorizaciones a PR11, PR06, PR10 y PRIN | **a PRNA NO**, a propósito |
 
+**El fixture compartido del 2026-09-23 y la migración de marca del
+2026-09-28.** El Cliente `ZZP-Pruebas MPPP SA` de la tabla de arriba puede
+no ser un alta nueva: en Dev vive, desde el 2026-09-23, un Cliente CON
+ESTE MISMO CIF BAC (`900100200`) pero con el `sanic_nombre` de ANTES de
+hoy (`"PR - Pruebas MPPP SA"`, la marca vieja) — y sus 5 Planes (PR11,
+PR06, PR10, PRIN, PRNA) ya armados y en uso por `pruebas/gui/`. Buscar
+ese Cliente por `sanic_nombre` (como hacía este archivo hasta hoy) deja
+de encontrarlo apenas se migra la marca, y el código entonces intenta
+CREAR uno nuevo — lo que choca con la clave alternativa `KEY - MPPP -
+Cliente - CIF BAC` (HTTP 412), porque el CIF BAC ya existe.
+
+La causa de fondo: **el nombre es decorativo y cambia; el CIF BAC es la
+identidad del Cliente** (tiene clave alternativa justamente por eso). Por
+eso `preparar()`, `verificar()` y `limpiar()` localizan el Cliente por
+`sanic_cifbac eq '{CIF_BAC}'`, no por `sanic_nombre`. Cuando lo encuentran
+así, lo usan TAL COMO ESTÁ — nunca lo renombran ni lo modifican; no hace
+falta, y además nadie tiene permiso para tocar un registro que no creó.
+
+Plan (`sanic_codigo`), Autorizado (`sanic_nombre` = el correo real) y
+AutorizacionPlan (el `sanic_nombre` que calcula el plugin, que es
+`<correo> → <código>` — ver `NombreCalculado.DeAutorizacionPlan` en
+`src/Sanic.Mppp.Plugins/Steps/ReglasDeSteps.cs`) YA se buscaban por su
+propia clave de negocio antes de hoy: ninguno de los tres se vio afectado
+por la migración de marca del Cliente, y no se tocó lo que ya funcionaba.
+
+**Efecto secundario DESEADO, no un bug**: como ese Cliente viejo NO lleva
+el prefijo `ZZP-`, ni `marca_agua.borrar_marcado()` (para el Cliente) ni
+la comprobación de pertenencia de `limpiar()` (para sus Planes y
+AutorizacionPlan, más abajo) lo van a dejar borrar — se queda como
+"ignorado", reportado, no borrado en silencio. Es exactamente la
+protección que hace falta: ese fixture compartido vive desde el
+2026-09-23 con planes ya en uso, y NO debe desaparecer por un
+`--limpiar` casual — fue justo el accidente del 2026-09-27 (ver más
+abajo). Si algún día hay que jubilar ese Cliente viejo de verdad, es una
+decisión manual y consciente del aprobador, nunca un flag de esta
+herramienta.
+
 Última línea: JSON de una línea, igual que las herramientas de construcción.
 """
 import json
@@ -154,7 +191,11 @@ def comprobar_largos(remitente):
 def preparar(dv, remitente):
     hechos = []
 
-    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{CLIENTE}'",
+    # Por CIF BAC, no por sanic_nombre: el CIF BAC es la clave de negocio del
+    # Cliente (clave alternativa `KEY - MPPP - Cliente - CIF BAC`), el nombre
+    # es decorativo y puede haber cambiado de marca (ver el docstring del
+    # módulo). Si ya existe con este CIF, se usa TAL CUAL — nunca se renombra.
+    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_cifbac eq '{CIF_BAC}'",
               "sanic_mppp_tbl_clienteid,sanic_nombre")
     if cli is None:
         idc = crear(dv, "sanic_mppp_tbl_clientes",
@@ -215,7 +256,8 @@ def preparar(dv, remitente):
 
 def verificar(dv, remitente=None):
     faltan, bien = [], []
-    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{CLIENTE}'", "sanic_nombre")
+    # Igual que en preparar(): por CIF BAC (clave de negocio), no por sanic_nombre.
+    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_cifbac eq '{CIF_BAC}'", "sanic_nombre")
     (bien if cli else faltan).append(f"cliente {CLIENTE}")
     for p in PLANES:
         pl = uno(dv, "sanic_mppp_tbl_plans", f"sanic_codigo eq '{p['codigo']}'",
@@ -262,10 +304,18 @@ def limpiar(dv, remitente=None):
       borra con `marca_agua.borrar_marcado()`, releído justo antes.
     - **Plan**: su `sanic_nombre` lo recalcula un plugin (`<codigo> -
       <cliente>`) y nunca puede empezar con `ZZP-`; su `sanic_codigo` (4
-      caracteres) no tiene lugar para la marca. La protección equivalente:
-      releer el Plan puntual justo antes del `DELETE` y exigir que su
-      `_sanic_clienteid_value` siga siendo, exactamente, el GUID del
-      Cliente marcado.
+      caracteres) no tiene lugar para la marca. La protección equivalente
+      tiene DOS pasos, no uno: (1) el Cliente del que cuelga tiene que
+      HABERSE ENCONTRADO Y LLEVAR la marca `ZZP-` (`cliente_marcado`, más
+      abajo — el Cliente se busca por CIF BAC, así que puede existir y
+      encontrarse sin llevarla: ver "El fixture compartido del
+      2026-09-23..." en el docstring del módulo); (2) releer el Plan
+      puntual justo antes del `DELETE` y exigir que su
+      `_sanic_clienteid_value` siga siendo, exactamente, el GUID de ESE
+      Cliente marcado. Sin el paso (1), un Cliente real (con el CIF
+      esperado pero sin la marca) protegería sus Planes solo por
+      coincidencia de GUID, y eso alcanzaría para borrarlos: por eso el
+      paso (1) va primero.
     - **AutorizacionPlan**: su `sanic_nombre` también lo recalcula un
       plugin (`<correo> → <código>`) y tampoco puede llevar la marca. Se
       busca por los DOS lookups exactos (Autorizado × Plan, los dos ya
@@ -282,9 +332,21 @@ def limpiar(dv, remitente=None):
     """
     borrados, ignorados = [], []
 
-    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{CLIENTE}'",
+    # Por CIF BAC (clave de negocio), no por sanic_nombre — ver "El fixture
+    # compartido del 2026-09-23..." en el docstring del módulo. Localizar así
+    # puede encontrar el Cliente viejo, SIN la marca `ZZP-`: a propósito NO se
+    # lo trata como "propio de este fixture" solo por tener el CIF esperado.
+    # `cliente_marcado` es la puerta que protege sus Planes/AutorizacionPlan
+    # más abajo; `marca_agua.borrar_marcado()`, al final, hace la misma
+    # comprobación (releída) para el Cliente mismo. Que las dos se nieguen a
+    # borrar un Cliente sin la marca es EL COMPORTAMIENTO CORRECTO, no un bug
+    # a "arreglar": ese Cliente viene vivo desde el 2026-09-23 con sus 5
+    # Planes en uso, y no tiene que desaparecer por un `--limpiar` casual
+    # (fue justo el accidente del 2026-09-27, documentado arriba).
+    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_cifbac eq '{CIF_BAC}'",
               "sanic_mppp_tbl_clienteid,sanic_nombre")
     cliente_id = cli["sanic_mppp_tbl_clienteid"] if cli else None
+    cliente_marcado = bool(cli) and marca_agua.marcado(cli.get("sanic_nombre"))
 
     # Planes que EXISTEN con el código esperado y cuelgan del Cliente marcado
     # (verificado ahora; se vuelve a releer justo antes de cada DELETE más
@@ -294,6 +356,15 @@ def limpiar(dv, remitente=None):
         pl = uno(dv, "sanic_mppp_tbl_plans", f"sanic_codigo eq '{p['codigo']}'",
                  "sanic_mppp_tbl_planid,_sanic_clienteid_value")
         if pl is None:
+            continue
+        if cli is not None and not cliente_marcado:
+            # El Cliente existe (por CIF) pero SIN la marca: es el fixture
+            # compartido viejo, no algo que este `--limpiar` haya creado.
+            # Ninguno de sus Planes se toca, aunque cuelguen de él.
+            ignorados.append(
+                f"plan {p['codigo']}: cuelga del Cliente {CLIENTE!r} (CIF {CIF_BAC}), pero ese "
+                f"Cliente no lleva la marca {marca_agua.PREFIJO!r} — es el fixture compartido vivo "
+                "desde 2026-09-23 con sus planes en uso; no se toca (ver el docstring de esta función)")
             continue
         if cliente_id is None or pl.get("_sanic_clienteid_value") != cliente_id:
             ignorados.append(f"plan {p['codigo']} existe pero no cuelga del Cliente marcado "

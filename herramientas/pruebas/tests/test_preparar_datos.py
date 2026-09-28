@@ -16,6 +16,14 @@ verificación de pertenencia releída justo antes de cada borrado; envolver
 es "¿se borra lo que hay que borrar?" — es la contraria: **¿sobrevive un
 registro que no lleva la marca (o cuya pertenencia no se puede probar en el
 momento del borrado)?** Eso es lo que este archivo verifica primero.
+
+**2026-09-28, migración de marca de agua.** El Cliente pasó a buscarse por
+`sanic_cifbac` (clave de negocio), no por `sanic_nombre` (decorativo, y lo
+que rompió `preparar()`/`verificar()` cuando se migró la marca de `PR -` a
+`ZZP-`: el Cliente viejo del 2026-09-23 sigue vivo en Dev con el nombre de
+antes, mismo CIF). `LimpiarSobreviveSinMarca` suma un caso más por eso: ese
+Cliente viejo, encontrado por CIF pero SIN la marca `ZZP-`, tiene que
+sobrevivir ÉL Y SUS PLANES — nunca borrarse solo porque el CIF coincidió.
 """
 import os
 import sys
@@ -55,8 +63,9 @@ class LimpiarSobreviveSinMarca(unittest.TestCase):
         registro se releyó y YA NO lleva `ZZP-` (alguien lo renombró en el
         medio, a mano), no se borra. Nada de POST/PATCH/DELETE en total."""
         cs = ClienteSimulado()
-        # El listado por $filter todavía lo encuentra con el nombre marcado...
-        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_nombre eq '{prep.CLIENTE}'"),
+        # El listado por $filter (por CIF BAC, la clave de negocio) todavía lo
+        # encuentra con el nombre marcado...
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
                      (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": prep.CLIENTE}]}, {}))
         # ...pero la relectura puntual, justo antes del DELETE, ya no.
         cs.responder("GET", _contiene("sanic_mppp_tbl_clientes(C1)", "$select=sanic_nombre"),
@@ -77,7 +86,7 @@ class LimpiarSobreviveSinMarca(unittest.TestCase):
         coincidencia de código con un plan real del banco) tiene que
         sobrevivir, aunque el Cliente del fixture sí se borre."""
         cs = ClienteSimulado()
-        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_nombre eq '{prep.CLIENTE}'"),
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
                      (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": prep.CLIENTE}]}, {}))
         cs.responder("GET", _contiene("sanic_mppp_tbl_clientes(C1)", "$select=sanic_nombre"),
                      (200, {"sanic_nombre": prep.CLIENTE}, {}))
@@ -107,7 +116,7 @@ class LimpiarSobreviveSinMarca(unittest.TestCase):
         explotar la prueba con `AssertionError` por no tener una regla para
         ese `GET` sin filtro (a propósito: no se configura ninguna)."""
         cs = ClienteSimulado()
-        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_nombre eq '{prep.CLIENTE}'"),
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
                      (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": prep.CLIENTE}]}, {}))
         cs.responder("GET", _contiene("sanic_mppp_tbl_clientes(C1)", "$select=sanic_nombre"),
                      (200, {"sanic_nombre": prep.CLIENTE}, {}))
@@ -139,6 +148,36 @@ class LimpiarSobreviveSinMarca(unittest.TestCase):
         self.assertIn(prep.CLIENTE, borrados)
         self.assertIn(REMITENTE, borrados)
 
+    def test_cliente_viejo_del_fixture_compartido_encontrado_por_cif_sin_marca_sobrevive_con_sus_planes(self):
+        """El caso que dispara esta ronda de trabajo: el Cliente REAL del
+        fixture compartido, vivo en Dev desde el 2026-09-23 con el mismo CIF
+        BAC pero el nombre de ANTES de la migración de marca (`"PR - Pruebas
+        MPPP SA"`, sin `ZZP-`), con sus 5 Planes ya colgando de él. `limpiar()`
+        lo ENCUENTRA (por CIF, no por nombre) pero, justo porque no lleva la
+        marca, ni él ni ninguno de sus Planes se tocan. Es el efecto
+        secundario deseado de buscar por clave de negocio, no un bug: ese
+        fixture compartido no tiene que desaparecer por un `--limpiar`
+        casual (el accidente del 2026-09-27)."""
+        cs = ClienteSimulado()
+        nombre_viejo = "PR - Pruebas MPPP SA"
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
+                     (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": nombre_viejo}]}, {}))
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes(C1)", "$select=sanic_nombre"),
+                     (200, {"sanic_nombre": nombre_viejo}, {}))
+        for p in prep.PLANES:
+            cs.responder("GET", _contiene("sanic_mppp_tbl_plans?", f"sanic_codigo eq '{p['codigo']}'"),
+                         (200, {"value": [{"sanic_mppp_tbl_planid": f"P-{p['codigo']}",
+                                           "_sanic_clienteid_value": "C1"}]}, {}))
+
+        borrados, ignorados = prep.limpiar(cs, remitente=None)
+
+        self.assertFalse(cs.hubo_escritura(), "no se esperaba ningún POST/PATCH/DELETE")
+        self.assertEqual(borrados, [])
+        self.assertEqual(len(ignorados), len(prep.PLANES) + 1)  # los 5 planes + el cliente
+        self.assertTrue(
+            any("PR11" in m and "no lleva la marca" in m and "no se toca" in m for m in ignorados), ignorados)
+        self.assertTrue(any(prep.CLIENTE in m and "no lleva el prefijo" in m for m in ignorados), ignorados)
+
 
 class LimpiarBorraElFixturePropio(unittest.TestCase):
     def test_borra_cliente_plan_autorizacion_y_autorizado_cuando_todo_esta_marcado_y_enlazado(self):
@@ -146,7 +185,7 @@ class LimpiarBorraElFixturePropio(unittest.TestCase):
         correo exacto y AutorizacionPlan con los dos lookups exactos — todo
         lo del fixture se borra, y nada más."""
         cs = ClienteSimulado()
-        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_nombre eq '{prep.CLIENTE}'"),
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
                      (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": prep.CLIENTE}]}, {}))
         cs.responder("GET", _contiene("sanic_mppp_tbl_clientes(C1)", "$select=sanic_nombre"),
                      (200, {"sanic_nombre": prep.CLIENTE}, {}))
@@ -185,6 +224,68 @@ class LimpiarBorraElFixturePropio(unittest.TestCase):
             "sanic_mppp_tbl_plans(P1)",
             "sanic_mppp_tbl_clientes(C1)",
         ]))
+
+
+class PreparaYVerificaLocalizanClientePorClaveDeNegocio(unittest.TestCase):
+    """2026-09-28: `preparar()` y `verificar()` localizan el Cliente por
+    `sanic_cifbac` (su clave de negocio, con clave alternativa `KEY - MPPP -
+    Cliente - CIF BAC`), no por `sanic_nombre` (decorativo). Ninguna de las
+    dos rutas configura acá una regla para un `GET` filtrado por
+    `sanic_nombre eq` sobre `sanic_mppp_tbl_clientes`: si el código
+    reintrodujera la búsqueda por nombre, `ClienteSimulado` lo haría
+    explotar con `AssertionError`, a propósito."""
+
+    def test_verificar_encuentra_el_cliente_por_cif_aunque_el_nombre_no_coincida(self):
+        cs = ClienteSimulado()
+        nombre_viejo = "PR - Pruebas MPPP SA"  # el Cliente real del 2026-09-23, sin la marca ZZP-
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
+                     (200, {"value": [{"sanic_nombre": nombre_viejo}]}, {}))
+        for p in prep.PLANES:
+            estado = {"sanic_codigo": p["codigo"], "statecode": 0 if p["activo"] else 1,
+                      "sanic_tipoformato": prep.FORMATO[p["formato"]], "sanic_moneda": prep.MONEDA[p["moneda"]]}
+            cs.responder("GET", _contiene("sanic_mppp_tbl_plans?", f"sanic_codigo eq '{p['codigo']}'"),
+                         (200, {"value": [estado]}, {}))
+        cs.responder("GET", _contiene("sanic_mppp_tbl_autorizados?", f"sanic_nombre eq '{REMITENTE}'"),
+                     (200, {"value": [{"sanic_nombre": REMITENTE}]}, {}))
+        for p in prep.PLANES:
+            nombre_ap = f"{REMITENTE} → {p['codigo']}"
+            resultado = ((200, {"value": [{"sanic_nombre": nombre_ap}]}, {}) if p["autorizado"]
+                         else _sin_resultados)
+            cs.responder("GET", _contiene("sanic_mppp_tbl_autorizacionplans?", f"sanic_nombre eq '{nombre_ap}'"),
+                         resultado)
+
+        bien, faltan = prep.verificar(cs, remitente=REMITENTE)
+
+        self.assertEqual(faltan, [])
+        self.assertIn(f"cliente {prep.CLIENTE}", bien)
+        self.assertFalse(cs.hubo_escritura(), "--verificar es de solo lectura")
+
+    def test_preparar_no_recrea_el_cliente_encontrado_por_cif_aunque_el_nombre_no_coincida(self):
+        cs = ClienteSimulado()
+        nombre_viejo = "PR - Pruebas MPPP SA"
+        cs.responder("GET", _contiene("sanic_mppp_tbl_clientes?", f"sanic_cifbac eq '{prep.CIF_BAC}'"),
+                     (200, {"value": [{"sanic_mppp_tbl_clienteid": "C1", "sanic_nombre": nombre_viejo}]}, {}))
+        for p in prep.PLANES:
+            cs.responder("GET", _contiene("sanic_mppp_tbl_plans?", f"sanic_codigo eq '{p['codigo']}'"),
+                         (200, {"value": [{"sanic_mppp_tbl_planid": f"P-{p['codigo']}",
+                                           "sanic_codigo": p["codigo"],
+                                           "statecode": 0 if p["activo"] else 1}]}, {}))
+        cs.responder("GET", _contiene("sanic_mppp_tbl_autorizados?", f"sanic_nombre eq '{REMITENTE}'"),
+                     (200, {"value": [{"sanic_mppp_tbl_autorizadoid": "A1", "sanic_nombre": REMITENTE}]}, {}))
+        for p in prep.PLANES:
+            if not p["autorizado"]:
+                continue
+            nombre_ap = f"{REMITENTE} → {p['codigo']}"
+            cs.responder("GET", _contiene("sanic_mppp_tbl_autorizacionplans?", f"sanic_nombre eq '{nombre_ap}'"),
+                         (200, {"value": [{"sanic_mppp_tbl_autorizacionplanid": f"AP-{p['codigo']}"}]}, {}))
+        plan_inactivo = next(p for p in prep.PLANES if not p["activo"])
+        cs.responder("PATCH", f"sanic_mppp_tbl_plans(P-{plan_inactivo['codigo']})", (204, {}, {}))
+
+        hechos = prep.preparar(cs, REMITENTE)
+
+        self.assertFalse(any(l["metodo"] == "POST" for l in cs.llamadas),
+                         "todo ya existía (el Cliente, encontrado por CIF): no se esperaba ningún POST")
+        self.assertEqual(hechos, [f"plan {plan_inactivo['codigo']} DESACTIVADO a propósito"])
 
 
 class SemaforoBloqueaLimpiarYCreacion(unittest.TestCase):
