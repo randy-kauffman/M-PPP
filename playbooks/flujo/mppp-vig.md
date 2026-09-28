@@ -13,6 +13,44 @@ Los umbrales salen de la tabla de Parametros, leidos al empezar cada ejecucion, 
 respaldo por si el parametro no esta: 15 minutos sin validar, 30 sin responder, 3 reintentos,
 30 dias de vencimiento.
 
+## D-62 — blindaje de la etapa de arranque (corregido 2026-09-28)
+
+La etapa de arranque (`Parametro_sin_validar -> Parametro_sin_responder -> Parametro_reintentos
+-> Parametro_vencimiento -> Umbrales -> Correos_que_quedaron_en_la_bandeja`) quedo encadenada
+**tambien con `runAfter: [Succeeded, Failed]`**, igual que los cinco bloques entre si. Antes solo
+tenia `[Succeeded]`: si CUALQUIERA de esos pasos fallaba, los cinco bloques de recuperacion
+quedaban `Skipped` esa corrida entera, no solo el paso que fallo (detectado por el set V, caso
+V-01, `pruebas/07-vigilancia.md`).
+
+**Alcance decidido: los cinco eslabones, sin excepcion, y sin distinguir ninguno para "cortar".**
+Motivo: los cuatro `Parametro_*` ya tienen, DESDE ANTES de este arreglo, un valor de respaldo
+para cuando la lectura no esta (ver arriba: 15/30/3/30 dias-minutos), resuelto con
+`coalesce(first(outputs('Parametro_*')?['body/value'])?['sanic_valor'], '<respaldo>')` dentro de
+`Umbrales`. Eso significa que un `Parametro_*` que falla NO deja al flujo con un umbral vacio: lo
+deja con el umbral de respaldo ya documentado y ya probado. No hacia falta agregar un valor por
+defecto nuevo -- ya existia, y es justo lo que hace seguro blindar con `Failed` en los cuatro
+lugares. Si `Umbrales` mismo llega a fallar (el unico caso no cubierto por el `coalesce`, porque
+implicaria que `sanic_valor` trae algo no numerico: un problema de datos, no de disponibilidad),
+dejar que `Correos_que_quedaron_en_la_bandeja` igual lo intente es preferible a saltearlo entero:
+el bloque falla rapido y de forma RUIDOSA (queda `Failed`, visible en el historial de
+ejecuciones) en vez de `Skipped` en silencio -- y de paso no le impide a `Leer_la_bandeja`
+(la lectura de Outlook, que no depende de `Umbrales`) intentar de todos modos. No se encontro
+ningun eslabon de la etapa de arranque cuyo fallo justifique CORTAR la cadena.
+
+Se blindo con `[Succeeded, Failed]`, igual que la cadena entre los cinco bloques -- no se agrego
+`TimedOut` ni `Skipped` para no romper la convencion ya establecida en el resto del archivo (y
+porque ninguna de las llamadas de esta etapa tiene un `timeout` configurado que pueda producir
+`TimedOut` distinto de `Failed`).
+
+**Concurrency Control en el trigger, tambien aplicado.** El trigger `Cada_10_minutos` quedo con
+`runtimeConfiguration.concurrency.runs = 1`: evita que dos corridas de `MPPP-VIG` se superpongan
+(el `recurrence` de 10 minutos no lo impedia por si solo). Evidencia que lo justifico: decenas de
+eventos Bitacora `Error` ("Fallo la ingesta del correo", origen MPPP-VIG) agrupados en ventanas de
+2-3 minutos -- mas seguido de lo que una sola corrida secuencial cada 10 minutos explica. Ver
+`pruebas/07-vigilancia.md` para la evidencia completa y el hallazgo de la causa de fondo del
+error "Fallo la ingesta del correo" -- NO corregida desde este playbook: es de otro componente,
+pendiente de que el coordinador le asigne su propio ID en `diseno/PENDIENTES.md`.
+
 ## Divergencias declaradas respecto del diseno
 
 - El bloque 5 (vencer los que nadie clasifico) corre en **todas** las ejecuciones, no "solo en la

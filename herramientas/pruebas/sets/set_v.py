@@ -19,11 +19,15 @@ en `pruebas/07-vigilancia.md`, sección "La pregunta que dejó abierta M-06". En
 - El encadenamiento **entre los 5 bloques** SÍ blinda con `runAfter: [Succeeded, Failed]` (tanto en
   el repo como en el flujo desplegado — **V-01** lo compara). La cascada que M-06 sospechaba
   ("el flujo se corta antes de llegar a ese bloque") no pasa ahí.
-- Lo que SÍ está roto, confirmado por **V-01** (a propósito en rojo, CONVENCIONES §3): la etapa de
-  arranque común de los 5 bloques (los 4 `Parametro_*` + `Umbrales` + el bloque 1) está encadenada
-  solo con `["Succeeded"]`. Si esa etapa falla en una corrida puntual, los CINCO bloques se saltean
-  esa vez — no solo el bloque 4. Esto explica por qué M-06 pudo no ver actuar a `MPPP-VIG` en una
-  ventana de ~22 minutos sin que el bloque 4 esté roto en sí mismo.
+- Lo que estaba roto, confirmado por **V-01** (a propósito en rojo, CONVENCIONES §3), era la etapa
+  de arranque común de los 5 bloques (los 4 `Parametro_*` + `Umbrales` + el bloque 1): estaba
+  encadenada solo con `["Succeeded"]`. Si esa etapa fallaba en una corrida puntual, los CINCO
+  bloques se salteaban esa vez — no solo el bloque 4. Esto explicaba por qué M-06 pudo no ver actuar
+  a `MPPP-VIG` en una ventana de ~22 minutos sin que el bloque 4 estuviera roto en sí mismo.
+  **Corregido el 2026-09-28 (D-62)**: se agregó `"Failed"` a los cinco `runAfter` de esa etapa
+  (razonamiento del alcance en `playbooks/flujo/mppp-vig.md`) y `runtimeConfiguration.concurrency.
+  runs=1` al trigger (evidencia de corridas superpuestas en `pruebas/07-vigilancia.md`). **V-01 pasó
+  de FALLAR a propósito a verificar que ese blindaje sigue puesto** — ver su docstring más abajo.
 - Aparte: ningún bloque de `MPPP-VIG` escribe un evento de Bitácora "Requiere revision" (159460016)
   al marcar una Solicitud — eso lo hace `MPPP-ENV`, en otro escenario. M-06 asumía esa entrada; este
   set no repite esa asunción (ver V-04 y V-07).
@@ -241,10 +245,18 @@ def v01(ctx):
 
     c.check("el flujo está Activado (statecode=1)", vivo["statecode"] == 1, f"statecode={vivo['statecode']}")
 
-    rec = (vivo["definicion"].get("triggers", {}).get("Cada_10_minutos", {}) or {}).get("recurrence", {})
+    trigger = vivo["definicion"].get("triggers", {}).get("Cada_10_minutos", {}) or {}
+    rec = trigger.get("recurrence", {})
     c.check(f"la recurrencia real es cada {RECURRENCE_MINUTOS} minutos (leído en vivo: "
             f"frequency={rec.get('frequency')!r} interval={rec.get('interval')!r})",
             rec.get("frequency") == "Minute" and rec.get("interval") == RECURRENCE_MINUTOS, str(rec))
+
+    # D-62 parte (b), corregido el 2026-09-28: Concurrency Control en 1 para que dos corridas de
+    # MPPP-VIG no se superpongan reintentando el mismo backlog en simultáneo (evidencia de corridas
+    # superpuestas en pruebas/07-vigilancia.md, sección "Investigación de la causa de fondo").
+    runs = ((trigger.get("runtimeConfiguration") or {}).get("concurrency") or {}).get("runs")
+    c.check(f"el trigger tiene Concurrency Control en 1 (D-62b; leído en vivo: runs={runs!r})",
+            runs == 1, f"runtimeConfiguration={trigger.get('runtimeConfiguration')}")
 
     acts = vivo["definicion"].get("actions", {})
     BLOQUES = ["Correos_que_quedaron_en_la_bandeja", "Solicitudes_sin_validar",
@@ -263,9 +275,12 @@ def v01(ctx):
         c.check(f"{siguiente!r} corre después de {previo!r} tanto si tuvo éxito como si falló",
                 {"Succeeded", "Failed"} <= cond, f"runAfter[{previo!r}]={sorted(cond)}")
 
-    # HALLAZGO de este set (pregunta abierta de M-06, ver el .md): la etapa de arranque común de
-    # los 5 bloques NO tiene la misma blindadura. Se declara la FALLA a propósito: es un defecto
-    # real y confirmado, no un capricho de este caso (CONVENCIONES §3).
+    # D-62, corregido el 2026-09-28: la etapa de arranque común de los 5 bloques tiene el mismo
+    # blindaje que ya tenían los 5 bloques entre sí (hallazgo original de este set investigando por
+    # qué M-06 no vio actuar a MPPP-VIG en ~22 min de espera real — razonamiento del alcance del
+    # arreglo en playbooks/flujo/mppp-vig.md). Este check ahora verifica que el blindaje SIGUE
+    # puesto; si alguien lo revierte (a mano en el portal, o reimportando una versión vieja), este
+    # caso vuelve a FALLAR exactamente acá, sin esperar nada.
     CADENA_ARRANQUE = [("Parametro_sin_validar", "Parametro_sin_responder"),
                         ("Parametro_sin_responder", "Parametro_reintentos"),
                         ("Parametro_reintentos", "Parametro_vencimiento"),
@@ -274,11 +289,9 @@ def v01(ctx):
     for previo, siguiente in CADENA_ARRANQUE:
         cond = set((acts.get(siguiente, {}).get("runAfter") or {}).get(previo, []))
         c.check(
-            f"{siguiente!r} debería blindarse con Failed (además de Succeeded) al depender de "
-            f"{previo!r} — CONFIRMADO que hoy no lo hace: si {previo!r} falla en una corrida, los "
-            "CINCO bloques de recuperación se saltean enteros esa vez, no solo el que falló "
-            "(hallazgo de este set investigando por qué M-06 no vio actuar a MPPP-VIG en ~22 min de "
-            "espera real; pendiente de que se le asigne un ID en diseno/PENDIENTES.md)",
+            f"{siguiente!r} corre después de {previo!r} tanto si tuvo éxito como si falló (D-62: si "
+            f"{previo!r} falla en una corrida y esto no está blindado, los CINCO bloques de "
+            "recuperación se saltean enteros esa vez, no solo el que falló)",
             {"Succeeded", "Failed"} <= cond, f"runAfter[{previo!r}]={sorted(cond)}")
 
     # Lo desplegado == el repo: no confiar en que el archivo versionado sea lo que corre de verdad.

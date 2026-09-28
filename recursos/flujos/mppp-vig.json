@@ -2,7 +2,10 @@
   "triggers": {
     "Cada_10_minutos": {
       "type": "Recurrence",
-      "recurrence": { "frequency": "Minute", "interval": 10 }
+      "recurrence": { "frequency": "Minute", "interval": 10 },
+      "runtimeConfiguration": {
+        "concurrency": { "runs": 1 }
+      }
     }
   },
   "actions": {
@@ -27,7 +30,7 @@
     },
 
     "Parametro_sin_responder": {
-      "runAfter": { "Parametro_sin_validar": ["Succeeded"] },
+      "runAfter": { "Parametro_sin_validar": ["Succeeded", "Failed"] },
       "type": "OpenApiConnection",
       "inputs": {
         "host": {
@@ -47,7 +50,7 @@
     },
 
     "Parametro_reintentos": {
-      "runAfter": { "Parametro_sin_responder": ["Succeeded"] },
+      "runAfter": { "Parametro_sin_responder": ["Succeeded", "Failed"] },
       "type": "OpenApiConnection",
       "inputs": {
         "host": {
@@ -67,7 +70,7 @@
     },
 
     "Parametro_vencimiento": {
-      "runAfter": { "Parametro_reintentos": ["Succeeded"] },
+      "runAfter": { "Parametro_reintentos": ["Succeeded", "Failed"] },
       "type": "OpenApiConnection",
       "inputs": {
         "host": {
@@ -87,7 +90,7 @@
     },
 
     "Umbrales": {
-      "runAfter": { "Parametro_vencimiento": ["Succeeded"] },
+      "runAfter": { "Parametro_vencimiento": ["Succeeded", "Failed"] },
       "type": "Compose",
       "inputs": {
         "minutos_sin_validar": "@int(coalesce(first(outputs('Parametro_sin_validar')?['body/value'])?['sanic_valor'], '15'))",
@@ -98,7 +101,7 @@
     },
 
     "Correos_que_quedaron_en_la_bandeja": {
-      "runAfter": { "Umbrales": ["Succeeded"] },
+      "runAfter": { "Umbrales": ["Succeeded", "Failed"] },
       "type": "Scope",
       "actions": {
         "Leer_la_bandeja": {

@@ -36,6 +36,23 @@ de colchón = 32 minutos por caso.** No es un número arbitrario:
   es evidencia de que el defecto de arranque (o algo peor) es más frecuente de lo esperado, y hay que
   mirar `diseno/PENDIENTES.md`, no este número.
 
+## D-62 corregido (2026-09-28) — la etapa de arranque ya blinda con Failed
+
+**El defecto que describe esta sección ya se corrigió.** `recursos/flujos/mppp-vig.json` y
+`playbooks/flujo/mppp-vig.md` (razonamiento completo del alcance ahí) quedaron con `"Failed"`
+agregado al `runAfter` de los cinco eslabones de la etapa de arranque, desplegado contra el
+entorno con `herramientas/construir/flujo.py playbooks/flujo/mppp-vig.md --completar` y
+verificado leyendo `workflows?$select=clientdata` (no el repo) el 2026-09-28: `statecode=1`
+(activo), `recurrence` intacto (10 minutos), los cinco eslabones de arranque Y los cuatro entre
+bloques con `["Succeeded","Failed"]`, y repo == desplegado en `runAfter`/`type` de cada acción de
+nivel superior. De paso se agregó `runtimeConfiguration.concurrency.runs = 1` al trigger
+(parte (b) de D-62, ver la sección de concurrencia más abajo), también verificado desplegado.
+
+El texto que sigue (el hallazgo original, el razonamiento de M-06, las tablas de V-01) se conserva
+tal cual se escribió durante la investigación — es la evidencia de POR QUÉ el arreglo es el que
+es. **V-01 pasó de estar en rojo a propósito a verificar que el blindaje sigue puesto**; ver su
+sección más abajo para la tabla actualizada y el síntoma que delataría un revert.
+
 ## La pregunta que dejó abierta M-06 (set M, `04-comunicaciones.md`)
 
 M-06 preparó una Solicitud con `sanic_fechaacuseiniciado` de hace 40 minutos y
@@ -85,13 +102,65 @@ a ese bloque por los errores del bloque anterior.
    probaba algo que `MPPP-VIG` nunca prometió — es una expectativa mal fundada del propio caso M-06,
    no un defecto de `MPPP-VIG`. **V-07** no repite ese error.
 
-**Para quien registre esto en `diseno/PENDIENTES.md`:** el defecto verificable y accionable es el del
-punto 3 — agregar `"Failed"` (y evaluar `"TimedOut"`/`"Skipped"` también, para blindar del todo) al
-`runAfter` de `Parametro_sin_responder`, `Parametro_reintentos`, `Parametro_vencimiento`, `Umbrales` y
-`Correos_que_quedaron_en_la_bandeja`; investigar por qué `"Fallo la ingesta del correo"` es tan
-frecuente (backlog no drenado, reintentos agotados); y considerar `Concurrency Control` en el trigger
-recurrente para evitar corridas superpuestas. No se toca el flujo desde este set — es de quien lo
+**Para quien registre esto en `diseno/PENDIENTES.md`:** el defecto verificable y accionable del punto 3
+(el `runAfter` sin `Failed`) **ya se corrigió el 2026-09-28** — ver la sección "D-62 corregido" arriba.
+La `Concurrency Control` en el trigger recurrente **también se aplicó** (`runs: 1`), para evitar
+corridas superpuestas. Lo que sigue abierto, sin tocar, es la causa de fondo: por qué
+`"Fallo la ingesta del correo"` es tan frecuente. No se toca el flujo desde este set — es de quien lo
 diseñó.
+
+## Investigación de la causa de fondo de "Fallo la ingesta del correo" (2026-09-28, SIN corregir)
+
+Parte (c) de D-62: investigar, no arreglar. Evidencia recolectada el 2026-09-28 contra el entorno,
+por consulta directa a la Bitácora (`sanic_mppp_tbl_bitacoras`), sin esperar ningún schedule:
+
+- **898 eventos `Error` (159460017) con origen MPPP-VIG (159460005)** en las 2 horas previas a
+  ~06:26 UTC del 2026-09-28 (`$filter=sanic_evento eq 159460017 and sanic_origen eq 159460005 and
+  sanic_fechaevento ge <hace 2h>&$count=true`). Es MUCHO más que "decenas": es un incidente activo,
+  no un ruido de fondo ocasional.
+- **Ritmo continuo, no en ráfagas de 10 minutos.** Entre 06:15:06 y 06:26:42 UTC se registraron 76
+  eventos, a un ritmo de ~1 cada 8-9 segundos, DISTRIBUIDOS a lo largo de toda la ventana — no
+  agrupados en una sola ráfaga de hasta 25 (el tope de `Leer_la_bandeja`) cada 10 minutos. Una sola
+  corrida secuencial de `MPPP-VIG` (con `concurrency.repetitions: 1` en su `Foreach` interno) no
+  puede producir más de 25 fallos cada 10 minutos (~2,5/min) si procesa un solo lote; el ritmo medido
+  (~7/min) triplica ese máximo teórico. Esto es consistente con **corridas superpuestas de
+  `MPPP-VIG`** (el hallazgo de la parte (b) de este mismo D-62, sin Concurrency Control hasta este
+  arreglo) reintentando el mismo backlog en simultáneo, no con una sola corrida bien comportada.
+- **0% de éxito en la misma ventana.** En las mismas 2 horas, **cero** eventos `Ingresada` (159460001)
+  con origen MPPP-VIG (`Bitacora_ingresada` de `mppp-ing.json`, que se escribe SOLO si la ingesta
+  llega al final). Ningún intento de reingesta vía VIG terminó bien en esa ventana.
+- **No es un problema general de Outlook/Graph.** En la misma ventana, **cero** eventos `Error` con
+  origen MPPP-REC (159460001): la ingesta normal (correo nuevo, disparada por `MPPP-REC`) no muestra
+  el mismo síntoma — de hecho no hubo ninguna Solicitud nueva creada por ningún origen en esa ventana
+  (entorno de prueba, sin tráfico real). El problema es específico de la RE-ingesta que dispara VIG
+  sobre correos que ya estaban en la bandeja, no de leer un correo nuevo.
+- **La Bitácora no alcanza para saber QUÉ acción de `MPPP-ING` falla.** El propio texto que graba
+  `Si_algo_fallo/Bitacora_error` en `recursos/flujos/mppp-vig.json` lo dice: *"El detalle de que accion
+  fallo esta en el historial de ejecuciones del flujo, no aca"*. Ese historial de ejecuciones vive en
+  la API de administración de Power Automate (`service.flow.microsoft.com`), no en el Web API de
+  Dataverse — `herramientas/dataverse_api.py` solo tiene un token para el recurso de Dataverse, no
+  para ese scope, y este set no tiene credenciales para leerlo. Tampoco hay acceso directo al buzón de
+  ingesta (API de Outlook/Graph) desde acá. **Por eso lo que sigue es una hipótesis con evidencia
+  circunstancial, no un diagnóstico confirmado — no se afirma como hecho.**
+
+**Hipótesis más consistente con la evidencia (a confirmar por quien tenga acceso al historial de
+ejecuciones o al buzón):** IDs de mensaje de Outlook que dejan de ser válidos entre que
+`Correos_que_quedaron_en_la_bandeja` los lee (`GetEmailsV3`) y que `Reingerir`/`MPPP-ING` los vuelve a
+leer (`GetEmailV2` por `messageId`). Si el tenant no tiene habilitado "Immutable Id" para el conector
+de Outlook/Graph, mover un mensaje de carpeta (`MoveV2`, el último paso de `MPPP-ING` antes de
+clasificar) **cambia su ID** salvo que se pida explícitamente el ID inmutable. Con corridas
+superpuestas de VIG (parte (b), antes de este arreglo) leyendo la MISMA bandeja casi al mismo tiempo,
+es plausible que una corrida ya haya movido un correo (cambiándole el ID) cuando otra corrida, que lo
+leyó un instante antes con el ID viejo, intenta `Leer_el_correo` con ese ID y reciba 404 — lo que
+haría fallar `Ingerir` completo y dispararía exactamente este evento. **Esto explicaría por qué el
+ritmo bajó por primera vez a analizarse recién después de aplicar el Concurrency Control** (parte
+(b): si las corridas dejan de superponerse, dejan de pisarse los IDs), pero **no explica un backlog
+que nunca se drena si además hay mensajes genuinamente rotos** (adjunto corrupto, remitente con
+formato inválido, etc.) — ambas causas pueden convivir. **Reportado, no corregido**: no es un defecto
+de `mppp-vig.json` (que ya hace lo que puede: reintenta y, con el arreglo de D-62, ya no se apaga
+entero cuando algo falla), sino de `mppp-ing.json` y/o de la configuración del conector de Outlook, o
+de mensajes concretos en la bandeja — **merece su propio ID en `diseno/PENDIENTES.md`**, a criterio
+de quien lo diseñó.
 
 ## Qué bloque prueba cada caso (nombrado, no contado)
 
@@ -135,9 +204,10 @@ corre nadie de rutina** (mismo criterio que el set E con E-08). Por eso:
 ## V-01 · El flujo está vivo y bien armado (sin esperar el schedule)
 
 **Qué prueba.** Que `MPPP-VIG` esté activo, que su recurrence real sea la que se documenta acá, que
-los 5 bloques existan y estén encadenados de forma que uno que falle no tumbe a los que siguen, y
-deja registrado (a propósito, en rojo) el defecto de la etapa de arranque que explica la pregunta
-abierta de M-06.
+los 5 bloques existan y estén encadenados de forma que uno que falle no tumbe a los que siguen, que
+la etapa de arranque tenga el mismo blindaje (D-62, corregido el 2026-09-28 — este caso pasó de dar
+FALLA a propósito a verificar que el blindaje sigue puesto), y que el trigger tenga Concurrency
+Control en 1 (parte (b) de D-62).
 
 **Necesita.** Nada de negocio: solo lectura de la definición del flujo (`workflows.clientdata`, Web
 API) y de `recursos/flujos/mppp-vig.json` (solo lectura, nunca se edita desde este set).
@@ -157,18 +227,24 @@ lo documentado acá.
 | `Comunicaciones_sin_enviar` depende de `Solicitudes_sin_validar` | con `Succeeded` y `Failed` |
 | `Envios_iniciados_sin_confirmar` depende de `Comunicaciones_sin_enviar` | con `Succeeded` y `Failed` |
 | `Por_clasificar_vencidos` depende de `Envios_iniciados_sin_confirmar` | con `Succeeded` y `Failed` |
+| `Parametro_sin_responder` depende de `Parametro_sin_validar` | con `Succeeded` y `Failed` (D-62) |
+| `Parametro_reintentos` depende de `Parametro_sin_responder` | ídem (D-62) |
+| `Parametro_vencimiento` depende de `Parametro_reintentos` | ídem (D-62) |
+| `Umbrales` depende de `Parametro_vencimiento` | ídem (D-62) |
+| `Correos_que_quedaron_en_la_bandeja` depende de `Umbrales` | ídem (D-62) |
+| `triggers.Cada_10_minutos.runtimeConfiguration.concurrency.runs` | `1` (D-62, parte b) |
 | Lo desplegado == el repo | mismo `runAfter` y `type` en cada acción de nivel superior |
 | Los 4 parámetros (`vigilancia.minutos.sinvalidar`, `vigilancia.minutos.sinresponder`, `vigilancia.reintentos.maximo`, `clasificacion.dias.vencimiento`) | cada uno con una versión activa |
 
-**Y lo que HOY no cumple, a propósito, para que quede visible (CONVENCIONES §3):**
-
-| Qué | Valor esperado | Hoy |
-|---|---|---|
-| `Parametro_sin_responder` depende de `Parametro_sin_validar` | con `Succeeded` y `Failed` | solo `Succeeded` |
-| `Parametro_reintentos` depende de `Parametro_sin_responder` | ídem | solo `Succeeded` |
-| `Parametro_vencimiento` depende de `Parametro_reintentos` | ídem | solo `Succeeded` |
-| `Umbrales` depende de `Parametro_vencimiento` | ídem | solo `Succeeded` |
-| `Correos_que_quedaron_en_la_bandeja` depende de `Umbrales` | ídem | solo `Succeeded` |
+**D-62, corregido el 2026-09-28 (histórico: así estaba antes).** Hasta esa fecha, los cinco checks de
+la "etapa de arranque" de la tabla de arriba (`Parametro_sin_responder`...`Correos_que_quedaron_en_la_bandeja`)
+daban **FALLA a propósito** (CONVENCIONES §3, "un defecto conocido no es N-A"): la etapa de arranque
+común de los 5 bloques estaba encadenada solo con `["Succeeded"]`, así que un `Parametro_*` que
+fallaba saltaba los CINCO bloques de recuperación esa corrida. Se corrigió agregando `"Failed"` a esos
+cinco `runAfter` (igual que ya tenían los 5 bloques entre sí) y agregando Concurrency Control (`runs:
+1`) al trigger — razonamiento completo del alcance en `playbooks/flujo/mppp-vig.md`, sección
+"D-62 — blindaje de la etapa de arranque". Este caso ahora verifica que ese blindaje **sigue puesto**,
+no que esté roto.
 
 **Cómo se verifica.** `GET workflows?$select=name,statecode,clientdata&$filter=name eq 'Cloud Flow -
 MPPP - VIG - Vigilar pendientes'`, parseando `clientdata.properties.definition` (o `clientdata`
@@ -177,11 +253,20 @@ directo si no trae `properties`), comparado campo a campo contra
 
 **Cómo se sabe que falló.** Si `statecode != 1` o el recurrence no es `10` minutos, es un cambio de
 configuración real (alguien lo apagó o le cambió el schedule) — mirar quién lo tocó. Si falta un
-bloque o un `runAfter` entre los 5 bloques no trae `Failed`, es un cambio real en el diseño del flujo
-— no un capricho de esta prueba. Los 5 checks de la "etapa de arranque" están **FALLA a propósito**
-hasta que alguien corrija `recursos/flujos/mppp-vig.json` (que no es este set) y lo despliegue: no se
-apaga esta parte del caso para "verlo todo en verde" (CONVENCIONES §3, "un defecto conocido no es
-N-A").
+bloque o un `runAfter` (entre los 5 bloques O en la etapa de arranque) no trae `Failed`, es un cambio
+real en el diseño del flujo — no un capricho de esta prueba.
+
+**Síntoma de un revert de D-62 (si alguien lo pisa).** Si alguien vuelve a dejar la etapa de arranque
+con solo `["Succeeded"]` (a mano en el portal, o reimportando una versión vieja del JSON), este caso
+vuelve a FALLAR exactamente en los checks de `Parametro_sin_responder`...`Correos_que_quedaron_en_la_bandeja`,
+sin esperar nada — no hace falta que el defecto se manifieste en producción para detectarlo. Si
+además se saca el Concurrency Control, el check de `runtimeConfiguration.concurrency.runs` falla
+también. El síntoma EN PRODUCCIÓN de un revert (si V-01 no se corre) es el mismo que originó este
+hallazgo: los cinco bloques de recuperación dejan de actuar TODOS JUNTOS en corridas puntuales
+(no uno solo), coincidiendo con eventos `Error` de origen MPPP-VIG en la Bitácora en esa misma
+ventana — y, si además se pierde el Concurrency Control, vuelve a verse más de un evento `Error` en
+la misma franja de pocos segundos (ver la sección "Investigación de la causa de fondo" más arriba
+para el patrón real medido).
 
 **Automatizable.** `API` (Dataverse Web API contra `workflows`, sin esperar el schedule real — mejora
 sobre la versión anterior de este caso, que era 100% manual).
