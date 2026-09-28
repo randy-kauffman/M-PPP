@@ -125,12 +125,36 @@ def sembrar(dv, propietario, cantidad_filas):
     # El ownerid SIEMPRE se (re)asigna a quien pide la siembra, exista o no el
     # cliente: es lo que hace que "Mis clientes - por digitar" muestre datos
     # para ESTA sesión, y otra sesión (otro rol) puede sembrar después.
+    #
+    # EXCEPCIÓN, agregada el 2026-09-28 (confirmada en vivo corriendo este script
+    # a mano con `admin_tecnico`): hay roles de prueba (`admin_tecnico`,
+    # `SR - MPPP - Administrador tecnico`) que por DISEÑO no tienen NINGÚN
+    # privilegio sobre Cliente — están acotados a Parámetro/Reglas
+    # (`diseno/04-matriz-privilegios.md`) — y Dataverse rechaza con HTTP 403
+    # asignar un registro como dueño a un principal que ni siquiera puede LEER esa
+    # tabla ("is missing prvRead... Consider adding missed privilege to one of the
+    # principal roles"), sin importar que quien ejecuta el PATCH sea el service
+    # principal con System Administrator: es una validación sobre el DUEÑO nuevo,
+    # no sobre quien llama. Esto no es un error de la siembra: es exactamente lo
+    # que se espera de un rol que nunca usa "Mis clientes - por digitar" (esa
+    # vista es de Ejecutivo/Supervisor). Se detecta por HTTP 403 + "privilege" +
+    # el nombre de la tabla en el mensaje, se deja documentado en `hechos`, y se
+    # sigue sin reasignar — cualquier OTRO motivo de 403 (o cualquier otro HTTP)
+    # sigue reventando como antes, sin taparlo.
     if cli is None or cli.get("_ownerid_value") != propietario:
         est, r, _ = dv.call("PATCH", f"{CLIENTES}({idc})",
                             {"ownerid@odata.bind": f"/systemusers({propietario})"})
         if est not in (200, 204):
-            raise RuntimeError(f"No se pudo asignar el cliente a {propietario}: HTTP {est} {r}")
-        hechos.append(f"cliente asignado a {propietario}")
+            mensaje = str((r or {}).get("error") or r)
+            sin_privilegio_por_diseno = (
+                est == 403 and "privilege" in mensaje.lower() and "cliente" in mensaje.lower())
+            if not sin_privilegio_por_diseno:
+                raise RuntimeError(f"No se pudo asignar el cliente a {propietario}: HTTP {est} {r}")
+            hechos.append(
+                f"cliente NO reasignado a {propietario}: el rol no tiene privilegio sobre Cliente "
+                "(esperado para roles acotados como Administrador tecnico, no es un error)")
+        else:
+            hechos.append(f"cliente asignado a {propietario}")
 
     pl = uno(dv, PLANES, f"sanic_codigo eq '{PLAN_CODIGO}'", "sanic_mppp_tbl_planid")
     if pl is None:

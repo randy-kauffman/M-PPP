@@ -49,12 +49,19 @@ tienen el privilegio de la Custom API (ver E-09); confirmarla viva y con el rol 
 **Qué tiene que pasar.** El botón "Descargar para digitar" presente y habilitado con filas
 seleccionadas.
 
-**Cómo se verifica.** El resultado de esa corrida de Playwright.
+**Cómo se verifica.** El resultado de esa corrida de Playwright. **CONECTADO el 2026-09-28**
+(antes `N-A` con el comando exacto): `herramientas/pruebas/sets/set_e.py::e01()` invoca
+`dn-02-descargar-para-digitar` por subproceso (`--reporter=json`, verifica el total de pruebas
+ejecutadas contra lo esperado — mismo guardia contra falso verde que `dotnet test` en `set_r.py`) y
+reporta OK/FALLA real en el resumen de `correr.py E`, ya no `N-A`.
 
 **Cómo se sabe que falló.** Ver A-15 (`05-app-y-comandos.md`): distinguir AUSENTE (metadata de
-ribbon) de DESHABILITADO (regla de habilitación) — son diagnósticos opuestos.
+ribbon) de DESHABILITADO (regla de habilitación) — son diagnósticos opuestos. También falla si el
+archivo `dn-02-descargar-para-digitar` no matchea exactamente 1 prueba (filtro roto, 0 pruebas
+corridas con exit 0 — el mismo riesgo que un FQN mal escrito en `dotnet test`).
 
-**Automatizable.** GUI — ya construido en `pruebas/gui/casos/`, no se reescribe acá.
+**Automatizable.** GUI — ya construido en `pruebas/gui/casos/`, no se reescribe acá; conectado a
+`set_e.py` el 2026-09-28.
 
 ---
 

@@ -55,6 +55,24 @@
 
 export const IDIOMA_POR_DEFECTO = 3082; // Espanol (convencion del proyecto)
 
+// Mensajes del JS (A-13), copiados TAL CUAL de `recursos/js/comandos.js` (objeto
+// `TEXTOS`, líneas 98-127) — la plantilla del diálogo de confirmación que arma
+// `openConfirmDialog` antes de aplicar un comando. `{accion}` y `{n}` se sustituyen
+// en tiempo real (`armar()` en comandos.js); acá solo se arma la MISMA plantilla
+// para comparar contra el texto real del diálogo.
+export const TEXTOS_JS = {
+  1033: { confirmar: 'Apply "{accion}" to {n} selected row(s)?' },
+  3082: { confirmar: '¿Aplicar "{accion}" a {n} fila(s) seleccionada(s)?' },
+};
+
+export function armarTexto(plantilla, valores) {
+  let texto = plantilla;
+  for (const [clave, valor] of Object.entries(valores)) {
+    texto = texto.split(`{${clave}}`).join(valor);
+  }
+  return texto;
+}
+
 /**
  * Los 7 botones propios de la barra de Fila, secuencia 10 a 70
  * (playbooks/importacion/comandos.md).
@@ -243,3 +261,69 @@ export const COLUMNAS_EXPORTACION_ESPERADAS = [
 // Patron del nombre del archivo que arma `comandos.js` (nombreDeArchivoExportacion):
 // "MPPP-para-digitar-YYYYMMDD-HHMMSS.xlsx"
 export const PATRON_NOMBRE_ARCHIVO_EXPORTACION = /^MPPP-para-digitar-\d{8}-\d{6}\.xlsx$/;
+
+// ---------------------------------------------------------------------------------
+// A-02 (12.6) -- los 6 comandos GENERICOS que DA-06 oculta en TODAS las tablas, mas
+// "Nuevo" (oculto solo en las 4 tablas donde el alta no es de una persona). Son
+// comandos ESTANDAR de la plataforma (no un CustomAction del proyecto, a diferencia
+// de BOTONES_FILA de arriba): las etiquetas 1033/3082 son las que Microsoft publica
+// para Unified Interface.
+//
+// CONFIRMADO EN VIVO (2026-09-28, primera corrida real, tabla `AutorizacionCliente`
+// -- el único lugar donde DA-06 resultó NO estar aplicado, ver `05-app-y-comandos.md`
+// A-02): "Email a Link" es el nombre accesible TAL CUAL (sin prefijo). "Flow" en
+// cambio NO aparece solo: el nombre accesible real es "Run Flow ..." (corregido
+// abajo). `eliminar`/`asignar`/`compartir`/`combinar` NO se pudieron confirmar
+// contra el DOM real todavía porque en NINGUNA tabla de este entorno aparecieron
+// (DA-06 los tiene bien ocultos en todos lados) -- sin un lugar donde estén
+// presentes no hay como leer su nombre accesible real; quedan con la etiqueta
+// estándar de Microsoft Learn hasta que alguna corrida los encuentre.
+export const COMANDOS_GENERICOS = [
+  { id: "eliminar", etiqueta: { 1033: "Delete", 3082: "Eliminar" } },
+  { id: "asignar", etiqueta: { 1033: "Assign", 3082: "Asignar" } },
+  { id: "compartir", etiqueta: { 1033: "Share", 3082: "Compartir" } },
+  // "Run Flow"/"Ejecutar flujo" confirmado en vivo para 1033; 3082 sigue sin
+  // confirmar (esta sesión corrió en inglés) -- se sigue el mismo patrón
+  // "Ejecutar X" que usa la plataforma para el resto de comandos con acción.
+  { id: "flujo", etiqueta: { 1033: "Run Flow", 3082: "Ejecutar flujo" } },
+  { id: "enviarvinculo", etiqueta: { 1033: "Email a Link", 3082: "Enviar vínculo por correo electrónico" } },
+  { id: "combinar", etiqueta: { 1033: "Merge", 3082: "Combinar" } },
+];
+
+export const COMANDO_NUEVO = { id: "nuevo", etiqueta: { 1033: "New", 3082: "Nuevo" } };
+
+// Las tablas de A-02 (`pruebas/05-app-y-comandos.md`, tabla del caso): en las 4
+// primeras (donde el alta es de un proceso, no de una persona) "Nuevo" también tiene
+// que estar oculto; en las demás, de catálogo, "Nuevo" SÍ tiene que aparecer (una
+// persona da de alta ahí). `sitemap` referencia una clave de `SITEMAP` (config.mjs)
+// cuando la tabla tiene entrada propia; `subgrid: true` marca las 2 que solo se ven
+// dentro del formulario de Solicitud (ResultadoRegla, Bitácora —
+// diseno/05-app-model-driven.md, línea 208: "ResultadoRegla y Bitácora solo se ven
+// en subgrilla"). `roles` son los papeles de `local/sesion-<papel>.json` que pueden
+// ver la tabla (05-app-model-driven.md §2): HideCustomAction es una personalización
+// de TABLA, no de rol, así que un papel por tabla alcanza para probarlo — no hace
+// falta repetir el mismo chequeo con las 4 sesiones (ver el caso a02 de `set_a.py`).
+//
+// CORRECCIÓN 2026-09-28: la versión original de A-02 (`pruebas/05-app-y-comandos.md`)
+// contaba "10 tablas", cerrado antes de que `AutorizacionCliente` tuviera su propia
+// entrada de sitemap (agregada el 2026-09-27, `diseno/05-app-model-driven.md` §2).
+// Son 11 tablas hoy — CONVENCIONES.md §7 ("nombrar, no contar"): se nombran las 11,
+// no se repite el número viejo.
+// `area` es la ÁREA del sitemap (`diseno/05-app-model-driven.md` §2: Trabajo,
+// Consulta, Catálogos, Configuración NO son un árbol plano, son áreas separadas
+// con su propio selector "Change area" — confirmado en vivo 2026-09-28, ver
+// `ayudantes/navegacion.mjs::cambiarArea`). `undefined` en Trabajo porque es el
+// área por defecto de toda sesión, no hace falta cambiar.
+export const TABLAS_A02 = [
+  { tabla: "Solicitud", sitemap: "solicitudes", area: "Consulta", ocultarNuevo: true, roles: ["ejecutivo", "supervisor"] },
+  { tabla: "Fila", sitemap: "filas", area: "Consulta", ocultarNuevo: true, roles: ["ejecutivo", "supervisor"] },
+  { tabla: "ResultadoRegla", subgrid: true, ocultarNuevo: true, roles: ["ejecutivo", "supervisor"] },
+  { tabla: "Bitácora", subgrid: true, ocultarNuevo: true, roles: ["ejecutivo", "supervisor"] },
+  { tabla: "Cliente", sitemap: "clientes", area: "Catalogos", ocultarNuevo: false, roles: ["ejecutivo", "supervisor", "admin_planes"] },
+  { tabla: "Plan", sitemap: "planes", area: "Catalogos", ocultarNuevo: false, roles: ["ejecutivo", "supervisor", "admin_planes"] },
+  { tabla: "Autorizado", sitemap: "autorizados", area: "Catalogos", ocultarNuevo: false, roles: ["ejecutivo", "supervisor", "admin_planes"] },
+  { tabla: "AutorizacionPlan", sitemap: "autorizacionesPlanes", area: "Catalogos", ocultarNuevo: false, roles: ["ejecutivo", "supervisor", "admin_planes"] },
+  { tabla: "AutorizacionCliente", sitemap: "autorizacionesClientes", area: "Catalogos", ocultarNuevo: false, roles: ["ejecutivo", "supervisor", "admin_planes"] },
+  { tabla: "Parámetro", sitemap: "parametros", area: "Configuracion", ocultarNuevo: false, roles: ["admin_tecnico"] },
+  { tabla: "Regla", sitemap: "reglas", area: "Configuracion", ocultarNuevo: false, roles: ["admin_tecnico"] },
+];

@@ -20,29 +20,91 @@ async function esperarSitemap(page) {
   await page.getByRole("navigation").first().waitFor({ state: "visible", timeout: 30_000 });
 }
 
+// CONFIRMADO EN VIVO (2026-09-28, exploración puntual con `ariaSnapshot()`): el
+// NOMBRE ACCESIBLE que arma la plataforma para entradas de sitemap y áreas pierde
+// los acentos ("Configuración" -> "Configuracion", "Para atención manual" -> "Para
+// atencion manual", el área "Catálogos" -> "Catalogos"), aunque el texto VISIBLE sí
+// los tenga. `selectores.mjs`/`config.mjs` guardan las etiquetas con su acento
+// correcto (para que un humano las lea bien en el código y en los reportes); acá se
+// le sacan los acentos ANTES de buscar por rol/nombre accesible, para no fallar por
+// una diferencia que no tiene nada que ver con si la entrada existe o no.
+function quitarAcentos(texto) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+function escaparRegex(texto) {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function patronSinAcentos(etiqueta) {
+  return new RegExp(escaparRegex(quitarAcentos(etiqueta)), "i");
+}
+
+/**
+ * Cambia de ÁREA del sitemap (Trabajo/Consulta/Catálogos/Configuración —
+ * `diseno/05-app-model-driven.md` §2: NO son un solo árbol plano, son áreas
+ * separadas con su propio selector "Change area"/"Cambiar de área"). CONFIRMADO
+ * EN VIVO (2026-09-28): el disparador es `button` con nombre que contiene "change
+ * area", y abre un `menu` con un `menuitemradio` por área. Si ya se está en esa
+ * área (`[checked]`), no hace nada.
+ */
+export async function cambiarArea(page, nombreArea) {
+  const disparador = page.getByRole("button", { name: /change area|cambiar de.rea/i }).first();
+  await disparador.waitFor({ state: "visible", timeout: 15_000 });
+  const yaActiva = await page
+    .getByRole("menuitemradio", { name: patronSinAcentos(nombreArea), checked: true })
+    .count();
+  if (yaActiva > 0) return; // ya estábamos en esa área, el menú ni se abrió
+  await disparador.click();
+  const opcion = page.getByRole("menuitemradio", { name: patronSinAcentos(nombreArea) }).first();
+  await opcion.waitFor({ state: "visible", timeout: 10_000 });
+  await opcion.click();
+}
+
 /**
  * Navega a una entrada del sitemap por su etiqueta visible (ver
- * `config.mjs` -> `SITEMAP`). Intenta primero por rol semantico
- * (recomendado por Microsoft) y cae a `[title="..."]` como respaldo, que es
- * el selector que la propia guia de Microsoft usa para el sitemap cuando el
- * rol no alcanza.
+ * `config.mjs` -> `SITEMAP`). Si `area` se pasa (y no es "Trabajo", el área por
+ * defecto de todas las sesiones), cambia de área primero (`cambiarArea`). Intenta
+ * primero por rol semantico (recomendado por Microsoft) y cae a `[title="..."]`
+ * como respaldo, que es el selector que la propia guia de Microsoft usa para el
+ * sitemap cuando el rol no alcanza — con los acentos sacados en los dos caminos
+ * (ver `quitarAcentos`).
  */
-export async function irASitemap(page, etiqueta) {
-  const porRol = page.getByRole("treeitem", { name: etiqueta, exact: true });
+export async function irASitemap(page, etiqueta, area) {
+  if (area) {
+    await cambiarArea(page, area);
+  }
+  const patron = patronSinAcentos(etiqueta);
+
+  const porRol = page.getByRole("treeitem", { name: patron });
   if ((await porRol.count()) > 0) {
     await porRol.first().click();
     return;
   }
 
-  const porLink = page.getByRole("link", { name: etiqueta, exact: true });
+  const porLink = page.getByRole("link", { name: patron });
   if ((await porLink.count()) > 0) {
     await porLink.first().click();
     return;
   }
 
-  const porTitulo = page.locator(`[role="presentation"][title="${etiqueta}"]`).first();
-  await porTitulo.waitFor({ state: "visible", timeout: 15_000 });
-  await porTitulo.click();
+  // Respaldo por `title`, sin acentos tampoco: como es un atributo CSS exacto
+  // (no un matcher de Playwright), se prueban las dos formas del texto (con y
+  // sin acento) en vez de una regex.
+  const candidatos = [etiqueta, quitarAcentos(etiqueta)];
+  for (const candidato of candidatos) {
+    const porTitulo = page.locator(`[role="presentation"][title="${candidato}"]`).first();
+    if ((await porTitulo.count()) > 0) {
+      await porTitulo.waitFor({ state: "visible", timeout: 15_000 });
+      await porTitulo.click();
+      return;
+    }
+  }
+  throw new Error(
+    `No se encontró la entrada de sitemap '${etiqueta}' (probado con y sin acentos, por treeitem, ` +
+      `link y [title]).${area ? ` Área: '${area}'.` : ""} Puede que el área no sea la correcta, o que ` +
+      `la etiqueta real haya cambiado — revisar con 'ariaSnapshot()' antes de asumir que la entrada no existe.`
+  );
 }
 
 // Mensaje de "vista vacia". Confirmado EN VIVO el 2026-09-27 contra esta app
@@ -111,4 +173,77 @@ export async function seleccionarFilas(page, cantidad) {
     const casillero = fila.getByRole("checkbox").first();
     await casillero.click({ force: true });
   }
+}
+
+/** Texto visible de una columna de la grilla principal, por su `col-id` (el nombre
+ * lógico de la columna, p.ej. `sanic_estado`). NO CONFIRMADO EN VIVO todavía (mismo
+ * caso que `[role="grid"]` en `esperarGrilla`: hay que verificarlo contra la app
+ * real la primera vez que se corra este caso) — si `col-id` no es el atributo real,
+ * el locator no encuentra nada y `textContent()` tira, con el `row-index`/columna
+ * pedidos en el mensaje, nunca un string vacío que parezca "no cambió nada". */
+export async function leerTextoColumna(page, indiceFila, columna) {
+  const celda = page.locator(`[row-index="${indiceFila}"] [col-id="${columna}"]`).first();
+  await celda.waitFor({ state: "visible", timeout: 10_000 });
+  const texto = await celda.textContent();
+  if (texto === null) {
+    throw new Error(
+      `No se pudo leer la columna '${columna}' de la fila ${indiceFila} ([col-id="${columna}"] no ` +
+        `encontrado o sin texto). Puede que el atributo real no sea 'col-id' en esta grilla — revisar ` +
+        `con el inspector de Playwright antes de asumir que la columna cambió o no cambió.`
+    );
+  }
+  return texto.trim();
+}
+
+/**
+ * Abre un registro DIRECTO por su GUID (deep-link `pagetype=entityrecord`), en vez
+ * de navegar por sitemap+grilla+click. A diferencia de `irASitemap`/`abrirApp` (que
+ * a propósito NO usan deep-link a una VISTA, config.mjs: el id de una vista no es
+ * un dato estable que se haya verificado), acá el GUID SÍ es estable: es el de un
+ * registro que esta misma corrida sembró (`ayudantes/datos-gui.mjs::fixtureSembrado`),
+ * no un id de metadata supuesto. Navegar así es además más confiable que abrir una
+ * vista compartida (p.ej. "Solicitudes", sin filtro por dueño) y hacer click en "la
+ * primera fila": con varios agentes tocando Dev en paralelo esa vista puede tener
+ * filas de cualquiera, y "la primera" no es necesariamente la propia.
+ */
+export async function abrirRegistro(page, etn, id) {
+  const url = new URL(urlApp());
+  url.searchParams.set("pagetype", "entityrecord");
+  url.searchParams.set("etn", etn);
+  url.searchParams.set("id", id);
+  await page.goto(url.toString());
+  await page.getByRole("navigation").first().waitFor({ state: "visible", timeout: 30_000 });
+}
+
+/**
+ * Ubica un subgrid DENTRO de un formulario ya abierto (`abrirRegistro`), por la
+ * etiqueta de su pestaña/sección (p.ej. "Filas", "Reglas", "Bitácora" —
+ * `diseno/05-app-model-driven.md` línea 165).
+ *
+ * CONFIRMADO EN VIVO (2026-09-28, corrida real de A-01/A-02): el formulario de
+ * Solicitud NO tiene una pestaña por sección — todas las secciones ("Correo",
+ * "Filas", "Reglas", "Comunicaciones", "Revision", "Bitacora") viven apiladas
+ * dentro de la única pestaña "General"; por eso `pestaña` casi nunca encuentra
+ * nada y el `if` de abajo no hace nada — comportamiento correcto, no un bug (se
+ * deja el intento por si algún formulario SÍ tuviera pestañas separadas). Y, mismo
+ * hallazgo que `irASitemap`: la región pierde los acentos en su nombre accesible
+ * (`region "Bitacora"`, confirmado con `ariaSnapshot()`, no "Bitácora") — se
+ * busca sin acentos con el mismo helper.
+ */
+export async function irASubgrid(page, etiquetaPestaña, etiquetaSubgrid) {
+  const pestaña = page.getByRole("tab", { name: etiquetaPestaña, exact: false });
+  if ((await pestaña.count()) > 0) {
+    await pestaña.first().click();
+  }
+  const region = page.getByRole("region", { name: patronSinAcentos(etiquetaSubgrid) }).first();
+  await region.waitFor({ state: "visible", timeout: 15_000 });
+  return region;
+}
+
+/** Selecciona la primera fila DENTRO de un subgrid ya localizado (`irASubgrid`). */
+export async function seleccionarFilaEnSubgrid(region) {
+  const fila = region.locator('[row-index="0"]').first();
+  await fila.waitFor({ state: "visible", timeout: 15_000 });
+  const casillero = fila.getByRole("checkbox").first();
+  await casillero.click({ force: true });
 }

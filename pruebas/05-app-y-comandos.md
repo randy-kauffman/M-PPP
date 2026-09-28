@@ -123,37 +123,57 @@ Command Checker (`&ribbondebug=true`), un botón que aparece **`(hidden)`** es u
 portal), y ningún ajuste de reglas lo arregla. Mismo síntoma en pantalla ("no lo veo"), causas
 opuestas — confundirlas es lo que costó dos días con DN-02.
 
-**Automatizable.** GUI (`pruebas/gui/casos/ribbon-fila.spec.mjs`, sesión `ejecutivo`). **Gap
-conocido, no cubierto todavía por el arnés**: la SubGrid de Fila dentro de una Solicitud, y los 3
-botones de Solicitud (`atendido`/`descartar`/`revisado`) — punto de extensión, ver
-`pruebas/gui/README.md` §6.
+**Automatizable.** GUI (`pruebas/gui/casos/ribbon-fila.spec.mjs`, sesión `ejecutivo`), **HomepageGrid
+Y SubGrid** desde el 2026-09-28 (antes solo HomepageGrid — gap cerrado esta migración: el segundo
+test del archivo abre la Solicitud sembrada por su GUID propio y verifica los mismos 5 botones en la
+subgrilla de Filas). `herramientas/pruebas/sets/set_a.py::a01()` invoca este arnés por subproceso y
+reporta OK/FALLA real, ya no N-A. **Gap que sigue sin cubrir**: los 3 botones de Solicitud
+(`atendido`/`descartar`/`revisado`) — punto de extensión, ver `pruebas/gui/README.md` §6.
 
 ---
 
 ## A-02 · Los comandos genéricos NO aparecen (12.6)
 
-**Qué prueba.** Los `HideCustomAction` en las 10 tablas del sitemap.
+**Qué prueba.** Los `HideCustomAction` en las tablas del sitemap.
 
-**Necesita.** Las 4 sesiones (`estado_sesiones.py` primero); acceso a las 10 entradas del sitemap
-entre las cuatro.
+**CORRECCIÓN 2026-09-28 (CONVENCIONES.md §7, "nombrar, no contar").** Esta sección contaba "10
+tablas" desde antes del 2026-09-27, cuando `AutorizacionCliente` todavía no tenía entrada propia de
+sitemap (se agregó el 2026-09-27, `diseno/05-app-model-driven.md` §2). Hoy son **11**: se nombran
+las 11 en la tabla de abajo, no se repite el número viejo.
 
-**Cómo.** En **cada** entrada del sitemap, con cada sesión que la vea, seleccioná una fila y mirá
-la barra (incluido el menú `…`).
+**Necesita.** Las 4 sesiones (`estado_sesiones.py` primero); acceso a las 11 entradas/subgrids entre
+las cuatro. **Alcance real del arnés automatizado (esta migración):** `HideCustomAction` es una
+personalización de TABLA, no de rol — la metadata compilada es la misma para cualquier usuario que
+abra esa tabla. Dos sesiones alcanzan sin repetir el mismo chequeo cuatro veces: `ejecutivo` (9
+tablas que ve Ejecutivo/Supervisor) y `admin_tecnico` (Parámetro y Regla, exclusivas de
+Configuración) — ver `pruebas/gui/casos/a-02-comandos-genericos-ocultos.spec.mjs` y
+`TABLAS_A02`/`selectores.mjs` para el detalle completo de la decisión.
+
+**Cómo.** En **cada** entrada del sitemap (o subgrid), con la sesión que la vea, seleccioná una fila
+y mirá la barra (incluido el menú `…`).
 
 **Esperado.** En **ninguna** tabla aparecen: **Eliminar**, **Asignar**, **Compartir**, **Flujo**,
 **Enviar vínculo**, **Combinar**. Y **Nuevo** no aparece en Solicitud, Fila, ResultadoRegla ni
 Bitácora (sí en los catálogos, donde el alta es de una persona).
 
-| Tabla | Sin los 6 genéricos | Sin "Nuevo" |
-|---|---|---|
-| Solicitud | | **sí** |
-| Fila | | **sí** |
-| ResultadoRegla | | **sí** |
-| Bitácora | | **sí** |
-| Cliente, Plan, Autorizado, Autorización, Parámetro, Regla | | (Nuevo **sí** aparece) |
+| Tabla | Sin los 6 genéricos | Sin "Nuevo" | Dónde |
+|---|---|---|---|
+| Solicitud | | **sí** | sitemap "Solicitudes" |
+| Fila | | **sí** | sitemap "Filas" |
+| ResultadoRegla | | **sí** | subgrid "Reglas" del formulario de Solicitud |
+| Bitácora | | **sí** | subgrid "Bitácora" del formulario de Solicitud |
+| Cliente | | (Nuevo **sí** aparece) | sitemap "Clientes" |
+| Plan | | (Nuevo **sí** aparece) | sitemap "Planes" |
+| Autorizado | | (Nuevo **sí** aparece) | sitemap "Correos Autorizados" |
+| AutorizacionPlan | | (Nuevo **sí** aparece) | sitemap "Autorizaciones - Planes" |
+| AutorizacionCliente | | (Nuevo **sí** aparece) | sitemap "Autorizaciones - Clientes" (agregada 2026-09-27) |
+| Parámetro | | (Nuevo **sí** aparece) | sitemap "Parámetros" (solo Administrador técnico) |
+| Regla | | (Nuevo **sí** aparece) | sitemap "Reglas" (solo Administrador técnico) |
 
-**Cómo se verifica.** Recorrido manual del sitemap con las 4 sesiones (no hay caso `.spec.mjs`
-todavía — punto de extensión, `pruebas/gui/README.md` §6).
+**Cómo se verifica.** `MPPP_USUARIO=ejecutivo npx playwright test a-02-comandos-genericos-ocultos` y
+`MPPP_USUARIO=admin_tecnico npx playwright test a-02-comandos-genericos-ocultos` (`pruebas/gui/`);
+`herramientas/pruebas/sets/set_a.py::a02()` invoca las dos corridas por subproceso y las combina en
+un solo caso.
 
 **Cómo se sabe que falló.** Mismo diagnóstico REGLA-vs-METADATA de A-01/`A-15` si un
 `HideCustomAction` no surtiera efecto en alguna tabla puntual. **No alcanza con `RetrieveEntityRibbon`
@@ -163,7 +183,10 @@ en el servidor mientras no se dibujaba — esa API ve la definición del ribbon,
 compilada que de verdad sirve el navegador. Usarla acá repetiría el mismo error de diagnóstico que
 motivó este archivo entero.
 
-**Automatizable.** GUI. Sin caso de arnés escrito todavía (extensión pendiente).
+**Automatizable.** GUI (`pruebas/gui/casos/a-02-comandos-genericos-ocultos.spec.mjs`, sesiones
+`ejecutivo` + `admin_tecnico`) — escrito y conectado el 2026-09-28. Las etiquetas de los 6 comandos
+genéricos son las estándar de Unified Interface (`COMANDOS_GENERICOS`, `selectores.mjs`), no
+confirmadas todavía contra esta app puntual — a corregir con la primera corrida real si no calzan.
 
 ---
 
@@ -210,39 +233,61 @@ del usuario, y que la grilla se refresque sola — todo eso es DOM, punto de ext
 
 **Esperado.** **Nada** cambia. Ninguna fila cambia de estado, no hay entradas nuevas en Bitácora.
 
-**Cómo se verifica.** Arnés de `pruebas/gui/` (no escrito todavía, punto de extensión — ver
-`pruebas/gui/README.md` §6).
+**Cómo se verifica.** `MPPP_USUARIO=ejecutivo npx playwright test a-04-cancelar-no-cambia-nada`
+(`pruebas/gui/casos/a-04-cancelar-no-cambia-nada.spec.mjs`, escrito el 2026-09-28).
+`herramientas/pruebas/sets/set_a.py::a04()` lo invoca por subproceso.
 
 **Cómo se sabe que falló.** Sin llamar al Web API no hay ninguna diferencia observable entre
 "canceló" y "no hizo nada": esta rama del JS **solo la puede probar un navegador real**, apretando
 el botón y después Cancelar, y mirando que ninguna fila haya cambiado. Ningún caso de API puede
 sustituir esto — sería probar lo que el sistema *no* hizo por no habérselo pedido, no lo que el
-diálogo *decidió*.
+diálogo *decidió*. **Cómo evita el falso verde** (el mismo riesgo: "no pasó nada" es lo que también
+se ve si el botón nunca se apretó): el caso arma DOS evidencias independientes, no una — (1)
+POSITIVA, que el diálogo de confirmación REALMENTE apareció después del click (si no aparece, el
+test explota con un error explícito, nunca sigue de largo como si "nada" fuera la prueba); (2)
+NEGATIVA con RED, no solo con la UI: cero peticiones de escritura al Web API grabadas desde antes
+del primer click hasta después de cerrar el diálogo con Cancelar (`ayudantes/dialogos.mjs::
+grabarEscriturasApi`). Detalle completo en el comentario de cabecera de ese archivo.
 
-**Automatizable.** GUI (sesión `ejecutivo`). Sin caso de arnés escrito todavía.
+**Automatizable.** GUI (`pruebas/gui/casos/a-04-cancelar-no-cambia-nada.spec.mjs`, sesión
+`ejecutivo`) — escrito y conectado el 2026-09-28.
 
 ---
 
-## A-05 · Sin selección
+## A-05 · Sin selección: ningún botón propio se dibuja (AUSENTE, no "deshabilitado")
+
+**CORRECCIÓN FECHADA 2026-09-28.** El título corto de este caso venía arrastrando, en
+`herramientas/pruebas/sets/set_a.py` (título de `pc.Caso`) y en el nombre con el que se lo citaba en
+otros documentos, la expectativa VIEJA e INCORRECTA: "sin selección, los botones propios están
+**deshabilitados**". El cuerpo de este caso ya documentaba, desde el 2026-09-27, el hallazgo real
+(ver "Esperado" abajo: la plataforma los **ausenta**, no los deja grises) — lo que faltaba corregir
+era el título, que es lo único que lee quien solo mira el resumen de `correr.py`. AUSENTE y
+DESHABILITADO son diagnósticos **opuestos** con el mismo síntoma en pantalla ("no lo veo") — ver
+A-15, este mismo archivo: confundirlos es justo lo que costó dos días con DN-02. Esta migración
+además separó la aserción a su propio archivo (`casos/a-05-sin-seleccion.spec.mjs`, con la misma
+nota de corrección) para que pueda invocarse y reportarse de forma independiente de A-01.
 
 **Qué prueba.** El `EnableRule` `Mscrm.SelectionCountAtLeastOne`.
 
 **Necesita.** Sesión `local/sesion-ejecutivo.json`.
 
-**Cómo.** `MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila`.
+**Cómo.** `MPPP_USUARIO=ejecutivo npx playwright test a-05-sin-seleccion`.
 
 **Esperado.** Sin ninguna fila seleccionada, **ningún** botón propio se dibuja (confirmado en vivo
 el 2026-09-27: no quedan "grises" — desaparece el grupo entero, distinto de lo que asumía una
 versión anterior del arnés).
 
-**Cómo se verifica.** La salida de `MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila`
-(segundo `test` del archivo, "sin ninguna fila seleccionada, ningún botón propio se dibuja").
+**Cómo se verifica.** La salida de `MPPP_USUARIO=ejecutivo npx playwright test a-05-sin-seleccion`
+(`pruebas/gui/casos/a-05-sin-seleccion.spec.mjs`).
+`herramientas/pruebas/sets/set_a.py::a05()` lo invoca por subproceso.
 
 **Cómo se sabe que falló.** Si aparece cualquiera de los botones propios sin selección — puede ser
-un cambio real de comportamiento de la plataforma, revisar antes de asumir defecto.
+un cambio real de comportamiento de la plataforma, revisar antes de asumir defecto. También falla si
+alguno queda "presente pero deshabilitado" (la expectativa vieja): sería un cambio real de
+comportamiento a investigar, no un defecto silencioso de este caso.
 
-**Automatizable.** GUI — **ya escrito**, `pruebas/gui/casos/ribbon-fila.spec.mjs` (falta correrlo
-de punta a punta con sesión real, ver `pruebas/gui/README.md` §5).
+**Automatizable.** GUI (`pruebas/gui/casos/a-05-sin-seleccion.spec.mjs`, sesión `ejecutivo`) —
+conectado el 2026-09-28.
 
 ---
 
@@ -383,14 +428,19 @@ título *"Rechazada en AS400 — 2 fila(s)"* y un solo campo — arnés pendient
 
 **Esperado.** **Ninguna** fila cambia de estado. No hay ningún `MotivoAccion` colgado.
 
-**Cómo se verifica.** Arnés de `pruebas/gui/` (no escrito todavía — buscar `[role="dialog"]` y
-cerrarlo sin guardar, ver `pruebas/gui/README.md` §6 punto 3).
+**Cómo se verifica.** `MPPP_USUARIO=ejecutivo npx playwright test a-09-cancelar-dialogo-motivo`
+(`pruebas/gui/casos/a-09-cancelar-dialogo-motivo.spec.mjs`, escrito el 2026-09-28 — usa "Anular"
+como comando con diálogo de motivo, admite Validada directo sin precondición extra).
+`herramientas/pruebas/sets/set_a.py::a09()` lo invoca por subproceso.
 
 **Cómo se sabe que falló.** Mismo motivo que A-04: no hay ninguna llamada al Web API que distinga
 "cerró con la X" de "no hizo nada". Solo un navegador real, apretando la X de verdad, prueba esta
-rama.
+rama. Mismo mecanismo de evidencia que A-04 (positiva: el diálogo apareció de verdad; negativa con
+red: cero escrituras al Web API, ni el `POST` del `MotivoAccion` transporte ni el `PATCH` de la
+Fila) — ver `ayudantes/dialogos.mjs`.
 
-**Automatizable.** GUI (sesión `ejecutivo`). Sin caso de arnés escrito todavía.
+**Automatizable.** GUI (`pruebas/gui/casos/a-09-cancelar-dialogo-motivo.spec.mjs`, sesión
+`ejecutivo`) — escrito y conectado el 2026-09-28.
 
 ---
 
@@ -547,14 +597,29 @@ vez de `3082` (`pruebas/gui/README.md` §6 punto 4).
 (Las 8 etiquetas de Fila, con las dos versiones de idioma, ya están centralizadas en
 `pruebas/gui/selectores.mjs`, `BOTONES_FILA`, copiadas de `playbooks/importacion/comandos.md`.)
 
-**Cómo se verifica.** Caso de `pruebas/gui/` con sesión en inglés (no escrito todavía — punto de
-extensión).
+**Cómo se verifica.** `MPPP_USUARIO=ejecutivo MPPP_IDIOMA_ESPERADO=1033 npx playwright test
+a-13-multiidioma-botones` y `MPPP_USUARIO=supervisor MPPP_IDIOMA_ESPERADO=3082 npx playwright test
+a-13-multiidioma-botones` (`pruebas/gui/casos/a-13-multiidioma-botones.spec.mjs`, escrito el
+2026-09-28). `local/sesion-ejecutivo.json` está confirmada en inglés (1033) en vivo desde el
+2026-09-27 (`selectores.mjs`); `local/sesion-supervisor.json` se prueba esperando español (3082, la
+convención del proyecto) — si resultara estar también en inglés, el caso lo reporta como FALLA con
+el texto real encontrado (hallazgo legítimo, no se fuerza un verde). `herramientas/pruebas/sets/
+set_a.py::a13()` invoca las dos corridas por subproceso.
 
 **Cómo se sabe que falló.** Si con el idioma en inglés aparece una etiqueta en español, o al revés.
-Los MENSAJES del JS (objeto `TEXTOS` de `comandos.js`) no tienen caso de arnés todavía: falta
-además comparar el texto de confirmación/resultado, no solo la etiqueta del botón.
+**Los MENSAJES del JS SÍ tienen caso de arnés desde esta migración**: el segundo `test` del archivo
+compara el texto real del diálogo de confirmación contra la plantilla `TEXTOS[idioma].confirmar` de
+`recursos/js/comandos.js` (copiada a `TEXTOS_JS`, `selectores.mjs`). **Hallazgo, leyendo el código
+fuente (2026-09-28):** el nombre de la acción que arma ese mensaje (`ejecutar("Digitada", ...)`,
+`comandos.js` línea 568) es un literal en **español, fijo**, sin pasar por `TEXTOS` — a diferencia
+del resto de la plantilla, que sí traduce. En una sesión en inglés el diálogo dice literalmente
+`Apply "Digitada" to 1 selected row(s)?`: el contenedor se traduce, el nombre de la acción adentro
+no. El caso verifica el comportamiento REAL (con "Digitada" fijo en las dos plantillas), y deja esto
+documentado (CONVENCIONES.md §7) para que el aprobador decida si es un gap de UX a corregir — no es
+parte del alcance de esta migración arreglarlo.
 
-**Automatizable.** GUI. Sin caso de arnés escrito todavía.
+**Automatizable.** GUI (`pruebas/gui/casos/a-13-multiidioma-botones.spec.mjs`, sesiones `ejecutivo`
++ `supervisor`) — escrito y conectado el 2026-09-28.
 
 ---
 
@@ -646,10 +711,12 @@ Command Checker (metadata compilada) — o al revés, se regeneró metadata sobr
 en la lista pero `(hidden)` por una regla. Confundirlos es exactamente lo que costó dos días este
 mismo día.
 
-**Automatizable.** Manual (el diagnóstico y la reparación en el maker portal). El síntoma
-"presente vs. ausente" en el DOM real ya lo automatiza `pruebas/gui/ayudantes/ribbon.mjs`
-(GUI, con sesión), pero la ACCIÓN de "Regenerate ribbon metadata" es manual, en el maker portal — por
-eso el caso queda `N-A` en este set de API y no se corre desde acá.
+**Automatizable.** La DETECCIÓN (que un botón esté AUSENTE del DOM real, HomepageGrid y SubGrid) está
+conectada desde el 2026-09-28: `herramientas/pruebas/sets/set_a.py::a15()` reusa la MISMA corrida de
+Playwright que `a01()` (mismo archivo `ribbon-fila.spec.mjs`, cacheada en `ctx.extra` para no
+duplicar Dev) y reporta OK/FALLA real. La ACCIÓN de "Regenerate ribbon metadata" en caso de FALLA
+sigue siendo manual, en el maker portal (privilegio de PLATAFORMA) — el caso documenta ese paso
+siguiente en el mensaje de falla, ya no como motivo de `N-A` del caso completo.
 
 > **Nota para quien mantenga el documento de instalación en otro entorno** (fuera del alcance de este
 > archivo de pruebas, pero registrado acá porque de acá sale la lección): después de importar la

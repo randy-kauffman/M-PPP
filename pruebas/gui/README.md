@@ -10,26 +10,44 @@ clic.
 
 No reemplaza `herramientas/pruebas/` (API/backend, otro dueño): lo complementa.
 
-## Alcance aprobado: dos casos, no trece
+## Alcance: ocho casos conectados (2026-09-28)
 
-`pruebas/05-app-y-comandos.md` lista 13 casos (A-01 a A-13). Este arnés cubre **solo dos**, a
-propósito:
+Hasta el 2026-09-27 este arnés cubría **dos** casos a propósito (ver el historial de esta sección
+más abajo). El aprobador pidió sumar los casos de navegador que hoy no cubre nadie **y conectarlos**
+a los sets de Python en vez de dejarlos como un comando que hay que acordarse de correr
+("un comando que hay que acordarse de correr es un comando que no se corre"). Esta migración
+(2026-09-28) agregó seis casos nuevos y conectó los ocho — los dos viejos más los seis nuevos — a
+`herramientas/pruebas/sets/set_a.py` y `set_e.py`, que ahora invocan `npx playwright test` por
+subproceso y reportan OK/FALLA real en el resumen de `correr.py`, no `N-A`:
 
-1. **`casos/ribbon-fila.spec.mjs`** — los 7 botones del ribbon de Fila (`digitada`, `aprobar`,
-   `rechazadaas400`, `anular`, `devolver`, `atendida`, `descargarparadigitar`): presentes y
-   habilitados con una fila que admite el comando seleccionada; ausentes cuando ninguna fila
-   seleccionada admite el comando (A-01/A-05 de `pruebas/05-app-y-comandos.md`).
-2. **`casos/dn-02-descargar-para-digitar.spec.mjs`** — DN-02 de punta a punta: abrir la vista,
-   seleccionar filas, apretar "Download for entry", **capturar la descarga real**, y validar el
-   `.xlsx`: nombre contra el patrón, encabezados contra `exportacion.columnas`, cantidad de filas
+1. **`casos/ribbon-fila.spec.mjs`** (A-01) — los 5 botones que admiten Validada, presentes y
+   habilitados, en **HomepageGrid Y SubGrid** (el SubGrid se agregó esta migración).
+2. **`casos/a-05-sin-seleccion.spec.mjs`** (A-05) — sin selección, ningún botón propio se dibuja
+   (AUSENTE, no "deshabilitado" — ver la nota de corrección fechada en el propio archivo). Vivía
+   como un segundo test de `ribbon-fila.spec.mjs`; se separó a su propio archivo para poder
+   invocarse y reportarse de forma independiente.
+3. **`casos/a-02-comandos-genericos-ocultos.spec.mjs`** (A-02) — los 6 comandos genéricos (DA-06) y
+   "Nuevo" ocultos/visibles según corresponda, en las 11 tablas del proyecto (2 sesiones: `ejecutivo`
+   cubre 9, `admin_tecnico` cubre Parámetro/Regla).
+4. **`casos/a-04-cancelar-no-cambia-nada.spec.mjs`** (A-04) — cancelar el diálogo de confirmación no
+   dispara ninguna escritura al Web API (evidencia con red, no solo con la UI).
+5. **`casos/a-09-cancelar-dialogo-motivo.spec.mjs`** (A-09) — cerrar el diálogo de motivo con la X,
+   mismo mecanismo de evidencia que A-04.
+6. **`casos/a-13-multiidioma-botones.spec.mjs`** (A-13) — etiquetas de botones Y mensaje de
+   confirmación del JS, en el idioma real de la sesión (1033/3082).
+7. **`casos/dn-02-descargar-para-digitar.spec.mjs`** (E-01) — DN-02 de punta a punta: abrir la
+   vista, seleccionar filas, apretar "Download for entry", **capturar la descarga real**, y validar
+   el `.xlsx`: nombre contra el patrón, encabezados contra `exportacion.columnas`, cantidad de filas
    igual a lo seleccionado.
+8. **A-15** (`05-app-y-comandos.md`) no tiene archivo propio: reusa la corrida de `ribbon-fila`
+   (`set_a.py::a15()` cachea el resultado de `a01()`, nunca duplica la corrida).
 
-**Por qué no los otros once.** Son diálogos, íconos e idioma de UI (A-03 confirmación masiva, A-04
-cancelar, A-06/A-07 transiciones de estado, A-08/A-09 diálogo de motivo, A-10 Anular/Devolver,
-A-11/A-12 Solicitud, A-13 multiidioma): si se rompen, se notan al primer clic — alguien lo ve ese
-mismo día. El botón invisible es el único defecto de esta clase que puede pasar **días** sin que
-nadie lo note, porque el síntoma (nada aparece) es indistinguible de "no había nada que mostrar".
-Agregar el resto queda documentado en `§6` de este archivo, para cuando el aprobador lo pida.
+**Historial: por qué originalmente eran solo dos.** Son diálogos, íconos e idioma de UI (A-03
+confirmación masiva, A-06/A-07 transiciones de estado, A-08 diálogo de motivo, A-10 Anular/Devolver,
+A-11/A-12 Solicitud): si se rompen, se notan al primer clic — alguien lo ve ese mismo día. El botón
+invisible (A-01/A-15) era el único defecto de esta clase que podía pasar **días** sin que nadie lo
+note, porque el síntoma (nada aparece) es indistinguible de "no había nada que mostrar". Esa
+distinción sigue siendo válida para lo que queda sin cubrir (§10 al final de este archivo).
 
 ## La distinción que le da sentido al caso 1: AUSENTE ≠ DESHABILITADO
 
@@ -155,6 +173,15 @@ es una copia de la lógica, es el MISMO candado visto desde Node. Se prueba inte
 cruzada (Node toma → Python lo ve en rojo y lo respeta; Node suelta → Python lo ve en verde de
 nuevo) antes de confiar en él — ver el comentario en `ayudantes/semaforo.mjs`.
 
+**`MPPP_SEMAFORO_HEREDADO=1` (2026-09-28).** Cuando `set_a.py`/`set_e.py` invocan este arnés por
+subproceso DESDE un caso que ya corre dentro de `correr.py` (que toma el semáforo para TODA la
+corrida, no una vez por set), `setup/global-setup.mjs` NO vuelve a tomarlo: ya es del proceso Python
+que nos invocó, un nivel más arriba, y un segundo intento de tomarlo reventaría siempre contra su
+propio PID (vivo). Con la bandera puesta, `global-setup.mjs` corre la guarda de sesiones, la siembra
+y la limpieza igual que siempre, pero no toma ni suelta el candado. Corriendo `npx playwright test`
+de forma DIRECTA (como en este README) esta variable no está seteada, y el comportamiento es el de
+siempre. Ver el comentario largo en `setup/global-setup.mjs`.
+
 `setup/global-setup.mjs` lo toma UNA vez para toda la corrida (siembra + los dos casos +
 limpieza) — es el equivalente, para este arnés, de lo que `correr.py` hace por cada set de Python:
 un solo candado para toda la ventana en la que se toca Dev, no uno por caso. Si la siembra falla a
@@ -213,14 +240,20 @@ pruebas/gui/
 ├── ayudantes/
 │   ├── sesion.mjs                     resuelve/valida la ruta del storageState, nunca la lee
 │   ├── guarda-sesiones.mjs            invoca estado_sesiones.py::verificar_o_fallar (§3)
-│   ├── semaforo.mjs                   semáforo compartido con semaforo.py (§5)
-│   ├── datos-gui.mjs                  puente Node → sembrar_datos_gui.py + WhoAmI del dueño
-│   ├── navegacion.mjs                 abrir la app, sitemap, grilla, selección de filas
+│   ├── semaforo.mjs                   semáforo compartido con semaforo.py (§5, con bypass MPPP_SEMAFORO_HEREDADO)
+│   ├── datos-gui.mjs                  puente Node → sembrar_datos_gui.py + WhoAmI del dueño + fixtureSembrado()
+│   ├── navegacion.mjs                 abrir la app, sitemap, grilla, selección de filas, subgrids, deep-link a un registro
 │   ├── ribbon.mjs                     presente vs deshabilitado (diagnóstico opuesto, §"AUSENTE ≠ DESHABILITADO")
+│   ├── dialogos.mjs                   grabar escrituras al Web API + cancelar/cerrar diálogos (A-04, A-09)
 │   └── xlsx.mjs                       lee el .xlsx descargado (parser propio, ver el comentario del archivo)
 ├── casos/
-│   ├── ribbon-fila.spec.mjs           caso 1: los 7 botones se dibujan cuando corresponde
-│   └── dn-02-descargar-para-digitar.spec.mjs   caso 2: descarga de punta a punta
+│   ├── ribbon-fila.spec.mjs                    A-01: los botones se dibujan (HomepageGrid y SubGrid)
+│   ├── a-05-sin-seleccion.spec.mjs             A-05: sin selección, ningún botón se dibuja (AUSENTE)
+│   ├── a-02-comandos-genericos-ocultos.spec.mjs A-02: los 6 genéricos y "Nuevo" ocultos/visibles, 11 tablas
+│   ├── a-04-cancelar-no-cambia-nada.spec.mjs   A-04: cancelar el diálogo de confirmación
+│   ├── a-09-cancelar-dialogo-motivo.spec.mjs   A-09: cerrar el diálogo de motivo con la X
+│   ├── a-13-multiidioma-botones.spec.mjs       A-13: etiquetas y mensaje de confirmación, por idioma
+│   └── dn-02-descargar-para-digitar.spec.mjs   E-01: descarga de punta a punta
 └── descargas/                         (gitignored) .xlsx capturados durante una corrida
 ```
 
@@ -287,17 +320,33 @@ una fila `Validada` seleccionada (`digitada`, `rechazadaas400`, `anular`, `atend
 (igual a las 3 seleccionadas). El fixture (`ZZP-Pruebas GUI SA` y sus hijos) quedó limpio después
 (`sembrar_datos_gui.py --verificar` confirmó `cliente: false` al terminar).
 
-## 10. Agregar los demás casos de `pruebas/05-app-y-comandos.md`
+## 10. Lo que sigue sin cubrir de `pruebas/05-app-y-comandos.md`
 
-Para sumar el resto (A-03 confirmación masiva, A-04 cancelar, A-06/A-07 transiciones de estado y
-"el plugin manda", A-08/A-09 diálogo de motivo, A-10 Anular/Devolver, A-11/A-12 Solicitud, A-13
-multiidioma) — fuera del alcance aprobado hoy:
+Después de esta migración (2026-09-28, ocho casos conectados — §1) queda, todavía fuera del
+alcance de este arnés:
 
-1. Agregar un archivo nuevo en `casos/` (uno por caso o por grupo relacionado).
-2. Reusar `ayudantes/navegacion.mjs` y `ayudantes/ribbon.mjs` — no duplicar selectores ahí, todo
-   sale de `selectores.mjs`.
-3. Para los diálogos de motivo (A-08, A-09, A-12): son `navigateTo` a `entityrecord` de
-   `sanic_mppp_tbl_motivoaccion` en modo creación dentro de un diálogo modal — buscar el
-   `[role="dialog"]` y el campo de texto por su etiqueta, con la misma estrategia de `getByRole`.
-4. Para A-13 (multiidioma): correr el mismo caso con dos sesiones (una de un usuario en inglés),
-   pasando el idioma a `verificarBotones(page, BOTONES_FILA, 1033)` en vez de `3082`.
+- **A-03** (confirmación masiva: el texto exacto del diálogo "¿Aplicar 'Digitada' a 3 fila(s)
+  seleccionada(s)?" y del resultado "3 de 3 fila(s) actualizada(s).") — el EFECTO ya lo cubre
+  `set_a.py::a03()` por API; solo el DOM del diálogo queda GUI, opcional.
+- **A-06/A-07** (transiciones de estado, "el plugin manda") — el EFECTO ya lo cubren `set_a.py::
+  a06()/a07()` por API; la experiencia en pantalla queda GUI, opcional, no bloqueante.
+- **A-08** (que el diálogo de motivo se DIBUJE centrado, con el título "Rechazada en AS400 — 2
+  fila(s)") — el EFECTO ya lo cubre `set_a.py::a08()` por API. `ayudantes/dialogos.mjs` (agregado
+  esta migración para A-09) da la base para escribir este caso: reusarlo, no duplicar.
+- **A-10** (vistas Devueltas/estado en pantalla) — el EFECTO ya lo cubre `set_a.py::a10()` por API;
+  GUI opcional.
+- **A-11/A-12** (Solicitud: vista "Por clasificar", vista "Para revisar") — el EFECTO ya lo cubren
+  `set_a.py::a11()/a12()` por API; GUI opcional. Necesitan los 3 botones de Solicitud
+  (`atendido`/`descartar`/`revisado`), que tampoco tienen `dataId` descubierto todavía (§8 punto d).
+- **La SubGrid de Solicitud, sus 3 botones propios** (`atendido`/`descartar`/`revisado`) — A-01 ya
+  cubre la SubGrid de FILA (esta migración); la de Solicitud (otra tabla, otros botones) sigue sin
+  caso.
+- **A-02, las otras 2 sesiones** (`supervisor`, `admin_planes`) — el arnés ya corre con `ejecutivo` +
+  `admin_tecnico` (alcanza para las 11 tablas, `HideCustomAction` es de tabla, no de rol — ver la
+  nota en `05-app-y-comandos.md`); agregar las otras dos sesiones no agrega cobertura nueva sobre la
+  metadata, solo lo haría si algún día `HideCustomAction` pasara a depender del rol.
+
+Para agregar cualquiera de estos: reusar `ayudantes/navegacion.mjs`, `ayudantes/ribbon.mjs` y
+`ayudantes/dialogos.mjs` — no duplicar selectores, todo sale de `selectores.mjs`; y conectar el caso
+nuevo a `set_a.py` con el mismo patrón `_playwright_test`/`_chequear_playwright` que ya usan A-01,
+A-02, A-04, A-05, A-09, A-13 y A-15.

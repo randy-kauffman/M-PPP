@@ -63,6 +63,34 @@ export async function sembrarDatosGui(propietarioUserId, { filas = 3 } = {}) {
   return resultado;
 }
 
+/**
+ * El `solicitudId`/`filaIds` que `sembrarDatosGui()` creó (o encontró ya creados)
+ * en esta corrida, publicados por `setup/global-setup.mjs` vía `process.env`
+ * (ver el comentario ahí: es el mecanismo documentado de Playwright para pasar
+ * datos de `globalSetup` a los tests). Los casos que necesitan abrir un registro
+ * PROPIO por su GUID (p.ej. la SubGrid de A-01, dentro del formulario de la
+ * Solicitud sembrada) lo resuelven acá, nunca navegando una vista compartida y
+ * asumiendo "la primera fila" (con varios agentes tocando Dev a la vez, esa fila
+ * puede ser de cualquiera).
+ */
+export function fixtureSembrado() {
+  const solicitudId = process.env.MPPP_GUI_SOLICITUD_ID;
+  if (!solicitudId) {
+    throw new Error(
+      "No hay MPPP_GUI_SOLICITUD_ID: este proceso no pasó por setup/global-setup.mjs (¿se está " +
+        "llamando a fixtureSembrado() fuera de un test de Playwright?) o la siembra no devolvió " +
+        "solicitudId."
+    );
+  }
+  let filaIds = [];
+  try {
+    filaIds = JSON.parse(process.env.MPPP_GUI_FILA_IDS || "[]");
+  } catch {
+    filaIds = [];
+  }
+  return { solicitudId, filaIds };
+}
+
 /** Limpia el fixture. No lanza si ya estaba limpio; sí si el script falla. */
 export async function limpiarDatosGui() {
   const { stdout, stderr } = await correrPython(["--limpiar"]);

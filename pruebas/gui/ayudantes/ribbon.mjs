@@ -38,7 +38,7 @@ function patronDeEtiquetas(etiquetasPosibles) {
  * inglés). Devuelve el locator y CON QUE etiqueta lo encontró, o `null` si no
  * apareció con ninguna.
  */
-export async function localizarBoton(page, etiquetasPosibles) {
+export async function localizarBoton(page, etiquetasPosibles, { raiz = page } = {}) {
   // IMPORTANTE (aprendido en vivo, 2026-09-27, tres rondas — cada una con
   // evidencia real, no supuesta):
   //  1) El ROL de accesibilidad real de estos comandos es "menuitem" dentro
@@ -56,8 +56,18 @@ export async function localizarBoton(page, etiquetasPosibles) {
   //     2×N en descartarse, y con 7 botones eso alcanza a superar el timeout
   //     del test. Por eso se prueban las dos etiquetas EN UN SOLO patrón
   //     (regex `1033|3082`): una sola espera acotada, no dos.
+  // `raiz` (nuevo 2026-09-28): por defecto es `page` (busca en toda la página,
+  // el comportamiento de siempre para los 7 botones de Fila — nunca chocan con
+  // nada fuera del ribbon de Fila). A-02 lo usa para acotar la búsqueda a
+  // `page.getByRole('main')`: CONFIRMADO EN VIVO (2026-09-28, primera corrida
+  // real) que un `menuitem "New Create a new record"` vive en el `banner`
+  // (`region "Global commands"`, el selector de "nuevo registro" de CUALQUIER
+  // tabla, siempre presente en toda página) — buscar "Nuevo" en `page` entero
+  // confundía ESE botón global con el "Nuevo" del ribbon de la tabla puntual
+  // (que si DA-06 lo ocultó, no debería aparecer ahí). `main` excluye el
+  // `banner` de la app y dejó el falso positivo en cero.
   const patron = patronDeEtiquetas(etiquetasPosibles);
-  const enBarra = page.getByRole("menuitem", { name: patron }).first();
+  const enBarra = raiz.getByRole("menuitem", { name: patron }).first();
   const aparecio = await enBarra
     .waitFor({ state: "visible", timeout: 6_000 })
     .then(() => true)
@@ -68,22 +78,32 @@ export async function localizarBoton(page, etiquetasPosibles) {
   }
 
   // No esta a la vista con ninguna etiqueta: puede estar colapsado en "mas
-  // comandos" (ESE disparador sí es un "button" real, distinto de los items).
-  for (const nombreOverflow of ETIQUETAS_MAS_COMANDOS) {
-    const overflow = page.getByRole("button", { name: nombreOverflow, exact: false });
-    if ((await overflow.count()) > 0) {
-      await overflow.first().click();
-      const enMenu = page.getByRole("menuitem", { name: patron }).first();
-      const apareceEnMenu = await enMenu
-        .waitFor({ state: "visible", timeout: 2_000 })
-        .then(() => true)
-        .catch(() => false);
-      if (apareceEnMenu) {
-        const texto = (await enMenu.textContent().catch(() => null)) || etiquetasPosibles[0];
-        return { locator: enMenu, etiqueta: texto.trim() };
+  // comandos". CORREGIDO EN VIVO (2026-09-28, primera corrida real del test de
+  // SubGrid): el disparador de overflow NO tiene un rol fijo — en el HomepageGrid
+  // (confirmado 2026-09-27) es un "button" real; en un SubGrid embebido en un
+  // formulario (menos ancho disponible, confirmado con el `error-context.md` de
+  // esa corrida: `menuitem "More commands for Fila"`) es un "menuitem" más,
+  // DENTRO del mismo menubar que los comandos — mismo patrón que ya obligó a
+  // corregir "button"->"menuitem" para los comandos en sí. Por eso acá se prueban
+  // los DOS roles, no uno solo: no hacerlo fue la causa real de un falso "AUSENTE"
+  // en 4 de los 5 comandos del SubGrid, que en realidad estaban ahí, colapsados.
+  for (const rolOverflow of ["button", "menuitem"]) {
+    for (const nombreOverflow of ETIQUETAS_MAS_COMANDOS) {
+      const overflow = raiz.getByRole(rolOverflow, { name: nombreOverflow, exact: false });
+      if ((await overflow.count()) > 0) {
+        await overflow.first().click();
+        const enMenu = raiz.getByRole("menuitem", { name: patron }).first();
+        const apareceEnMenu = await enMenu
+          .waitFor({ state: "visible", timeout: 2_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (apareceEnMenu) {
+          const texto = (await enMenu.textContent().catch(() => null)) || etiquetasPosibles[0];
+          return { locator: enMenu, etiqueta: texto.trim() };
+        }
+        // Cerrar el menu si no era ahi, para no ensuciar el siguiente intento.
+        await page.keyboard.press("Escape").catch(() => {});
       }
-      // Cerrar el menu si no era ahi, para no ensuciar el siguiente intento.
-      await page.keyboard.press("Escape").catch(() => {});
     }
   }
 
