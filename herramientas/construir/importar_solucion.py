@@ -71,6 +71,20 @@ COMPONENTE_TABLA = 1
 COMPONENTE_SITEMAP = 62
 
 CLAVES = {"tipo": str, "idiomas": list, "cambios": list}
+# Opcionales, a nivel del bloque completo (no de un cambio): sirven para que
+# `--solo-verificar` denuncie una tabla de la app que se quedó SIN bloque
+# `ribbon` en este playbook (D-69: `sanic_mppp_tbl_autorizacioncliente` entró a
+# la app el 2026-09-27, DN-01, y nunca se agregó a `comandos.md`; nada lo dijo
+# hasta que un caso de GUI miró el DOM real, semanas después). `app` es el
+# `uniquename` de la app model-driven CONTRA la que comparar (se lee su lista
+# real de tablas por `RetrieveAppComponents`, no lo que el playbook DICE que
+# tiene: la fuente de verdad es la plataforma). `tablas_excluidas_de_ocultar`
+# es la lista, chica y explícita, de tablas de la app que a propósito NO
+# llevan bloque `ribbon` (hoy: `sanic_mppp_tbl_motivoaccion`, una tabla técnica
+# que solo se abre en un diálogo de creación rápida, nunca como grilla con
+# barra de comandos — `05-app-model-driven.md` DA-03). Omitir 'app' apaga la
+# denuncia entera: un playbook que no lo declara no se compara contra nada.
+CLAVES_OPCIONALES = {"app": str, "tablas_excluidas_de_ocultar": list}
 CLASES = ("app_componentes", "ribbon")
 
 CLAVES_POR_CLASE = {
@@ -99,7 +113,9 @@ MENSAJE_FALLO_CLIENTE = (
 # Validación sin red
 # ---------------------------------------------------------------------------
 def validar_playbook(datos, identidad):
-    faltan, sobran = sorted(set(CLAVES) - set(datos)), sorted(set(datos) - set(CLAVES))
+    presentes = set(datos)
+    faltan = sorted(set(CLAVES) - presentes)
+    sobran = sorted(presentes - set(CLAVES) - set(CLAVES_OPCIONALES))
     if faltan or sobran:
         partes = []
         if faltan:
@@ -114,6 +130,22 @@ def validar_playbook(datos, identidad):
     cambios = exigir_forma(datos["cambios"], list, "el bloque de la importación", "cambios", no_vacio=True)
     apps, tablas_ribbon = set(), set()
     prefijo = identidad["prefijo"] + "_"
+
+    if "tablas_excluidas_de_ocultar" in datos and "app" not in datos:
+        raise ErrorPlaybook(
+            "'tablas_excluidas_de_ocultar' no tiene sentido sin 'app': no hay contra qué lista de "
+            "tablas de la app compararla")
+    if "app" in datos:
+        exigir_forma(datos["app"], str, "el bloque de la importación", "app", no_vacio=True)
+    if "tablas_excluidas_de_ocultar" in datos:
+        excluidas = exigir_forma(datos["tablas_excluidas_de_ocultar"], [str], "el bloque de la importación",
+                                 "tablas_excluidas_de_ocultar")
+        fuera = [t for t in excluidas if not t.startswith(prefijo)]
+        if fuera:
+            raise ErrorPlaybook(
+                f"'tablas_excluidas_de_ocultar' {fuera} no llevan el prefijo del publisher '{prefijo}'")
+        if len(set(excluidas)) != len(excluidas):
+            raise ErrorPlaybook("'tablas_excluidas_de_ocultar' tiene repetidos")
     for i, cambio in enumerate(cambios):
         donde = f"el cambio [{i}]"
         exigir_forma(cambio, dict, donde, "cambio")
@@ -612,7 +644,42 @@ def steps_apagados(dv, prefijo):
     return sorted(s["name"] for s in filas if s.get("statecode") == 1)
 
 
+def tablas_sin_ocultar(dv, datos):
+    """Tablas REALES de `datos['app']` (vía `RetrieveAppComponents`, la plataforma,
+    nunca lo que el playbook dice que tiene) que este playbook no cubre con un
+    cambio `ribbon`. Existe por D-69: una tabla puede entrar a la app y no
+    aparecer nunca en el playbook de comandos, y nada lo decía hasta que un caso
+    de GUI miró el DOM real, semanas después. `--solo-verificar` la corre siempre
+    que el playbook declare `app` — no depende de que alguien se acuerde de
+    mirar."""
+    id_app = _id_de_la_app(dv, datos["app"])
+    tablas_app = _tablas_de_la_app(dv, id_app)
+    con_bloque = {c["tabla"] for c in datos["cambios"] if c["clase"] == "ribbon"}
+    excluidas = set(datos.get("tablas_excluidas_de_ocultar", []))
+    return sorted(tablas_app - con_bloque - excluidas)
+
+
 def _contra_entorno(dv, datos, identidad, solo_verificar, componente, forzar=False):
+    """Envuelve `_contra_entorno_nucleo` para agregar, SIN tocar ninguno de sus
+    caminos de salida, la denuncia de `tablas_sin_ocultar`. Así la lógica de
+    exportar/editar/importar (la parte cara y arriesgada) queda intacta, y la
+    denuncia es puramente aditiva: un playbook que no declara `app` no cambia
+    en nada."""
+    estado, comp, detalle = _contra_entorno_nucleo(dv, datos, identidad, solo_verificar, componente, forzar)
+    if "app" in datos and estado in ("ya_existia", "difiere", "creado"):
+        sin_ocultar = tablas_sin_ocultar(dv, datos)
+        if sin_ocultar:
+            detalle += " | AVISO (D-69): " + "; ".join(
+                f"la tabla '{t}' está en la app '{datos['app']}' y no tiene bloque de ocultos" for t in sin_ocultar)
+            if estado in ("ya_existia", "creado"):
+                # Nada del playbook está mal por sí solo, pero hay una tabla de la
+                # app sin cubrir: eso NO es éxito silencioso. Sale del set de
+                # códigos 0 de `salida()` a propósito.
+                estado = "difiere"
+    return estado, comp, detalle
+
+
+def _contra_entorno_nucleo(dv, datos, identidad, solo_verificar, componente, forzar=False):
     solucion = identidad["solucion"]
     comprobar_solucion_e_idioma(dv, identidad)
 

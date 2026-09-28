@@ -500,5 +500,110 @@ class ContraElEntorno(Base):
         self.assertFalse(any(l["ruta"] == "ExportSolution" for l in cliente.llamadas))
 
 
+class DenunciaTablasSinBloque(ContraElEntorno):
+    """D-69: `sanic_mppp_tbl_autorizacioncliente` entró a la app el 2026-09-27 y
+    nunca se agregó a `comandos.md`; nada lo denunció hasta que un caso de GUI
+    miró el DOM real, semanas después. La clave opcional 'app' tiene que hacer
+    que `--solo-verificar` (y una corrida real) DEJEN de salir en verde cuando la
+    app tiene una tabla sin cambio `ribbon`."""
+
+    # Cambio `ribbon` SIN botones propios (como las tablas de catálogo reales:
+    # `sanic_mppp_tbl_cliente` y compañía), para poder armar un ribbon "ya
+    # aplicado" sin tener que simular todo el ciclo de un botón con icono.
+    CAMBIO_SIN_BOTONES = {"clase": "ribbon", "tabla": TABLA, "biblioteca": "sanic_mppp_wr_js_comandos",
+                          "botones": [], "ocultar": [".Assign"]}
+    RIBBON_YA_OCULTO = "<RibbonDefinitions></RibbonDefinitions>"  # `.Assign` ya no está: nada que importar.
+
+    def _cliente_con_tablas_de_app(self, tablas_app, pendiente=True):
+        """`pendiente=True`: el ribbon real todavía no tiene lo que pide el
+        cambio (fuerza `difiere`/import real, para probar que la denuncia es
+        ADITIVA). `pendiente=False`: el ribbon ya está como el playbook lo pide
+        (fast-path `ya_existia`), para probar que sin nada más que denunciar
+        el resultado sigue siendo verde."""
+        if pendiente:
+            cliente = self.armar_ribbon(ClienteSimulado())
+        else:
+            cliente = ClienteSimulado()
+            armar_cliente_precondiciones_ok(cliente, IDENT)
+            cliente.responder("GET", lambda r: r.startswith("RetrieveEntityRibbon("),
+                              (200, {"CompressedEntityXml": zip_ribbon(self.RIBBON_YA_OCULTO)}, {}))
+        cliente.responder("GET", lambda r: r.startswith("appmodules/Microsoft.Dynamics.CRM.RetrieveUnpublishedMultiple"),
+                          (200, {"value": [{"appmoduleid": APP_ID, "uniquename": APP}]}, {}))
+        cliente.responder("GET", lambda r: r.startswith("RetrieveAppComponents("),
+                          (200, {"value": [{"componenttype": 1, "objectid": "md-" + t}
+                                           for t in tablas_app]}, {}))
+        cliente.responder("GET", lambda r: r.startswith("EntityDefinitions(md-"),
+                          lambda r, c, s: (200, {"LogicalName": r.split("(md-")[1].split(")")[0]}, {}))
+        return cliente
+
+    def test_solo_verificar_denuncia_la_tabla_de_la_app_sin_bloque(self):
+        cliente = self._cliente_con_tablas_de_app([TABLA, TABLAS[1]])
+        estado, _, detalle = imp.construir(
+            self.escribir(comp(app=APP, cambios=[CAMBIO_RIBBON])), True, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)
+        self.assertIn(f"la tabla '{TABLAS[1]}' está en la app '{APP}' y no tiene bloque de ocultos", detalle)
+
+    def test_sin_tablas_de_mas_no_hay_aviso(self):
+        cliente = self._cliente_con_tablas_de_app([TABLA], pendiente=False)
+        estado, _, detalle = imp.construir(
+            self.escribir(comp(app=APP, cambios=[self.CAMBIO_SIN_BOTONES])), True, lambda: cliente)
+        self.assertEqual("ya_existia", estado, detalle)
+        self.assertNotIn("AVISO", detalle)
+
+    def test_una_tabla_excluida_a_proposito_no_se_denuncia(self):
+        componente = comp(app=APP, cambios=[self.CAMBIO_SIN_BOTONES])
+        componente["tablas_excluidas_de_ocultar"] = [TABLAS[1]]
+        cliente = self._cliente_con_tablas_de_app([TABLA, TABLAS[1]], pendiente=False)
+        estado, _, detalle = imp.construir(self.escribir(componente), True, lambda: cliente)
+        self.assertEqual("ya_existia", estado, detalle)
+        self.assertNotIn("AVISO", detalle)
+
+    def test_un_playbook_sin_app_no_denuncia_nada(self):
+        # Comportamiento de antes: sin la clave opcional, cero llamadas nuevas y
+        # cero cambio de estado. Backward compatible con `mantenimientoppp.md`.
+        cliente = self.armar_ribbon(ClienteSimulado())
+        estado, _, detalle = imp.construir(
+            self.escribir(comp(cambios=[CAMBIO_RIBBON])), True, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)  # difiere por el propio cambio ribbon, no por AVISO
+        self.assertNotIn("AVISO", detalle)
+        self.assertFalse(any(l["ruta"].startswith("RetrieveAppComponents") for l in cliente.llamadas))
+
+    def test_un_creado_con_una_tabla_de_la_app_sin_bloque_no_sale_en_verde(self):
+        # La denuncia es ADITIVA: el import que sí estaba declarado se hace igual,
+        # pero el estado final no puede ser 'creado' (código de salida 0) mientras
+        # quede una tabla de la app sin cubrir.
+        cliente = self._cliente_con_tablas_de_app([TABLA, TABLAS[1]])
+        estado, _, detalle = imp.construir(
+            self.escribir(comp(app=APP, cambios=[CAMBIO_RIBBON])), False, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)
+        self.assertIn("AVISO", detalle)
+        self.assertIn(TABLAS[1], detalle)
+        self.assertIn("ImportSolution", [l["ruta"] for l in cliente.llamadas if l["metodo"] == "POST"])
+
+
+class ValidacionDeClavesOpcionales(Base):
+    def rechaza(self, componente, fragmento):
+        centinela = FabricaCentinela()
+        estado, _, detalle = imp.construir(self.escribir(componente), False, centinela)
+        self.assertEqual("error", estado, detalle)
+        self.assertIn(fragmento, detalle)
+        self.assertFalse(centinela.llamada)
+
+    def test_tablas_excluidas_sin_app_se_rechaza(self):
+        malo = comp(cambios=[CAMBIO_RIBBON])
+        malo["tablas_excluidas_de_ocultar"] = [TABLAS[1]]
+        self.rechaza(malo, "no tiene sentido sin 'app'")
+
+    def test_tablas_excluidas_sin_prefijo_se_rechaza(self):
+        malo = comp(app=APP, cambios=[CAMBIO_RIBBON])
+        malo["tablas_excluidas_de_ocultar"] = ["account"]
+        self.rechaza(malo, "no llevan el prefijo del publisher")
+
+    def test_tablas_excluidas_repetidas_se_rechazan(self):
+        malo = comp(app=APP, cambios=[CAMBIO_RIBBON])
+        malo["tablas_excluidas_de_ocultar"] = [TABLAS[1], TABLAS[1]]
+        self.rechaza(malo, "tiene repetidos")
+
+
 if __name__ == "__main__":
     unittest.main()
