@@ -169,77 +169,109 @@ regla: cualquiera podría mandar filas a digitar sin autorización.
 
 ## C-05 · El correo se mueve y cambia de identificador
 
-**Qué prueba.** El paso 7 de `MPPP-ING` y DF-04: el identificador de Outlook **cambia al mover**, y
-por eso hay una acción aparte que lo vuelve a guardar.
+**Qué prueba.** El paso 7 de `MPPP-ING` y DF-04: el identificador de Outlook **cambia al mover**
+(`MoveV2` sin "Immutable Id" habilitado en el tenant — D-66, `diseno/PENDIENTES.md`), y que
+`MPPP-ING` guarda el identificador **NUEVO** (el de después de moverlo), no el viejo — que es
+justo lo que hasta hoy rompía la re-ingesta de `MPPP-VIG`.
 
-**Necesita.** Un correo real, procesado de punta a punta por `MPPP-REC`/`MPPP-ING` contra el buzón
-compartido `mppp@55xljh.onmicrosoft.com`, y acceso a ese buzón para ver la carpeta `Procesados`.
+**Necesita.** Acceso real (Graph, vía `herramientas/graph_api.py`) al buzón de ingesta
+`mppp@55xljh.onmicrosoft.com` — otorgado hoy por el aprobador ("ya le di acceso al buzón real"); un
+buzón de prueba de Graph como remitente (`PP_MAIL_BUZON_1`); `MPPP-REC` y `MPPP-ING` activos
+(`statecode=1`, se verifica contra `workflows` antes de correr, no se asume).
 
-**Cómo.** Mandar un correo real a `mppp@55xljh.onmicrosoft.com` y, con acceso al buzón, mirar dónde
-queda y qué campo trae la Solicitud resultante.
+**Cómo (`c05()` de `set_c.py`).**
+1. Manda un correo real por Graph, desde `PP_MAIL_BUZON_1` hacia `mppp@55xljh.onmicrosoft.com`, con
+   asunto único `ZZP-C05C06-<nonce>` y un adjunto `.xlsx` válido con nombre propio (lo usa C-06).
+2. Poll sobre la carpeta `Inbox` del buzón real hasta que aparezca (captura el identificador de
+   Graph **ANTES** de `MoveV2`) — margen 90s (`MPPP-REC` sondea cada 1 minuto).
+3. Poll sobre la carpeta `Procesados` hasta que aparezca ahí (captura el identificador **DESPUÉS**)
+   — margen ~4-5 minutos.
+4. Busca la Solicitud resultante en Dataverse por `sanic_messageid` (el Message-ID RFC822 del
+   correo, estable entre carpetas — nunca el `id` de Graph, que es justo lo que cambia).
 
 **Qué tiene que pasar.**
 
-- El correo queda en **`Procesados`**, no en la bandeja de entrada.
-- `outlook message id` dice **sí**.
+| Qué | Valor |
+|---|---|
+| El correo aparece en `Inbox` del buzón real | sí (identificador capturado antes de mover) |
+| El correo termina en `Procesados` | sí |
+| Identificador de Graph antes vs. después | **DISTINTOS** — esto es lo ESPERADO, no un defecto: `MoveV2` sin Immutable Id cambia el ID siempre |
+| `sanic_outlookmessageid` guardado en la Solicitud | = el identificador de **DESPUÉS** de mover (NUNCA el de antes) |
 
-**Cómo se verifica.** Acceso manual al buzón compartido, más `ver_solicitud.py <MPPP-########>`
-para el campo del identificador.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py C` (caso `C-05`, sin navegador, sin
+acceso manual al buzón); a mano, `ver_solicitud.py <MPPP-########>` muestra `outlook message id: sí`.
 
-**Cómo se sabe que falló.** Si el correo queda en la bandeja, `MPPP-VIG` lo va a reingerir a los 15
-minutos — vas a ver reintentos en la Bitácora (protegidos por C-07), no una segunda Solicitud.
+**Cómo se sabe que falló.** Dos causas con el mismo síntoma ("no llegó a Procesados"): (a) el
+correo nunca apareció en `Inbox` — Graph no entregó el envío, revisar el HTTP de `mandar_correo()`;
+(b) apareció en `Inbox` pero nunca pasó a `Procesados` — `MPPP-REC` puede estar desactivado
+(`statecode=0`; revisar `workflows` antes de reintentar, NUNCA asumir que está activo) o `MPPP-ING`
+está fallando. Si SÍ llega a `Procesados` pero `sanic_outlookmessageid` guardado coincide con el
+identificador de **ANTES** de moverlo (no con el de después), el arreglo del aprobador se revirtió:
+es exactamente el bug de D-66 — una re-ingesta futura de `MPPP-VIG` va a fallar con 404 sobre ese
+ID viejo.
 
-**Automatizable.** `N-A` — **investigado de nuevo hoy (2026-09-27), con una herramienta nueva que
-antes no existía.** `herramientas/graph_api.py` ya manda y lee correo real contra Graph (probado
-hoy: HTTP 202 al mandar, `Mail.Read` disponible), así que en principio podría inspeccionar carpetas
-de un buzón real — lo que decía la versión anterior de este caso ("no hay Web API para inspeccionar
-carpetas de Outlook") ya no es del todo cierto. Pero se comprobó, programáticamente y sin imprimir
-ninguna dirección, que la Application Access Policy del service principal de Graph lo limita a 4
-buzones de prueba (`PP_MAIL_BUZON_1`..`PP_MAIL_BUZON_4`) y **ninguno de los 4 es
-`mppp@55xljh.onmicrosoft.com`**: Graph puede *mandar* un correo hacia ese buzón (el destino no
-necesita permiso), pero no puede *leer sus carpetas* — un 403 esperado, no un defecto. No es un
-caso de navegador (no hay pantalla de la app que mirar, es un tema de Exchange): `pruebas/gui/` no
-aplica. Reproducción manual, con los dos flujos activos (verificado hoy, `statecode=1` los dos):
-mandar un correo real a `mppp@55xljh.onmicrosoft.com`, esperar 1-2 minutos, y confirmar a mano, con
-acceso al buzón compartido, que el correo pasó a `Procesados`.
+**Automatizable.** `API` (`correr.py C`, caso `C-05`, vía `herramientas/graph_api.py` contra el
+buzón real — sin navegador, `pruebas/gui/` no aplica). **Corrección 2026-09-28**: hasta hoy este
+caso era `N-A` porque la Application Access Policy del service principal de Graph limitaba el
+acceso a los 4 buzones de prueba (`PP_MAIL_BUZON_1..4`), ninguno el buzón real de ingesta. El
+aprobador dio acceso real al buzón (`mppp@55xljh.onmicrosoft.com`) hoy; se verificó que el acceso
+YA propagó (`GET users/mppp@55xljh.onmicrosoft.com/mailFolders` responde HTTP 200 y expone la
+carpeta `Procesados`, no un 403) antes de escribir este caso — si esa verificación hubiera dado 403,
+este caso seguía en `N-A` con la nota de que la Application Access Policy todavía no se propagó
+(puede tardar hasta 30 minutos).
 
 ---
 
-## C-06 · El `.eml` queda guardado con su nombre real
+## C-06 · El Excel queda guardado con su nombre real (el `.eml`, con nombre FIJO)
 
-**Qué prueba.** RF-10 y el insumo del plugin liviano: sin el `.eml` no hay clasificación; y que el
-archivo se guarda con metadatos reales (nombre original), no un nombre de relleno.
+**Qué prueba.** RF-10 y el insumo del plugin liviano: sin el `.eml` no hay clasificación; y que
+`sanic_exceloriginal` se guarda con el nombre ORIGINAL del adjunto tal como lo mandó quien escribió
+el correo — no un nombre inventado por el flujo.
 
-**Necesita.** La misma Solicitud real de C-05 (un correo real ya procesado por `MPPP-ING`).
+**Necesita.** La misma Solicitud real que arma C-05 (comparten el único correo real que este set
+manda: `ctx.extra["c05c06"]`, en memoria dentro de la misma corrida de `correr.py C`).
 
 **Cómo.** Con esa Solicitud, leer `sanic_correocrudo_name` y `sanic_exceloriginal_name`.
 
-**Qué tiene que pasar.** `sanic_correocrudo_name` trae el nombre real que Outlook le dio al
-mensaje; `sanic_exceloriginal_name` trae el nombre original del adjunto `.xlsx` tal como lo mandó
-quien escribió el correo.
+**Qué tiene que pasar.**
 
-**Cómo se verifica.** `python3 herramientas/pruebas/ver_solicitud.py <MPPP-########>` (línea
-`archivos`), o un GET directo:
-`sanic_mppp_tbl_solicituds(<id>)?$select=sanic_correocrudo_name,sanic_exceloriginal_name`.
+| Campo | Valor esperado |
+|---|---|
+| `sanic_correocrudo_name` | **`correo.eml`** — nombre FIJO, ver "Corrección al MD" abajo |
+| `sanic_exceloriginal_name` | el nombre REAL que tenía el adjunto `.xlsx` del correo real (el que mandó `c05()`, a propósito distinto del nombre del archivo fuente en `pruebas/adjuntos/`) |
 
-**Cómo se sabe que falló.** Si alguno de los dos nombres viene vacío o con un nombre inventado por
-el propio flujo (en vez del real), `MPPP-ING` no está preservando el nombre original del archivo
-que capturó de Outlook.
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py C` (caso `C-06`); a mano,
+`python3 herramientas/pruebas/ver_solicitud.py <MPPP-########>` (línea `archivos`), o un GET
+directo: `sanic_mppp_tbl_solicituds(<id>)?$select=sanic_correocrudo_name,sanic_exceloriginal_name`.
 
-**Automatizable.** `N-A` — mismo bloqueo de fondo que C-05 (hace falta el correo real). **Novedad
-de hoy**: la VERIFICACIÓN en sí ya no exige la app ni una sesión de navegador — antes esta hoja
-decía "abrí la Solicitud en la app, pestaña con los archivos" (ver "Corrección al MD" abajo);
-`sanic_correocrudo_name`/`sanic_exceloriginal_name` son campos de Web API comunes, y
-`ver_solicitud.py` ya los usa para su resumen. `simulador.py` sube el `.eml` con un nombre FIJO
-(`correo.eml`), así que corriendo el caso simulado se probaría al simulador, no al sistema — por
-eso sigue en `N-A` y no se "resuelve" con datos simulados. Falta el correo real de C-05, no una
-herramienta de verificación.
+**Cómo se sabe que falló.** Si `sanic_exceloriginal_name` viene vacío, o distinto del nombre real
+del adjunto que mandó `c05()`, `MPPP-ING` no está leyendo `@first(variables('excels'))?['name']`
+del correo real (o el `Foreach`/filtro de adjuntos está descartando el que no es inline mal). Si
+`sanic_correocrudo_name` viniera vacío, `ExportEmail_V2`/`UpdateEntityFileImageFieldContent`
+fallaron sin que el flujo lo reportara. Si `sanic_correocrudo_name` viniera con un nombre DISTINTO
+de `correo.eml`, alguien cambió `x-ms-file-name` en `Guardar_el_correo_crudo` — actualizar esta
+fila del MD junto con el cambio, no antes.
 
-> **Corrección al MD (2026-09-27).** La versión anterior de este caso pedía "sesión con acceso de
-> lectura a Solicitud (Ejecutivo o Supervisor)" para abrir la app y descargar el archivo a mano. Es
-> un error de alcance: los dos campos que este caso necesita (`_name`) se leen por Web API sin
-> ninguna sesión de aplicación — la verificación es más simple de lo que decía la hoja anterior, el
-> obstáculo real siempre fue (y sigue siendo) el correo real, no la falta de acceso a la app.
+**Automatizable.** `API` (`correr.py C`, caso `C-06`, sobre la Solicitud real que deja `c05()` en
+la misma corrida — Web API, sin navegador). **Corrección 2026-09-28, DOBLE.**
+
+1. **Se destrabó** por lo mismo que C-05: acceso real al buzón de ingesta, ya operativo.
+2. **Se corrigió la premisa del `.eml`.** La versión anterior de este caso esperaba que
+   `sanic_correocrudo_name` trajera "el nombre real que Outlook le dio al mensaje". **Es falso, y
+   no es un defecto**: se verificó hoy, contra el `clientdata` **DESPLEGADO** de `MPPP-ING`
+   (`workflows`, no el repo — mismo criterio que ya usó D-62), que `Guardar_el_correo_crudo` fija
+   `"x-ms-file-name": "correo.eml"` a mano, **igual con correo real que con el simulado** — no hay
+   ningún paso del flujo que calcule ese nombre a partir del mensaje. `simulador.py` ya subía el
+   mismo nombre fijo por la misma razón (imita al flujo, no lo simplifica). La parte "nombre real"
+   de este caso SIEMPRE fue, y solo puede ser, sobre `sanic_exceloriginal_name` (el Excel, que sí
+   usa `@first(variables('excels'))?['name']`, tomado de los adjuntos reales del correo) — eso es
+   lo que el correo real prueba de más que el simulador: que `MPPP-ING` lee el nombre del adjunto
+   de un mensaje GENUINO de Outlook/Graph, no que arme un nombre para el `.eml`.
+
+> **Corrección al MD (2026-09-27, sigue vigente).** La versión anterior de este caso pedía "sesión
+> con acceso de lectura a Solicitud (Ejecutivo o Supervisor)" para abrir la app y descargar el
+> archivo a mano. Los dos campos `_name` se leen por Web API sin ninguna sesión de aplicación — eso
+> ya estaba bien corregido; lo que faltaba corregir (2026-09-28) era la expectativa sobre el `.eml`.
 
 ---
 
@@ -467,65 +499,52 @@ reutiliza) un Autorizado con una `AutorizacionCliente` hacia un Cliente dado, si
 (`10-autorizacion-cliente.md`), que hoy arma esto mismo a mano con `dataverse_api.py POST` según su
 propio README.
 
+**Nuevo 2026-09-28, de C-05/C-06.** `sets/set_c.py::_q()` url-encodea la `ruta` antes de pasarla a
+`graph_api.Graph.call()` — `graph_api.py` NO lo hace (a diferencia de `dataverse_api.Dataverse.call()`,
+que sí tiene un `safe=` explícito), así que cualquier `$filter` de Graph con espacios revienta con
+`InvalidURL`. Se resolvió local (este set no es dueño de `graph_api.py`) pero es un defecto real del
+propio `graph_api.py`, no algo para repetir en cada set que lo use — candidato a corregir en
+`graph_api.py::Graph.call()` directamente (el mismo `safe=` que ya usa `dataverse_api.py`) la próxima
+vez que alguien lo toque. `_folders_buzon_ingesta()`, `_mensaje_por_asunto_en_carpeta()`,
+`_esperar_mensaje_en_carpeta()` y `_limpiar_correo_real()` son candidatas a subir a un módulo común si
+otro set real necesita correo real contra un buzón de Graph con carpetas (hoy `set_v.py::v02()` y
+`set_m.py` ya tienen su propia versión de "mandar y esperar", con otro criterio de correlación —
+asunto contra Dataverse, no carpeta de Graph — así que no son el mismo helper todavía).
+
 ---
 
 ## Resultados
 
-Última corrida: **2026-09-27**, `python3 herramientas/pruebas/correr.py C` contra Dev. 5 OK · 4
-FALLA · 2 N-A.
+Última corrida: **2026-09-28**, `python3 herramientas/pruebas/correr.py C` contra Dev. **11 OK · 0
+FALLA · 0 N-A** — los 11 casos, incluidos C-05/C-06 (correo real contra
+`mppp@55xljh.onmicrosoft.com`), en verde. Verificado aparte, después de cerrar el set: cero correos
+`ZZP-C05C06-*` residuales en el buzón real (`$filter=startswith(subject,'ZZP-C05C06')` → 0
+resultados) y cero Solicitudes `ZZP-C05C06-*` residuales en Dataverse — la limpieza de
+`cerrar()` funcionó de punta a punta.
 
 | Caso | Solicitud | Resultado | Notas |
 |---|---|---|---|
 | C-01 camino feliz | (borrada al cerrar) | **OK** | |
-| C-02 respuesta no se procesa | (borrada al cerrar) | **FALLA** | `sanic_mppp_capi_clasificarcorreo` responde HTTP 400 antes de llegar a ningún `check()` propio — ver "Defecto encontrado" abajo |
+| C-02 respuesta no se procesa | (borrada al cerrar) | **OK** | ver "Defecto ya resuelto" abajo |
 | C-03 reenvío sí se procesa | (borrada al cerrar) | **OK** | |
-| C-04 remitente no reconocido | (borrada al cerrar) | **FALLA** | mismo defecto que C-02 (mismo camino `!procesar`) |
-| C-05 el correo se mueve | — | **N-A** | ver el caso arriba |
-| C-06 el `.eml`/excel con nombre real | — | **N-A** | ver el caso arriba |
+| C-04 remitente no reconocido | (borrada al cerrar) | **OK** | |
+| C-05 el correo se mueve y cambia de identificador | (borrada al cerrar; correo real borrado del buzón) | **OK** | primera corrida con acceso real al buzón de ingesta |
+| C-06 el Excel con nombre real (el `.eml`, fijo) | (misma Solicitud que C-05) | **OK** | |
 | C-07 no duplica | (borrada al cerrar) | **OK** | |
 | C-08 sin adjunto | (borrada al cerrar) | **OK** | |
 | C-09 DN-01 modo cliente entra | (borrada al cerrar) | **OK** | |
-| C-10 DN-01 modo plan no entra (mismo correo) | (borrada al cerrar) | **FALLA** | mismo defecto (camino `!procesar`, `remitente_no_reconocido`) |
-| C-11 DN-01 valor basura degrada | (borrada al cerrar) | **FALLA** | la parte (a) (`remitente_no_reconocido`) pega el mismo defecto ANTES de poder ejercitar la parte (b); la parte (b) (autorizado por plan, camino `nuevo`) no llegó a correr |
+| C-10 DN-01 modo plan no entra (mismo correo) | (borrada al cerrar) | **OK** | |
+| C-11 DN-01 valor basura degrada | (borrada al cerrar) | **OK** | |
 
-### Defecto encontrado (no es de este set, es de `ClasificarCorreo`)
+### Defecto ya resuelto (no era de este set, era de `ClasificarCorreo`)
 
-Las cuatro FALLA de arriba **no son un problema de las reglas de nivel Correo ni de DN-01**: la
-Custom API revienta ANTES de terminar, con un error genérico
-(`"No se pudo clasificar el correo. El equipo tecnico ya tiene el detalle."`, HTTP 400) cada vez
-que la clasificación NO es `nuevo`/`reenvio` (es decir, cada vez que `!procesar`, que es exactamente
-cuando el diseño manda avisar a los ejecutivos en vez de comunicarse con el cliente).
-
-**Causa raíz, confirmada en `plugintracelogs` (2026-09-27, reproducido 4/4 veces, aislado sin
-ningún otro proceso corriendo):**
-
-```
-System.InvalidCastException: Unable to cast object of type 'System.Guid' to type 'Microsoft.Xrm.Sdk.EntityReference'.
-   at Microsoft.Xrm.Sdk.Entity.GetAttributeValue[T](String attributeLogicalName)
-   at Sanic.Mppp.Plugins.Datos.AvisosDataverse.<>c.<AvisarAEjecutivos>b__4_1(Entity e)
-   ...
-   at Sanic.Mppp.Plugins.Datos.AvisosDataverse.AvisarAEjecutivos(Guid solicitudId, String titulo, String cuerpo)
-   at Sanic.Mppp.Plugins.Api.ClasificarCorreo.Ejecutar(Guid solicitudId, DateTime ahoraUtc)
-```
-
-`src/Sanic.Mppp.Plugins/Datos/Avisos.cs:106-111` consulta `systemuserroles` (la tabla nativa de
-intersección N:N de roles) y hace `e.GetAttributeValue<EntityReference>("systemuserid")`. En una
-entidad de intersección, Dataverse devuelve las columnas del vínculo como `Guid` **plano**, no como
-`EntityReference` (a diferencia de un lookup en una tabla normal) — el cast revienta siempre que la
-consulta trae al menos una fila, o sea, siempre que exista al menos un usuario con el rol
-`SR - MPPP - Ejecutivo` asignado (que es el estado normal de Dev: las cuatro sesiones de
-`CONVENCIONES.md` §6 ya existen).
-
-**Alcance real, más allá de este set.** Como el plugin corre dentro de la transacción de la Custom
-API, la excepción revierte TODO lo que `Ejecutar` ya había hecho (`GuardarResultados`, `Clasificar`,
-el evento de Bitácora "Correo clasificado" — se confirmó con `leer_bitacora()` sobre una Solicitud
-de diagnóstico: quedó vacía). En un entorno real, **cualquier correo real que sea una respuesta o
-que venga de un remitente no reconocido queda atascado en Ingresada para siempre**, sin acuse (es
-lo esperado, DF-08), pero TAMPOCO con el aviso interno a los ejecutivos que el diseño prevé como
-compensación — falla exactamente el mecanismo que se supone que avisa que algo no se procesó.
-
-**No se toca `src/` desde este set** (este agente es dueño de exactamente dos archivos). Queda
-reportado acá con la evidencia completa para que quien mantiene `diseno/PENDIENTES.md` lo registre
-con su propio ID. Arreglo sugerido, una vez que se decida: en
-`src/Sanic.Mppp.Plugins/Datos/Avisos.cs:109`, `e.GetAttributeValue<Guid>(ColumnaIdUsuario)` en vez
-de `e.GetAttributeValue<EntityReference>(ColumnaIdUsuario).Id`.
+La corrida del 2026-09-27 (5 OK · 4 FALLA · 2 N-A) había encontrado que C-02/C-04/C-10/C-11 (todo
+caso por el camino `!procesar`) fallaban con HTTP 400 genérico
+(`"No se pudo clasificar el correo. El equipo tecnico ya tiene el detalle."`) por un
+`InvalidCastException` en `src/Sanic.Mppp.Plugins/Datos/Avisos.cs:109`
+(`GetAttributeValue<EntityReference>` sobre una columna de `systemuserroles` que Dataverse devuelve
+como `Guid` plano). **Confirmado RESUELTO**: el commit `999f9fb` ("fix(plugins): D-59
+systemuserroles.systemuserid llega como Guid, no EntityReference") corrigió exactamente esa línea,
+y la corrida de hoy (2026-09-28) confirma las cuatro en **OK**, sin el HTTP 400. No se tocó `src/`
+desde este set (este agente es dueño de exactamente dos archivos) — el resuelto se confirma por la
+corrida en verde y el commit, no por leer el código de nuevo.
