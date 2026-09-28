@@ -36,6 +36,7 @@ Se **genera**, no se dibuja a mano: `python3 herramientas/generar_er.py`. Cuando
 | DD-18 | **Auditoría nativa activada en los catálogos** (Cliente, Plan, Autorizado, AutorizacionPlan, Parametro, Regla), tabla y columnas; **desactivada en la unidad histórica** (Solicitud, Fila, ResultadoRegla, Bitacora). **Notas y actividades desactivadas en todas.** | Aprobado por el aprobador el 2026-09-20. En un banco importa quién cambió un CIF, una autorización o un parámetro, y los catálogos tienen poco volumen. La unidad histórica ya lleva su trazabilidad en columnas propias y en la Bitácora (D-06), y su volumen es alto. La auditoría solo registra si además está activada a nivel de entorno. Notas y actividades se pueden activar después; desactivarlas, no. |
 | DD-19 | **El nombre visible de cada columna se fija en el playbook de su tabla** (`playbooks/tabla/`), no acá. | Este diccionario define nombres lógicos, tipos y reglas. El nombre visible es texto de negocio que se puede cambiar después sin romper nada; el nombre lógico, no. |
 | DD-20 | **Las primarias de Regla, ResultadoRegla y Bitácora son autonuméricas y opcionales**: `REG-{SEQNUM:4}`, `RES-{SEQNUM:10}` y `BIT-{SEQNUM:10}`. Se llenan solas; nadie las digita ni las calcula. | Decisión del aprobador (2026-09-20), al cerrar D-4 y D-5. Cumple BP-PP-192 (la primaria nunca es texto libre) sin un plugin más: en esas tres tablas el nombre tiene poca relevancia (`01` §4), y lo que identifica al registro es otra cosa (el código de la regla; la solicitud y el código de regla; la solicitud y la fecha del evento). Bitácora deja de necesitar el step de nombre calculado. |
+| DD-21 | **Retención de auditoría de la organización subida de 30 a 365 días** (`organization.auditretentionperiodv2`), aplicada y verificada en Dev el 2026-09-28. **El número es un SUPUESTO del agente que cierra D-53, pendiente de confirmación del aprobador**: nadie especificó el valor, el aprobador pidió proceder sin preguntar, y 365 días es la dirección segura (guarda más historia, nunca menos) y reversible (se puede volver a bajar en un `PATCH`). Ver detalle y procedimiento en §2.5-bis. | D-53 (`PENDIENTES.md`): la auditoría nativa de `sanic_mppp_tbl_parametro` ya registraba quién cambia qué, pero con 30 días de retención la CONSTANCIA de un aval de riesgo (C-03) se borraba antes de que alguien la necesitara. |
 
 ## 1. Choices globales
 
@@ -160,6 +161,31 @@ Resuelve la relación N:N entre correos autorizados y clientes: un mismo correo 
 - `plantilla.obligatoriedad`: lista de excepciones sobre un valor por defecto: `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}],"reglas":[{"gestion":"Exclusion","clasificacion":"*","formato":"*","opcionales":["moneda","banco"]}]}`; arranca con todo obligatorio salvo Referencia (DD-16) y crece cuando el negocio escriba la matriz. DN-03 agrega `porGestion`, el atajo solo-por-gestión que además puede endurecer: `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}],"porGestion":{"Exclusion":{"opcionales":[{"campo":"numeroCuenta"},{"campo":"banco"}]},"Modificacion":{"obligatorios":[{"campo":"referencia"}]}}}`.
 
 Largos de la plantilla vigente (ficha §9): Nombre ≤44 · Identificación 1–16 · Referencia ≤20 · Cuenta 1–16.
+
+### 2.5-bis Retención de auditoría (nivel organización, NO es una fila de Parámetro) — DD-21, D-53
+
+**No confundir con `retencion.dias.general` / `retencion.dias.noreconocidas` de §2.5**: esos dos son parámetros de NEGOCIO que consume el job de purga de fase 3 sobre la unidad histórica (D-35). Esto de acá es otra cosa: **cuánto tiempo guarda Dataverse el registro de auditoría nativo** (quién cambió qué, cuándo y con qué valores) — la columna `AuditRetentionPeriodV2` de la tabla `organization`, que **no vive en `sanic_mppp_tbl_parametro`** y por lo tanto **`herramientas/construir/datos.py` no la toca ni la ve**.
+
+**Estado verificado en Dev (2026-09-28)**: subida de **30 a 365 días** (DD-21). Confirmado contra Microsoft Learn (*Configure auditing*, tabla "Organization table columns"): `auditretentionperiodv2` es un entero, 1 a 365.000 días, `-1` = para siempre, default 30. **Sí se puede por Web API**, con el mismo service principal `# PowerPlatform-Dev` (System Administrator) que usa `herramientas/dataverse_api.py` — no hace falta el centro de administración ni un rol distinto.
+
+**Procedimiento exacto (dos minutos, el mismo en Test y en Producción)**, con el service principal de ese entorno:
+
+```bash
+# 1. Leer el valor actual (opcional, para confirmar antes de tocar nada)
+python3 herramientas/dataverse_api.py GET "organizations?\$select=organizationid,isauditenabled,auditretentionperiodv2"
+
+# 2. Escribir el valor nuevo (365 = un año; usar el organizationid que devolvió el paso 1)
+python3 herramientas/dataverse_api.py PATCH "organizations(<organizationid>)" '{"auditretentionperiodv2": 365}'
+
+# 3. Releer para verificar
+python3 herramientas/dataverse_api.py GET "organizations?\$select=organizationid,auditretentionperiodv2"
+```
+
+Se aplicó y se verificó así en Dev el 2026-09-28 (30 → 365, confirmado leyendo de vuelta). **Ojo**: Learn aclara que un cambio de retención no alcanza a los registros de auditoría YA escritos — cada registro queda con la retención vigente en el momento en que se creó; la retención nueva rige para lo que se audite de ahí en adelante. Cambiar el valor es en sí mismo un evento auditado (la tabla `organization` está entre las que la plataforma audita).
+
+**Por qué 365 y no otro número**: es un SUPUESTO (ver DD-21), no una cifra que haya dado el aprobador. Cambiarlo después es el mismo `PATCH` de arriba con otro número; no rompe nada.
+
+**Para que viaje a Test y a Producción**: esto **no es un componente de la solución** (no hay `customizations.xml` que lo lleve) y **no vive en ningún playbook**: un entorno nuevo nace siempre con el valor por defecto (30 días), y nadie se va a acordar de subirlo si no queda en una lista de pasos de puesta en marcha. **Pendiente para el coordinador**: agregar este procedimiento como paso de `06-inventario-componentes.md` §13 (puesta en marcha / migración), junto a los demás pasos manuales que no viajan solos (ej. D-49). No se agregó acá porque `06` no es un documento de este defecto.
 
 ### 2.6 `sanic_mppp_tbl_regla` (CatálogoReglas de solicitud, RF-06, D-04)
 | Columna | Tipo | Req | Nota |
