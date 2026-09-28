@@ -75,6 +75,7 @@ class Graph:
             "Content-Type": "application/json; charset=utf-8",
         }
         h.update(cabeceras or {})
+        ruta = urllib.parse.quote(ruta, safe="/?&=$(),'@._-:")
         req = urllib.request.Request(
             self.api + ruta, method=metodo, headers=h,
             data=json.dumps(cuerpo).encode() if cuerpo is not None else None)
