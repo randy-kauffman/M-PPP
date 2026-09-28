@@ -27,26 +27,51 @@ archivos nuevos (`09`–`13`) usan prefijos que no colisionan con esos ni entre 
 | Herramienta | Para qué | Identidad que usa |
 |---|---|---|
 | `herramientas/pruebas/como_rpa.py` | solo verifica que la puerta D-9 deje pasar | el bot (`local/rpa_cred.env`) |
-| `herramientas/pruebas/probar_rpa.py [--maximo=N] [--claimminutos=N] [--confirmar]` | ciclo completo: pide lote, muestra el contrato, registra resultados, marca atención manual | el bot (`local/rpa_cred.env`) |
-| `herramientas/pruebas/actuar_fila.py <Solicitud> <accion> [--fila N] [--motivo "..."]` | actuar como una **persona** (vía service principal) — necesario para chocar contra el claim | service principal (`local/pp_secrets.env`) |
+| `herramientas/pruebas/probar_rpa.py [--maximo=N] [--claimminutos=N] [--confirmar]` | ciclo completo, para correr a mano | el bot (`local/rpa_cred.env`) |
+| `herramientas/pruebas/sets/set_b.py` | **la automatización de este archivo** (`correr.py B`): reusa `probar_rpa.Bot` para llamar como el bot, con asserts en vez de `print()` | el bot, y el service principal para todo lo demás |
 | `herramientas/pruebas/ver_solicitud.py <Solicitud\|--ultima\|--parametros>` | inspección de solo lectura | service principal |
 | `herramientas/dataverse_api.py GET\|POST "<recurso>" '<json>'` | llamadas directas (roles, parámetros, o para provocar un rechazo con una identidad que NO es el bot) | service principal |
 
 Ninguna de estas herramientas se edita ni se ejecuta desde acá: los comandos de abajo son los que
-**quien corra la prueba** tiene que teclear.
+**quien corra la prueba a mano** tiene que teclear. La corrida automatizada la hace
+`herramientas/pruebas/sets/set_b.py` (`python3 herramientas/pruebas/correr.py B`).
+
+> **`actuar_fila.py` NO sirve para los casos que impersonan "una persona" contra el claim o la
+> segregación de funciones** (B-07, B-12, B-18, B-20). Esa herramienta actúa siempre como el service
+> principal de `local/pp_secrets.env`, y ese service principal — verificado en vivo el 2026-09-27
+> (`# PowerPlatform-Dev`, con `WhoAmI` + `systemuserroles_association`) — **solo tiene el rol
+> `System Administrator`**, ningún rol de negocio. `actuar_fila.py` exige el rol de negocio
+> (`SR - MPPP - Ejecutivo`/`Supervisor`) ANTES de escribir nada, así que con el service principal esos
+> comandos fallan con "necesita el rol ... y no lo tiene" — nunca llegan a chocar contra el claim ni
+> contra la segregación, que es justo lo que esos casos quieren ver. La forma correcta, ya usada en
+> `08-integridad-y-plugins.md` (I-13), es impersonar directo a un usuario real con el rol
+> (`local/sesion-ejecutivo.json` es `User1` = Ejecutivo; `local/sesion-supervisor.json` es `User2` =
+> Supervisor) con la cabecera `MSCRMCallerID` sobre una llamada del service principal — verificando
+> antes el rol contra `systemuserroles_association`, nunca supuesto. Los casos de abajo ya lo dicen
+> así; `set_b.py` lo implementa así.
 
 ## Preparativos comunes a todo este archivo
 
+Los deja listos `set_b.py` por su cuenta (CONVENCIONES §8): datos de negocio (fixture `PR*` +
+remitente propio de este set), los 15 Excel, la autenticación del bot (`local/rpa_cred.env`, nunca
+leído ni impreso), y User1/User2 verificados por rol. **Este archivo no depende de haber corrido
+antes `01`/`02`/`03` ni ningún otro set** — cada caso arma su propia Solicitud con
+`E01-feliz-formato11.xlsx` (3 Filas Validada, misma `fechavalidada`: sirve tanto para el desempate de
+FIFO como para armar lotes). Eso reemplaza lo que decía la versión anterior de esta sección ("correr
+cualquier caso de `01`/`02`/`03`"), que violaba CONVENCIONES §8 (un set no depende de otro).
+
+Para correr un caso suelto A MANO (fuera de `set_b.py`) sigue haciendo falta:
+
 - Rol `SR - MPPP - RPA` instalado (inventario 6.7) y app user `# MPP-RPA` con ese rol asignado
   (13.5), con sus credenciales en `local/rpa_cred.env` (no se toca ni se lee acá).
-- `local/pp_secrets.env` con una identidad de service principal para `actuar_fila.py` y
-  `dataverse_api.py` (ya lo usan las pruebas 03/06/08).
-- Al menos una Solicitud con Filas en **Validada** (correr cualquier caso de `01`/`02`/`03`, o
-  crear filas directo con `dataverse_api.py`). Varios casos de acá abajo piden **más de una** fila
-  Validada a la vez: usar un Excel con varias filas (`E01-feliz-formato11.xlsx` trae 3).
-- Parámetros sembrados: `rpa.horas.tolerancia`, `rpa.minutos.claimmaximo`, `rpa.lote.maximo`
-  (hoy **100**, confirmar con `ver_solicitud.py --parametros` porque es configurable),
-  `rpa.codigos` (con al menos `OK` y `RECH-GEN`), `rpa.puedeaprobar`.
+- `local/pp_secrets.env` con una identidad de service principal para `dataverse_api.py`.
+- Al menos una Solicitud con Filas en **Validada** (crear filas con `dataverse_api.py`, o correr
+  `set_b.py`, que las arma sola). Varios casos de acá abajo piden **más de una** fila Validada a la
+  vez: usar un Excel con varias filas (`E01-feliz-formato11.xlsx` trae 3).
+- Parámetros sembrados: `rpa.horas.tolerancia`, `rpa.minutos.claimmaximo`, `rpa.lote.maximo` (canon
+  **100**, CONVENCIONES §8.2 — confirmar con `ver_solicitud.py --parametros` antes de asumirlo:
+  distinto del tope DURO de 500 de `maximo` en `obtenerfilaspendientes`, que no es un parámetro, está
+  fijo en el código), `rpa.codigos` (con al menos `OK` y `RECH-GEN`), `rpa.puedeaprobar`.
 - Datos ficticios, descartables con `zz`/`ZZ`. Ninguna fila con datos reales de clientes.
 
 ---
@@ -65,11 +90,16 @@ seguridad de la plataforma. Anotado el nombre exacto y el `roleid` vigente de `S
 para poder restaurarlo; una ventana de Dev donde nadie más esté corriendo pruebas de fase 2 (este
 caso apaga la puerta para **todo** el entorno mientras dura).
 
-> **ADVERTENCIA — alto riesgo de entorno compartido.** Este caso rompe temporalmente el acceso del
-> bot real para TODO Dev. Ya existe cobertura sin este riesgo: `PuertaDelRpaAceptacion` (8 pruebas
-> unitarias, 7 de rechazo, en verde — `diseno/FASE2-ESTADO.md`) prueba esta rama con un doble en
-> memoria. Si no hay necesidad de la confirmación end-to-end, anotar **N/A** con el motivo "cubierto
-> a nivel unitario, no se repite contra Dev compartido sin necesidad".
+> **DECISIÓN (2026-09-27, migración a `set_b.py`): este caso queda SIEMPRE N-A en la corrida
+> automatizada, sin excepción.** Rompe temporalmente el acceso del bot real para TODO Dev, y esta
+> migración corrió con **cuatro agentes automatizados en paralelo sobre el mismo entorno compartido**
+> — no hay ventana segura para tomarlo, ni siquiera "rápido": cualquier otro set que en ese momento
+> llame a una Custom API del RPA (el propio `set_b.py` incluido) se rompería sin que sea un defecto
+> del sistema. Ya existe cobertura sin este riesgo: `PuertaDelRpaAceptacion` (8 pruebas unitarias, 7
+> de rechazo, en verde — `diseno/FASE2-ESTADO.md`) prueba esta rama con un doble en memoria — el mismo
+> precedente que ya usó I-12 para no repetir un riesgo de entorno sin necesidad. Si alguna vez hace
+> falta la confirmación end-to-end contra Dev de verdad, es una operación MANUAL, coordinada con quien
+> más esté usando el entorno en ese momento, nunca parte de una corrida automática.
 
 **Cómo.**
 1. `dataverse_api.py GET "roles?$filter=name eq 'SR - MPPP - RPA'&$select=roleid,name"` y anotar el
@@ -89,8 +119,10 @@ las dos Custom API devuelve `MPPP-RPA-007` citando el nombre del rol.
 `MPPP-RPA-007` ("el rol no está creado"), la comprobación del rol no corrió primero: es la MISMA
 confusión de horas del 2026-09-22, reaparecida.
 
-**Automatizable.** Manual, alto riesgo — requiere ventana exclusiva y restauración inmediata. La
-cobertura repetible y segura es la unitaria, ya cerrada.
+**Automatizable.** API, pero `set_b.py` lo reporta **siempre N-A por política** (ver la DECISIÓN más
+arriba): nunca toca el rol real. Si algún día se necesita correrlo de verdad, es manual, alto riesgo,
+requiere ventana exclusiva y restauración inmediata — la cobertura repetible y segura mientras tanto
+es la unitaria, ya cerrada.
 
 ---
 
@@ -99,18 +131,21 @@ cobertura repetible y segura es la unitaria, ya cerrada.
 **Qué prueba.** Las dos condiciones de D-9 fallan cerrado: una persona (sin `applicationid`) nunca
 pasa, y un app user CON `applicationid` pero SIN el rol tampoco.
 
-**Necesita.** Un usuario humano cualquiera con sesión válida en `dataverse_api.py`
-(`local/pp_secrets.env`, que ya es una identidad de service principal — sirve para el sub-caso "sin
-el rol" si ese SP no tiene `SR - MPPP - RPA` asignado; confirmarlo antes con
-`dataverse_api.py GET "systemusers(...)/systemuserroles_association?$select=name"`).
+**Necesita.** Dos identidades: (a) el service principal de `local/pp_secrets.env` — **verificado en
+vivo el 2026-09-27**: SÍ es una identidad de aplicación, pero solo tiene el rol `System
+Administrator`, ningún rol de negocio, así que sirve para el sub-caso "identidad de aplicación sin el
+rol"; y (b) un usuario humano real (`User1`, sin `applicationid`) para el sub-caso "sin identidad de
+aplicación" — impersonado con la cabecera `MSCRMCallerID` sobre una llamada del service principal, no
+hace falta su sesión de navegador ni su MFA para esto.
 
 **Cómo.**
-1. `dataverse_api.py POST "sanic_mppp_capi_obtenerfilaspendientes" ''` (Function: en realidad va
-   por querystring, `GET "sanic_mppp_capi_obtenerfilaspendientes(maximo=5,claimminutos=5)"`) con la
-   identidad del service principal.
-2. Repetir contra `sanic_mppp_capi_registrarresultadorpa` (Action, POST).
+1. `dataverse_api.py GET "sanic_mppp_capi_obtenerfilaspendientes(maximo=5,claimminutos=5)"` con la
+   identidad del service principal (sub-caso "aplicación sin el rol").
+2. Repetir contra `sanic_mppp_capi_registrarresultadorpa` (Action, POST, cuerpo `{"resultados":"[]"}`).
+3. La misma llamada del paso 1, pero con la cabecera `MSCRMCallerID` puesta al `systemuserid` de
+   `User1` (sub-caso "persona sin identidad de aplicación").
 
-**Qué tiene que pasar.** Las dos llamadas rechazadas con `MPPP-RPA-006`.
+**Qué tiene que pasar.** Las tres llamadas rechazadas con `MPPP-RPA-006`.
 
 **Cómo se verifica.** El mensaje de error de cada llamada.
 
@@ -161,6 +196,13 @@ trae 3 filas que se validan juntas, sirve para el desempate.
 2. Anotar qué `filaid`/número de fila vino.
 3. `python3 herramientas/pruebas/probar_rpa.py --maximo=2` de nuevo, **sin** haber reportado nada
    (el claim no excluye: ver B-09).
+
+> **Nota de la automatización (`set_b.py`).** Corriendo contra un Dev COMPARTIDO no se puede asumir
+> que las 3 filas de este caso sean las únicas pendientes (CONVENCIONES §8: un set autocontenido no
+> asume un entorno ajeno vacío). `set_b.py` pide con `maximo=500` (el tope duro, para traer toda la
+> cola) y filtra el resultado por el número de SU PROPIA Solicitud, verificando el orden relativo
+> entre sus 3 filas — equivalente a lo de arriba, pero no se rompe si hay otras filas pendientes de
+> otro origen.
 
 **Qué tiene que pasar.** Las mismas 2 primeras filas por orden de `numerofila` (a igual
 `fechavalidada`), en el mismo orden las dos veces.
@@ -239,22 +281,22 @@ aceptan silenciosamente un valor sin sentido.
 entrega; mientras esté vigente, una persona no puede transicionarla, y el mensaje dice CUÁNTO
 FALTA, nunca una hora (Nicaragua es UTC-6 y una hora sin convertir miente).
 
-**Necesita.** Una Fila Validada; una identidad de "persona" para `actuar_fila.py` (el service
-principal cuenta, porque para el plugin es una identidad distinta de la del bot — ver el
-encabezado de `actuar_fila.py`).
+**Necesita.** Una Fila Validada; un usuario real con el rol `SR - MPPP - Ejecutivo` (`User1`).
+**No** sirve `actuar_fila.py` con el service principal (ver el aviso al principio de este archivo):
+se impersona a `User1` directo con `MSCRMCallerID`.
 
 **Cómo.**
 1. `python3 herramientas/pruebas/probar_rpa.py --claimminutos=10` (deja el claim puesto aunque no
    se confirme: "ponerlo es parte de entregar").
 2. Anotar el `filaid` devuelto.
-3. `python3 herramientas/pruebas/actuar_fila.py <Solicitud> digitar --fila <N>` sobre esa misma
-   fila, dentro de los 10 minutos.
+3. Un `PATCH` a `sanic_mppp_tbl_filas(<filaid>)` con `{"sanic_estado": 159460004}` (Digitada),
+   con la cabecera `MSCRMCallerID` puesta al `systemuserid` de `User1`, dentro de los 10 minutos.
 
 **Qué tiene que pasar.** El paso 3 se rechaza con un mensaje del tipo "La fila está reservada por
 el proceso automático; se libera en N minutos." (o "en menos de un minuto"), **nunca** "no
 autorizado" ni una hora del reloj.
 
-**Cómo se verifica.** El mensaje de rechazo de `actuar_fila.py`.
+**Cómo se verifica.** El mensaje de error del `PATCH` del paso 3.
 
 **Cómo se sabe que falló.** Si la transición se permite (el claim no frena), o si el mensaje dice
 una hora en vez de una duración (bug ya documentado y corregido una vez — ver
@@ -272,11 +314,15 @@ reporte tiene que aceptarse igual — lo contrario crearía divergencia con AS40
 pasó ahí).
 
 **Necesita.** Una Fila Validada; posibilidad de pedir un claim MUY corto (1 minuto) y esperar a que
-venza antes de reportar.
+venza antes de reportar — o, equivalente y más rápido (lo que usa `set_b.py`, mismo mecanismo que
+`08-integridad-y-plugins.md` I-13): forzar `sanic_claimhasta` a un pasado reciente con un `PATCH`
+directo del service principal (identidad de aplicación: no entra a la lista blanca de una persona,
+pero sí la escribe una identidad de aplicación) en vez de esperar el minuto real.
 
 **Cómo.**
 1. `python3 herramientas/pruebas/probar_rpa.py --claimminutos=1` y anotar el `filaid`.
-2. Esperar más de 1 minuto (sin que nadie más actúe sobre la fila).
+2. Esperar más de 1 minuto (sin que nadie más actúe sobre la fila) — o, más rápido:
+   `dataverse_api.py PATCH sanic_mppp_tbl_filas(<filaid>) '{"sanic_claimhasta":"<5 minutos atrás, con Z>"}'`.
 3. `dataverse_api.py POST sanic_mppp_capi_registrarresultadorpa` (como el bot) con
    `{"resultados":"[{\"filaid\":\"<id>\",\"resultado\":\"digitada\",\"codigo\":\"OK\",\"fechaproceso\":\"<ahora ISO con Z>\"}]"}`.
 
@@ -380,12 +426,13 @@ bot va a intentar aprobar, va a fallar, y va a reintentarlo en cada corrida dura
 **Qué prueba.** `SeleccionParaElRpa.EntraEnElLote` compara contra el usuario que llama, no contra
 "cualquiera con el rol del RPA": el bot no aprueba lo que digitó una persona.
 
-**Necesita.** Una Fila Validada; `actuar_fila.py` (identidad de service principal, no del bot) para
-digitarla como si fuera una persona.
+**Necesita.** Una Fila Validada; un usuario real con el rol `SR - MPPP - Ejecutivo` (`User1`) para
+digitarla como una persona — **no** `actuar_fila.py` con el service principal (ver el aviso al
+principio de este archivo): se impersona a `User1` directo con `MSCRMCallerID`.
 
 **Cómo.**
-1. `python3 herramientas/pruebas/actuar_fila.py <Solicitud> digitar --fila <N>` (la digita el
-   service principal, NO el bot).
+1. Un `PATCH` a la Fila con `{"sanic_estado": 159460004}` (Digitada), con `MSCRMCallerID` puesto al
+   `systemuserid` de `User1` (la digita una persona, NO el bot).
 2. `python3 herramientas/pruebas/probar_rpa.py` — pedir el lote como el bot.
 
 **Qué tiene que pasar.** Esa fila (Digitada, pero por otra identidad) **no** aparece en el lote del
@@ -434,15 +481,19 @@ es 4xx (se estaría tratando como error de la LLAMADA cuando es de la fecha de U
 **Qué prueba.** Los cuatro códigos restantes del catálogo por ítem, en un solo lote (mismo espíritu
 que `probar_rpa.py` paso 3: un lote mixto no debe arrastrar lo malo sobre lo bueno).
 
-**Necesita.** Al menos una Fila Validada real (para el ítem bueno) y tres `filaid` inventados o
-incompletos.
+**Necesita.** Tres Filas Validada reales, DISTINTAS (una por ítem que sí resuelve a una fila), y un
+`filaid` inventado para el ítem que no. **No repetir la misma fila real en dos ítems del mismo
+lote**: `probar_rpa.py` ya deja anotado que dos operaciones sobre la MISMA fila dentro de un lote
+rompen la llamada ENTERA, no solo el ítem — y acá se necesitan los cuatro resultados por separado
+para verificar que ninguno arrastra a los demás.
 
 **Cómo.** Un lote de 4 ítems en una sola llamada a `registrarresultadorpa`:
 1. `filaid` de un GUID que no existe → esperar `MPPP-RPA-001`.
-2. `resultado: "aprobadaXYZ"` (no es ninguno de los 4 valores válidos) → `MPPP-RPA-002`.
-3. `resultado: "rechazada"` **sin** `mensaje` → `MPPP-RPA-004`.
-4. `codigo: "NO-EXISTE-ESTE-CODIGO"` sobre una fila real, `resultado: "rechazada"` con `mensaje` →
-   `MPPP-RPA-005`.
+2. Sobre una fila real: `resultado: "aprobadaXYZ"` (no es ninguno de los 4 valores válidos) →
+   `MPPP-RPA-002`.
+3. Sobre OTRA fila real: `resultado: "rechazada"` **sin** `mensaje` → `MPPP-RPA-004`.
+4. Sobre una TERCERA fila real: `codigo: "NO-EXISTE-ESTE-CODIGO"`, `resultado: "rechazada"` con
+   `mensaje` → `MPPP-RPA-005`.
 
 **Qué tiene que pasar.** HTTP 200, `conerror: 4`, cada ítem con su código propio en `error`, y
 ninguno afecta a los demás.
@@ -534,14 +585,16 @@ lote): eso perdería hechos reales de AS400, que es justo lo que este diseño ev
 pero ese booleano tapa DOS situaciones opuestas ("ya me lo dijiste" vs. "una persona actuó antes") y
 el bot tiene que decidir por `estadofila`, nunca por `yaregistrado`.
 
-**Necesita.** Una Fila Validada real; `actuar_fila.py` para simular que una persona actuó en el
-medio.
+**Necesita.** Una Fila Validada real; un usuario real con el rol `SR - MPPP - Ejecutivo` (`User1`)
+para simular que una persona actuó en el medio — **no** `actuar_fila.py` con el service principal
+(ver el aviso al principio de este archivo): se impersona a `User1` directo con `MSCRMCallerID`.
 
 **Cómo.**
 1. Reportar `digitada` sobre la fila (como el bot).
 2. Repetir EXACTAMENTE el mismo reporte (`digitada`, mismo `filaid`).
-3. Sobre otra Fila Validada: reportar `digitada` como el bot, y luego `actuar_fila.py <Solicitud>
-   anular --fila <N> --motivo "prueba B-18"` (una persona anula).
+3. Sobre otra Fila Validada: reportar `digitada` como el bot, y luego un `PATCH` a esa Fila con
+   `{"sanic_estado": 159460007, "sanic_mensaje": "prueba B-18"}` (Anulada), con `MSCRMCallerID`
+   puesto al `systemuserid` de `User1` (una persona anula).
 4. Reportar `digitada` OTRA VEZ sobre esa misma fila anulada, como el bot.
 
 **Qué tiene que pasar.** Paso 2: `yaregistrado: true`, `estadofila: "digitada"`, nada cambia. Paso
@@ -591,10 +644,14 @@ bot volvería a intentar algo que ya se determinó que no sabe resolver), o el c
 *Atendida* — ver `13-construido-hoy.md` H-01/H-07): CUALQUIER transición exitosa de la fila la
 limpia, sin importar quién la hizo ni a qué estado fue.
 
-**Necesita.** Una Fila marcada `sanic_requiereatencionmanual = sí` (seguir B-19 primero).
+**Necesita.** Una Fila marcada `sanic_requiereatencionmanual = sí` (repetir B-19, o seguir su
+resultado si corrió antes en el mismo set); un usuario real con el rol `SR - MPPP - Ejecutivo`
+(`User1`) — **no** `actuar_fila.py` con el service principal (ver el aviso al principio de este
+archivo).
 
-**Cómo.** `python3 herramientas/pruebas/actuar_fila.py <Solicitud> digitar --fila <N>` sobre esa
-fila (una transición cualquiera que la plataforma permita desde su estado actual).
+**Cómo.** Un `PATCH` a esa Fila con `{"sanic_estado": 159460004}` (Digitada), con `MSCRMCallerID`
+puesto al `systemuserid` de `User1` (una transición cualquiera que la plataforma permita desde su
+estado actual).
 
 **Qué tiene que pasar.** La transición se aplica, y `sanic_requiereatencionmanual` vuelve a `no`,
 sin que nadie haya tocado esa columna a propósito.
