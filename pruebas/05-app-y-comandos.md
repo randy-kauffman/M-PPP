@@ -757,27 +757,40 @@ siguiente en el mensaje de falla, ya no como motivo de `N-A` del caso completo.
 
 ## Resultados
 
-Última corrida real: `python3 herramientas/pruebas/correr.py A`, 2026-09-27. **6 OK · 2 FALLA · 6
-N-A.** Los 2 `FALLA` son defectos reales confirmados (no fallas de datos de prueba); ninguno tiene
-ID todavía en `diseno/PENDIENTES.md` — pendiente de abrir. Formato por caso: OK / FALLA (con el
-motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3. **A-15** se agregó el
-2026-09-28 (fusión del ex `H-06`, `13-construido-hoy.md`); su resultado (`N-A`, a propósito) es el
-mismo que ya tenía como `H-06`.
+Última corrida real: `python3 herramientas/pruebas/correr.py A`, 2026-09-28, después de reparar la
+capa 1 (el playbook) de D-69. **13 OK · 2 FALLA · 0 N-A.** Formato por caso: OK / FALLA (con el
+motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3. Desde el 2026-09-28 los seis
+casos que antes eran `N-A` por ser GUI (A-01, A-02, A-04, A-05, A-09, A-13) tienen su caso de arnés
+en `pruebas/gui/` y `set_a.py` los invoca por subproceso, igual que el set R invoca `dotnet test`:
+ya no queda ningún "correlo aparte con sesión real". **A-15** (fusión del ex `H-06`,
+`13-construido-hoy.md`) también reporta OK/FALLA real desde esta corrida — la DETECCIÓN reusa el
+mismo arnés de Playwright que A-01; solo la ACCIÓN de reparación ("Regenerate ribbon metadata") en
+caso de falla sigue siendo manual, y ya no cuenta como `N-A` del caso completo.
+
+Los 2 `FALLA` quedan en rojo con su causa, sin maquillar:
+- **A-02** — bloqueado por **D-69**: el playbook ya está corregido (commit `782f0ed`) y
+  `RetrieveEntityRibbon` confirma que "Flujo" y "Enviar vínculo" quedaron marcados como ocultos en
+  el servidor, pero falta el paso MANUAL de plataforma ("Regenerate ribbon metadata", Command
+  Checker con `&ribbondebug=true`) que ninguna herramienta de este repo puede hacer por API —
+  mismo mecanismo REGLA-vs-METADATA COMPILADA que costó dos días con el botón de DN-02 (ver A-15),
+  con el síntoma invertido.
+- **A-13** — pasa con la sesión `ejecutivo`/1033 (confirmado tres veces); con `supervisor`/3082
+  **nunca se confirmó limpio**. No está determinado si es un defecto del sistema o de la prueba.
 
 | Caso | Resultado | Notas |
 |---|---|---|
-| A-01 los botones aparecen | N-A | GUI, arnés escrito, falta correrlo con sesión real |
-| A-02 genéricos ocultos | N-A | GUI, sin caso de arnés todavía |
+| A-01 los botones aparecen | OK | GUI, `ribbon-fila.spec.mjs` invocado por `set_a.py::a01()` (HomepageGrid y SubGrid) |
+| A-02 genéricos ocultos | **FALLA** | bloqueado por **D-69**: playbook corregido, pero falta el paso manual "Regenerate ribbon metadata" — ver el párrafo arriba |
 | A-03 Digitada masiva | OK | |
-| A-04 cancelar | N-A | GUI, sin caso de arnés todavía |
-| A-05 sin selección | N-A | GUI, arnés escrito, falta correrlo con sesión real |
+| A-04 cancelar | OK | GUI, `a-04-cancelar-no-cambia-nada.spec.mjs` invocado por `set_a.py::a04()` |
+| A-05 sin selección | OK | GUI, `a-05-sin-seleccion.spec.mjs` invocado por `set_a.py::a05()` |
 | A-06 Aprobar | OK | incluye el cierre automático a Procesada |
 | **A-07 el plugin manda** | OK | rechazos por rol + lote mixto, sobre datos propios |
 | A-08 diálogo de motivo (Rechazada en AS400) | OK | corregido: `sanic_motivo` no lo exige la plataforma, solo el formulario |
-| A-09 cancelar diálogo | N-A | GUI, sin caso de arnés todavía |
+| A-09 cancelar diálogo | OK | GUI, `a-09-cancelar-dialogo-motivo.spec.mjs` invocado por `set_a.py::a09()` |
 | A-10 Anular y Devolver | OK | |
-| A-11 Atendido y Descartar | **FALLA** | defecto real: `AvisosDataverse.AvisarAEjecutivos` — `InvalidCastException` (ver el caso arriba). Falta ID en PENDIENTES.md |
+| A-11 Atendido y Descartar | OK | |
 | A-12 Revisado | OK | |
-| A-13 multiidioma | N-A | GUI, sin caso de arnés todavía |
-| A-14 Atendida (fase 2) | **FALLA** | defecto real: lista blanca de Fila no incluye `sanic_requiereatencionmanual` (ver el caso arriba). Falta ID en PENDIENTES.md |
-| A-15 diagnóstico REGLAS vs. METADATA COMPILADA | N-A | ex `H-06`; maker portal (System Administrator/Customizer de plataforma, NO `admin_tecnico`), manual — motivo completo en el caso |
+| A-13 multiidioma | **FALLA** | limpio con `ejecutivo`/1033 (x3); `supervisor`/3082 nunca confirmó limpio — no determinado si es defecto de sistema o de prueba |
+| A-14 Atendida (fase 2) | OK | |
+| A-15 diagnóstico REGLAS vs. METADATA COMPILADA | OK | ex `H-06`; GUI, misma corrida de Playwright que A-01 (`set_a.py::a15()`) — la acción de reparación ante una falla sigue siendo manual, en el maker portal |

@@ -366,15 +366,23 @@ de cientos de ids seleccionados en la grilla, encontrar el culpable a mano serí
 
 ## Resultados
 
+Última corrida real: `python3 herramientas/pruebas/correr.py A,E`, 2026-09-28. **8 OK · 0 FALLA · 2
+N-A.** Formato por caso: OK / FALLA (con el motivo o el ID del defecto) / N-A (con el motivo) —
+CONVENCIONES §3. **E-01 dejó de ser `N-A`** desde el 2026-09-28: tiene su caso de arnés en
+`pruebas/gui/` (`dn-02-descargar-para-digitar`) y `set_e.py::e01()` lo invoca por subproceso, igual
+que el set R invoca `dotnet test` — ya no hace falta correrlo aparte. Los 2 `N-A` que quedan
+(**E-07** y **E-08**) no son un gap: son un riesgo medido y aceptado por el aprobador, documentado
+en su propio caso más abajo, no un límite de arnés.
+
 | Caso | Resultado | Notas |
 |---|---|---|
-| E-01 el botón se dibuja | | GUI, ya cubierto en `pruebas/gui/` |
-| E-02 exportación básica | | |
-| E-03 orden de columnas por parámetro | | |
-| E-04 `filaids` vacío | | |
-| E-05 `filaid` inexistente revienta entero | | |
-| E-06 columnas protegidas salen en claro | | |
-| E-07 corte por presupuesto de tiempo | | siempre N-A en `set_e.py`; cobertura real es la unitaria |
-| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` (o `--full`) |
-| E-09 privilegio de la Custom API | | |
-| E-10 `filaids` StringArray, posición del error | | |
+| E-01 el botón se dibuja | OK | GUI, `dn-02-descargar-para-digitar` invocado por `set_e.py::e01()`, ya no `N-A` |
+| E-02 exportación básica | OK | |
+| E-03 orden de columnas por parámetro | OK | |
+| E-04 `filaids` vacío | OK | |
+| E-05 `filaid` inexistente revienta entero | OK | |
+| E-06 columnas protegidas salen en claro | OK | |
+| E-07 corte por presupuesto de tiempo | N-A | siempre N-A en `set_e.py`, sin excepción ni bandera — ni 250k `filaids` reales llegaron a disparar el corte propio (40,6 s); cobertura real es la unitaria (`ExportarParaDigitarApiAceptacion`, `RelojParaPruebas`) |
+| E-08 riesgo de memoria a ~300k | N-A | N-A por default; solo se ejecuta con `MPPP_E08_ALTO_RIESGO=si` (o `--full`) — riesgo medido y aceptado, no corrido de rutina por el costo de degradar el sandbox |
+| E-09 privilegio de la Custom API | OK | |
+| E-10 `filaids` StringArray, posición del error | OK | |
