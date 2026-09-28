@@ -42,7 +42,7 @@ completo, y por qué, está en `herramientas/pruebas/sets/set_r.py::preparar()` 
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
 | `plantilla.estructura` con la forma esperada | `preparacion_comun.verificar_estructura_plantilla()` |
 | `plantilla.obligatoriedad` y `autorizacion.modo` activos (sin forzar valor: el canon de ambos es "la versión activa", DN-01/DN-03) | `preparacion_comun.verificar_parametro_activo()` |
-| Un Autorizado + una `AutorizacionCliente` marcados `ZZP-`, para R-16/R-17 (DN-01) | Web API directa (`preparar_datos.py` no la crea) |
+| Un Autorizado + una `AutorizacionCliente` (borrados por GUID en `cerrar()`, no por `marca_agua`: su nombre lo calcula un step y lo pisa — ver R-16), para R-16/R-17 (DN-01) | Web API directa (`preparar_datos.py` no la crea) |
 
 **Corré este set con**:
 
@@ -481,43 +481,54 @@ ya corrigió el aprobador una vez ("el portero también tiene que preguntar lo m
 la validación de nadie.
 
 **Necesita.** `autorizacion.modo` versionado a `"clienteX"` (basura) por este caso, desactivada en su
-propio `finally`; el mismo Autorizado `ZZP-` (autorizado SOLO por cliente) de R-16; el REMITENTE
-compartido de este set (autorizado SOLO por plan); `E01-feliz-formato11.xlsx`.
+propio `finally`; el Autorizado de R-16 (autorizado SOLO por `AutorizacionCliente`, cero
+`AutorizacionPlan`); el REMITENTE compartido de este set (autorizado SOLO por plan);
+`E01-feliz-formato11.xlsx`.
 
 **Cómo.**
-1. Con `autorizacion.modo = "clienteX"` activo, correo desde el Autorizado `ZZP-` (solo cliente) con `E01-feliz-formato11.xlsx`.
+1. Con `autorizacion.modo = "clienteX"` activo, correo desde el Autorizado de R-16 (solo cliente) con `E01-feliz-formato11.xlsx`.
 2. Con el mismo parámetro basura activo, correo desde el REMITENTE de siempre (solo plan) con el mismo Excel.
 
-**Qué tiene que pasar.**
+**Qué tiene que pasar, según el DISEÑO.**
 
 | Correo | Resultado esperado |
 |---|---|
-| Autorizado `ZZP-` (solo cliente) | **No reconocida** — el valor basura degradó a `plan`, y por `plan` ese correo no tiene ninguna autorización |
+| Autorizado de R-16 (solo cliente) | **No reconocida** — el valor basura degradó a `plan`, y por `plan` ese correo no tiene ninguna autorización |
 | REMITENTE de siempre (solo plan) | Igual que siempre: **En proceso**, 3 filas **Validada** |
 
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py R` (caso `R-17`).
-
-**Cómo se sabe que falló.** Cualquier excepción o rechazo genérico por el valor del parámetro (el
-diseño exige degradar, nunca romper); o que el correo solo-por-cliente SÍ entre (el valor basura se
-estaría interpretando como `cliente`); o que el correo solo-por-plan deje de entrar (la degradación
-rompió el camino de siempre, que es justamente lo que "nunca tumba la validación" prohíbe).
-
-> **Dependencia confirmada contra Dev (2026-09-28): D-59 bloquea la primera mitad.**
-> `diseno/PENDIENTES.md` ya tiene esto documentado, **ABIERTA, pospuesta por el aprobador
-> (2026-09-27)**: `Datos/Avisos.cs:109` (`AvisosDataverse.AvisarAEjecutivos`) hace
+> **DEFECTO CONFIRMADO — este caso da FALLA a propósito, hasta que se resuelva D-59.** El paso 1
+> nunca llega a devolver la clasificación: `sanic_mppp_capi_clasificarcorreo` responde **HTTP 400**
+> con el mensaje genérico *"No se pudo clasificar el correo. El equipo tecnico ya tiene el
+> detalle."* en vez de la respuesta normal (`clasificacion=remitente_no_reconocido, procesar=false`).
+> Confirmado contra `plugintracelog` de Dev el 2026-09-28: la causa real es
+> `Datos/Avisos.cs:109` (`AvisosDataverse.AvisarAEjecutivos`), que hace
 > `e.GetAttributeValue<EntityReference>("systemuserid")` sobre `systemuserroles` (tabla
-> intersección), y esa columna viaja como `Guid`, no como `EntityReference` — `InvalidCastException`
-> **siempre** que una Solicitud termina en un estado que dispara el aviso a ejecutivos (respuesta,
-> ilegible, remitente no reconocido). Ese es EXACTAMENTE el camino que necesita la primera mitad de
-> este caso (el correo solo-por-cliente tiene que terminar "No reconocida"). Confirmado en
-> `plugintracelog` de Dev reproduciendo el caso con y sin `AutorizacionCliente` de por medio: no es
-> un defecto nuevo de DN-01, es D-59 de siempre, con una superficie más para dispararlo. Mientras
-> D-59 siga abierta, `set_r.py::r17` reporta **N-A** para el caso completo (la transacción de la
-> primera mitad se revierte entera, así que tampoco queda "No reconocida" persistida para comparar
-> con la segunda) en vez de un FALLA que en realidad es de otro defecto ya tomado.
+> intersección) — esa columna viaja como `Guid`, no como `EntityReference`, y el cast lanza
+> `InvalidCastException`. Pasa **siempre** que una Solicitud termina en un estado que dispara el
+> aviso a ejecutivos (respuesta, ilegible, remitente no reconocido), y la transacción entera se
+> revierte: ni siquiera queda `sanic_estadoprocesamiento = No reconocida` persistido. Es
+> `diseno/PENDIENTES.md`, entrada **D-59: ABIERTA, pospuesta por el aprobador (2026-09-27)** — el
+> mismo defecto que ya dejó en rojo `C-02`/`C-04`/`C-10`/`C-11` del set C. **Por CONVENCIONES §3,
+> "Un defecto conocido no es N-A": un caso bloqueado por un defecto ya registrado es FALLA**, aunque
+> D-59 no sea el tema de este caso — nunca se apaga la prueba que lo detecta, ni se lo pinta de gris
+> con un N-A que dejaría el resumen mintiendo "0 FALLA".
 
-**Automatizable.** API (`correr.py R`, caso `R-17`; **N-A hoy, bloqueado por D-59** — ver la nota de
-arriba).
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py R` (caso `R-17`) — hoy tiene que dar
+**FALLA**, citando `D-59` en el motivo del primer check.
+
+**Cómo se sabe que falló *de la forma esperada*.** El síntoma correcto es el check
+`bloqueado por D-59 (diseno/PENDIENTES.md): ...HTTP 400...` en rojo, con el detalle
+`InvalidCastException`/`systemuserroles` (vía `plugintracelog`, si hace falta confirmarlo a mano).
+Si algún día `sanic_mppp_capi_clasificarcorreo` empieza a devolver 200 con
+`clasificacion=remitente_no_reconocido, procesar=false` para este correo, **este caso pasa a
+ejercitar sus aserciones normales** (la tabla de arriba) y hay que actualizar `diseno/PENDIENTES.md`
+(cerrar `D-59`) y esta nota. Si en cambio aparece cualquier OTRO síntoma (un HTTP distinto de 400,
+un mensaje que no sea el genérico de siempre, o que la segunda mitad —remitente por plan— deje de
+entrar), **eso es un defecto NUEVO, distinto de D-59**, y se investiga aparte: no se le atribuye a
+D-59 solo porque el caso ya venía en rojo.
+
+**Automatizable.** API (`correr.py R`, caso `R-17`; **FALLA hoy, bloqueado por D-59** — ver la nota
+de arriba).
 
 ---
 
@@ -640,5 +651,5 @@ existen.
 | R-14 duplicados pasan | | | |
 | R-15 DN-01 canon `plan` | | | |
 | R-16 DN-01 modo `cliente` | | | |
-| R-17 DN-01 valor basura degrada | | | **N-A, bloqueado por D-59** (ya ABIERTA, pospuesta) |
+| R-17 DN-01 valor basura degrada | | | **FALLA, bloqueado por D-59** (ya ABIERTA, pospuesta) |
 | R-18 DN-03 `Exclusion` afloja tres campos | | | PROVISIONAL, confirmar con aprobador |

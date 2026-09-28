@@ -476,6 +476,23 @@ def r16(ctx):
     return c
 
 
+def _r17_verificar_remitente_por_plan(ctx, c):
+    """La segunda mitad de R-17: el correo autorizado por PLAN (`REMITENTE`, de siempre) sigue
+    entrando igual bajo el valor basura. Nunca la bloquea D-59: `REMITENTE` queda reconocido
+    (`procesar=True`), así que jamás entra a la rama de `ClasificarCorreo` que dispara el aviso a
+    ejecutivos."""
+    sid2, mid2, rc2, rv2 = ctx.procesar(
+        remitente=REMITENTE, asunto="Prueba R-17 basura (por plan, de siempre)",
+        cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
+    c.check("el correo autorizado por PLAN sigue reconocido y procesado (el valor basura no tumbó nada)",
+            rc2.get("procesar") is True, str(rc2))
+    if rv2 is not None:
+        filas2 = sim.leer_filas(ctx.dv, sid2)
+        c.check("sus 3 filas siguen Validada, igual que siempre",
+                len(filas2) == 3 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas2),
+                str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas2]))
+
+
 def r17(ctx):
     c = pc.Caso("R-17", "DN-01: valor basura en `autorizacion.modo` degrada a `plan`, sin tumbar la operación")
     pid = _sembrar_version_modo(ctx.dv, "clienteX", "ZZP- prueba set R (R-17): valor basura")
@@ -495,13 +512,20 @@ def r17(ctx):
                 # necesita ejercitar. Confirmado en `plugintracelog` de Dev el 2026-09-28 (mismo
                 # stack que documenta D-59, y reproducido también con un Autorizado sin ninguna
                 # relación con DN-01: no es un bug nuevo de este caso, es D-59 de siempre).
-                c.na("D-59 bloquea esta mitad del caso (Autorizado reconocible pero sin ningún plan "
-                     "autorizado dispara AvisarAEjecutivos, que revienta con InvalidCastException — "
-                     "diseno/PENDIENTES.md D-59, ya ABIERTA y pospuesta por el aprobador). La otra "
-                     "mitad (remitente por plan sigue entrando bajo el valor basura) no se pudo "
-                     "ejercitar en consecuencia: el caso compara las dos mitades y la transacción de "
-                     "la primera se revierte entera, así que ni siquiera queda 'No reconocida' "
-                     "persistida para comparar.")
+                #
+                # CONVENCIONES §3, "Un defecto conocido no es N-A": un caso bloqueado por un
+                # defecto YA REGISTRADO es FALLA, aunque el defecto no sea el tema del caso y ya
+                # tenga su ID en PENDIENTES.md — el mismo criterio que ya aplicó el set C en
+                # C-02/C-04/C-10/C-11 contra este mismo D-59. Nunca N-A: N-A es para límites del
+                # entorno, no para el sistema fallando.
+                c.check(f"bloqueado por D-59 (diseno/PENDIENTES.md): {e}", False,
+                        "AvisosDataverse.AvisarAEjecutivos revienta con InvalidCastException "
+                        "(Guid -> EntityReference sobre systemuserroles) al clasificar un correo "
+                        "que termina 'No reconocida'; la transacción entera se revierte, así que "
+                        "tampoco queda 'No reconocida' persistida para comparar con la segunda mitad")
+                # Se intenta igual la segunda mitad — da evidencia extra, pero el caso YA es
+                # FALLA por el check de arriba, pase lo que pase acá.
+                _r17_verificar_remitente_por_plan(ctx, c)
                 return c
             raise
         c.check("el correo SOLO autorizado por cliente queda No reconocido bajo el valor basura "
@@ -511,16 +535,7 @@ def r17(ctx):
         c.check("Estado = No reconocida", s1.get("sanic_estadoprocesamiento") == NOREC,
                 str(s1.get("sanic_estadoprocesamiento")))
 
-        sid2, mid2, rc2, rv2 = ctx.procesar(
-            remitente=REMITENTE, asunto="Prueba R-17 basura (por plan, de siempre)",
-            cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
-        c.check("el correo autorizado por PLAN sigue reconocido y procesado (el valor basura no tumbó nada)",
-                rc2.get("procesar") is True, str(rc2))
-        if rv2 is not None:
-            filas2 = sim.leer_filas(ctx.dv, sid2)
-            c.check("sus 3 filas siguen Validada, igual que siempre",
-                    len(filas2) == 3 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas2),
-                    str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas2]))
+        _r17_verificar_remitente_por_plan(ctx, c)
     finally:
         _desactivar_parametro(ctx.dv, pid)
     return c
