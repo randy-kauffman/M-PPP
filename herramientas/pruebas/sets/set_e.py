@@ -53,11 +53,15 @@ import base64
 import io
 import json
 import os
+import re
+import subprocess
 import sys
 import time
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _HERRAMIENTAS_PRUEBAS = os.path.dirname(_AQUI)
+_RAIZ = os.path.dirname(os.path.dirname(_HERRAMIENTAS_PRUEBAS))
+_PRUEBAS_GUI = os.path.join(_RAIZ, "pruebas", "gui")
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
@@ -237,21 +241,94 @@ _ALIAS_DOMINIO = {"admin_planes": "User3", "admin_tecnico": "User4"}
 
 
 # ===========================================================================
-# E-01 — el botón se dibuja en el ribbon. NO corre acá (GUI): ver el
-# docstring del módulo y `pruebas/gui/casos/dn-02-descargar-para-digitar.spec.mjs`.
+# Puente hacia `pruebas/gui/` (Playwright), por subproceso — copia local del mismo
+# patrón que `sets/set_r.py::_dotnet_test` y `sets/set_a.py::_playwright_test`
+# (CONVENCIONES §8: un set no depende de otro set, tampoco de su código interno;
+# ver el docstring largo en `set_a.py` para el detalle completo del porqué de cada
+# pieza — acá solo el resumen).
+# ===========================================================================
+def _extraer_reporte_json(stdout):
+    """Ver el docstring gemelo en `set_a.py::_extraer_reporte_json` para el porqué
+    completo (CONFIRMADO EN VIVO 2026-09-28): `setup/global-setup.mjs` imprime sus
+    propios `console.log` (guarda de sesiones, semáforo, siembra — con JSON embebido
+    en la línea de siembra) ANTES del reporte; `json.loads(stdout)` a secas revienta
+    siempre. Se busca la ÚLTIMA línea que es EXACTAMENTE '{' y se parsea desde ahí."""
+    posiciones = [m.start() for m in re.finditer(r"^\{[ \t]*$", stdout, re.MULTILINE)]
+    if not posiciones:
+        return None
+    try:
+        return json.loads(stdout[posiciones[-1]:])
+    except json.JSONDecodeError:
+        return None
+
+
+def _playwright_test(archivo, esperados, usuario="ejecutivo", timeout=480, extra_env=None):
+    """`total is None` -> límite de ENTORNO (N-A). Cualquier otro total (0 incluido)
+    es un número real que el llamador compara contra `esperados`, nunca N-A: un
+    archivo que no matchea ningún test de Playwright igual sale con exit 0 — mismo
+    riesgo de falso verde que un FQN mal escrito en `dotnet test`.
+    `MPPP_SEMAFORO_HEREDADO=1`: este proceso YA tiene el semáforo de `correr.py` para
+    toda la corrida; sin avisarle a `setup/global-setup.mjs` (Node), su propio intento
+    de tomarlo de nuevo reventaría siempre contra el PID de este mismo proceso."""
+    env = dict(os.environ)
+    env["MPPP_USUARIO"] = usuario
+    env["MPPP_SEMAFORO_HEREDADO"] = "1"
+    if extra_env:
+        env.update(extra_env)
+    try:
+        proc = subprocess.run(
+            ["npx", "playwright", "test", archivo, "--reporter=json"],
+            cwd=_PRUEBAS_GUI, env=env, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError as e:
+        return False, None, None, None, f"'npx'/'playwright' no está disponible en el PATH: {e}"
+    except subprocess.TimeoutExpired as e:
+        # `TimeoutExpired.stdout`/`.stderr` son SIEMPRE bytes, incluso con `text=True`
+        # en el `subprocess.run` original — ver el docstring gemelo en `set_a.py`.
+        def _texto(x):
+            if x is None:
+                return ""
+            return x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
+        parcial = _texto(e.stdout) + "\n" + _texto(e.stderr)
+        return False, None, None, None, f"playwright test no terminó en {timeout}s:\n{parcial[-1500:]}"
+
+    salida = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    reporte = _extraer_reporte_json(proc.stdout or "")
+    if reporte is None:
+        return False, 0, 0, 0, f"Playwright no devolvió JSON válido (rc={proc.returncode}):\n{salida[-1800:]}"
+
+    stats = reporte.get("stats", {})
+    passed = stats.get("expected", 0)
+    failed = stats.get("unexpected", 0)
+    flaky = stats.get("flaky", 0)
+    skipped = stats.get("skipped", 0)
+    total = passed + failed + flaky + skipped
+    ok = proc.returncode == 0 and failed == 0 and flaky == 0
+    detalle = f"rc={proc.returncode} passed={passed} failed={failed} flaky={flaky} skipped={skipped} total={total}\n{salida[-1800:]}"
+    return ok, total, passed, failed, detalle
+
+
+# ===========================================================================
+# E-01 — el botón se dibuja en el ribbon. CONECTADO el 2026-09-28 (antes N-A
+# completo, citando el comando exacto): invoca `pruebas/gui/casos/dn-02-descargar-
+# para-digitar.spec.mjs` por subproceso, mismo arnés que ya existía — este set
+# sigue sin duplicarlo (CONVENCIONES §9), ahora lo CORRE en vez de solo nombrarlo.
 # ===========================================================================
 def e01(ctx):
     c = pc.Caso("E-01", "El comando 'Descargar para digitar' se dibuja en el ribbon")
-    c.na(
-        "Requiere navegador real con una sesión de Ejecutivo o Supervisor (CONVENCIONES §6); ya está "
-        "automatizado en pruebas/gui/ y este set NUNCA lo duplica (CONVENCIONES §9). Guarda previa "
-        "obligatoria: 'python3 herramientas/pruebas/estado_sesiones.py'. Si la sesión vive y el rol "
-        "coincide, correr desde pruebas/gui/: 'MPPP_USUARIO=ejecutivo npx playwright test dn-02' (o "
-        "'ribbon-fila' para los 7 botones del ribbon de Fila). LECCIÓN cara (A-15, set A, 2026-09-27): este "
-        "comando estuvo definido y PUBLICADO en el servidor y NO se dibujaba en el cliente — la causa "
-        "era la metadata compilada del ribbon. Tres caminos de API distintos lo confirmaron 'publicado' "
-        "y NINGUNO detectó que no se veía; costó dos días de diagnóstico. Por eso este caso, aunque acá "
-        "sea N-A, es el único que mira el DOM real en vez de confiar en que 'publicado' == 'se dibuja'.")
+    ok, total, passed, failed, detalle = _playwright_test("dn-02-descargar-para-digitar", esperados=1)
+    if total is None:
+        c.na(f"no se pudo correr Playwright (dn-02-descargar-para-digitar): {detalle}")
+        return c
+    c.check(
+        "'dn-02-descargar-para-digitar' matcheó exactamente 1 prueba — un total distinto (0 "
+        "incluido) es el mismo riesgo de falso verde que un FQN mal escrito en `dotnet test`",
+        total == 1, f"matcheó {total} (passed={passed}, failed={failed})")
+    c.check(
+        "el botón 'Descargar para digitar' está presente y habilitado, y la descarga real de punta "
+        "a punta funciona (LECCIÓN cara, A-15 set A, 2026-09-27: este comando estuvo PUBLICADO en el "
+        "servidor y NO se dibujaba en el cliente — la causa era la metadata compilada del ribbon; "
+        "ningún camino de API lo hubiera detectado, por eso este caso vive acá, mirando el DOM real)",
+        ok, detalle)
     return c
 
 

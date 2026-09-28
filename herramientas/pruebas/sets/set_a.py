@@ -46,11 +46,16 @@ pasó acá como `A-15`, mismo cuerpo, `N-A` a propósito por el mismo motivo (ve
 seis casos de H (sitemap/vistas/formulario) pasaron a `G-14`..`G-19` en `set_g.py`; `set_h.py`
 desapareció. La tabla de equivalencias completa vive en `pruebas/README.md`.
 """
+import json
 import os
+import re
+import subprocess
 import sys
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _HERRAMIENTAS_PRUEBAS = os.path.dirname(_AQUI)
+_RAIZ = os.path.dirname(os.path.dirname(_HERRAMIENTAS_PRUEBAS))
+_PRUEBAS_GUI = os.path.join(_RAIZ, "pruebas", "gui")
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
@@ -193,77 +198,210 @@ def _leer_fila(ctx, fid, campos="sanic_estado,sanic_mensaje,sanic_notainterna,"
 
 
 # ===========================================================================
+# Puente hacia `pruebas/gui/` (Playwright), por subproceso — mismo patrón que
+# `sets/set_r.py::_dotnet_test` (dueño: set R, no se toca; acá una copia local,
+# CONVENCIONES §8: un set no depende de otro set, tampoco de su código interno).
+# ===========================================================================
+def _extraer_reporte_json(stdout):
+    """El reporter `json` de Playwright imprime UN objeto JSON al final de `stdout`,
+    pero ANTES de eso `setup/global-setup.mjs` ya imprimió sus propios `console.log`
+    (guarda de sesiones, semáforo, siembra — incluso una línea con JSON embebido:
+    `sembrar_datos_gui.py -> creado: {...}`) — nada de eso es el reporte. `json.loads`
+    a secas sobre TODO `stdout` revienta siempre con una corrida real (CONFIRMADO EN
+    VIVO 2026-09-28: primera corrida por `correr.py`, el falso 'Playwright no devolvió
+    JSON válido' que ESTA función corrige). Se busca la ÚLTIMA línea que es
+    EXACTAMENTE '{' (el objeto de nivel superior que arma `JSON.stringify(reporte,
+    undefined, 2)`; los objetos anidados como '"config": {' nunca quedan solos en su
+    propia línea, y la línea de siembra tampoco: es una sola línea larga con el JSON
+    pegado al texto) y se parsea desde ahí hasta el final. `None` si no se encontró."""
+    posiciones = [m.start() for m in re.finditer(r"^\{[ \t]*$", stdout, re.MULTILINE)]
+    if not posiciones:
+        return None
+    try:
+        return json.loads(stdout[posiciones[-1]:])
+    except json.JSONDecodeError:
+        return None
+
+
+def _playwright_test(archivo, esperados, usuario="ejecutivo", timeout=480, extra_env=None):
+    """Corre `npx playwright test <archivo>` (`pruebas/gui/`) como subproceso, con el
+    reporter JSON — más robusto que el regex de `_dotnet_test` (Playwright ya sabe
+    contar sus propias pruebas, no hace falta parsear texto libre).
+
+    Devuelve `(ok, total, passed, failed, detalle)`. `total is None` es SOLO el límite
+    de ENTORNO real (node/npx ausente, timeout del proceso): N-A, igual criterio que
+    `_dotnet_test`. Cualquier otro resultado — incluido `total == 0` — es un número que
+    el LLAMADOR compara contra `esperados` con `c.check(...)`, NUNCA con `c.na(...)`:
+    un archivo/filtro que no matchea ningún test de Playwright igual imprime `"0
+    passed"` con exit code 0, el MISMO riesgo de falso verde que un FQN mal escrito en
+    `dotnet test` — por eso el total ejecutado se verifica siempre, no solo el
+    `returncode` (pedido explícito de esta migración).
+
+    `timeout=480` (8 min): `a02-comandos-genericos-ocultos` con `ejecutivo` (9 tablas,
+    ~1min cada una por la navegación real) tarda ~12min en el peor caso medido en vivo
+    (2026-09-28) — se pasa `timeout` explícito más alto para ESE archivo puntual desde
+    `a02()`; el resto de los archivos (1-2 tests) corre en 1-2 minutos.
+
+    `MPPP_SEMAFORO_HEREDADO=1`: este proceso Python YA tiene el semáforo tomado por
+    quien nos invocó (`correr.py`, para TODA la corrida) — sin este aviso,
+    `setup/global-setup.mjs` (Node) intentaría tomarlo de nuevo, lo vería ocupado por
+    un PID vivo (el nuestro, un nivel más arriba) y reventaría SIEMPRE con "SEMÁFORO EN
+    ROJO": un falso FALLA en cada corrida conectada, no una contención real. Ver el
+    comentario en `pruebas/gui/setup/global-setup.mjs`.
+
+    Si la guarda de sesiones (o cualquier otra cosa dentro de `globalSetup`) revienta,
+    esto NO se reporta como N-A: es un resultado real (0 pruebas corridas, con el
+    motivo exacto en `detalle`) que el llamador convierte en FALLA — "Regla de
+    aislamiento de fallas" de esta migración: FALLA ese caso puntual, nunca una
+    excepción que tire abajo el resto del set (`correr.py` ya aísla por caso, pero acá
+    además se captura para dar un motivo legible, no un traceback crudo)."""
+    env = dict(os.environ)
+    env["MPPP_USUARIO"] = usuario
+    env["MPPP_SEMAFORO_HEREDADO"] = "1"
+    if extra_env:
+        env.update(extra_env)
+    try:
+        proc = subprocess.run(
+            ["npx", "playwright", "test", archivo, "--reporter=json"],
+            cwd=_PRUEBAS_GUI, env=env, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError as e:
+        return False, None, None, None, f"'npx'/'playwright' no está disponible en el PATH: {e}"
+    except subprocess.TimeoutExpired as e:
+        # `TimeoutExpired.stdout`/`.stderr` son SIEMPRE bytes, incluso con `text=True`
+        # en el `subprocess.run` original (vienen del buffer crudo, antes del decoder
+        # de texto) — CONFIRMADO EN VIVO 2026-09-28 (`TypeError: can't concat str to
+        # bytes` en la primera corrida por `correr.py`, con A-02/ejecutivo superando
+        # el timeout de entonces). Se decodifican acá, nunca se asume `str`.
+        def _texto(x):
+            if x is None:
+                return ""
+            return x.decode("utf-8", errors="replace") if isinstance(x, bytes) else x
+        parcial = _texto(e.stdout) + "\n" + _texto(e.stderr)
+        return False, None, None, None, f"playwright test no terminó en {timeout}s:\n{parcial[-1500:]}"
+
+    salida = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    reporte = _extraer_reporte_json(proc.stdout or "")
+    if reporte is None:
+        # globalSetup pudo reventar ANTES de que Playwright llegue a emitir JSON
+        # válido (p.ej. la guarda de sesiones) — se trata como una corrida real con 0
+        # pruebas, nunca como N-A (CONVENCIONES §3: un bloqueo real no es N-A).
+        return False, 0, 0, 0, f"Playwright no devolvió JSON válido (rc={proc.returncode}):\n{salida[-1800:]}"
+
+    stats = reporte.get("stats", {})
+    passed = stats.get("expected", 0)
+    failed = stats.get("unexpected", 0)
+    flaky = stats.get("flaky", 0)
+    skipped = stats.get("skipped", 0)
+    total = passed + failed + flaky + skipped
+    ok = proc.returncode == 0 and failed == 0 and flaky == 0
+    detalle = f"rc={proc.returncode} passed={passed} failed={failed} flaky={flaky} skipped={skipped} total={total}\n{salida[-1800:]}"
+    return ok, total, passed, failed, detalle
+
+
+def _chequear_playwright(c, etiqueta, archivo, esperados, usuario="ejecutivo", extra_env=None, timeout=480):
+    """Corre `_playwright_test` y traduce el resultado a `c.check(...)` — el patrón
+    repetido por todos los casos GUI de este set (A-01, A-02, A-04, A-05, A-09, A-13,
+    A-15): primero el guardia de "matcheó lo que se esperaba" (el que evita el falso
+    verde), después el resultado real."""
+    ok, total, passed, failed, detalle = _playwright_test(
+        archivo, esperados, usuario=usuario, extra_env=extra_env, timeout=timeout)
+    if total is None:
+        c.na(f"no se pudo correr Playwright ({archivo}): {detalle}")
+        return False
+    c.check(
+        f"{etiqueta}: '{archivo}' (usuario={usuario}) matcheó exactamente {esperados} prueba(s) de "
+        "Playwright — un total distinto (0 incluido) es el mismo riesgo de falso verde que un FQN "
+        "mal escrito en `dotnet test` (ver set_r.py)",
+        total == esperados, f"matcheó {total} (passed={passed}, failed={failed})")
+    c.check(f"{etiqueta}: las pruebas de '{archivo}' (usuario={usuario}) pasan", ok, detalle)
+    return ok and total == esperados
+
+
+# ===========================================================================
 # A-01, A-02, A-04, A-05, A-09, A-13 — puramente GUI: solo un navegador ve un
 # ribbon dibujado, un diálogo que se cerró sin guardar, o un idioma de UI.
 # Ninguna llamada al Web API puede distinguir estos casos de "no pasó nada".
+# Conectados el 2026-09-28 (antes N-A citando el comando exacto): ahora invocan
+# `npx playwright test` por subproceso y reportan OK/FALLA real (pedido del
+# aprobador: "un comando que hay que acordarse de correr es un comando que no se
+# corre").
 # ===========================================================================
 def a01(ctx):
     c = pc.Caso("A-01", "Los botones aparecen donde deben (HomepageGrid y SubGrid)")
-    c.na(
-        "dibujo de ribbon: solo lo ve un navegador real. Corré "
-        "`MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila` (pruebas/gui/, sesión "
-        "local/sesion-ejecutivo.json) — ya escrito y con selectores verificados en vivo el "
-        "2026-09-27, cubre HomepageGrid para los 5 botones que admiten Validada y el caso 'sin "
-        "selección'. La SubGrid de Fila dentro de Solicitud, y los 3 botones de Solicitud, no "
-        "tienen caso .spec.mjs todavía (pruebas/gui/README.md §6). Diagnóstico si un botón no "
-        "aparece: en el Command Checker (&ribbondebug=true), '(hidden)' es una REGLA; AUSENTE de "
-        "la lista entera es METADATA COMPILADA (ver A-15, este mismo archivo) — mismo "
-        "síntoma, causas opuestas.")
+    ok, total, passed, failed, detalle = _playwright_test("ribbon-fila", esperados=2)
+    ctx.extra["a01_resultado"] = (ok, total, passed, failed, detalle)  # A-15 lo reusa, no repite la corrida
+    if total is None:
+        c.na(f"no se pudo correr Playwright (ribbon-fila): {detalle}")
+        return c
+    c.check(
+        "'ribbon-fila' matcheó exactamente 2 pruebas (HomepageGrid Validada + SubGrid) — un total "
+        "distinto (0 incluido) es el mismo riesgo de falso verde que un FQN mal escrito en `dotnet "
+        "test`", total == 2, f"matcheó {total} (passed={passed}, failed={failed})")
+    c.check(
+        "los botones que admiten Validada se dibujan, presentes y habilitados, en HomepageGrid Y en "
+        "SubGrid (diagnóstico AUSENTE-vs-DESHABILITADO en el detalle si falla)", ok, detalle)
     return c
 
 
 def a02(ctx):
-    c = pc.Caso("A-02", "Los comandos genéricos NO aparecen en las 10 tablas (12.6)")
-    c.na(
-        "dibujo de ribbon en 10 tablas × barra + menú '…': solo un navegador real. Sin caso "
-        ".spec.mjs todavía (pruebas/gui/README.md §6); correrlo a mano con las 4 sesiones "
-        "(estado_sesiones.py primero). NO alcanza con `RetrieveEntityRibbon` por Web API "
-        "(herramientas/construir/importar_solucion.py la usa para importar): es uno de los 'tres "
-        "caminos de API' que el 2026-09-27 confirmaron el botón de DN-02 como si estuviera bien, y "
-        "no se dibujaba — esa API ve la definición, no la metadata compilada que sirve el "
-        "navegador. Mismo diagnóstico REGLA-vs-METADATA que A-01 si un HideCustomAction fallara.")
+    c = pc.Caso("A-02", "Los comandos genéricos NO aparecen en las tablas (12.6)")
+    # HideCustomAction es una personalización de TABLA, no de rol: la metadata
+    # compilada es la misma para cualquier usuario que abra esa tabla. Dos sesiones
+    # alcanzan para cubrir las 11 tablas (ver TABLAS_A02 en selectores.mjs y el
+    # docstring del .spec.mjs) sin repetir el mismo chequeo cuatro veces.
+    # 9 tablas x ~1min de navegación real cada una: ~12min medido en vivo (2026-09-28)
+    # en el peor caso -- timeout explícito más generoso que el default de 480s.
+    _chequear_playwright(c, "Ejecutivo (9 tablas + verificación de cobertura)",
+                          "a-02-comandos-genericos-ocultos", esperados=10, usuario="ejecutivo",
+                          timeout=900)
+    _chequear_playwright(c, "Administrador técnico (Parámetro, Regla + verificación de cobertura)",
+                          "a-02-comandos-genericos-ocultos", esperados=3, usuario="admin_tecnico")
     return c
 
 
 def a04(ctx):
     c = pc.Caso("A-04", "Cancelar no cambia nada")
-    c.na(
-        "es la rama 'cancelado' de openConfirmDialog (respuesta.confirmed=false): sin llamar al "
-        "Web API no hay ninguna diferencia observable entre 'canceló' y 'no hizo nada', así que "
-        "solo un navegador real prueba esta rama del JS. Arnés pendiente (pruebas/gui/README.md "
-        "§6); sesión local/sesion-ejecutivo.json.")
+    _chequear_playwright(c, "Cancelar 'Digitada'", "a-04-cancelar-no-cambia-nada", esperados=1)
     return c
 
 
 def a05(ctx):
-    c = pc.Caso("A-05", "Sin selección: los botones propios están deshabilitados")
-    c.na(
-        "EnableRule Mscrm.SelectionCountAtLeastOne: solo lo ve un navegador. YA cubierto por "
-        "`MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila` (segundo test del archivo: 'sin "
-        "ninguna fila seleccionada, ningún botón propio se dibuja'), confirmado en vivo el "
-        "2026-09-27 que sin selección la plataforma no dibuja NINGUNO de los botones propios (no "
-        "quedan grises: desaparece el grupo entero).")
+    c = pc.Caso("A-05", "Sin selección: ningún botón propio se dibuja (AUSENTE, no 'deshabilitado')")
+    # CORRECCIÓN 2026-09-28: el título de este caso decía "los botones propios están
+    # deshabilitados". Es la expectativa VIEJA e INCORRECTA — el propio arnés (2026-09-27,
+    # `ribbon-fila.spec.mjs` de entonces) ya había confirmado en vivo que la plataforma
+    # NO dibuja los botones sin selección (AUSENTE), no los deja "presentes pero
+    # grises" (DESHABILITADO): son diagnósticos OPUESTOS con el mismo síntoma en
+    # pantalla (ver A-15, mismo archivo). El cuerpo de `pruebas/05-app-y-comandos.md`
+    # ya reflejaba el hallazgo correcto; lo que quedaba mal era este título corto (lo
+    # único que lee quien solo mira el resumen de `correr.py`) y que la aserción vivía
+    # mezclada dentro de `ribbon-fila.spec.mjs` (A-01) en vez de en su propio caso
+    # invocable — separado a `casos/a-05-sin-seleccion.spec.mjs`, con la nota de
+    # corrección fechada.
+    _chequear_playwright(c, "Sin selección", "a-05-sin-seleccion", esperados=1)
     return c
 
 
 def a09(ctx):
     c = pc.Caso("A-09", "Cancelar el diálogo de motivo (la X, sin guardar)")
-    c.na(
-        "es la rama de rechazo de openForm/useQuickCreateForm (pedirMotivo() devuelve null): mismo "
-        "motivo que A-04, ninguna llamada al Web API distingue 'cerró con la X' de 'no hizo nada'. "
-        "Arnés pendiente (pruebas/gui/README.md §6, punto 3: buscar [role=\"dialog\"]); sesión "
-        "local/sesion-ejecutivo.json.")
+    _chequear_playwright(c, "Cerrar con la X el diálogo de 'Anular'", "a-09-cancelar-dialogo-motivo", esperados=1)
     return c
 
 
 def a13(ctx):
     c = pc.Caso("A-13", "Multiidioma de los botones y de los mensajes del JavaScript")
-    c.na(
-        "el idioma de la UI (Configuración personal → Idiomas) y el DOM resultante solo los ve un "
-        "navegador. selectores.mjs ya trae las 8 etiquetas de Fila en 1033/3082 (BOTONES_FILA), "
-        "copiadas de playbooks/importacion/comandos.md; falta el caso que corra con una sesión en "
-        "inglés pasando 1033 a verificarBotones (pruebas/gui/README.md §6, punto 4). Los mensajes "
-        "del JS (objeto TEXTOS de recursos/js/comandos.js) no tienen caso de arnés todavía.")
+    # `local/sesion-ejecutivo.json` está confirmada en inglés (1033) en vivo desde el
+    # 2026-09-27 (selectores.mjs); se usa para probar 1033. `local/sesion-supervisor.json`
+    # se prueba esperando 3082 (español, la convención del proyecto) — si resultara
+    # estar TAMBIÉN en inglés, este caso lo reporta como FALLA con el texto real
+    # encontrado, un hallazgo legítimo (no se fuerza un verde inventando el idioma que
+    # "debería" tener una sesión sin haberlo confirmado).
+    _chequear_playwright(c, "Sesión 'ejecutivo' (confirmada en inglés, 1033)",
+                          "a-13-multiidioma-botones", esperados=2, usuario="ejecutivo",
+                          extra_env={"MPPP_IDIOMA_ESPERADO": "1033"})
+    _chequear_playwright(c, "Sesión 'supervisor' (esperada en español, 3082)",
+                          "a-13-multiidioma-botones", esperados=2, usuario="supervisor",
+                          extra_env={"MPPP_IDIOMA_ESPERADO": "3082"})
     return c
 
 
@@ -645,33 +783,50 @@ def a14(ctx):
 
 
 # ===========================================================================
-# A-15 — La lección del botón fantasma. GUI, N-A a propósito: NINGUNA prueba de API la detecta, ese
-# es el punto. El ex `H-06` de `sets/set_h.py` (fusionado el 2026-09-28: CONVENCIONES.md §4, "La
-# regla del nombre" — H se nombraba por la fecha, no por lo que prueba; este caso es sobre un
-# COMANDO de la barra, tema de ESTE set). Mismo cuerpo que `H-06`, solo el ID cambió.
+# A-15 — La lección del botón fantasma. El ex `H-06` de `sets/set_h.py` (fusionado
+# el 2026-09-28: CONVENCIONES.md §4 — H se nombraba por la fecha, no por lo que
+# prueba; este caso es sobre un COMANDO de la barra, tema de ESTE set).
+#
+# CONECTADO el 2026-09-28 (antes N-A completo). La MITAD que un navegador puede
+# confirmar de verdad — que los botones NO estén AUSENTES de la lista real del
+# DOM, la señal concreta del defecto de metadata compilada que costó dos días —
+# ahora corre de verdad, reusando la MISMA corrida de Playwright que A-01
+# (`ctx.extra["a01_resultado"]`, cacheado por `a01()`: correr Playwright DOS veces
+# por la misma evidencia sería duplicar infraestructura y Dev innecesariamente,
+# CONVENCIONES §9). La OTRA mitad — diagnosticar con el Command Checker
+# (`&ribbondebug=true`) y, si hiciera falta, regenerar metadata desde
+# make.powerapps.com — sigue siendo 100% manual (privilegio de PLATAFORMA, ningún
+# usuario de prueba lo tiene) y se documenta en el `check` como el paso siguiente
+# si este caso alguna vez da FALLA, no como motivo de N-A.
 # ===========================================================================
 def a15(ctx):
-    c = pc.Caso("A-15", "La leccion del boton fantasma: distinguir REGLAS de METADATA COMPILADA")
-    c.na(
-        "Requiere el Command Checker en vivo ('&ribbondebug=true') y, si hay que regenerar metadata, acceso de "
-        "CUSTOMIZACION DE LA SOLUCION en make.powerapps.com sobre 'sanic_mppp_sol_mantenimientoppp' — privilegio de "
-        "PLATAFORMA (System Administrator/System Customizer de Dataverse), NO el rol de negocio "
-        "'SR - MPPP - Administrador tecnico' que prueba 'local/sesion-admin_tecnico.json' (acotado a Parametro/"
-        "Reglas dentro de la app, '04-matriz-privilegios.md'). Ninguna prueba de API detecta este defecto y ESE es "
-        "el punto: 'RetrieveEntityRibbon', los 'ribbondiff' con sus LocLabels en 1033/3082 y el verificador del "
-        "proyecto confirmaron el boton 'Descargar para digitar' PUBLICADO en el servidor, y ninguno de los tres vio "
-        "que no se dibujaba en el cliente (dos dias de diagnostico, 2026-09-27). La causa: la metadata COMPILADA del "
-        "ribbon, que 'PublishAllXml' NO regenera; se arregla con el boton 'Regenerate ribbon metadata' del Command "
-        "Checker. Guarda previa obligatoria: 'python3 herramientas/pruebas/estado_sesiones.py'. Con sesion "
-        "'local/sesion-ejecutivo.json' viva y el rol 'SR - MPPP - Ejecutivo' confirmado, el arnes que SI mira el DOM "
-        "real (no confia en 'publicado' == 'se dibuja') se corre desde 'pruebas/gui/': "
-        "'MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila' (ver 'pruebas/gui/ayudantes/ribbon.mjs', que "
-        "codifica esta misma distincion: boton AUSENTE de la lista del Command Checker -> sospechar metadata "
-        "compilada antes que el EnableRule; boton presente pero '(hidden)' -> revisar el EnableRule, la metadata "
-        "esta bien). Este set NUNCA duplica ese arnes (CONVENCIONES §9). PENDIENTE fuera de este set, para quien "
-        "mantenga el documento de instalación en otro entorno: después de importar la solución y publicar "
-        "(PublishAllXml), hay que regenerar la metadata del ribbon desde el Command Checker o los botones custom "
-        "no aparecen, aunque la publicación haya terminado sin ningún error.")
+    c = pc.Caso("A-15", "La lección del botón fantasma: distinguir REGLAS de METADATA COMPILADA")
+    cacheado = ctx.extra.get("a01_resultado")
+    if cacheado is not None:
+        ok, total, passed, failed, detalle = cacheado
+        origen = "reusando la corrida de Playwright de A-01 (mismo archivo, mismo fixture: no se duplica)"
+    else:
+        ok, total, passed, failed, detalle = _playwright_test("ribbon-fila", esperados=2)
+        origen = "corrida propia (A-01 no dejó nada cacheado en ctx.extra — no debería pasar en un set completo)"
+    if total is None:
+        c.na(f"no se pudo correr Playwright (ribbon-fila): {detalle}")
+        return c
+    c.check(
+        f"'ribbon-fila' matcheó exactamente 2 pruebas ({origen}) — un total distinto es el mismo "
+        "riesgo de falso verde que un FQN mal escrito en `dotnet test`",
+        total == 2, f"matcheó {total} (passed={passed}, failed={failed})")
+    c.check(
+        "los botones de Fila NO están AUSENTES de la lista real del DOM (HomepageGrid y SubGrid) — "
+        "la confirmación en vivo de que hoy NO se repite el defecto de metadata compilada que costó "
+        "dos días el 2026-09-27 (DN-02, 'Descargar para digitar' publicado en el servidor y ausente "
+        "en el cliente). SI ESTO DA FALLA: el diagnóstico manual completo (Command Checker con "
+        "'&ribbondebug=true', privilegio de PLATAFORMA — System Administrator/System Customizer, NO "
+        "el rol de negocio 'SR - MPPP - Administrador tecnico' — y, si un botón aparece AUSENTE de "
+        "la lista entera del Command Checker, 'Regenerate ribbon metadata' en make.powerapps.com "
+        "sobre 'sanic_mppp_sol_mantenimientoppp') sigue siendo manual y es el paso siguiente, no "
+        "algo que este caso pueda hacer solo — pero la DETECCIÓN, que antes costó dos días, ahora "
+        "corre en cada corrida del set.",
+        ok, detalle)
     return c
 
 
