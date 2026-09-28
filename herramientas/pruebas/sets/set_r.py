@@ -23,6 +23,7 @@ _HERRAMIENTAS_PRUEBAS = os.path.dirname(_AQUI)
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
+import preparar_datos as prep  # noqa: E402
 import simulador as sim  # noqa: E402
 import generar_excel as genexcel  # noqa: E402
 
@@ -57,7 +58,11 @@ CLIENTES = "sanic_mppp_tbl_clientes"
 AUTORIZACIONCLIENTES = "sanic_mppp_tbl_autorizacionclientes"
 
 # El Cliente compartido de `preparar_datos.py` (dueño de PR11/PR06/PR10/PRIN/PRNA).
-CLIENTE_COMPARTIDO = "PR - Pruebas MPPP SA"
+# Referenciado desde `prep.CLIENTE`, nunca repetido como literal (2026-09-28: la
+# marca de fixture se movió de "PR" a "ZZP-" sobre `sanic_nombre` en
+# `preparar_datos.py`; un literal acá se habría quedado obsoleto y esta
+# búsqueda habría dejado de encontrar el Cliente).
+CLIENTE_COMPARTIDO = prep.CLIENTE
 
 
 def _excel(nombre):
@@ -87,7 +92,8 @@ def preparar(ctx):
       COMPRUEBA que exista una versión activa de cada uno (§8.2: su canon es
       "la versión activa más alta", no un valor fijo que este set deba
       sembrar). R-18 lee el CONTENIDO del primero para decidir si corre su
-      aserción o si reporta N-A (criterio PROVISIONAL); R-16/R-17 versionan
+      aserción o si reporta N-A (criterio confirmado por el aprobador, 2026-09-28; el N-A es por
+      precondición de entorno, no por duda sobre el criterio); R-16/R-17 versionan
       el segundo ellos mismos, de forma transitoria, y lo devuelven a su
       estado antes de terminar (ver esos casos).
     - **DN-01: un Autorizado + una `AutorizacionCliente`** hacia el Cliente
@@ -542,14 +548,14 @@ def r17(ctx):
 
 
 def r18(ctx):
-    c = pc.Caso("R-18", "DN-03: `Exclusion` afloja numeroCuenta/banco/moneda (marcado PROVISIONAL)")
+    c = pc.Caso("R-18", "DN-03: `Exclusion` afloja numeroCuenta/banco/moneda")
     activo = ctx.extra["obligatoriedad_activa"]
     valor = activo.get("sanic_valor") or ""
     if "porGestion" not in valor or '"Exclusion"' not in valor:
-        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion': este criterio está "
-             "marcado PROVISIONAL en playbooks/datos/parametros.md, pendiente de confirmación de "
-             "negocio del aprobador (diseno/DIRECTRICES-NUEVAS.md, DN-03) — no se puede evaluar hoy. "
-             f"Valor activo: {valor!r}")
+        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno: el "
+             "criterio ya está confirmado por el aprobador (2026-09-28, diseno/DIRECTRICES-NUEVAS.md, "
+             "DN-03) — esto es una precondición de entorno (podría faltar sembrar acá), no una duda "
+             f"sobre el criterio. Valor activo: {valor!r}")
         return c
 
     fila_dict = genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="ACH",

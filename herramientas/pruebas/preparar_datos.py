@@ -10,18 +10,55 @@ funcionales, y los borra cuando se termina.
 prueba. Tiene que ser una casilla real a la que tengas acceso, porque varios
 casos se comprueban leyendo la respuesta que llega a ese buzón.
 
-**Qué crea** (todo con nombres que empiezan en `PR`, para poder borrarlo sin
-tocar nada del cliente):
+**El incidente del 2026-09-27 y el rediseño del 2026-09-28.** Un `--limpiar`
+de esta herramienta borró autorizaciones REALES del aprobador. La causa: el
+borrado de `AutorizacionPlan` se armaba con un `GET` de TODA la tabla y un
+`in` de Python contra `sanic_nombre` ("¿contiene `→ PR11`?") — cualquier fila
+real cuyo texto coincidiera por casualidad caía, sin que nadie releyera el
+registro ni comprobara que de verdad era del fixture. Tres cambios, aprobados
+por el aprobador ese mismo día:
+
+1. **La marca de fixture es `ZZP-`** (`marca_agua.py`), no `PR`. Vive en
+   `sanic_nombre` del Cliente (`ZZP-Pruebas MPPP SA`), el único campo de este
+   fixture que es texto libre y no lo recalcula ningún plugin. El código
+   corto de cada Plan (`sanic_codigo`, `T(4)`) **sigue siendo `PR11`/`PR06`/
+   `PR10`/`PRIN`/`PRNA`, sin marca**: la columna no tiene los 4 caracteres de
+   `ZZP-` MÁS algo que distinga un plan de otro, y de cualquier forma no es
+   lo que el limpiador verifica (identifica el caso de prueba, nada más —
+   ver el "Aviso" al final de `marca_agua.py`). Ni el `sanic_nombre` de Plan
+   ni el de `AutorizacionPlan` pueden llevar `ZZP-` tampoco: los dos son
+   **calculados por un plugin PreOperation** que los sobrescribe siempre
+   (`playbooks/tabla/sanic_mppp_tbl_plan.md`, `…autorizacionplan.md`, §1) con
+   un formato que empieza por el código o por el correo, nunca por la marca.
+   Por eso `limpiar()` (abajo) no llama a `marca_agua.borrar_marcado()` para
+   Plan ni para AutorizacionPlan: usa la protección EQUIVALENTE — releer el
+   registro puntual justo antes de cada `DELETE` y exigir que sus lookups
+   (`_sanic_clienteid_value`, `_sanic_autorizadoid_value`,
+   `_sanic_planid_value`) sigan apuntando, exactamente, al Cliente/Plan/
+   Autorizado de ESTE fixture, en vez de un prefijo de texto. Es la misma
+   garantía de `marca_agua` (releer inmediatamente antes de borrar, abortar
+   si no se puede probar pertenencia), aplicada por relación porque el
+   texto no tiene dónde vivir.
+2. **`limpiar()` ya no arma listas por `GET` sin filtro + coincidencia de
+   nombre.** Cada búsqueda usa un `$filter` exacto (código de plan, correo
+   del remitente, o los dos lookups de la `AutorizacionPlan`), y cada
+   `DELETE` relee el registro puntual inmediatamente antes.
+3. **`--limpiar` y la creación (`--remitente`) van adentro de
+   `semaforo.tomar(...)`**: si alguien está probando a mano (semáforo en
+   rojo), esta herramienta ya no puede pisarlo. `--verificar` es de solo
+   lectura y no toma el semáforo.
+
+**Qué crea:**
 
 | Qué | Para qué caso |
 |---|---|
-| Cliente `PR - Pruebas MPPP SA` | dueño de todos los planes de prueba |
+| Cliente `ZZP-Pruebas MPPP SA` | dueño de todos los planes de prueba |
 | Plan `PR11` formato 11, COR | el camino feliz, y las reglas de formato 11 |
 | Plan `PR06` formato 06, COR | que la referencia NO se derive (DD-15) |
 | Plan `PR10` formato 10, USD | `MONEDA_DEL_PLAN` |
 | Plan `PRIN` formato 06, COR, **inactivo** | `PLAN_EXISTE` con un plan que existe pero no vale |
 | Plan `PRNA` formato 06, COR | `AUTORIZACION_CORREO_PLAN`: existe, pero el remitente no está autorizado |
-| Autorizado = el remitente | `REMITENTE_RECONOCIDO` |
+| Autorizado = el remitente | `REMITENTE_RECONOCIDO` (su `sanic_nombre` ES el correo real: no lleva `ZZP-`, ver `limpiar()`) |
 | Autorizaciones a PR11, PR06, PR10 y PRIN | **a PRNA NO**, a propósito |
 
 Última línea: JSON de una línea, igual que las herramientas de construcción.
@@ -33,9 +70,13 @@ import sys
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(os.path.dirname(_AQUI))
 sys.path.insert(0, os.path.join(RAIZ, "herramientas"))
+sys.path.insert(0, _AQUI)
 
-PREFIJO = "PR"
-CLIENTE = "PR - Pruebas MPPP SA"
+import marca_agua  # noqa: E402
+import semaforo  # noqa: E402
+
+CLIENTE_BASE = "Pruebas MPPP SA"
+CLIENTE = marca_agua.nombre_de_prueba(CLIENTE_BASE)  # "ZZP-Pruebas MPPP SA"
 CIF_BAC = "900100200"      # `sanic_cifbac` admite 9, y usa los 9
 CIF_COM = "PRUEBASMPPP"    # `sanic_cifcom` admite 12: NO pasarse (antes decía 13 y fallaba)
 
@@ -189,29 +230,123 @@ def verificar(dv, remitente=None):
 
 
 def limpiar(dv, remitente=None):
-    borrados = []
-    # Orden inverso a las dependencias: autorizaciones, autorizados, planes, cliente.
-    est, r, _ = dv.call("GET", "sanic_mppp_tbl_autorizacionplans?$select=sanic_mppp_tbl_autorizacionplanid,sanic_nombre")
-    for x in r.get("value", []):
-        if any(f"→ {p['codigo']}" in (x.get("sanic_nombre") or "") for p in PLANES):
-            dv.call("DELETE", f"sanic_mppp_tbl_autorizacionplans({x['sanic_mppp_tbl_autorizacionplanid']})")
-            borrados.append(x["sanic_nombre"])
-    if remitente:
-        aut = uno(dv, "sanic_mppp_tbl_autorizados", f"sanic_nombre eq '{remitente}'",
-                  "sanic_mppp_tbl_autorizadoid")
-        if aut:
-            dv.call("DELETE", f"sanic_mppp_tbl_autorizados({aut['sanic_mppp_tbl_autorizadoid']})")
-            borrados.append(remitente)
+    """Borra el fixture `PR*`/`ZZP-` — nunca por coincidencia de nombre (ver
+    el docstring del módulo, "El incidente del 2026-09-27"). Orden inverso a
+    las dependencias: autorizaciones, autorizado, planes, cliente. Devuelve
+    `(borrados, ignorados)`: `ignorados` son registros que EXISTEN con el
+    código/correo esperado pero que, releídos justo antes de decidir, no se
+    pudo probar que son de este fixture — no se tocan, y quedan reportados en
+    vez de desaparecer en silencio.
+
+    Cómo se prueba pertenencia, entidad por entidad (no todas pueden llevar
+    el prefijo `ZZP-` de `marca_agua.borrar_marcado()` — ver el docstring del
+    módulo):
+    - **Cliente**: `sanic_nombre` es texto libre, nadie lo recalcula. Se
+      borra con `marca_agua.borrar_marcado()`, releído justo antes.
+    - **Plan**: su `sanic_nombre` lo recalcula un plugin (`<codigo> -
+      <cliente>`) y nunca puede empezar con `ZZP-`; su `sanic_codigo` (4
+      caracteres) no tiene lugar para la marca. La protección equivalente:
+      releer el Plan puntual justo antes del `DELETE` y exigir que su
+      `_sanic_clienteid_value` siga siendo, exactamente, el GUID del
+      Cliente marcado.
+    - **AutorizacionPlan**: su `sanic_nombre` también lo recalcula un
+      plugin (`<correo> → <código>`) y tampoco puede llevar la marca. Se
+      busca por los DOS lookups exactos (Autorizado × Plan, los dos ya
+      verificados como propios de este fixture) y, justo antes del
+      `DELETE`, se relee esa fila puntual por su GUID y se reconfirma que
+      los dos lookups siguen siendo los esperados — nunca por `sanic_nombre`
+      ni por un `GET` de toda la tabla.
+    - **Autorizado (el remitente)**: su `sanic_nombre` ES el correo real de
+      quien corre las pruebas (BP-PP-192): no se le puede poner `ZZP-` sin
+      romper el dato. Se busca por `$filter` EXACTO sobre ese correo (nunca
+      por substring) y se borra por el GUID que devolvió esa misma
+      búsqueda — mismo criterio ya usado para `REMITENTE_MODOCLIENTE` en
+      `herramientas/pruebas/sets/set_r.py::cerrar()`.
+    """
+    borrados, ignorados = [], []
+
+    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{CLIENTE}'",
+              "sanic_mppp_tbl_clienteid,sanic_nombre")
+    cliente_id = cli["sanic_mppp_tbl_clienteid"] if cli else None
+
+    # Planes que EXISTEN con el código esperado y cuelgan del Cliente marcado
+    # (verificado ahora; se vuelve a releer justo antes de cada DELETE más
+    # abajo, no se reusa esta lectura para borrar).
+    ids_plan = {}
     for p in PLANES:
-        pl = uno(dv, "sanic_mppp_tbl_plans", f"sanic_codigo eq '{p['codigo']}'", "sanic_mppp_tbl_planid")
-        if pl:
-            dv.call("DELETE", f"sanic_mppp_tbl_plans({pl['sanic_mppp_tbl_planid']})")
+        pl = uno(dv, "sanic_mppp_tbl_plans", f"sanic_codigo eq '{p['codigo']}'",
+                 "sanic_mppp_tbl_planid,_sanic_clienteid_value")
+        if pl is None:
+            continue
+        if cliente_id is None or pl.get("_sanic_clienteid_value") != cliente_id:
+            ignorados.append(f"plan {p['codigo']} existe pero no cuelga del Cliente marcado "
+                             f"({CLIENTE!r}); no se borra (¿código chocó con un plan real?)")
+            continue
+        ids_plan[p["codigo"]] = pl["sanic_mppp_tbl_planid"]
+
+    aut = uno(dv, "sanic_mppp_tbl_autorizados", f"sanic_nombre eq '{remitente}'",
+              "sanic_mppp_tbl_autorizadoid") if remitente else None
+    autorizado_id = aut["sanic_mppp_tbl_autorizadoid"] if aut else None
+
+    # AutorizacionPlan: por los dos lookups exactos, nunca por nombre.
+    if autorizado_id:
+        for codigo, plan_id in ids_plan.items():
+            ap = uno(dv, "sanic_mppp_tbl_autorizacionplans",
+                     f"_sanic_autorizadoid_value eq {autorizado_id} and _sanic_planid_value eq {plan_id}",
+                     "sanic_mppp_tbl_autorizacionplanid")
+            if ap is None:
+                continue
+            ap_id = ap["sanic_mppp_tbl_autorizacionplanid"]
+            # Releer INMEDIATAMENTE antes del DELETE, no la fila de arriba.
+            fresca = uno(dv, "sanic_mppp_tbl_autorizacionplans",
+                        f"sanic_mppp_tbl_autorizacionplanid eq {ap_id}",
+                        "_sanic_autorizadoid_value,_sanic_planid_value,sanic_nombre")
+            if (fresca is None or fresca.get("_sanic_autorizadoid_value") != autorizado_id
+                    or fresca.get("_sanic_planid_value") != plan_id):
+                ignorados.append(f"autorizacion {codigo}: cambió entre el listado y el borrado; no se toca")
+                continue
+            est, r, _ = dv.call("DELETE", f"sanic_mppp_tbl_autorizacionplans({ap_id})")
+            if est in (200, 204):
+                borrados.append(fresca.get("sanic_nombre") or f"autorizacion {codigo}")
+            else:
+                ignorados.append(f"autorizacion {codigo}: DELETE devolvió HTTP {est}: {r}")
+
+    # Autorizado (remitente): match exacto por correo, borrado por GUID
+    # directo (no puede llevar `ZZP-`, ver el docstring de esta función).
+    if aut:
+        est, r, _ = dv.call("DELETE", f"sanic_mppp_tbl_autorizados({autorizado_id})")
+        if est in (200, 204):
+            borrados.append(remitente)
+        else:
+            ignorados.append(f"autorizado {remitente}: DELETE devolvió HTTP {est}: {r}")
+
+    # Plan: releer justo antes y reconfirmar que sigue colgando del Cliente marcado.
+    for p in PLANES:
+        plan_id = ids_plan.get(p["codigo"])
+        if plan_id is None:
+            continue
+        fresca = uno(dv, "sanic_mppp_tbl_plans", f"sanic_mppp_tbl_planid eq {plan_id}",
+                     "_sanic_clienteid_value")
+        if fresca is None or cliente_id is None or fresca.get("_sanic_clienteid_value") != cliente_id:
+            ignorados.append(f"plan {p['codigo']}: ya no cuelga del Cliente marcado justo antes de "
+                             "borrar; no se toca")
+            continue
+        est, r, _ = dv.call("DELETE", f"sanic_mppp_tbl_plans({plan_id})")
+        if est in (200, 204):
             borrados.append(p["codigo"])
-    cli = uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{CLIENTE}'", "sanic_mppp_tbl_clienteid")
+        else:
+            ignorados.append(f"plan {p['codigo']}: DELETE devolvió HTTP {est}: {r}")
+
+    # Cliente: último, con la marca de agua estándar (releída justo antes).
     if cli:
-        dv.call("DELETE", f"sanic_mppp_tbl_clientes({cli['sanic_mppp_tbl_clienteid']})")
-        borrados.append(CLIENTE)
-    return borrados
+        ok, motivo = marca_agua.borrar_marcado(dv, "sanic_mppp_tbl_clientes", cliente_id,
+                                               "sanic_nombre")
+        if ok:
+            borrados.append(CLIENTE)
+        else:
+            ignorados.append(f"cliente {CLIENTE}: {motivo}")
+
+    return borrados, ignorados
 
 
 def main():
@@ -226,10 +361,16 @@ def main():
     dv = Dataverse()
     try:
         if "--limpiar" in argv:
-            borrados = limpiar(dv, remitente)
-            return salida("limpio", f"borrados {len(borrados)}: {borrados}" if borrados
-                          else "no había nada que borrar")
+            # Bajo semáforo: si alguien está probando a mano, esto no arranca
+            # (ver "El incidente del 2026-09-27" en el docstring del módulo).
+            with semaforo.tomar(f"preparar_datos.py --limpiar{f' --remitente {remitente}' if remitente else ''}"):
+                borrados, ignorados = limpiar(dv, remitente)
+            detalle = f"borrados {len(borrados)}: {borrados}" if borrados else "no había nada que borrar"
+            if ignorados:
+                detalle += f"; IGNORADOS (no se pudo probar pertenencia, no se tocaron): {ignorados}"
+            return salida("limpio", detalle)
         if "--verificar" in argv:
+            # Solo lectura: no toma el semáforo.
             bien, faltan = verificar(dv, remitente)
             if faltan:
                 return salida("difiere", f"faltan o están mal: {faltan}")
@@ -239,7 +380,9 @@ def main():
         malos = comprobar_largos(remitente)
         if malos:
             return salida("error", "hay valores más largos de lo que admite la tabla: " + "; ".join(malos))
-        hechos = preparar(dv, remitente)
+        # Bajo semáforo también la creación: escribe en el entorno compartido.
+        with semaforo.tomar(f"preparar_datos.py --remitente {remitente}"):
+            hechos = preparar(dv, remitente)
         bien, faltan = verificar(dv, remitente)
         if faltan:
             return salida("error", f"se escribió pero no quedó bien: {faltan}")
