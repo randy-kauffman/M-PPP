@@ -215,8 +215,10 @@ namespace Sanic.Mppp.Plugins.Steps
         /// de servidor ANIDADO (profundidad mayor que 1: la Custom API del RPA escribiendo como SYSTEM, donde
         /// `InitiatingUserId` vale SYSTEM en todos los niveles), se confía en la identidad que la Custom API ya
         /// grabó: `sanic_aprobadapor` del `Target` si la transición va a Aprobada, `sanic_digitadapor` del `Target`
-        /// si va a Digitada, o el `sanic_digitadapor` de la PRE-IMAGE para cualquier otro caso. Si ahí tampoco hay
-        /// nadie, `null`: no se asume ningún actor y la transición se rechaza sola por falta de rol.
+        /// si va a Digitada. Para cualquier OTRO caso no hay ninguna columna del `Target` que guarde una identidad
+        /// (no existe `sanic_rechazadopor`): se devuelve `null` a propósito — ver
+        /// <see cref="RolDeServidorSinIdentidad"/>, que es quien decide el rol para ese hueco, en vez de adivinar
+        /// una identidad que no existe.
         /// </summary>
         internal static Guid? ResolverIdentidadDelActor(IPluginExecutionContext contexto, bool esCodigoDeServidor, Entity target, Entity preImagen, EstadoDeLaFila hacia)
         {
@@ -235,7 +237,56 @@ namespace Sanic.Mppp.Plugins.Steps
                 return target.GetAttributeValue<EntityReference>("sanic_digitadapor")?.Id;
             }
 
-            return preImagen.GetAttributeValue<EntityReference>("sanic_digitadapor")?.Id;
+            return null;
+        }
+
+        /// <summary>
+        /// D-60 (2026-09-28). El rol a usar cuando <see cref="ResolverIdentidadDelActor"/> no pudo resolver ninguna
+        /// identidad para código de servidor ANIDADO (`esCodigoDeServidor &amp;&amp; Depth &gt; 1`) — hoy, en la
+        /// práctica, solo pasa para `Hacia == RechazadaEnAS400`.
+        ///
+        /// **El defecto que esto reemplaza.** Hasta acá, ese hueco se llenaba leyendo `sanic_digitadapor` de la
+        /// PRE-IMAGE, como proxy de "quién está actuando". Esa columna es `null` cuando la fila nunca pasó por
+        /// Digitada — el camino MÁS COMÚN del RPA: intenta directo desde Validada y AS400 la rechaza (diseno/03 §4,
+        /// fila "Validada o Digitada → Rechazada en AS400") — así que el actor resolvía a `RolDeActor.Ninguno` y
+        /// `AutorizarQuienDigita` (`Dominio/TransicionesDeFila.cs`) rechazaba SIEMPRE la transición, aunque quien
+        /// llama ya hubiera pasado <see cref="PuertaDelRpa.Exigir"/> con el rol RPA confirmado. Confirmado leyendo
+        /// el `plugintracelog` real de Dev (2026-09-28), en `messageblock` (NO en `exceptiondetails`, que la
+        /// corrección de seguridad del proyecto genericiza a propósito):
+        ///
+        ///   RegistrarResultadoRpa: empieza.
+        ///   System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: El rol de quien
+        ///   llama no puede hacer esta transición.
+        ///
+        /// **Por qué no hay una identidad real que leer.** No existe una columna `sanic_rechazadopor`: nadie
+        /// registró nunca "quién rechazó" como dato propio (a diferencia de `sanic_digitadapor`/`sanic_aprobadapor`).
+        /// Agregar una es un cambio de esquema de Dataverse, fuera del alcance de este arreglo. Y no hay forma de
+        /// preguntarle a la plataforma quién originó la llamada real: el spike C-05 parte B ya probó que ni
+        /// `context.ParentContext` ni `SharedVariables` sobreviven el `Update` anidado con SYSTEM
+        /// (`spikes/c05-parseo-excel/CONCLUSIONES-B.md`, "Ninguna de las dos vías propuestas por el diseño sirve").
+        ///
+        /// **Por qué confiar el rol es correcto acá, y no un debilitamiento de la seguridad.** `AutorizarQuienDigita`
+        /// (la única autorización que usa esta transición) NUNCA compara identidades — solo mira el ROL
+        /// (`p.Actor.Roles == Ejecutivo || p.Actor.Roles == Rpa`), a diferencia de `AutorizarAprobar`, que sí exige
+        /// segregación de funciones por identidad. Y la identidad REAL de quien llama a la Custom API del RPA YA se
+        /// verificó, con consulta a Dataverse, ANTES de llegar acá: <see cref="PuertaDelRpa.Exigir"/> corre en
+        /// `RegistrarResultadoRpaApi.Execute` (D-9) sobre el `InitiatingUserId` de ESE nivel — el mismo que, según
+        /// documenta `diseno/03-contratos-custom-api.md` §4, "en su nivel, antes de elevar, sí es el usuario de
+        /// aplicación del bot". Confiar acá es el MISMO criterio "a SYSTEM se le cree" que ya gobierna
+        /// `BaseDeStep.EsCodigoDeServidor` (ver su propio comentario) y el bypass del claim en
+        /// `TransicionesDeFila.Evaluar` — no una excepción nueva.
+        ///
+        /// **Por qué no generaliza a cualquier transición.** Se falla CERRADO (`RolDeActor.Ninguno`) para cualquier
+        /// `hacia` que no sea `RechazadaEnAS400`: hoy Anular nunca lo hace el RPA (03 §4, "el RPA nunca anula") y
+        /// Devolver solo lo hace un Supervisor persona (nunca código de servidor), así que ninguna otra combinación
+        /// debería llegar acá. Si el día de mañana otra transición empieza a escribirse desde código de servidor
+        /// anidado, tiene que agregarse ACÁ a propósito — nunca heredar un "sí" que nadie pidió.
+        /// </summary>
+        internal static RolDeActor RolDeServidorSinIdentidad(bool esCodigoDeServidor, int depth, EstadoDeLaFila hacia)
+        {
+            return esCodigoDeServidor && depth > 1 && hacia == EstadoDeLaFila.RechazadaEnAS400
+                ? RolDeActor.Rpa
+                : RolDeActor.Ninguno;
         }
     }
 
@@ -290,7 +341,11 @@ namespace Sanic.Mppp.Plugins.Steps
             // El actor para roles y para la segregación de funciones es el mismo usuario confiado, nunca SYSTEM
             // (revisión de código, 2026-09-21): ver el contrato arriba y PlomeriaDeFila.ResolverIdentidadDelActor.
             var actorId = PlomeriaDeFila.ResolverIdentidadDelActor(contexto, esCodigoDeServidor, target, preImagen, hacia);
-            var roles = actorId.HasValue ? PlomeriaDeFila.DeterminarRoles(servicio, actorId.Value) : RolDeActor.Ninguno;
+            // D-60 (2026-09-28): sin identidad resoluble (código de servidor anidado, "cualquier otro caso" —
+            // hoy solo Rechazada en AS400), el rol NO sale de una consulta: ver PlomeriaDeFila.RolDeServidorSinIdentidad.
+            var roles = actorId.HasValue
+                ? PlomeriaDeFila.DeterminarRoles(servicio, actorId.Value)
+                : PlomeriaDeFila.RolDeServidorSinIdentidad(esCodigoDeServidor, contexto.Depth, hacia);
             var rpaPuedeAprobar = PlomeriaDeFila.LeerRpaPuedeAprobar(servicio);
             var ahora = PlomeriaDeFila.AhoraUtc(contexto);
             var claimHasta = PlomeriaDeFila.LeerClaimHasta(servicio, target.Id, esCodigoDeServidor);
