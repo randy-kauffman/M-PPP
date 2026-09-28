@@ -34,8 +34,9 @@ dibujaba en el cliente**. Costó dos días. La causa era la metadata compilada d
 regenera desde el Command Checker (`&ribbondebug=true`). Y el diagnóstico clave: en el Command
 Checker, un botón `(hidden)` es problema de **REGLAS**; un botón **AUSENTE de la lista** es problema
 de **METADATA COMPILADA**. Mismo síntoma en pantalla, causas opuestas. El procedimiento completo de
-diagnóstico está documentado, con evidencia, en `H-06` (`pruebas/13-construido-hoy.md`) — acá se
-cita esa distinción en los casos donde aplica (A-01, A-02), sin repetirla entera.
+diagnóstico está documentado, con evidencia, en `A-15` (fusionado acá el 2026-09-28 desde el ex set
+H, `13-construido-hoy.md` — `CONVENCIONES.md` §4, "La regla del nombre") — acá se cita esa
+distinción en los casos donde aplica (A-01, A-02), sin repetirla entera.
 
 ### Por qué esto NO usa `comportamiento_roles.py --con-escritura`
 
@@ -115,7 +116,7 @@ vista — comportamiento correcto, no un defecto). Sin selección, ningún botó
 (`pruebas/gui/casos/ribbon-fila.spec.mjs`, ya escrito y con sus selectores verificados en vivo el
 2026-09-27 — falta correrlo de punta a punta con sesión real).
 
-**Cómo se sabe que falló.** Ver la distinción de `H-06` (`pruebas/13-construido-hoy.md`): en el
+**Cómo se sabe que falló.** Ver la distinción de `A-15` (este mismo archivo): en el
 Command Checker (`&ribbondebug=true`), un botón que aparece **`(hidden)`** es un problema de
 **REGLAS** (`EnableRule` contra la selección actual, revisar `TRANSICIONES_VALIDAS`); un botón
 **AUSENTE de la lista entera** es un problema de **METADATA COMPILADA** (regenerar desde el maker
@@ -154,7 +155,7 @@ Bitácora (sí en los catálogos, donde el alta es de una persona).
 **Cómo se verifica.** Recorrido manual del sitemap con las 4 sesiones (no hay caso `.spec.mjs`
 todavía — punto de extensión, `pruebas/gui/README.md` §6).
 
-**Cómo se sabe que falló.** Mismo diagnóstico REGLA-vs-METADATA de A-01/`H-06` si un
+**Cómo se sabe que falló.** Mismo diagnóstico REGLA-vs-METADATA de A-01/`A-15` si un
 `HideCustomAction` no surtiera efecto en alguna tabla puntual. **No alcanza con `RetrieveEntityRibbon`
 por Web API** (la misma llamada que usa `herramientas/construir/importar_solucion.py` para publicar):
 es uno de los "tres caminos de API" que el 2026-09-27 confirmaron que el botón de DN-02 **existía**
@@ -593,12 +594,78 @@ migración: no existía en el archivo antes del 2026-09-27.
 
 ---
 
+## A-15 · La lección del botón fantasma: distinguir REGLAS de METADATA COMPILADA
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): este caso era `H-06`
+del set `H` (`13-construido-hoy.md`, prefijo `H-`), un archivo aparte nombrado por la fecha en que
+se escribió, no por lo que prueba. `H-06` es sobre un comando de la barra — el tema de ESTE
+archivo—, así que quedó acá con el mismo cuerpo, solo cambió el ID. `13-construido-hoy.md`
+desapareció; la tabla de equivalencias completa vive en `pruebas/README.md`.
+
+**Qué prueba.** El hallazgo real del 2026-09-27: el botón "Descargar para digitar" existía en el
+servidor —verificado por API por TRES caminos distintos (`RetrieveEntityRibbon`, los `ribbondiff` con
+sus LocLabels en 1033/3082, y el verificador del proyecto)— y NO se dibujaba en el navegador: la causa
+era la metadata de ribbon **compilada**, no una regla de habilitación. Este caso documenta el
+PROCEDIMIENTO DE DIAGNÓSTICO para la próxima vez que un botón nuevo "no aparezca", sea cual sea, y que
+quien lo encuentre sepa en minutos —no en dos días, como esta vez— si el problema es de REGLAS o de
+METADATA COMPILADA: son diagnósticos opuestos con el mismo síntoma superficial ("no lo veo").
+
+**Necesita.** Acceso de **customización de la solución** en `make.powerapps.com` sobre
+`sanic_mppp_sol_mantenimientoppp` — privilegio de PLATAFORMA (System Administrator/System Customizer
+de Dataverse), **no** el rol de negocio `SR - MPPP - Administrador tecnico` que prueban
+`local/sesion-admin_tecnico.json` y `estado_sesiones.py`: ese rol está acotado a las tablas Parámetro
+y Reglas dentro de la app (`04-matriz-privilegios.md`) y no da acceso al maker portal para regenerar
+metadata. Además: `local/sesion-ejecutivo.json` (rol `SR - MPPP - Ejecutivo`), confirmada viva y con
+ese rol por `python3 herramientas/pruebas/estado_sesiones.py` ANTES de correr nada; el parámetro de
+URL `&ribbondebug=true` agregado a la URL de la app model-driven.
+
+**Cómo.**
+1. Abrir la vista de Filas en la app con `&ribbondebug=true` en la URL, y usar el **Command
+   Checker** sobre el comando en cuestión.
+2. Leer la lista de comandos que devuelve el Command Checker:
+   - Si el botón aparece marcado **`(hidden)`**: es un problema de **REGLAS** (`EnableRule`/
+     `DisplayRule`) — revisar contra la selección actual, la metadata está bien.
+   - Si el botón está **AUSENTE de la lista entera**: es un problema de **METADATA COMPILADA** del
+     ribbon — ningún ajuste de reglas lo va a arreglar.
+3. Para el segundo caso: en el maker portal, sobre la tabla/app correspondiente, usar **"Regenerate
+   ribbon metadata"** (o volver a publicar la personalización completa) y repetir el paso 1.
+
+**Qué tiene que pasar.** Después de "Regenerate ribbon metadata", un botón que estaba AUSENTE de la
+lista del Command Checker pasa a aparecer (visible o `(hidden)`, según la selección actual).
+
+**Cómo se verifica.** La lista del Command Checker antes y después. Para la confirmación en el DOM
+real (con sesión y sin depender del maker portal): `cd pruebas/gui && MPPP_USUARIO=ejecutivo npx
+playwright test ribbon-fila` (ver `pruebas/gui/ayudantes/ribbon.mjs`, que codifica esta misma
+distinción: **AUSENTE** → "Sospechar metadata de ribbon (regenerar desde Command Checker) antes que el
+EnableRule"; **presente pero DESHABILITADO** → "revisar el EnableRule contra la selección actual, la
+metadata está bien"). Este set nunca duplica ese arnés (`CONVENCIONES` §9).
+
+**Cómo se sabe que falló (es decir, que se erró el diagnóstico).** Se pasaron minutos u horas
+ajustando `EnableRule`/`DisplayRule` sobre un botón que en realidad estaba AUSENTE de la lista del
+Command Checker (metadata compilada) — o al revés, se regeneró metadata sobre un botón que SÍ estaba
+en la lista pero `(hidden)` por una regla. Confundirlos es exactamente lo que costó dos días este
+mismo día.
+
+**Automatizable.** Manual (el diagnóstico y la reparación en el maker portal). El síntoma
+"presente vs. ausente" en el DOM real ya lo automatiza `pruebas/gui/ayudantes/ribbon.mjs`
+(GUI, con sesión), pero la ACCIÓN de "Regenerate ribbon metadata" es manual, en el maker portal — por
+eso el caso queda `N-A` en este set de API y no se corre desde acá.
+
+> **Nota para quien mantenga el documento de instalación en otro entorno** (fuera del alcance de este
+> archivo de pruebas, pero registrado acá porque de acá sale la lección): después de importar la
+> solución y publicar (`PublishAllXml`), hay que **regenerar la metadata del ribbon** desde el Command
+> Checker, o los botones custom no aparecen — aunque la publicación haya terminado sin ningún error.
+
+---
+
 ## Resultados
 
 Última corrida real: `python3 herramientas/pruebas/correr.py A`, 2026-09-27. **6 OK · 2 FALLA · 6
 N-A.** Los 2 `FALLA` son defectos reales confirmados (no fallas de datos de prueba); ninguno tiene
 ID todavía en `diseno/PENDIENTES.md` — pendiente de abrir. Formato por caso: OK / FALLA (con el
-motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3.
+motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3. **A-15** se agregó el
+2026-09-28 (fusión del ex `H-06`, `13-construido-hoy.md`); su resultado (`N-A`, a propósito) es el
+mismo que ya tenía como `H-06`.
 
 | Caso | Resultado | Notas |
 |---|---|---|
@@ -616,3 +683,4 @@ motivo o el ID del defecto) / N-A (con el motivo) — CONVENCIONES §3.
 | A-12 Revisado | OK | |
 | A-13 multiidioma | N-A | GUI, sin caso de arnés todavía |
 | A-14 Atendida (fase 2) | **FALLA** | defecto real: lista blanca de Fila no incluye `sanic_requiereatencionmanual` (ver el caso arriba). Falta ID en PENDIENTES.md |
+| A-15 diagnóstico REGLAS vs. METADATA COMPILADA | N-A | ex `H-06`; maker portal (System Administrator/Customizer de plataforma, NO `admin_tecnico`), manual — motivo completo en el caso |

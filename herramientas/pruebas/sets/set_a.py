@@ -37,6 +37,14 @@ Solicitudes/Filas que el propio caso creó con `ctx.procesar()`/`ctx.solicitud()
    `sanic_estado`, `sanic_mensaje`, `sanic_notainterna`). A-14 prueba el comportamiento DISEÑADO
    (el botón "Atendida" funciona); si da FALLA con "sanic_requiereatencionmanual no está(n)
    permitida(s)", es exactamente esa discrepancia — ver el MD, sección "Otro hallazgo".
+
+**A-15 (fusionado el 2026-09-28, `CONVENCIONES.md` §4, "La regla del nombre").** El ex set H
+(`13-construido-hoy.md`, nombrado por la fecha en que se escribió, no por lo que prueba) se repartió
+entre este set y el set G. Su caso `H-06` — el más caro del plan: documenta los dos días de
+diagnóstico del botón fantasma de `descargarParaDigitar` — es sobre un COMANDO de la barra, así que
+pasó acá como `A-15`, mismo cuerpo, `N-A` a propósito por el mismo motivo (ver el caso). Los otros
+seis casos de H (sitemap/vistas/formulario) pasaron a `G-14`..`G-19` en `set_g.py`; `set_h.py`
+desapareció. La tabla de equivalencias completa vive en `pruebas/README.md`.
 """
 import os
 import sys
@@ -199,7 +207,7 @@ def a01(ctx):
         "selección'. La SubGrid de Fila dentro de Solicitud, y los 3 botones de Solicitud, no "
         "tienen caso .spec.mjs todavía (pruebas/gui/README.md §6). Diagnóstico si un botón no "
         "aparece: en el Command Checker (&ribbondebug=true), '(hidden)' es una REGLA; AUSENTE de "
-        "la lista entera es METADATA COMPILADA (ver H-06, pruebas/13-construido-hoy.md) — mismo "
+        "la lista entera es METADATA COMPILADA (ver A-15, este mismo archivo) — mismo "
         "síntoma, causas opuestas.")
     return c
 
@@ -636,4 +644,35 @@ def a14(ctx):
     return c
 
 
-CASOS = [a01, a02, a03, a04, a05, a06, a07, a08, a09, a10, a11, a12, a13, a14]
+# ===========================================================================
+# A-15 — La lección del botón fantasma. GUI, N-A a propósito: NINGUNA prueba de API la detecta, ese
+# es el punto. El ex `H-06` de `sets/set_h.py` (fusionado el 2026-09-28: CONVENCIONES.md §4, "La
+# regla del nombre" — H se nombraba por la fecha, no por lo que prueba; este caso es sobre un
+# COMANDO de la barra, tema de ESTE set). Mismo cuerpo que `H-06`, solo el ID cambió.
+# ===========================================================================
+def a15(ctx):
+    c = pc.Caso("A-15", "La leccion del boton fantasma: distinguir REGLAS de METADATA COMPILADA")
+    c.na(
+        "Requiere el Command Checker en vivo ('&ribbondebug=true') y, si hay que regenerar metadata, acceso de "
+        "CUSTOMIZACION DE LA SOLUCION en make.powerapps.com sobre 'sanic_mppp_sol_mantenimientoppp' — privilegio de "
+        "PLATAFORMA (System Administrator/System Customizer de Dataverse), NO el rol de negocio "
+        "'SR - MPPP - Administrador tecnico' que prueba 'local/sesion-admin_tecnico.json' (acotado a Parametro/"
+        "Reglas dentro de la app, '04-matriz-privilegios.md'). Ninguna prueba de API detecta este defecto y ESE es "
+        "el punto: 'RetrieveEntityRibbon', los 'ribbondiff' con sus LocLabels en 1033/3082 y el verificador del "
+        "proyecto confirmaron el boton 'Descargar para digitar' PUBLICADO en el servidor, y ninguno de los tres vio "
+        "que no se dibujaba en el cliente (dos dias de diagnostico, 2026-09-27). La causa: la metadata COMPILADA del "
+        "ribbon, que 'PublishAllXml' NO regenera; se arregla con el boton 'Regenerate ribbon metadata' del Command "
+        "Checker. Guarda previa obligatoria: 'python3 herramientas/pruebas/estado_sesiones.py'. Con sesion "
+        "'local/sesion-ejecutivo.json' viva y el rol 'SR - MPPP - Ejecutivo' confirmado, el arnes que SI mira el DOM "
+        "real (no confia en 'publicado' == 'se dibuja') se corre desde 'pruebas/gui/': "
+        "'MPPP_USUARIO=ejecutivo npx playwright test ribbon-fila' (ver 'pruebas/gui/ayudantes/ribbon.mjs', que "
+        "codifica esta misma distincion: boton AUSENTE de la lista del Command Checker -> sospechar metadata "
+        "compilada antes que el EnableRule; boton presente pero '(hidden)' -> revisar el EnableRule, la metadata "
+        "esta bien). Este set NUNCA duplica ese arnes (CONVENCIONES §9). PENDIENTE fuera de este set, para quien "
+        "mantenga el documento de instalación en otro entorno: después de importar la solución y publicar "
+        "(PublishAllXml), hay que regenerar la metadata del ribbon desde el Command Checker o los botones custom "
+        "no aparecen, aunque la publicación haya terminado sin ningún error.")
+    return c
+
+
+CASOS = [a01, a02, a03, a04, a05, a06, a07, a08, a09, a10, a11, a12, a13, a14, a15]

@@ -100,9 +100,11 @@ solo se ve si los casos dicen FALLA.
 
 ---
 
-## 4. Convención de IDs
+## 4. Convención de IDs y archivos
 
-Un prefijo por archivo, una letra, sin colisiones. Estado al 2026-09-27:
+Un prefijo por archivo, una letra, sin colisiones. Estado al 2026-09-28, después del
+reagrupamiento de sets (13 → 11; la tabla de equivalencias completa, viejo → nuevo, está en
+`pruebas/README.md`):
 
 | Prefijo | Archivo |
 |---|---|
@@ -118,11 +120,51 @@ Un prefijo por archivo, una letra, sin colisiones. Estado al 2026-09-27:
 | `B` | `09-rpa-fase2.md` (Bot) |
 | `U` | `10-autorizacion-cliente.md` (aUtorización) |
 | `E` | `11-exportacion-excel.md` |
-| `O` | `12-obligatoriedad-gestion.md` |
-| `H` | `13-construido-hoy.md` |
 
 Un archivo nuevo elige una letra libre y **la agrega a esta tabla en el mismo commit**. Un ID
 asignado no se reusa ni se renumera: se referencia desde otros documentos y desde los módulos de `herramientas/pruebas/sets/`.
+
+### La regla del nombre: qué prueba, nunca cuándo ni qué pedido lo originó
+
+Los 13 sets originales se nombraron con **tres criterios mezclados**, y de los tres solo uno
+envejece bien:
+
+1. **Por tema** (`C`lasificación, `S`olicitud, `R`egistro, `M` comunicaciones, `A`pp, `G` seguridad,
+   `V`igilancia, `I`ntegridad) — el nombre dice **qué parte del sistema** prueba. No envejece:
+   dentro de seis meses "Reglas de Registro" sigue queriendo decir exactamente lo mismo.
+2. **Por directiva o fase** (`09-rpa-fase2.md` citando "fase 2"; y los dos archivos que hasta el
+   2026-09-28 se llamaban, en su propio encabezado, `10-autorizacion-cliente.md` citando "DN-01" y
+   `12-obligatoriedad-gestion.md` citando "DN-03") — envejece: dentro de seis meses nadie tiene
+   fresco qué pedido fue "DN-02", y hay que ir a buscarlo a `diseno/DIRECTRICES-NUEVAS.md` solo
+   para entender de qué habla el archivo.
+3. **Por fecha** (`13-construido-hoy.md`, "Construido el 2026-09-27") — ya había envejecido para
+   cuando se leyó por segunda vez: "hoy" es una palabra que miente apenas pasa la medianoche.
+
+**La regla, desde el reagrupamiento del 2026-09-28**: el nombre de un set responde **qué parte del
+sistema prueba** — nunca cuándo lo construimos ni qué pedido lo originó. La prueba de fuego:
+¿alguien que entra al proyecto en seis meses sabe qué hay adentro con solo leer el nombre?
+
+Aplicada, esa regla dejó los 13 sets en 11:
+
+- **El set `O` (`12-obligatoriedad-gestion.md`, nombrado por la directiva DN-03) se fusionó dentro
+  del set `R` (`03-reglas-de-registro.md`, Reglas de Registro)**, como los casos `R-19` a `R-28`:
+  la obligatoriedad por gestión **ES** una de las ocho reglas de Registro (`OBLIGATORIEDAD`), no un
+  tema aparte — probarla en un archivo distinto partía el motor de reglas en dos sin necesidad.
+- **El set `H` (`13-construido-hoy.md`, nombrado por la fecha) se fusionó dentro de dos sets por
+  TEMA**: el caso del botón fantasma (`H-06`, sobre un comando de la barra de la app) pasó a
+  `A-15` en `05-app-y-comandos.md`; los seis casos de sitemap, columna de trabajo y formulario
+  (`H-01` a `H-05`, `H-07`) pasaron a `G-14`..`G-19` en `06-seguridad-vistas-formularios.md` —
+  exactamente el tema que esos casos ya tenían, y que el nombre del archivo por fecha no decía.
+- **El set `U` (`10-autorizacion-cliente.md`) NO se fusionó**, aunque también nació citando "DN-01"
+  en su encabezado histórico: la autorización se evalúa en **dos niveles** — Correo
+  (`REMITENTE_RECONOCIDO`) y Registro (`AUTORIZACION_CORREO_PLAN`) — así que no pertenece por tema
+  a ninguno de los dos archivos que cubren esos niveles; es transversal, y eso sí justifica un
+  archivo propio. Que el nombre haya nacido citando una directiva no obligaba a fusionarlo: lo que
+  importa es que hoy `10-autorizacion-cliente.md` ya dice, en su propio nombre, qué prueba.
+
+Un ID viejo (`O-04`, `H-06`, etc.) puede seguir apareciendo en un reporte de corrida anterior al
+2026-09-28: la tabla de equivalencias completa (viejo → nuevo) vive en `pruebas/README.md`, para
+seguirle el hilo sin adivinar.
 
 ---
 

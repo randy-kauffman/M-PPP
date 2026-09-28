@@ -27,8 +27,12 @@ _AQUI = os.path.dirname(os.path.abspath(__file__))
 # Orden canónico de CONVENCIONES.md §4. El set P desapareció (sus
 # verificaciones se repartieron a `preparacion_comun.py`), pero la letra
 # queda documentada acá por prolijidad histórica: nunca va a haber un
-# `set_p.py`.
-ORDEN_CANONICO = ["C", "S", "R", "M", "A", "G", "V", "I", "B", "U", "E", "O", "H"]
+# `set_p.py`. Los sets O y H desaparecieron el 2026-09-28 (reagrupamiento de
+# CONVENCIONES.md §4, "La regla del nombre"): O se fusionó dentro de R
+# (R-19..R-28) y H se repartió entre A (A-15) y G (G-14..G-19). Tampoco va a
+# haber un `set_o.py` ni un `set_h.py` de nuevo — las letras quedan libres
+# para un archivo nuevo, no reservadas.
+ORDEN_CANONICO = ["C", "S", "R", "M", "A", "G", "V", "I", "B", "U", "E"]
 
 CAMPOS_OBLIGATORIOS = ("LETRA", "NOMBRE", "preparar", "CASOS", "cerrar")
 

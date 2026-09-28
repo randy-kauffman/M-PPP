@@ -28,8 +28,10 @@ PLAN_EXISTE ─────┼─→ OBLIGATORIEDAD ───────┘
 cambiar de código, orden, nivel ni efecto (`diseno/DIRECTRICES-NUEVAS.md`). R-15..R-18 cubren esas
 dos reglas bajo el comportamiento nuevo, automatizadas por API con el mismo arnés que R-01..R-14; la
 sección "Fase 2 — investigación y conclusión" explica exactamente qué agrega este archivo y qué
-queda a cargo de los sets dedicados `10-autorizacion-cliente.md` (`U`) y
-`12-obligatoriedad-gestion.md` (`O`), para no duplicar los mismos casos con otro nombre.
+queda a cargo del set dedicado `10-autorizacion-cliente.md` (`U`), para no duplicar los mismos casos
+con otro nombre. **R-19..R-28** son la cobertura exhaustiva de DN-03 (el ex set `O`,
+`12-obligatoriedad-gestion.md`, fusionado acá el 2026-09-28 — `CONVENCIONES.md` §4, "La regla del
+nombre"): ver la sección propia más abajo, justo después de R-18.
 
 **Set autocontenido** (`CONVENCIONES.md` §8). Prepara sus propios datos (el fixture compartido `PR*`
 más, para DN-01, un Autorizado y una `AutorizacionCliente` que `preparar_datos.py` **no** crea), no
@@ -580,6 +582,360 @@ motor no lo está aplicando).
 
 ---
 
+## Obligatoriedad por gestión, exhaustivo — casos R-19 a R-28 (fusionado del ex set O)
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): estos diez casos eran
+el set `O` (`12-obligatoriedad-gestion.md`, prefijo `O-`), un archivo aparte nombrado por la
+directiva que lo originó (DN-03) en vez de por lo que prueba. La obligatoriedad por gestión **ES**
+una de las ocho reglas de este mismo archivo (`OBLIGATORIEDAD`) — tenerla en otro archivo partía el
+motor de reglas en dos sin necesidad. El archivo `12-obligatoriedad-gestion.md` desapareció; la
+tabla de equivalencias completa (`O-01`→`R-19` … `O-10`→`R-28`) vive en `pruebas/README.md`.
+
+**`plantilla.obligatoriedad` es un parámetro GLOBAL** (§8.2 de `CONVENCIONES.md`): sembrar una
+versión nueva la vuelve la ACTIVA de inmediato, para toda Solicitud que se valide mientras esté
+activa, en TODO el entorno. **Ninguno de estos diez casos siembra una versión nueva.** Ni un solo
+`POST`/`PATCH` sobre `sanic_mppp_tbl_parametros`:
+
+- R-19, R-20 y R-26 leen lo YA sembrado (versión 1 y versión 2 activas hoy), nunca lo cambian.
+- R-21, R-23 y R-27 mandan Excel contra las Custom API, pero ejercitan gestiones/escenarios que la
+  versión YA activa cubre (nunca siembran una versión nueva para forzar un escenario).
+- R-22 (precedencia), R-24 (claves de `porGestion` sin distinguir caja/tildes) y R-25 (clave
+  desconocida dentro de `porGestion`) son los tres escenarios de mayor riesgo del diseño: los tres
+  se verifican corriendo `dotnet test` contra la suite ya construida con TDD
+  (`tests/Sanic.Mppp.Plugins.Tests/Aceptacion/ParametrosDePlantillaAceptacion.cs`), nunca sembrando
+  nada en Dev. Necesitan `dotnet` disponible en el PATH.
+- R-28 lee el catálogo de Reglas (`sanic_mppp_tbl_reglas`), no toca nada tampoco.
+
+**Frontera con R-18 (arriba), ahora dentro del mismo archivo.** R-18 ya manda un Excel real con
+`gestion=Exclusion` y `numeroCuenta`/`banco`/`moneda` en blanco contra las Custom API en vivo, y
+confirma que la fila queda Validada — la prueba EN VIVO, dentro del motor de las ocho reglas, de que
+`porGestion.Exclusion` funciona. Estos diez casos NO repiten ese envío (sería el mismo Excel, el
+mismo resultado, la misma evidencia con otro ID): son la cobertura **exhaustiva** de DN-03, lo que
+R-18 no cubre — R-20 verifica de solo lectura que el CONTENIDO sembrado es exactamente el que pidió
+el aprobador; R-21/R-23/R-27 ejercitan escenarios en vivo que R-18 no toca
+(`Inclusion`/`Modificacion` sin aflojar, una gestión inválida en la FILA, el mensaje al cliente);
+R-22/R-24/R-25 son de alto riesgo o de precedencia, nunca sembrados en Dev; R-26 es la evidencia de
+que versionar agrega una fila y nunca edita la vigente; R-19, R-28 cierran la compatibilidad y el
+catálogo.
+
+**Necesita, en general** (además de lo que ya deja listo `preparar()` de este set, arriba): `dotnet`
+disponible en el PATH para R-22, R-24 y R-25 (`dotnet test tests/Sanic.Mppp.Plugins.Tests --filter
+<FullyQualifiedName>`).
+
+---
+
+## R-19 · Compatibilidad: un parámetro SIN `porGestion` se comporta igual que antes de DN-03
+
+**Qué prueba.** La garantía explícita del diseño: "un parámetro sin `porGestion` se comporta
+EXACTAMENTE como hoy". Es la condición bajo la que lo ya sembrado en los tres entornos sigue siendo
+válido sin migrar nada. La prueba EN VIVO de una gestión sin ajuste ya existe en el propio motor de
+las ocho reglas (R-06, gestión `Inclusion`, estable v1/v2); este caso no la repite (ver la frontera
+de arriba) — verifica la garantía general a nivel unitario más la integridad de lo sembrado.
+
+**Necesita.** Confirmar que la versión 1 de `plantilla.obligatoriedad` (`{"porDefecto":
+"obligatorio","opcionales":[{"campo":"referencia"}]}`, sin `porGestion`) sigue existiendo intacta
+(no hace falta que sea la ACTIVA para este caso: alcanza con que la fila exista — ver R-26 para el
+chequeo de que ninguna versión se edita). `dotnet` en el PATH.
+
+**Cómo.** (1) `dotnet test` con `--filter` exacto sobre
+`ParametrosDePlantillaAceptacion.DN03_un_parametro_sin_porGestion_se_comporta_exactamente_como_hoy`
+(la garantía general: con y sin `reglas`, ninguna combinación cambia). (2) `GET` de solo lectura
+sobre `sanic_mppp_tbl_parametros` filtrando `sanic_nombre eq 'plantilla.obligatoriedad' and
+sanic_version eq 1`.
+
+**Qué tiene que pasar.** (1) La prueba unitaria pasa, y el filtro encontró exactamente 1 prueba (si
+encontrara 0, el filtro está mal escrito y el caso mentiría "OK" sin haber corrido nada). (2) La
+fila de la versión 1 existe y su `sanic_valor`, interpretado como JSON, es idéntico al de DD-16.
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total) y la respuesta de
+esa consulta `GET`.
+
+**Cómo se sabe que falló.** La prueba unitaria falla (una regresión real en el dominio), el filtro
+encontró 0 o más de 1 prueba (el nombre del `[Fact]` cambió sin actualizar este caso), o la versión
+1 no existe o su valor cambió (alguien la editó en vez de agregar una versión nueva — ver R-26).
+
+**Automatizable.** Unit (`dotnet test`) + API de solo lectura.
+
+---
+
+## R-20 · El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido
+
+**Qué prueba.** Que la versión ACTIVA hoy de `plantilla.obligatoriedad` trae, dentro de
+`porGestion.Exclusion`, exactamente los tres campos que pidió el aprobador (`numeroCuenta`, `banco`,
+`moneda`) como `opcionales`, y ninguno como `obligatorios` — ni de más ni de menos. **La prueba EN
+VIVO de que ese aflojamiento funciona contra una Solicitud real ya la hace R-18** (arriba): este
+caso es sobre el CONTENIDO del parámetro sembrado, de solo lectura, no vuelve a mandar un Excel.
+
+**Necesita.** `plantilla.obligatoriedad` en su versión activa más alta (§8.2: no se siembra nada
+acá). **El criterio lo confirmó el aprobador el 2026-09-28** (`playbooks/datos/parametros.md`): ya
+no es tentativo. Si en el entorno que se está corriendo `porGestion.Exclusion` no está sembrado
+(por ejemplo, todavía no se sembró en Test o Producción), este caso reporta `N-A` en vez de asumir
+un valor que no existe — esa sigue siendo una precondición legítima de entorno, no una duda sobre el
+criterio.
+
+**Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` (versión activa más alta de
+`plantilla.obligatoriedad`, la misma consulta que ya hace `preparacion_comun.verificar_parametro_activo`),
+parseando su `sanic_valor` como JSON y mirando `porGestion.Exclusion`.
+
+**Qué tiene que pasar.** `porGestion.Exclusion.opcionales` es EXACTAMENTE el conjunto
+`{numeroCuenta, banco, moneda}` (nombrados, no contados: CONVENCIONES §7), sin `obligatorios`, y
+ninguna otra gestión (`Inclusion`, `Modificacion`) tiene entrada todavía (ver R-21).
+
+**Cómo se verifica.** La respuesta de esa consulta `GET`, ya parseada.
+
+**Cómo se sabe que falló.** Falta alguno de los tres campos, sobra alguno, o `Exclusion` trae
+`obligatorios`: el parámetro sembrado no es el que el aprobador pidió, y R-18 (que sí manda un
+Excel real) podría estar pasando por una razón distinta a la documentada.
+
+**Automatizable.** API de solo lectura.
+
+---
+
+## R-21 · `Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía
+
+**Qué prueba.** Solo `Exclusion` está sembrada en `porGestion` hoy; `Inclusion` y `Modificacion`
+siguen bajo el bloque global sin ningún ajuste.
+
+**Necesita.** La misma versión activa que R-20 (se relee, no se asume el resultado de R-20: si
+mientras tanto `Inclusion`/`Modificacion` ganaron una entrada en `porGestion`, este caso lo detecta
+y reporta `N-A` en vez de mentir un `FALLA` contra una forma del parámetro que ya cambió).
+
+**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`, no a mano) con dos filas: `gestion=Inclusion` y
+`gestion=Modificacion`, las dos con `numeroCuenta`/`banco`/`moneda` en blanco.
+
+**Qué tiene que pasar.** Las dos filas se rechazan por `OBLIGATORIEDAD` (esos campos siguen siendo
+obligatorios para estas dos gestiones): comportamiento idéntico al de antes de DN-03.
+
+**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de las dos filas (cita al menos uno de
+`numeroCuenta`/`banco`/`moneda`).
+
+**Cómo se sabe que falló.** Alguna fila NO se rechaza, o se rechaza sin citar ninguno de esos tres
+campos: `porGestion` se estaría aplicando a una gestión que no tiene entrada sembrada (contagio
+entre gestiones que el diseño no pide).
+
+**Automatizable.** API.
+
+---
+
+## R-22 · Precedencia `obligatorios` sobre `opcionales` (cobertura unitaria, no sembrar en Dev)
+
+**Qué prueba.** "`opcionales` afloja, `obligatorios` endurece: si un campo queda en las dos listas
+de la MISMA entrada, gana `obligatorios`" — la mitad "endurece" de esta regla no está sembrada hoy
+en ningún entorno (el ejemplo de `Modificacion` con `obligatorios` en `DIRECTRICES-NUEVAS.md` es
+ilustrativo, no está en Dev).
+
+**Necesita.** **No sembrar una versión nueva en Dev solo para este caso**: crear una entrada con
+`obligatorios` cambiaría la versión ACTIVA para todo el entorno de forma permanente (agregar
+versiones es fácil; "deshacer" es sembrar otra versión más, nunca vuelve sola a la anterior). La
+cobertura confiable es `ParametrosDePlantillaAceptacion` (unitaria, ya construida con TDD según
+`DIRECTRICES-NUEVAS.md`).
+
+**Cómo.** Revisar que existan casos unitarios para: (a) un campo en `opcionales` de `porGestion`
+sin estar en `obligatorios`, (b) un campo en `obligatorios` sin estar en `opcionales`, (c) el mismo
+campo en las dos listas de la misma entrada (gana `obligatorios`). Los tres viven en
+`ParametrosDePlantillaAceptacion.cs`: (a)+(b) en
+`DN03_porGestion_afloja_con_opcionales_y_endurece_con_obligatorios_la_gestion_gana_sobre_lo_global`
+(gestión `Exclusion` = solo opcionales, gestión `Modificacion` = solo obligatorios) y (c) en
+`DN03_si_un_campo_esta_en_opcionales_y_en_obligatorios_de_la_misma_gestion_gana_obligatorios`.
+
+**Qué tiene que pasar.** Los tres escenarios ya están cubiertos en la suite de plugins, y las dos
+pruebas pasan.
+
+**Cómo se verifica.** (1) Que el código fuente de `ParametrosDePlantillaAceptacion.cs` siga
+declarando esos dos nombres de `[Fact]` (si se renombraron, este caso lo detecta en vez de correr un
+filtro que no encuentra nada y "pasa" en falso). (2) `dotnet test
+tests/Sanic.Mppp.Plugins.Tests --filter "FullyQualifiedName=<FQN1>|FullyQualifiedName=<FQN2>"`
+sobre esos dos nombres exactos — el filtro tiene que encontrar EXACTAMENTE 2 pruebas.
+
+**Cómo se sabe que falló.** Falta alguno de los dos `[Fact]` en el archivo, el filtro encuentra un
+número de pruebas distinto de 2 (nombre cambiado sin avisar), o alguna de las dos falla.
+
+**Automatizable.** Unit (no Dev).
+
+---
+
+## R-23 · Gestión inválida en la FILA: `OBLIGATORIEDAD` ni siquiera se evalúa
+
+**Qué prueba.** "Una fila cuyo valor de gestión no es válido SOLO calza con `*` en `reglas`, y NUNCA
+mira `porGestion`" — y, más preciso todavía: `OBLIGATORIEDAD` **depende de `LISTAS_VALIDAS`**
+(`playbooks/datos/reglas.md`, `sanic_dependede` de `OBLIGATORIEDAD` =
+`"AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"`; DD-13, "las reglas de registro guardan los motivos de
+lo que falló, sin historial por regla"). Con una gestión inválida, `LISTAS_VALIDAS` YA rechaza esa
+fila, así que `OBLIGATORIEDAD` **no se evalúa en absoluto** — no es que se evalúe "con el bloque
+global": directamente no corre, y por eso no puede sumar ningún motivo derivado de `porGestion` (ni
+aflojado ni endurecido).
+
+**Necesita.** Un Excel con una fila con un valor de `gestion` que no es
+`Inclusion`/`Exclusion`/`Modificacion` (p. ej. `"Baja"`), y ADEMÁS con `numeroCuenta`/`banco` en
+blanco (para poder distinguir, por el mensaje, si `OBLIGATORIEDAD` corrió o no).
+
+**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`) con esa única fila, mandado contra las Custom API.
+
+**Qué tiene que pasar.** La fila se rechaza citando el campo `gestión` (el único motivo:
+`LISTAS_VALIDAS`); el mensaje NO cita `numeroCuenta` ni `banco` — la prueba de que `OBLIGATORIEDAD`
+nunca llegó a correr, con o sin `porGestion`.
+
+**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de esa fila.
+
+**Cómo se sabe que falló.** El mensaje cita `numeroCuenta` o `banco` (señal de que `OBLIGATORIEDAD`
+sí corrió pese a la dependencia declarada — un cambio de comportamiento no documentado), o no cita
+`gestión` en absoluto.
+
+**Automatizable.** API.
+
+---
+
+## R-24 · Las CLAVES de `porGestion` (dentro del parámetro) no distinguen caja ni tildes (unitario, no Dev)
+
+**Qué prueba.** Cuidado con una trampa de redacción: esto **no** es sobre lo que un cliente escribe
+en la columna `Gestión` del Excel — eso ya lo normaliza `ListasPlantilla` (D-18a) ANTES de llegar a
+`ObligatoriedadPlantilla`, así que un Excel con `"exclusión"` en la celda se comporta igual con o sin
+DN-03 y no ejercitaría nada nuevo. Lo que DN-03 agrega es la comparación sin distinguir caja ni
+tildes de las **claves del propio JSON** sembrado en `plantilla.obligatoriedad` (p. ej. que
+`"porGestion":{"EXCLUSION":{...}}` se reconozca como la gestión `Exclusion`) — y eso solo se puede
+ejercitar con una forma de parámetro que hoy NO está sembrada en ningún entorno.
+
+**Necesita.** **No sembrar una versión nueva en Dev para esto**: cambiar la CLAVE con la que está
+sembrado `porGestion` en Dev no aporta nada que un Excel no pueda ya probar con la forma actual, y sí
+suma el mismo riesgo de R-22/R-25 (tocar la versión activa de todo el entorno) sin necesidad. `dotnet`
+en el PATH.
+
+**Cómo.** `dotnet test` con `--filter` sobre
+`ParametrosDePlantillaAceptacion.DN03_los_nombres_de_gestion_de_porGestion_se_comparan_sin_distinguir_caja_ni_tildes`
+(un `[Theory]` con las variantes `"  exclusión  "`, `"EXCLUSION"` y `"ExclusioN"` como CLAVE del
+JSON, no como valor de fila).
+
+**Qué tiene que pasar.** El filtro encuentra al menos una prueba y todas pasan: las tres variantes
+de clave resuelven a la misma gestión (`Exclusion`) y aplican el mismo aflojamiento.
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
+
+**Cómo se sabe que falló.** El filtro no encuentra ninguna prueba (el nombre cambió y este caso
+quedó "verde" sin haber corrido nada), o alguna variante falla.
+
+**Automatizable.** Unit (`dotnet test`), no Dev.
+
+---
+
+## R-25 · Gestión desconocida DENTRO de `porGestion` es error de configuración (alto riesgo, no sembrar en Dev)
+
+**Qué prueba.** Un typo en la CLAVE del parámetro (p. ej. `"Exclusio"` en vez de `"Exclusion"`) es
+un `FormatException` al leer el parámetro — error ruidoso de configuración, distinto de R-23 (que es
+sobre el VALOR de la fila, no sobre el parámetro).
+
+**Necesita.** **NO sembrar esto en Dev de rutina**: un `plantilla.obligatoriedad` con esta clave
+mal escrita, si se convierte en la versión activa, rompe la validación de TODA Solicitud del
+entorno hasta que alguien lo note y siembre una versión corregida (más alta). Es exactamente el
+"falla cerrado a propósito" del diseño, pero contra un entorno compartido el costo es alto.
+
+**Cómo.** Lo que corre `herramientas/pruebas/sets/set_r.py` (arnés API, sin navegador) es SOLO la
+mitad unitaria, a propósito: (1) confirma que el archivo de pruebas sigue trayendo un caso con una
+gestión desconocida DENTRO de `porGestion` (distinto de R-23, que es sobre el valor de la FILA), y
+(2) corre con `dotnet test --filter` el `[Theory]`
+`ParametrosDePlantillaAceptacion.Una_obligatoriedad_mal_cargada_revienta_con_el_motivo` completo (la
+clase entera de "parámetro mal cargado", que incluye esa fila de datos). **La mitad de alto riesgo
+contra Dev de verdad (sembrar `"porGestion":{"Exclusioon":{...}}` y mandar una Solicitud) NO se
+automatiza acá**: si algún día hace falta la confirmación contra un entorno real, se hace a mano, en
+una ventana coordinada, con una versión corregida lista para sembrar de inmediato después — y se
+documenta el resultado en la tabla de Resultados con la fecha y quién la corrió.
+
+**Qué tiene que pasar.** El `[Theory]` completo pasa (incluida la fila de la gestión desconocida): un
+parámetro con una clave de `porGestion` que no es ninguna gestión válida revienta con
+`FormatException` y un motivo que nombra la clave, nunca una lista "vacía pero válida".
+
+**Cómo se verifica.** La salida de `dotnet test` (recuento Failed/Passed/Total).
+
+**Cómo se sabe que falló.** El caso de la gestión desconocida desapareció del archivo de pruebas
+(la búsqueda del literal no lo encuentra), o el `[Theory]` completo (o esa fila en particular) falla.
+
+**Automatizable.** Unit (`dotnet test`, lo que corre este archivo) / manual de alto riesgo contra
+Dev (fuera de este arnés, ver "Cómo").
+
+---
+
+## R-26 · Versionar es AGREGAR una fila, nunca editar la vigente
+
+**Qué prueba.** DD-02/la nota de `playbooks/datos/parametros.md`: cambiar una regla de negocio
+siembra `sanic_version` más alto como fila NUEVA; la anterior queda intacta, de respaldo/histórico,
+y el motor resuelve la activa por `sanic_version` descendente con `statecode` activo.
+
+**Necesita.** Nada que crear: alcanza con leer lo ya sembrado.
+
+**Cómo.** `GET sanic_mppp_tbl_parametros?$select=sanic_version,sanic_valor,statecode&$filter=sanic_nombre
+eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc` (mismo patrón de lectura que usa
+`preparacion_comun.py`, sin ningún `POST`/`PATCH`).
+
+**Qué tiene que pasar.** Aparecen AL MENOS dos filas (`sanic_version=1` y `sanic_version=2`), las
+dos activas, con `sanic_valor` distinto entre sí, y la versión 1 sigue exactamente como la
+documenta `DD-16` (sin `porGestion`).
+
+**Cómo se verifica.** La respuesta de esa consulta.
+
+**Cómo se sabe que falló.** Solo aparece una fila (la versión 1 se editó en vez de agregar la 2:
+rompería `sanic_versionparametros` de Solicitudes ya procesadas con la versión anterior, que
+dejaría de decir la verdad), o la versión 1 tiene un `sanic_valor` distinto al original.
+
+**Automatizable.** API.
+
+---
+
+## R-27 · El mensaje al cliente no cambia con DN-03
+
+**Qué prueba.** El texto de rechazo de `OBLIGATORIEDAD` sigue nombrando el CAMPO, sin citar su
+valor (D-41) — que la obligatoriedad ahora dependa de la gestión no puede filtrarse al texto que
+lee el cliente (no tiene por qué deducir la configuración interna del banco).
+
+**Necesita.** Una fila de gestión `Inclusion` con `numeroCuenta` vacío (sigue siendo obligatoria
+para esa gestión — R-21): la fila 2 ("Sin Cuenta") de `E06-obligatoriedad.xlsx`, que
+`generar_excel.py` YA genera para R-06 — se reutiliza tal cual, sin armar un Excel nuevo
+(CONVENCIONES §9).
+
+**Cómo.** Mandar ese Excel (`E06-obligatoriedad.xlsx`) y leer `sanic_mensaje` de la fila 2.
+
+**Qué tiene que pasar.** El mensaje nombra el campo (`numeroCuenta`) exactamente como antes de
+DN-03, sin mencionar "gestión", "Exclusion" ni ninguna palabra de configuración interna.
+
+**Cómo se verifica.** `ver_solicitud.py --ultima`.
+
+**Cómo se sabe que falló.** El mensaje cambió de forma, o menciona la gestión o el hecho de que
+otra gestión no exigiría este campo.
+
+**Automatizable.** API.
+
+---
+
+## R-28 · La regla `OBLIGATORIEDAD` no cambia de código, orden, nivel ni dependencias
+
+**Qué prueba.** DN-03 es explícito: "No cambia de código, de orden, de nivel ni de efecto. Solo
+cambia qué considera obligatorio" — mismo principio que DN-01 sobre `AUTORIZACION_CORREO_PLAN`.
+DD-13 (`diseno/02-diccionario-datos.md`) dice que las reglas de REGISTRO (las ocho de
+`ReglasDeRegistro.cs`, `OBLIGATORIEDAD` entre ellas) NO dejan un `ResultadoRegla` propio ni un
+evento de Bitácora por regla — "la fila guarda los motivos de lo que falló, sin historial por
+regla". No hay ninguna Bitácora de la que leer "el orden en que se evaluaron las reglas de una
+fila": eso solo existe para las cinco reglas de nivel Solicitud (set `S`). Lo que SÍ tiene código,
+nivel, orden y dependencias declarados, en vivo, es el catálogo `sanic_mppp_tbl_reglas` — la misma
+tabla que ya lee `sets/set_i.py` (I-01..I-04) — y es contra eso que se verifica este caso, no contra
+una Solicitud procesada.
+
+**Necesita.** Nada que crear: el catálogo de Reglas ya existe (`preparar_datos.py`/playbooks).
+
+**Cómo.** `GET sanic_mppp_tbl_reglas?$select=sanic_codigo,sanic_nivel,sanic_efecto,sanic_orden,
+sanic_dependede,statecode&$filter=sanic_codigo eq 'OBLIGATORIEDAD'`.
+
+**Qué tiene que pasar.** Una única fila, activa, con `sanic_nivel=Registro`, `sanic_efecto=Rechaza`,
+`sanic_orden=60` y `sanic_dependede='AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS'` — exactamente lo que
+ya trae `playbooks/datos/reglas.md` desde antes de DN-03.
+
+**Cómo se verifica.** La respuesta de esa consulta `GET`.
+
+**Cómo se sabe que falló.** Cualquiera de esos cinco valores cambió, o hay más de una fila con ese
+código: señal de que se reimplementó (otro código, otro orden) en vez de ajustarse, contra la
+instrucción explícita del diseño.
+
+**Automatizable.** API de solo lectura.
+
+---
+
 ## Fase 2 — investigación y conclusión
 
 Se investigó si algo de `diseno/DIRECTRICES-NUEVAS.md` (DN-01, DN-02, DN-03) agrega o cambia un
@@ -625,17 +981,22 @@ existen.
    compatibilidad hacia atrás (gestión `Inclusion`, sin entrada en `porGestion`). Se agregó R-18 para
    el aflojamiento nuevo de `Exclusion`, confirmado por el aprobador el 2026-09-28.
 
-   **Lo que este archivo NO duplica.** `12-obligatoriedad-gestion.md` (set `O`) es la cobertura
-   exhaustiva de DN-03: la precedencia `obligatorios`/`opcionales` (`O-04`, deliberadamente **unitaria**,
-   nunca sembrada en Dev), la gestión inválida DENTRO del parámetro (`O-07`, alto riesgo, no se
-   siembra de rutina), el versionado agrega-nunca-edita (`O-08`) y el mensaje al cliente sin cambios
-   (`O-09`). R-06 y R-18 son el subconjunto que este archivo ya automatizaba por API dentro de su
-   propio arnés de las ocho reglas; `O` sigue siendo el dueño de la cobertura completa (incluida la
-   unitaria y la de alto riesgo, que no se automatizan contra Dev a propósito).
+   **Lo que este archivo ya NO separa en otro archivo.** Hasta el 2026-09-28, `12-obligatoriedad-
+   gestion.md` (set `O`) era la cobertura exhaustiva de DN-03 en un archivo aparte, nombrado por la
+   directiva que lo originó. Ese día se fusionó ACÁ (`CONVENCIONES.md` §4, "La regla del nombre"):
+   la precedencia `obligatorios`/`opcionales` (ahora `R-22`, deliberadamente **unitaria**, nunca
+   sembrada en Dev), la gestión inválida DENTRO del parámetro (`R-25`, alto riesgo, no se siembra de
+   rutina), el versionado agrega-nunca-edita (`R-26`) y el mensaje al cliente sin cambios (`R-27`)
+   — ver la sección "R-19 a R-28" arriba. R-06 y R-18 siguen siendo el subconjunto que se ejercita
+   EN VIVO dentro del motor de las ocho reglas; R-19..R-28 son la cobertura exhaustiva completa
+   (incluida la unitaria y la de alto riesgo, que no se automatizan contra Dev a propósito), ahora en
+   el mismo archivo en vez de en uno separado.
 
-**Conclusión**: el set R suma cuatro casos de fase 2 (R-15..R-18) sobre dos de sus ocho reglas
-(`AUTORIZACION_CORREO_PLAN`, `OBLIGATORIEDAD`), sin duplicar la cobertura exhaustiva que ya tienen
-`U` y `O`. DN-02 no aplica a este archivo: tiene su propio dueño (`E`).
+**Conclusión**: el set R suma catorce casos de fase 2 (R-15..R-28) sobre dos de sus ocho reglas
+(`AUTORIZACION_CORREO_PLAN`, `OBLIGATORIEDAD`) — cuatro (R-15..R-18) automatizados en vivo dentro del
+propio motor de reglas, diez (R-19..R-28, el ex set O) como cobertura exhaustiva de DN-03 — sin
+duplicar la cobertura que sigue teniendo `U` para DN-01. DN-02 no aplica a este archivo: tiene su
+propio dueño (`E`).
 
 ---
 
@@ -661,3 +1022,13 @@ existen.
 | R-16 DN-01 modo `cliente` | | | |
 | R-17 DN-01 valor basura degrada | | | **FALLA, bloqueado por D-59** (ya ABIERTA, pospuesta) |
 | R-18 DN-03 `Exclusion` afloja tres campos | | | confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
+| R-19 compatibilidad sin `porGestion` | | | ex O-01 |
+| R-20 `Exclusion` afloja los tres campos | | | ex O-02; confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
+| R-21 `Inclusion`/`Modificacion` sin cambios | | | ex O-03 |
+| R-22 precedencia `obligatorios` | | | ex O-04; unitario, no sembrar |
+| R-23 gestión inválida en la fila | | | ex O-05 |
+| R-24 sin distinguir caja/tildes | | | ex O-06 |
+| R-25 gestión desconocida en el parámetro | | | ex O-07; alto riesgo, preferir unitario |
+| R-26 versionar agrega, no edita | | | ex O-08 |
+| R-27 mensaje al cliente sin cambios | | | ex O-09 |
+| R-28 regla sin cambio de código/orden/nivel | | | ex O-10 |

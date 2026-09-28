@@ -725,6 +725,219 @@ que es exactamente lo que el aprobador descartó el 2026-09-25).
 
 ---
 
+## Sitemap, vistas y formulario, casos G-14 a G-19 (fusionado del ex set H)
+
+**Fusionado acá el 2026-09-28** (`CONVENCIONES.md` §4, "La regla del nombre"): estos seis casos
+eran el set `H` (`13-construido-hoy.md`, prefijo `H-`), un archivo aparte nombrado por la fecha en
+que se escribió — "Construido el 2026-09-27" — no por lo que prueba. Seis de sus siete casos son
+sobre sitemap, columna de trabajo, formulario y componentes de la app: exactamente el tema de ESTE
+archivo, así que pasaron acá como `G-14`..`G-19` (`H-01`→`G-14` … `H-05`→`G-18`, `H-07`→`G-19`,
+saltando `H-06`, que es sobre un comando de la barra y pasó a `A-15` en `05-app-y-comandos.md`).
+`13-construido-hoy.md` desapareció; la tabla de equivalencias completa vive en `pruebas/README.md`.
+
+**Corrección que ya traían estos casos contra `CONVENCIONES.md` (§1, §2, §7, §8).** La versión
+original de este archivo (`13-construido-hoy.md`) marcaba `H-01` a `H-05` como `Automatizable: GUI`
+(inspección visual con sesión de navegador). Eso estaba mal por partida doble: (1) el sitemap, el
+`layoutxml`/`fetchxml` de una vista y el `formxml` de un formulario son metadata **publicada**,
+legible por Web API con el mismo service principal que usa cualquier otro set de este archivo —
+mismo criterio que ya aplican G-01/G-03/G-08 arriba; (2) una inspección visual no es lo que pide
+`CONVENCIONES` §2 ("la verificación va contra la plataforma, no contra la salida del constructor" —
+ni contra el ojo de quien mira). Por eso corren como `API`, contra la plataforma en vivo, igual que
+el resto de este set.
+
+**Ninguna sesión de navegador para G-14 a G-18 y G-19**: se verifican contra Web API directo, con el
+mismo service principal `# PowerPlatform-Dev` que usa el resto de este archivo. No crean ningún
+dato: es lectura de metadata ya publicada (sitemap, vistas, formulario, componentes de la app) —
+nada que `cerrar()` tenga que borrar por estos seis casos en particular.
+
+---
+
+## G-14 · Sitemap: "Para atención manual" en el área Trabajo, en su posición exacta
+
+**Qué prueba.** El olvido corregido el 2026-09-27: la vista "Para atencion manual" existía desde
+fase 2 pero no tenía entrada propia en el sitemap. Ahora `subarea_paraatencionmanual` está,
+EXACTAMENTE, entre `subarea_poraprobar` y `subarea_porclasificar` dentro del área con título 1033
+"Trabajo", con sus títulos en 1033 y 3082, y abre la vista real "Para atención manual" (no una vista
+distinta ni una `Url` inventada).
+
+**Necesita.** Nada del navegador: conexión a Dataverse por Web API (el mismo service principal que
+usan los demás sets). Ningún dato previo — es lectura de metadata ya publicada.
+
+**Cómo.** `GET sitemaps?$select=sitemapxml&$filter=sitemapnameunique eq 'sanic_mppp_sm_mantenimientoppp'`;
+parsear el XML devuelto; ubicar el `Area` cuyo `Titles/Title[@LCID='1033']` sea "Trabajo"; leer, en
+orden de documento, los `Id` de sus `SubArea`; ubicar `subarea_paraatencionmanual` y confirmar que su
+`Url` apunta al `savedqueryid` real de la vista "Para atencion manual" sobre `sanic_mppp_tbl_fila`
+(`GET savedqueries?$select=savedqueryid&$filter=name eq 'Para atencion manual' and returnedtypecode eq 'sanic_mppp_tbl_fila'`).
+
+**Qué tiene que pasar.** `subarea_paraatencionmanual` aparece consecutiva entre `subarea_poraprobar` y
+`subarea_porclasificar` (sin ninguna otra entrada en el medio), con título 1033 y 3082 = "Para
+atencion manual", y su `Url` contiene `etn=sanic_mppp_tbl_fila` y el `savedqueryid` real de esa vista.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-14) — las dos consultas
+`GET` de arriba, comparadas en código, no a mano.
+
+**Cómo se sabe que falló.** Alguna de estas, todas objetivas y distinguibles entre sí: la entrada no
+existe (regresión del arreglo); existe pero no está pegada entre `poraprobar` y `porclasificar`
+(alguien la movió); le falta el título en 1033 o en 3082 (`playbooks/app/mantenimientoppp.md`
+§"Cada titulo lleva etiqueta por cada idioma"); o su `Url` apunta a un `savedqueryid` que no es el
+de "Para atencion manual" (abre otra vista sin que se note a simple vista).
+
+**Automatizable.** API (Web API directo, sin sesión de navegador).
+
+---
+
+## G-15 · Columna "Requiere atención manual" en las 4 vistas de trabajo, y en ninguna otra
+
+**Qué prueba.** El hallazgo del aprobador: sin esta columna, un ejecutivo no podía ver de un vistazo
+si el bot marcó la fila en las vistas donde ya trabaja todos los días. Se agregó a **Mis clientes —
+por digitar**, **Todos — por digitar**, **Por aprobar** y **Mis clientes — devueltas** — y a NINGUNA
+otra vista de Fila (ni **Filas**, ni **Terminadas**, ni **Tomadas por el bot**).
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.** Para cada una de las 7 vistas nombradas arriba:
+`GET savedqueries?$select=fetchxml,layoutxml&$filter=name eq '<nombre>' and returnedtypecode eq 'sanic_mppp_tbl_fila'`;
+parsear el `layoutxml` (`<row>/<cell name=...>`) y el `fetchxml` (`<entity>/<attribute name=...>`).
+
+**Qué tiene que pasar.** En **Mis clientes - por digitar**, **Todos - por digitar**, **Por aprobar** y
+**Mis clientes - devueltas**: el `layoutxml` trae una `<cell name="sanic_requiereatencionmanual">`
+inmediatamente después de `sanic_numerofila`, y el `fetchxml` trae su `<attribute>`. En **Filas**,
+**Terminadas** y **Tomadas por el bot**: la celda NO está.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-15).
+
+**Cómo se sabe que falló.** Falta la celda o el atributo en alguna de las 4 vistas de trabajo (el
+ejecutivo sigue sin ver la marca donde más la necesita); está pero no pegada a `sanic_numerofila`
+(queda perdida entre las demás columnas, contra el motivo de diseño de cada playbook de vista); o
+SOBRA en Filas/Terminadas/Tomadas por el bot (ruido en vistas que el diseño dejó explícitamente
+afuera).
+
+**Automatizable.** API (`layoutxml`/`fetchxml` reales vía Web API).
+
+---
+
+## G-16 · Catálogos: "Correos Autorizados", "Autorizaciones - Planes" y "Autorizaciones - Clientes"
+
+**Qué prueba.** Los dos renombres del 2026-09-27 ("Autorizados" → "Correos Autorizados",
+"Autorizaciones" → "Autorizaciones - Planes") y la entrada nueva de DN-01 ("Autorizaciones -
+Clientes"), las tres en el sitemap en vivo, cada una abriendo la vista por defecto de su propia
+tabla.
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.** Sobre el mismo `sitemapxml` de G-14, ubicar el `Area` con título 1033 "Catalogos" y sus
+`SubArea` `subarea_autorizados`, `subarea_autorizaciones` y `subarea_autorizacionescliente`; leer
+título 1033/3082 y el atributo `Entity` de cada una; y confirmar la vista por defecto real de cada
+tabla con
+`GET savedqueries?$select=name&$filter=returnedtypecode eq '<tabla>' and isdefault eq true and querytype eq 0`.
+
+**Qué tiene que pasar.** `subarea_autorizados`: título "Correos Autorizados", `Entity` =
+`sanic_mppp_tbl_autorizado`. `subarea_autorizaciones`: título "Autorizaciones - Planes", `Entity` =
+`sanic_mppp_tbl_autorizacionplan`, cuya vista por defecto es "Autorizaciones activas".
+`subarea_autorizacionescliente`: título "Autorizaciones - Clientes", `Entity` =
+`sanic_mppp_tbl_autorizacioncliente`, cuya vista por defecto es "Autorizaciones por cliente activas".
+Las dos últimas son entradas DISTINTAS que abren tablas DISTINTAS.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-16).
+
+**Cómo se sabe que falló.** Falta alguna de las tres entradas; algún título quedó con el nombre viejo
+("Autorizados"/"Autorizaciones" a secas); las dos entradas de autorización abren la MISMA tabla (no
+se diferenciaron); o la vista por defecto de alguna de las dos tablas no es la esperada (el sitemap
+"apunta bien" pero la vista que se abre no es la correcta).
+
+**Automatizable.** API.
+
+---
+
+## G-17 · Formulario "Autorizacion por cliente": encabezado (2 lookups) + evidencia
+
+**Qué prueba.** El formulario nuevo (DN-01, 2026-09-27), leyendo su `formxml` real de
+`systemforms`: el encabezado con los 3 campos (`sanic_nombre`, y los lookups
+`sanic_autorizadoid`/`sanic_clienteid`) y la sección separada "Evidencia de la autorizacion" con
+`sanic_documentofirmado` y `sanic_fechadocumento` (ver también `10-autorizacion-cliente.md` U-10, que
+prueba el guardado; este caso es solo de estructura del formulario).
+
+**Necesita.** Nada del navegador: Web API directo. Ningún dato previo.
+
+**Cómo.**
+`GET systemforms?$select=formxml&$filter=objecttypecode eq 'sanic_mppp_tbl_autorizacioncliente' and type eq 2`
+(2 = Main); parsear el `formxml`: los `<control datafieldname="...">` del `<header>`, y los de la
+`<section>` cuya `<label description="Evidencia de la autorizacion">` coincide.
+
+**Qué tiene que pasar.** El encabezado trae `sanic_nombre`, `sanic_autorizadoid` y `sanic_clienteid`,
+y los dos últimos son controles de tipo Lookup (`classid` `{270BD3DB-D9AF-4782-9025-509E298DEC0A}`).
+Existe una sección separada "Evidencia de la autorizacion" con `sanic_documentofirmado` y
+`sanic_fechadocumento`.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-17).
+
+**Cómo se sabe que falló.** Falta algún campo del encabezado, o alguno de los dos lookups no es un
+control Lookup real (`classid` distinto); o falta la sección de evidencia, o sus campos están
+mezclados con el encabezado en vez de en su propia sección (el hueco que señaló el aprobador seguiría
+sin cerrarse en la interfaz, aunque las columnas ya existan en la tabla).
+
+**Automatizable.** API (`formxml` real vía Web API).
+
+---
+
+## G-18 · El ícono reutilizado, no uno nuevo
+
+**Qué prueba.** "Para atención manual" reusa el SVG de "Para revisar" (mismo patrón de negocio);
+"Autorizaciones - Clientes" reusa el ícono de "Autorizaciones - Planes". Ninguna de las dos generó un
+web resource nuevo.
+
+**Necesita.** Nada del navegador: reusa el mismo `sitemapxml` de G-14/G-16. Ningún dato previo.
+
+**Cómo.** Sobre el `sitemapxml` en vivo, comparar el atributo `Icon` de `subarea_paraatencionmanual`
+contra el de `subarea_pararevisar`, y el de `subarea_autorizacionescliente` contra el de
+`subarea_autorizaciones`.
+
+**Qué tiene que pasar.** Los dos pares de `Icon` son, cada uno, el MISMO valor
+(`/WebResources/sanic_mppp_wr_svg_pararevisar` y `/WebResources/sanic_mppp_wr_svg_autorizaciones`
+respectivamente) — nada de un web resource nuevo.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-18).
+
+**Cómo se sabe que falló.** El `Icon` de alguna de las dos entradas nuevas difiere del de su par (se
+habría creado o asignado un web resource distinto sin necesidad).
+
+**Automatizable.** API (mismo `sitemapxml` de G-14/G-16, sin navegador).
+
+---
+
+## G-19 · `sanic_mppp_tbl_autorizacioncliente` como componente real de la app
+
+**Qué prueba.** El hueco que dejó resolver esta tabla con un **import manual de la solución** en vez
+de con la herramienta del proyecto en modo escritura: que la tabla sea un componente REAL de la app
+`MDA - MPPP - Mantenimiento PPP` (`RetrieveAppComponents` en vivo), no solo algo que el sitemap
+menciona (G-16) sin que la tabla misma viaje con la app.
+
+**Necesita.** Nada del navegador: Web API directo, más una corrida de solo lectura de
+`herramientas/construir/app.py` (con `--solo-verificar` nunca escribe). Ningún dato previo.
+
+**Cómo.**
+1. `python3 herramientas/construir/app.py playbooks/app/mantenimientoppp.md --solo-verificar`.
+2. Releer, en el propio caso (no confiar solo en la salida del paso 1 — `CONVENCIONES` §2):
+   `GET appmodules/Microsoft.Dynamics.CRM.RetrieveUnpublishedMultiple()?$select=appmoduleid&$filter=uniquename eq 'sanic_mppp_mda_mantenimientoppp'`,
+   después `GET RetrieveAppComponents(AppModuleId=<id>)` y, para cada componente de tabla
+   (`componenttype eq 1`), `GET EntityDefinitions(<objectid>)?$select=LogicalName`.
+
+**Qué tiene que pasar.** El paso 1 termina en `ya_existia` (nunca `difiere`/`error`/`bloqueado`), y
+entre los nombres lógicos que trae el paso 2 aparece, POR NOMBRE, `sanic_mppp_tbl_autorizacioncliente`
+— no se afirma un total de tablas (`CONVENCIONES` §7): ese número puede cambiar sin que nada esté
+roto.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py G` (caso G-19).
+
+**Cómo se sabe que falló.** El paso 1 no da `ya_existia` (el sitemap o los componentes en vivo se
+despegaron del playbook); o `sanic_mppp_tbl_autorizacioncliente` no aparece por nombre en
+`RetrieveAppComponents` (la tabla no viaja con la app, aunque el sitemap la mencione — exactamente el
+síntoma que motivó este caso: un import manual que quedó a medias).
+
+**Automatizable.** API.
+
+---
+
 ## Resultados
 
 | Caso | Resultado | Notas |
@@ -744,3 +957,9 @@ que es exactamente lo que el aprobador descartó el 2026-09-25).
 | G-11 multiidioma | | GUI, sin arnés |
 | G-12 ValidateApp | | |
 | G-13 frontera con el RPA | | nuevo |
+| G-14 sitemap "Para atención manual", en su posición | OK | ex H-01, API, sin sesión |
+| G-15 columna en las 4 vistas de trabajo, y en ninguna más | OK | ex H-02, API, sin sesión |
+| G-16 "Correos Autorizados" / "Autorizaciones - Planes" / "Autorizaciones - Clientes" | OK | ex H-03, API, sin sesión |
+| G-17 formulario AutorizacionCliente: encabezado + evidencia | OK | ex H-04, API, sin sesión |
+| G-18 íconos reutilizados, no nuevos | OK | ex H-05, API, sin sesión |
+| G-19 la tabla AutorizacionCliente es componente real de la app | OK | ex H-07, API, sin sesión |

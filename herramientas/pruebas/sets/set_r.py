@@ -10,16 +10,31 @@ al contrato de `sets/__init__.py` (`ctx.extra` en vez de atributos sueltos,
 
 **Fase 2**: investigado el 2026-09-27 (DN-01, DN-02, DN-03 en
 `diseno/DIRECTRICES-NUEVAS.md`) — se agregan R-15..R-18. El porqué, caso por
-candidato, y qué le corresponde a este archivo frente a los sets dedicados
-`10-autorizacion-cliente.md` (U) y `12-obligatoriedad-gestion.md` (O), está en
-la sección "Fase 2" de `pruebas/03-reglas-de-registro.md` (el MD manda; acá
-solo se registra que la conclusión ya se tomó).
+candidato, y qué le corresponde a este archivo frente al set dedicado
+`10-autorizacion-cliente.md` (U), está en la sección "Fase 2" de
+`pruebas/03-reglas-de-registro.md` (el MD manda; acá solo se registra que la
+conclusión ya se tomó).
+
+**Reagrupamiento del 2026-09-28** (`CONVENCIONES.md` §4, "La regla del
+nombre"): el set `O` (`12-obligatoriedad-gestion.md`, nombrado por la
+directiva DN-03 en vez de por lo que prueba) se fusionó ACÁ, como R-19..R-28
+— la obligatoriedad por gestión **ES** una de las ocho reglas de Registro
+(`OBLIGATORIEDAD`), probarla en otro archivo partía el motor en dos sin
+necesidad. `set_o.py` desapareció; sus funciones `o01..o10` viven abajo,
+renombradas `r19..r28`, con el mismo cuerpo (CONVENCIONES.md, tabla de
+equivalencias completa en `pruebas/README.md`). El límite que ya explicaba la
+frontera con R-18 (más abajo, junto a R-19..R-28) sigue siendo válido — ahora
+es un límite DENTRO del mismo archivo, no entre dos archivos.
 """
+import json
 import os
+import re
+import subprocess
 import sys
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
 _HERRAMIENTAS_PRUEBAS = os.path.dirname(_AQUI)
+_RAIZ = os.path.dirname(os.path.dirname(_HERRAMIENTAS_PRUEBAS))
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
@@ -54,6 +69,22 @@ TIPO_TEXTO = 159460001  # sanic_mppp_ch_tipoparametro: Texto
 PARAMETROS = "sanic_mppp_tbl_parametros"
 AUTORIZADOS = "sanic_mppp_tbl_autorizados"
 AUTORIZACIONCLIENTES = "sanic_mppp_tbl_autorizacionclientes"
+
+# --- de acá para abajo, constantes que traía `sets/set_o.py` (fusionado el 2026-09-28), usadas
+# solo por R-19..R-28 ---
+REGLAS = "sanic_mppp_tbl_reglas"
+
+NIVEL_REGISTRO = 159460002
+EFECTO_RECHAZA = 159460001
+
+# DD-16: la forma exacta de `plantilla.obligatoriedad` sanic_version=1 (sin `porGestion`). Se
+# compara como estructura JSON (no como texto crudo), para no depender de espacios/orden de claves.
+VALOR_V1_CANONICO = {"porDefecto": "obligatorio", "opcionales": [{"campo": "referencia"}]}
+
+RUTA_PARAMETROS_PLANTILLA_ACEPTACION = os.path.join(
+    _RAIZ, "tests", "Sanic.Mppp.Plugins.Tests", "Aceptacion", "ParametrosDePlantillaAceptacion.cs")
+RUTA_PROYECTO_TESTS = os.path.join(_RAIZ, "tests", "Sanic.Mppp.Plugins.Tests")
+NAMESPACE_ACEPTACION = "Sanic.Mppp.Plugins.Tests.Aceptacion.ParametrosDePlantillaAceptacion"
 
 
 def _excel(nombre):
@@ -109,13 +140,22 @@ def preparar(ctx):
 
     **Lo que NO prepara, y por qué:**
 
-    - **Roles de usuarios de prueba.** Igual que `set_s.py`: los 18 casos de
+    - **Roles de usuarios de prueba.** Igual que `set_s.py`: los 28 casos de
       este set llaman a las Custom API directo (`simulador.py`), nunca
       impersonan una sesión de navegador.
     - **Los cinco flujos activos.** Mismo motivo que `set_s.py`.
     - **El canon de configuración global** (§8.2, `autorizacion.modo` y
       `plantilla.obligatoriedad` incluidos). Lo aplica `correr.py` antes y
       después de CADA set, no cada set por separado.
+    - **Ninguna versión nueva de `plantilla.obligatoriedad`.** R-19..R-28
+      (el ex set O) nunca siembran: leen la activa (`obligatoriedad_activa`,
+      ya cargada arriba) o corren `dotnet test` contra la suite unitaria —
+      ver la nota que abre R-19.
+
+    Lo de arriba ya deja listo, sin ningún paso extra, lo que necesitaban
+    R-19..R-28 (el ex set O, fusionado el 2026-09-28): `obligatoriedad_activa`
+    ya estaba en `ctx.extra` para R-18, y ningún caso de O necesitaba roles,
+    sesiones ni ningún dato que este `preparar()` no dejara listo ya.
     """
     pc.verificar_datos_negocio(ctx.dv, REMITENTE)
     pc.verificar_excels()
@@ -550,4 +590,328 @@ def r18(ctx):
     return c
 
 
-CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18]
+# ===========================================================================
+# `dotnet test` — evidencia unitaria para R-22, R-24 y R-25 (nunca contra Dev). Migrado tal cual de
+# `sets/set_o.py` (fusionado el 2026-09-28).
+# ===========================================================================
+def _dotnet_test(filtro, timeout=240):
+    """Corre `dotnet test` con un filtro EXACTO/parcial contra la suite de aceptación C#
+    (`tests/Sanic.Mppp.Plugins.Tests`). Es la evidencia que R-19/R-22/R-24/R-25 usan en vez de
+    sembrar una versión de `plantilla.obligatoriedad` en Dev.
+
+    Devuelve `(ok, passed, failed, total, detalle)`. `total is None` significa que no se pudo
+    siquiera correr `dotnet test` (binario ausente, timeout) — un límite del ENTORNO (N-A), no un
+    defecto del sistema (CONVENCIONES §3). `total == 0` con `ok=True` es la trampa a evitar: un
+    filtro mal escrito que no matchea ninguna prueba hace que `dotnet test` "pase" sin haber corrido
+    nada — por eso cada caso, además de `ok`, revisa `total` contra lo que esperaba encontrar."""
+    try:
+        proc = subprocess.run(
+            ["dotnet", "test", RUTA_PROYECTO_TESTS, "--filter", filtro, "--nologo"],
+            cwd=_RAIZ, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError as e:
+        return False, None, None, None, f"'dotnet' no está disponible en el PATH: {e}"
+    except subprocess.TimeoutExpired as e:
+        return False, None, None, None, f"dotnet test no terminó en {timeout}s: {e}"
+
+    salida = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    m = re.search(r"Failed:\s*(\d+),\s*Passed:\s*(\d+),\s*Skipped:\s*(\d+),\s*Total:\s*(\d+)", salida)
+    if not m:
+        return False, None, None, None, f"no se pudo leer el resumen de dotnet test (rc={proc.returncode}):\n{salida[-1500:]}"
+    failed, passed, skipped, total = (int(x) for x in m.groups())
+    ok = proc.returncode == 0 and failed == 0
+    return ok, passed, failed, total, salida[-1500:]
+
+
+def _leer_fuente_tests(c):
+    """El código fuente de `ParametrosDePlantillaAceptacion.cs`, o `None` si no se pudo leer (y ya
+    deja el caso en N-A, con el motivo)."""
+    try:
+        with open(RUTA_PARAMETROS_PLANTILLA_ACEPTACION, encoding="utf-8") as f:
+            return f.read()
+    except OSError as e:
+        c.na(f"no se pudo leer {RUTA_PARAMETROS_PLANTILLA_ACEPTACION}: {e}")
+        return None
+
+
+# ===========================================================================
+# R-19 a R-28 — DN-03: cobertura EXHAUSTIVA de la obligatoriedad por gestión (el ex set O,
+# `pruebas/12-obligatoriedad-gestion.md`, fusionado acá el 2026-09-28 — CONVENCIONES.md §4, "La
+# regla del nombre": la obligatoriedad por gestión ES una de las ocho reglas de Registro, no un
+# tema aparte). `set_o.py` desapareció; estas diez funciones son `o01..o10` renombradas `r19..r28`,
+# mismo cuerpo, IDs y cruces internos actualizados.
+#
+# `plantilla.obligatoriedad` es un parámetro GLOBAL (CONVENCIONES §8.2): sembrar una versión nueva
+# la vuelve la ACTIVA de inmediato, para toda Solicitud que se valide mientras tanto, en TODO el
+# entorno. **Ninguno de estos diez casos escribe sobre esa tabla.** Ni un solo `POST`/`PATCH` sobre
+# `sanic_mppp_tbl_parametros`:
+#
+# - R-19, R-20, R-26 leen lo YA sembrado (versión 1 y versión 2 activas hoy), nunca lo cambian.
+# - R-21, R-23, R-27 mandan Excel contra las Custom API, pero ejercitan gestiones/escenarios que la
+#   versión YA activa cubre (nunca siembran una versión nueva para forzar un escenario).
+# - R-22 (precedencia), R-24 (claves de `porGestion` sin distinguir caja/tildes) y R-25 (clave
+#   desconocida dentro de `porGestion`) son los tres escenarios de mayor riesgo del diseño: los tres
+#   se verifican corriendo `dotnet test` contra la suite ya construida con TDD
+#   (`tests/Sanic.Mppp.Plugins.Tests/Aceptacion/ParametrosDePlantillaAceptacion.cs`), nunca sembrando
+#   nada en Dev.
+# - R-28 lee el catálogo de Reglas (`sanic_mppp_tbl_reglas`), no toca nada tampoco.
+#
+# **Frontera con R-18, ahora dentro del mismo archivo.** R-18 (arriba) ya manda un Excel real con
+# `gestion=Exclusion` y `numeroCuenta`/`banco`/`moneda` en blanco contra las Custom API en vivo, y
+# confirma que la fila queda Validada — la prueba EN VIVO de que `porGestion.Exclusion` funciona,
+# dentro del motor de las ocho reglas. Estos diez casos NO repiten ese envío (sería el mismo Excel,
+# el mismo resultado, la misma evidencia con otro ID): R-20 verifica, de solo lectura, que el
+# CONTENIDO sembrado es el que el aprobador pidió (los tres campos exactos), que es la mitad que
+# R-18 no cubre; R-21/R-23/R-27 ejercitan escenarios que R-18 no toca (`Inclusion`/`Modificacion`
+# sin aflojar, una gestión inválida en la FILA, el mensaje al cliente); R-22/R-24/R-25 son los de
+# alto riesgo o precedencia, que nunca se siembran en Dev; R-26 es la evidencia de que versionar
+# agrega, no edita.
+# ===========================================================================
+def r19(ctx):
+    c = pc.Caso("R-19", "Compatibilidad: un parámetro SIN `porGestion` se comporta igual que antes de DN-03")
+    fqn = f"{NAMESPACE_ACEPTACION}.DN03_un_parametro_sin_porGestion_se_comporta_exactamente_como_hoy"
+    ok, passed, failed, total, detalle = _dotnet_test(f"FullyQualifiedName={fqn}")
+    if total is None:
+        c.na(f"no se pudo correr `dotnet test` sobre {fqn!r}: {detalle}")
+        return c
+    c.check(f"el filtro encontró exactamente 1 prueba ({fqn})", total == 1, f"encontró {total}")
+    c.check("la prueba unitaria de compatibilidad pasa", ok, detalle)
+
+    est, r, _ = ctx.dv.call(
+        "GET",
+        f"{PARAMETROS}?$select=sanic_valor,statecode&$filter=sanic_nombre eq 'plantilla.obligatoriedad'"
+        " and sanic_version eq 1")
+    filas = r.get("value", []) if est == 200 else []
+    c.check("la fila sanic_version=1 de plantilla.obligatoriedad sigue existiendo "
+            "(histórico; no hace falta que sea la activa)", len(filas) == 1, f"HTTP {est}: {filas}")
+    if filas:
+        try:
+            valor = json.loads(filas[0].get("sanic_valor") or "{}")
+        except json.JSONDecodeError as e:
+            c.check("su sanic_valor es JSON válido", False, str(e))
+            return c
+        c.check("su sanic_valor sigue siendo EXACTAMENTE el de DD-16 (nunca se editó, ver R-26)",
+                valor == VALOR_V1_CANONICO, f"obtenido {valor!r}")
+    return c
+
+
+def r20(ctx):
+    c = pc.Caso("R-20", "El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido")
+    activo = ctx.extra["obligatoriedad_activa"]
+    valor_crudo = activo.get("sanic_valor") or ""
+    if "porGestion" not in valor_crudo or '"Exclusion"' not in valor_crudo:
+        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno "
+             "(el criterio ya está confirmado por el aprobador, 2026-09-28; esto es una precondición "
+             f"de entorno, no una duda sobre el criterio, DN-03) — no se puede evaluar hoy. "
+             f"Valor activo: {valor_crudo!r}")
+        return c
+    try:
+        datos = json.loads(valor_crudo)
+    except json.JSONDecodeError as e:
+        c.check("el valor activo es JSON válido", False, str(e))
+        return c
+
+    por_gestion = datos.get("porGestion") or {}
+    entrada = por_gestion.get("Exclusion") or {}
+    aflojados = {o.get("campo") for o in (entrada.get("opcionales") or [])}
+    c.check("porGestion.Exclusion.opcionales es EXACTAMENTE {numeroCuenta, banco, moneda} (ni más ni menos)",
+            aflojados == {"numeroCuenta", "banco", "moneda"}, f"obtenido {sorted(aflojados)}")
+
+    endurecidos = {o.get("campo") for o in (entrada.get("obligatorios") or [])}
+    c.check("Exclusion no trae ningún campo en `obligatorios` (el aprobador solo pidió aflojar)",
+            not endurecidos, f"obtenido {sorted(endurecidos)}")
+
+    otras = set(por_gestion) - {"Exclusion"}
+    c.check("ninguna otra gestión tiene entrada en porGestion todavía (ver R-21)",
+            not otras, f"obtenido {sorted(otras)}")
+    return c
+
+
+def r21(ctx):
+    c = pc.Caso("R-21", "`Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía")
+    activo = ctx.extra["obligatoriedad_activa"]
+    valor_crudo = activo.get("sanic_valor") or ""
+    try:
+        datos = json.loads(valor_crudo) if valor_crudo else {}
+    except json.JSONDecodeError as e:
+        c.check("el valor activo es JSON válido", False, str(e))
+        return c
+
+    claves_normalizadas = {k.strip().lower() for k in (datos.get("porGestion") or {})}
+    if "inclusion" in claves_normalizadas or "modificacion" in claves_normalizadas:
+        c.na("plantilla.obligatoriedad activo YA trae una entrada de porGestion para Inclusion o "
+             f"Modificacion (cambió desde que se escribió este caso): {datos.get('porGestion')!r} — "
+             "este caso asume que siguen sin aflojamiento y hay que reescribirlo contra la forma nueva.")
+        return c
+
+    ruta = ctx.excel_ad_hoc("ZZ-R21-inclusion-modificacion-sin-aflojar.xlsx", [
+        genexcel.fila(gestion="Inclusion", plan="PR11", clasificacion="ACH",
+                      nombre="Inclusion Prueba R-21", cuenta="", banco="", moneda=""),
+        genexcel.fila(gestion="Modificacion", plan="PR11", clasificacion="ACH",
+                      nombre="Modificacion Prueba R-21", cuenta="", banco="", moneda=""),
+    ])
+    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-21", cantidad_adjuntos=1,
+                                     cantidad_excel=1, excel_a_subir=ruta)
+    filas = sim.leer_filas(ctx.dv, sid)
+    c.check("2 filas, ambas Rechazada en validación (Inclusion y Modificacion NO se aflojan)",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas),
+            str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas]))
+    encabezados = ctx.extra["encabezados"]
+    for f in filas:
+        msg = f.get("sanic_mensaje") or ""
+        c.check(f"fila {f['sanic_numerofila']}: el mensaje cita al menos uno de numeroCuenta/banco/moneda "
+                "(siguen obligatorios; el bloque global no se aflojó)",
+                any(encabezados[campo] in msg for campo in ("numeroCuenta", "banco", "moneda")), msg)
+    return c
+
+
+def r22(ctx):
+    c = pc.Caso("R-22", "Precedencia `obligatorios` sobre `opcionales` (cobertura unitaria, NO se siembra en Dev)")
+    fuente = _leer_fuente_tests(c)
+    if fuente is None:
+        return c
+
+    escenario_ab = "DN03_porGestion_afloja_con_opcionales_y_endurece_con_obligatorios_la_gestion_gana_sobre_lo_global"
+    escenario_c = "DN03_si_un_campo_esta_en_opcionales_y_en_obligatorios_de_la_misma_gestion_gana_obligatorios"
+    c.check(f"existe el escenario (a)+(b): opcional sin obligatorio Y obligatorio sin opcional ({escenario_ab})",
+            escenario_ab in fuente)
+    c.check(f"existe el escenario (c): mismo campo en las dos listas de la misma entrada, gana obligatorios ({escenario_c})",
+            escenario_c in fuente)
+
+    filtro = f"FullyQualifiedName={NAMESPACE_ACEPTACION}.{escenario_ab}|FullyQualifiedName={NAMESPACE_ACEPTACION}.{escenario_c}"
+    ok, passed, failed, total, detalle = _dotnet_test(filtro)
+    if total is None:
+        c.na(f"no se pudo correr `dotnet test` sobre los dos escenarios: {detalle}")
+        return c
+    c.check("el filtro encontró EXACTAMENTE las 2 pruebas esperadas (ningún nombre quedó renombrado sin avisar)",
+            total == 2, f"encontró {total}")
+    c.check("las dos pruebas pasan (a, b y c cubiertos: opcionales, obligatorios y la precedencia entre ambos)",
+            ok, detalle)
+    return c
+
+
+def r23(ctx):
+    c = pc.Caso("R-23", "Gestión inválida en la FILA: `OBLIGATORIEDAD` ni siquiera se evalúa (depende de LISTAS_VALIDAS)")
+    ruta = ctx.excel_ad_hoc("ZZ-R23-gestion-invalida-cuenta-banco-vacios.xlsx", [
+        genexcel.fila(gestion="Baja", plan="PR11", clasificacion="ACH",
+                      nombre="Gestion Invalida Prueba R-23", cuenta="", banco=""),
+    ])
+    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-23", cantidad_adjuntos=1,
+                                     cantidad_excel=1, excel_a_subir=ruta)
+    filas = sim.leer_filas(ctx.dv, sid)
+    c.check("1 fila, Rechazada en validación", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_RECH_VAL,
+            str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas]))
+    if not filas:
+        return c
+    msg = filas[0].get("sanic_mensaje") or ""
+    encabezados = ctx.extra["encabezados"]
+    c.check("el mensaje nombra el campo 'gestión' (LISTAS_VALIDAS: el único motivo)",
+            encabezados["gestion"] in msg, msg)
+    c.check("el mensaje NO cita numeroCuenta ni banco (OBLIGATORIEDAD depende de LISTAS_VALIDAS: "
+            "no llega a evaluarse — playbooks/datos/reglas.md, sanic_dependede de OBLIGATORIEDAD)",
+            encabezados["numeroCuenta"] not in msg and encabezados["banco"] not in msg, msg)
+    return c
+
+
+def r24(ctx):
+    c = pc.Caso("R-24", "Las CLAVES de `porGestion` (dentro del parámetro) no distinguen caja ni tildes (unitario, no Dev)")
+    fqn = f"{NAMESPACE_ACEPTACION}.DN03_los_nombres_de_gestion_de_porGestion_se_comparan_sin_distinguir_caja_ni_tildes"
+    ok, passed, failed, total, detalle = _dotnet_test(f"FullyQualifiedName~{fqn}")
+    if total is None:
+        c.na(f"no se pudo correr `dotnet test` sobre {fqn!r}: {detalle}")
+        return c
+    c.check("el filtro encontró al menos una variante (exclusión/EXCLUSION/ExclusioN como CLAVE del JSON)",
+            total > 0, f"encontró {total}")
+    c.check("las variantes de caja/tilde en la CLAVE de porGestion resuelven a la misma gestión y pasan",
+            ok, detalle)
+    return c
+
+
+def r25(ctx):
+    c = pc.Caso("R-25", "Gestión desconocida DENTRO de `porGestion` revienta como error de configuración (alto riesgo, no sembrar en Dev)")
+    fuente = _leer_fuente_tests(c)
+    if fuente is None:
+        return c
+    c.check("existe un caso unitario con una gestión desconocida DENTRO de `porGestion` "
+            "(distinto de R-23, que es sobre el valor de la FILA)", "Bajas" in fuente)
+
+    fqn = f"{NAMESPACE_ACEPTACION}.Una_obligatoriedad_mal_cargada_revienta_con_el_motivo"
+    ok, passed, failed, total, detalle = _dotnet_test(f"FullyQualifiedName~{fqn}")
+    if total is None:
+        c.na(f"no se pudo correr `dotnet test` sobre {fqn!r}: {detalle}")
+        return c
+    c.check("el filtro encontró pruebas (todas las formas de parámetro mal cargado, incluida la gestión desconocida)",
+            total > 0, f"encontró {total}")
+    c.check("todas pasan: un parámetro mal cargado revienta con FormatException y un motivo, nunca en silencio",
+            ok, detalle)
+    return c
+
+
+def r26(ctx):
+    c = pc.Caso("R-26", "Versionar es AGREGAR una fila, nunca editar la vigente")
+    est, r, _ = ctx.dv.call(
+        "GET",
+        f"{PARAMETROS}?$select=sanic_version,sanic_valor,statecode"
+        "&$filter=sanic_nombre eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc")
+    filas = r.get("value", []) if est == 200 else []
+    c.check("hay al menos dos versiones (1 y 2), y las que hay están activas",
+            len(filas) >= 2 and all(f.get("statecode") == 0 for f in filas), str(filas))
+
+    v1 = next((f for f in filas if f.get("sanic_version") == 1), None)
+    v1_ok = False
+    if v1 is not None:
+        try:
+            v1_ok = json.loads(v1.get("sanic_valor") or "{}") == VALOR_V1_CANONICO
+        except json.JSONDecodeError:
+            v1_ok = False
+    c.check("la versión 1 existe y su sanic_valor es EXACTO al de DD-16 (sin porGestion, nunca editada)",
+            v1 is not None and v1_ok, str(v1))
+
+    v2 = next((f for f in filas if f.get("sanic_version") == 2), None)
+    c.check("la versión 2 existe y su sanic_valor es DISTINTO del de la versión 1 (se agregó, no se pisó)",
+            v2 is not None and v1 is not None and v2.get("sanic_valor") != v1.get("sanic_valor"), str(v2))
+    return c
+
+
+def r27(ctx):
+    c = pc.Caso("R-27", "El mensaje al cliente no cambia con DN-03 (sigue nombrando el CAMPO, nunca la gestión)")
+    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-27", cantidad_adjuntos=1,
+                                     cantidad_excel=1, excel_a_subir=_excel("E06-obligatoriedad.xlsx"))
+    filas = sim.leer_filas(ctx.dv, sid)
+    fila2 = next((f for f in filas if f["sanic_numerofila"] == 2), None)  # "Sin Cuenta", gestión Inclusion (default)
+    c.check("la fila 2 ('Sin Cuenta', gestión Inclusion) quedó Rechazada en validación",
+            fila2 is not None and fila2["sanic_estado"] == FILA_RECH_VAL, str(fila2))
+    if not fila2:
+        return c
+    msg = fila2.get("sanic_mensaje") or ""
+    encabezados = ctx.extra["encabezados"]
+    c.check("el mensaje nombra el campo (numeroCuenta), exactamente como antes de DN-03",
+            encabezados["numeroCuenta"] in msg, msg)
+    for prohibido in ("gestión", "gestion", "Exclusion", "porGestion"):
+        c.check(f"el mensaje NO menciona {prohibido!r} (la configuración interna no se filtra al cliente, D-41)",
+                prohibido not in msg, msg)
+    return c
+
+
+def r28(ctx):
+    c = pc.Caso("R-28", "La regla `OBLIGATORIEDAD` no cambia de código, orden, nivel ni dependencias")
+    est, r, _ = ctx.dv.call(
+        "GET",
+        f"{REGLAS}?$select=sanic_codigo,sanic_nivel,sanic_efecto,sanic_orden,sanic_dependede,statecode"
+        "&$filter=sanic_codigo eq 'OBLIGATORIEDAD'")
+    filas = r.get("value", []) if est == 200 else []
+    c.check("existe una única regla con código OBLIGATORIEDAD", len(filas) == 1, str(filas))
+    if not filas:
+        return c
+    regla = filas[0]
+    c.check("nivel = Registro (playbooks/datos/reglas.md)", regla.get("sanic_nivel") == NIVEL_REGISTRO, str(regla))
+    c.check("efecto = Rechaza (no cambió a Advierte/Envía a revisión)", regla.get("sanic_efecto") == EFECTO_RECHAZA, str(regla))
+    c.check("orden = 60 (misma posición relativa: después de AUTORIZACION_CORREO_PLAN=50, antes de MONEDA_DEL_PLAN=70)",
+            regla.get("sanic_orden") == 60, str(regla))
+    c.check("depende de AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS (mismas dependencias que antes de DN-03)",
+            regla.get("sanic_dependede") == "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS", str(regla))
+    c.check("está activa", regla.get("statecode") == 0, str(regla))
+    return c
+
+
+CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18,
+         r19, r20, r21, r22, r23, r24, r25, r26, r27, r28]
