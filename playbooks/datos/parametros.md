@@ -113,13 +113,15 @@ de AUDITORÍA de la organización**: son cosas distintas. La retención de audit
 tabla — está en `02-diccionario-datos.md` §2.5-bis (DD-21) — y por eso ni `datos.py` ni `parametro.py` la
 tocan.
 
-**Deriva encontrada al construir `parametro.py` (2026-09-28), sin corregir a propósito**: `datos.py
---solo-verificar` contra Dev marca `rpa.lote.maximo` (versión 1) con la `sanic_descripcion` sembrada más
-CORTA que la de este archivo — a este archivo se le agregó el resultado de la medición del 2026-09-26
-("MEDIDO en Dev... 0,33 s por item...") y nunca se corrió `--completar` para llevarlo a Dev. El `sanic_valor`
-(100) coincide en los dos lados; solo difiere el texto. No se corrigió acá porque excede el alcance de D-53
-(no es el playbook editado a mano, es el playbook adelantado al entorno) — queda para quien lo decida,
-con `datos.py playbooks/datos/parametros.md --completar` sobre esa única fila.
+**Deriva de `rpa.lote.maximo` — RESUELTA el 2026-09-28, `sanic_version=2`, primera prueba real de
+`parametro.py` (D-53).** La versión 1 en Dev había quedado con la `sanic_descripcion` CORTA original
+("Valor PROVISIONAL: hay que MEDIRLO, no estimarlo (D-54)."), mientras este archivo ya tenía el texto
+largo con el resultado de la medición del 2026-09-26 ("MEDIDO en Dev... 0,33 s por item..."). No se
+corrigió con `--completar` porque eso habría sido un PATCH sobre la fila VIGENTE, y `pruebas/CONVENCIONES.md`
+§8.2 es explícito: **versionar es agregar una fila, nunca editar la vigente**. Se corrigió con
+`herramientas/construir/parametro.py rpa.lote.maximo 100 --tipo=Numero --descripcion="..."`: agregó
+`sanic_version=2` (máximo sembrado + 1) con el mismo `sanic_valor` (`100`) y el texto ya medido, tanto
+en Dev como acá. La versión 1 queda intacta, de respaldo/histórico, tal como estaba.
 
 **Deriva esperada tras la confirmación de `porGestion.Exclusion` (2026-09-28)**: este archivo ya
 actualizó el texto de `sanic_descripcion` de `plantilla.obligatoriedad` `sanic_version=2` de
@@ -135,6 +137,7 @@ Valores con fuente:
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
 - `plantilla.obligatoriedad` `sanic_version=1`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
+- `rpa.lote.maximo` `sanic_version=2`: mismo texto medido que ya traía este archivo desde el 2026-09-26 (BP-PP-053); solo corrige el texto sembrado en Dev, que había quedado atrás. Sembrado con `parametro.py` (D-53) el 2026-09-28.
 - `plantilla.obligatoriedad` `sanic_version=2`: `porGestion.Exclusion` agregado por orden del aprobador (2026-09-27, DN-03) — confirmado por el aprobador el 2026-09-28.
 - Los tres de `vigilancia.*` y los dos de `retencion.dias.*`: **decididos por el aprobador el 2026-09-22** (D-45); no estaban en ningun archivo.
 
@@ -371,6 +374,16 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "{\"columnas\": [{\"campo\": \"numeroSolicitud\", \"encabezado\": \"No. Solicitud\"}, {\"campo\": \"numeroFila\", \"encabezado\": \"No. Fila\"}, {\"campo\": \"gestion\", \"encabezado\": \"Gestión\"}, {\"campo\": \"clasificacion\", \"encabezado\": \"Clasificación\"}, {\"campo\": \"numeroPlan\", \"encabezado\": \"No. Plan\"}, {\"campo\": \"nombreBeneficiario\", \"encabezado\": \"Nombre Colaborador / Proveedor\"}, {\"campo\": \"tipoIdentificacion\", \"encabezado\": \"Tipo ID\"}, {\"campo\": \"numeroIdentificacion\", \"encabezado\": \"No. Identificación\"}, {\"campo\": \"referencia\", \"encabezado\": \"Referencia\"}, {\"campo\": \"numeroCuenta\", \"encabezado\": \"No. Cuenta\"}, {\"campo\": \"moneda\", \"encabezado\": \"Moneda\"}, {\"campo\": \"banco\", \"encabezado\": \"Banco\"}]}",
       "sanic_descripcion": "DN-02 (2026-09-26): orden de columnas del Excel de 'Descargar para digitar' (sanic_mppp_capi_exportarparadigitar); el orden del arreglo ES el orden de columnas (A = primer elemento). numeroSolicitud/numeroFila dan trazabilidad; el resto es lo que el ejecutivo necesita para digitar en AS400. DECISION DEL NEGOCIO: el conjunto de columnas se cambia editando este parametro, nunca tocando codigo."
+    },
+    {
+      "sanic_nombre": "rpa.lote.maximo",
+      "sanic_version": 2,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "100",
+      "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 §3). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion (BP-PP-053), no la cuota. **MEDIDO en Dev el 2026-09-26**: 0,33 s por item, lineal de 10 a 50 (10->3,9s · 25->7,9s · 50->16,7s). Con 100 son ~33 s, el 28% del presupuesto, con mas de 3x de margen para degradacion. **Hay que volver a medirlo en Produccion**: Dev vacio no es Produccion con carga y con tablas grandes."
     }
   ]
 }
