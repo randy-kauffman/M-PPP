@@ -141,6 +141,36 @@ tablas" desde antes del 2026-09-27, cuando `AutorizacionCliente` todavía no ten
 sitemap (se agregó el 2026-09-27, `diseno/05-app-model-driven.md` §2). Hoy son **11**: se nombran
 las 11 en la tabla de abajo, no se repite el número viejo.
 
+**D-69, capa 1 (el playbook) cerrada el 2026-09-28; el caso SIGUE EN ROJO por una causa
+distinta, ya conocida.** Esta corrección solo actualizaba el NÚMERO de tablas; no alcanzaba a decir
+que `playbooks/importacion/comandos.md` seguía sin el bloque `ribbon` de `AutorizacionCliente` — la
+tabla nunca había entrado al playbook, así que sus comandos genéricos ("Flujo", "Enviar vínculo" y el
+resto) seguían a la vista en el entorno real. Este caso fue el que lo cazó: la primera corrida real
+de `a-02-comandos-genericos-ocultos.spec.mjs` (2026-09-28) encontró `AutorizacionCliente` en rojo
+mientras las otras 10 tablas pasaban. Causa raíz y las dos capas del arreglo del PLAYBOOK (el bloque
+que faltaba + `importar_solucion.py --solo-verificar` denunciando ahora cualquier tabla de la app sin
+bloque de ocultos) en `diseno/05-app-model-driven.md`, nota de corrección de DA-06.
+
+**Con el bloque agregado y reimportado, el `RibbonDiffXml` de `AutorizacionCliente` está bien
+definido y publicado en el servidor** — `importar_solucion.py` lo confirmó releyendo el entorno
+(`RetrieveEntityRibbon`) después de importar: `creado`, sin faltantes. **Pero la corrida real de este
+caso (2026-09-28, después del import) sigue en rojo para `AutorizacionCliente`: "Flujo" y "Enviar
+vínculo" siguen apareciendo en el DOM.** Es el MISMO defecto REGLA-vs-METADATA que costó dos días con
+DN-02 (`diseno/06-inventario-componentes.md`, ítem 5; `A-15` más abajo): `AutorizacionCliente` nunca
+había tenido una personalización de ribbon antes de hoy, así que su metadata COMPILADA nunca se
+regeneró — y publicar (`PublishXml`, que `importar_solucion.py` sí hace) **no alcanza** para eso.
+Hace falta un clic manual, de alguien con privilegio de PLATAFORMA (System Administrator o System
+Customizer, no un rol de negocio): Command Checker (`&ribbondebug=true` en la URL de la app) →
+"Regenerate ribbon metadata" sobre `sanic_mppp_sol_mantenimientoppp`. **Ninguna herramienta de este
+repo puede hacerlo por API** (confirmado en `herramientas/pruebas/sets/set_a.py::a01()`, misma nota).
+Las otras 10 tablas pasan porque su metadata ya se había regenerado antes, en otra sesión — el
+reimport de hoy no las tocó de forma que necesitaran regenerarse de nuevo.
+
+**Hallazgo aparte, no relacionado con D-69**: la misma corrida encontró `Autorizado` en rojo por un
+motivo distinto — `irASitemap` no encontró la entrada "Correos Autorizados" (error de navegación, no
+de `HideCustomAction`). `playbooks/importacion/comandos.md` no toca esa tabla en este cambio; queda
+para quien mantiene `pruebas/gui/` investigar si es un flake o una etiqueta que cambió.
+
 **Necesita.** Las 4 sesiones (`estado_sesiones.py` primero); acceso a las 11 entradas/subgrids entre
 las cuatro. **Alcance real del arnés automatizado (esta migración):** `HideCustomAction` es una
 personalización de TABLA, no de rol — la metadata compilada es la misma para cualquier usuario que

@@ -13,10 +13,51 @@ Reglas citadas: BP-PP-091, 093, 094, 095, 100, 186. Requisitos: RF-03, RF-11 a R
 | DA-03 | **El diálogo de motivo es el formulario de creación rápida de una tabla técnica**, `sanic_mppp_tbl_motivoaccion`: un texto obligatorio y los botones nativos de guardar y cancelar. El comando lo abre con `Xrm.Navigation.navigateTo({pageType:"entityrecord", entityName:"sanic_mppp_tbl_motivoaccion"}, {target:2})`, lee el motivo del registro que devuelve y lo aplica a TODAS las filas seleccionadas. **No hay ninguna página custom en la fase 1.** | **Corregida el 2026-09-22 con evidencia de Learn.** Decía "una página custom pequeña abierta como diálogo", y eso **no puede funcionar con acción masiva**: (1) `navigateTo` a una página custom resuelve el promise **sin ningún valor** al cerrar el diálogo — *"An object is passed only if the `pageType` = `entityRecord` and you opened the form in create mode"* ([navigateTo](https://learn.microsoft.com/power-apps/developer/model-driven-apps/clientapi/reference/xrm-navigation/navigateto)) —, así que la página no tiene cómo devolverle el motivo al comando; y (2) el `pageInput` de una página custom solo admite `entityName` y `recordId`, y `recordId` **debe ser un GUID** porque viaja en la URL: no hay forma de pasarle las 25 filas seleccionadas. DA-02 (acción masiva) y la página custom eran **incompatibles entre sí**. En cambio `pageType: "entityrecord"` en modo create **sí** devuelve `savedEntityReference[0]` con `id` y `name`, y admite `data` para prellenar columnas. Además saca de la fase 1 el único componente que no se podía construir por API. |
 | DA-04 | **La "bandeja de trabajo" como página custom completa** —lista de solicitudes a la izquierda, filas a la derecha, detalle en panel lateral, al estilo de la Accelerator— **queda para la versión 1.1**, después de la fase 1. | Es donde más rinde una página custom, pero es también lo más caro de la app. La fase 1 sale con la grilla nativa y sus comandos, que ya resuelven la acción masiva. |
 | DA-05 | **Solo controles modernos. El Creator Kit no se usa para nada.** | Decisión del aprobador: **ninguna dependencia externa** por ahora. El Creator Kit no tiene soporte oficial de Microsoft y obligaría a instalar `CreatorKitCore` en Test y Prod antes que la solución. |
-| DA-06 | **Se ocultan todos los comandos genéricos que no se usan**, en cada tabla: Eliminar, Asignar, Compartir, Flujo, Enviar vínculo, Combinar, y "Nuevo" donde el alta no es de una persona (Solicitud, Fila, ResultadoRegla, Bitácora). | Es lo que más ensucia una model-driven y lo más barato de arreglar. Además, varios de esos comandos ofrecen acciones que la matriz de privilegios no permite. |
+| DA-06 | **Se ocultan todos los comandos genéricos que no se usan**, en **todas** las tablas de la app — las de hoy y las que se agreguen después, sin excepción salvo una tabla técnica sin grilla propia (ver nota abajo): Eliminar, Asignar, Compartir, Flujo, Enviar vínculo, Combinar, y "Nuevo" donde el alta no es de una persona (Solicitud, Fila, ResultadoRegla, Bitácora). | Es lo que más ensucia una model-driven y lo más barato de arreglar. Además, varios de esos comandos ofrecen acciones que la matriz de privilegios no permite. |
 | DA-08 | **Notificaciones dentro de la app desde la fase 1** (campana de la model-driven, tabla nativa `appnotification`). Las crea el código de servidor, no los botones: la Custom API de validación y el plugin posterior a la transición. **Una por solicitud y por tanda, nunca una por fila.** **Alcance recortado a DOS avisos, decisión del aprobador del 2026-09-28** (ver la nota de corrección abajo): "Tenés filas por digitar" (al ejecutivo dueño del cliente, cuando su solicitud deja filas por digitar) y "Tenés filas por aprobar" (a los supervisores, cuando una solicitud pasa a tener filas por aprobar). | Decisión del aprobador. Cada aviso abre la vista o la solicitud que corresponde. Es nativo: no agrega dependencias ni licencias. |
 | DA-09 | **Toda pantalla se valida primero en un mockup HTML 100 % funcional** (`diseno/mockups/`), con datos ficticios, antes de construir nada. | Estándar del aprobador para cualquier Power App (BP-PP-102): probar la interfaz y dar opinión cuesta minutos en un mockup y días en la plataforma. |
 | DA-07 | **La lógica no vive en los botones.** Un botón solo cambia `sanic_estado` (y `sanic_mensaje` o `sanic_notainterna`, según a quién vaya dirigido el texto); que la transición sea válida, quién puede hacerla y la segregación de funciones los decide el plugin (`03` §4). | BP-PP-051. Un usuario que llame al Web API sin pasar por la app encuentra las mismas reglas. La visibilidad de cada botón según el rol es comodidad, no seguridad. |
+
+> **Nota de corrección, 2026-09-28 (D-69).** DA-06 estaba escrito como una **lista de tablas**, no
+> como una regla: cuando se redactó, `AutorizacionCliente` no existía todavía (nació el 2026-09-27,
+> DN-01). La tabla entró a la app y a la solución, pero `playbooks/importacion/comandos.md` nunca se
+> actualizó — nadie se acordó, y nada lo decía —, así que sus comandos genéricos ("Flujo", "Enviar
+> vínculo" y compañía) siguieron a la vista. Lo detectó el caso `A-02` del arnés de navegador
+> (`pruebas/05-app-y-comandos.md`), el primero que mira el DOM real y no la definición del ribbon.
+>
+> **Se cerró en dos capas.** La visible: se agregó el bloque `ribbon` que le faltaba a
+> `AutorizacionCliente` en `comandos.md`, con el mismo `ocultar` que su hermana `AutorizacionPlan`
+> (misma matriz de privilegios, `04-matriz-privilegios.md` línea 43; el alta SÍ es de una persona,
+> así que "Nuevo" no se oculta, a diferencia de Solicitud/Fila/ResultadoRegla/Bitácora). La de fondo:
+> **"todas las tablas de la app" ahora se GARANTIZA, no se espera que alguien se acuerde.**
+> `comandos.md` declara la clave opcional `app` (el `uniquename` de la app) y
+> `importar_solucion.py --solo-verificar` compara, contra `RetrieveAppComponents` (la plataforma, no
+> lo que el playbook dice tener), la lista real de tablas de la app contra las que sí tienen bloque
+> `ribbon`; una tabla que falte sale como `"la tabla X está en la app y no tiene bloque de ocultos"`
+> y el comando **deja de salir en verde** (código de salida distinto de 0) hasta que se agregue. La
+> única excepción admitida es `sanic_mppp_tbl_motivoaccion` (`tablas_excluidas_de_ocultar`): una
+> tabla técnica que solo se abre en el diálogo de creación rápida del motivo (DA-03), nunca como
+> grilla con barra de comandos — no tiene un `ribbon` que ocultar porque nunca dibuja uno.
+>
+> **Se evaluó armar el playbook entero desde la lista de tablas de la app y se descartó.** Los
+> botones propios (Fila, Solicitud) son decisiones de diseño por tabla — qué función JS, qué ícono,
+> qué regla de habilitación — que ningún generador podría inventar sin criterio humano; automatizar
+> solo la MITAD del archivo (el `ocultar`) y dejar la otra mitad manual habría hecho el playbook más
+> difícil de auditar (una parte generada, otra escrita a mano, en el mismo bloque JSON), sin resolver
+> el problema real: lo que falló no fue que el `ocultar` estuviera mal escrito, fue que la tabla
+> entera no tenía bloque. Eso es exactamente lo que la denuncia de `--solo-verificar` resuelve, sin
+> tocar cómo se escribe el playbook.
+>
+> **OJO, esto cierra la CAPA del playbook, no todo el caso `A-02`.** Reimportada la solución,
+> `importar_solucion.py` confirma contra el entorno que el `RibbonDiffXml` de `AutorizacionCliente`
+> está bien definido y publicado — pero la corrida real de `A-02` (`pruebas/05-app-y-comandos.md`)
+> sigue en rojo para esa tabla: "Flujo" y "Enviar vínculo" siguen dibujándose. Es el mismo defecto de
+> **metadata compilada del ribbon** que costó dos días con DN-02 (`06-inventario-componentes.md` ítem
+> 5): una tabla que estrena personalización de ribbon necesita, además de publicar, un "Regenerate
+> ribbon metadata" manual desde el Command Checker — con privilegio de plataforma, no por API. Las
+> otras 10 tablas ya tenían esa metadata regenerada de antes; `AutorizacionCliente` es la primera vez
+> que la necesita. Sigue pendiente de ese paso manual; no es un defecto del playbook ni de
+> `importar_solucion.py`.
 
 > **Nota de corrección, 2026-09-28 (D-64, decisión del aprobador).** DA-08 nombraba **cinco** avisos: al ejecutivo del cliente
 > cuando su solicitud deja filas por digitar; a los supervisores cuando pasa a tener filas por aprobar; al ejecutivo que
@@ -209,6 +250,6 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 | Comandos | 8 | Los de §5 |
 | Tabla técnica + su creación rápida | 1 + 1 | `sanic_mppp_tbl_motivoaccion`: el diálogo de motivo (DA-03 corregida) |
 | Web resources | ~10 | Íconos SVG del sitemap y de los botones |
-| Ocultamiento de comandos genéricos | 10 tablas | DA-06 |
+| Ocultamiento de comandos genéricos | 11 tablas | DA-06 (11 desde el 2026-09-28, D-69: `AutorizacionCliente` había quedado afuera) |
 
 **Aviso sobre cómo se construye.** Vistas, formularios, sitemap y comandos se crean por Web API o por archivo de solución, así que **toda la fase 1 entra al ciclo de playbooks**. *(Corregido el 2026-09-22: acá decía que la página custom era el único componente que un agente no podía crear solo. Con DA-03 corregida ya no hay ninguna página custom, así que no queda ningún componente de la fase 1 fuera del ciclo. La bandeja de trabajo de DA-04 sigue siendo página custom, pero es versión 1.1.)*
