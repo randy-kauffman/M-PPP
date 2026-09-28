@@ -35,6 +35,27 @@ descargarParaDigitar`, en `recursos/js/comandos.js`) NO escribe nada en Datavers
 la Custom API `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execute` y baja el
 `.xlsx` que devuelve con `Xrm.Navigation.openFile`.
 
+**Bloque de `sanic_mppp_tbl_autorizacioncliente` agregado el 2026-09-28 (D-69).** La tabla entró a
+la solución y a la app el 2026-09-27 (DN-01, `02` §2.4b) pero este playbook nunca se actualizó: es
+un olvido de alcance, no una decisión — nadie agregó el bloque `ribbon` que le tocaba cuando se
+creó la tabla, y `rg` sobre este archivo daba cero menciones. Lo detectó el caso `A-02` del arnés de
+navegador (`pruebas/05-app-y-comandos.md`), el primero que mira el DOM real en vez de la
+definición. Mismo `ocultar` que `sanic_mppp_tbl_autorizacionplan`, su hermana exacta en privilegios
+y en flujo (`04-matriz-privilegios.md` línea 43: "tiene EXACTAMENTE los mismos privilegios"; el
+arnés de navegador lo confirma con `ocultarNuevo: false` en `pruebas/gui/selectores.mjs`): el alta
+de una autorización SÍ es de una persona (el Administrador de planes), así que "Nuevo" NO se oculta,
+a diferencia de Solicitud/Fila/ResultadoRegla/Bitácora. Sin botones propios: no hay ninguna
+transición de estado sobre esta tabla.
+
+**Claves opcionales `app` y `tablas_excluidas_de_ocultar` agregadas el 2026-09-28 (D-69, capa 2).**
+Le dicen a `importar_solucion.py --solo-verificar` (y a una corrida real) contra qué app comparar
+la lista de tablas de este playbook, para que denuncie una tabla que entra a la app y se queda sin
+bloque acá — el mecanismo exacto que falló con `AutorizacionCliente`. `sanic_mppp_tbl_motivoaccion`
+es la única exclusión: es una tabla técnica que solo se abre en el diálogo de creación rápida del
+motivo (DA-03, `05-app-model-driven.md`), nunca como grilla con barra de comandos, así que no le
+corresponde ningún bloque `ribbon` — confirmado contra el arnés de navegador, que tampoco la incluye
+en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
+
 ## 1. Identidad
 
 ```json
@@ -62,6 +83,10 @@ la Custom API `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execu
   "idiomas": [
     1033,
     3082
+  ],
+  "app": "sanic_mppp_mda_mantenimientoppp",
+  "tablas_excluidas_de_ocultar": [
+    "sanic_mppp_tbl_motivoaccion"
   ],
   "cambios": [
     {
@@ -776,6 +801,90 @@ la Custom API `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execu
     },
     {
       "clase": "ribbon",
+      "tabla": "sanic_mppp_tbl_autorizacioncliente",
+      "biblioteca": "sanic_mppp_wr_js_comandos",
+      "botones": [],
+      "ocultar": [
+        ".Abandon",
+        ".AddAppointment",
+        ".AddCampaignResponse",
+        ".AddConnection",
+        ".AddConnectionNew",
+        ".AddConnectionToMe",
+        ".AddEmail",
+        ".AddFax",
+        ".AddFile",
+        ".AddLetter",
+        ".AddNote",
+        ".AddOtherActivities",
+        ".AddPhone",
+        ".AddRecurringAppointment",
+        ".AddServiceActivity",
+        ".AddTask",
+        ".AddToQueue",
+        ".AdvMergeRecords",
+        ".Assign",
+        ".AssociateParentChildCase",
+        ".BulkDelete",
+        ".Convert.Case",
+        ".Convert.Opportunity",
+        ".CustomizeEntity",
+        ".CustomizePreviewPane",
+        ".Delete",
+        ".DeleteMenu",
+        ".DesignView",
+        ".Detect",
+        ".Detect.All",
+        ".Detect.Selected",
+        ".DocumentTemplate",
+        ".DynamicPivotTable",
+        ".DynamicWorkesheet",
+        ".EditSalesProcess",
+        ".ExportSelectedToExcel",
+        ".ExportTemplate",
+        ".ExportToExcel",
+        ".ExportToExcelOnline",
+        ".FinishStage",
+        ".Flows.RefreshCommandBar",
+        ".FormDesign",
+        ".Import",
+        ".ImportData",
+        ".ImportDataFromCSV",
+        ".ImportDataFromExcel",
+        ".ImportDataFromXML",
+        ".MBPF.ConvertTo",
+        ".MailMerge",
+        ".OpenActiveStage",
+        ".Permissions",
+        ".Permissions.Sharing",
+        ".Permissions.SharingNonRefresh",
+        ".PromoteToResponse",
+        ".PublishAll",
+        ".PublishEntity",
+        ".QueueItemDetail",
+        ".Remove",
+        ".Reports",
+        ".RunReport",
+        ".RunScript",
+        ".RunWorkflow",
+        ".SaveAsComplete",
+        ".Send",
+        ".Send.Selected",
+        ".Send.View",
+        ".SendDirectEmail",
+        ".SendSelected",
+        ".Sharing",
+        ".StaticWorksheet",
+        ".StaticWorksheetAll",
+        ".SuggestProduct",
+        ".SwitchProcess",
+        ".WordTemplate",
+        ".modern.AddEmail",
+        ".modern.SendDirectEmail"
+      ]
+    },
+    {
+      "clase": "ribbon",
       "tabla": "sanic_mppp_tbl_parametro",
       "biblioteca": "sanic_mppp_wr_js_comandos",
       "botones": [],
@@ -1140,4 +1249,5 @@ la Custom API `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execu
 
 - El web resource `sanic_mppp_wr_js_comandos` existe (`playbooks/web-resource/js_comandos.md`).
 - Los iconos `sanic_mppp_wr_svg_cmd*` existen (12.1).
-- Las 10 tablas estan en la solucion.
+- Las 11 tablas estan en la solucion (agregada `sanic_mppp_tbl_autorizacioncliente` el 2026-09-28, D-69).
+- La app `sanic_mppp_mda_mantenimientoppp` existe y ya tiene sus tablas enganchadas (`mantenimientoppp.md`, se corre antes que este playbook): `app` la usa para denunciar una tabla de la app sin bloque acá.
