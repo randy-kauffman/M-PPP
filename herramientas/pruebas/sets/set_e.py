@@ -25,7 +25,17 @@ puede degradar el sandbox de Dataverse Dev para cualquier otro usuario
 mientras corre. Por default `e08()` da N-A explicando cómo correrlo a
 propósito. Solo se ejecuta de verdad con la variable de entorno
 `MPPP_E08_ALTO_RIESGO=si` puesta ANTES de invocar a `correr.py` — nunca por
-defecto, y nunca reintentada sola si algo la bloquea.
+defecto, y nunca reintentada sola si algo la bloquea. Con datos reales del
+2026-09-26 (`diseno/DIRECTRICES-NUEVAS.md`): 100.000 filas OK · 250.000 OK en
+40,6s · 300.000 revienta por memoria del sandbox, y revienta ANTES de que el
+plugin llegue a su propio corte de 100s (por eso el mensaje elegante de E-07
+no sale a ese volumen).
+
+**`correr.py --full`** (2026-09-28, decisión del aprobador: "no importa que
+degrade el ambiente, en el modo FULL debería correr esta prueba") prende
+`MPPP_E08_ALTO_RIESGO` — ver `CASOS_FULL` más abajo. La bandera suelta sigue
+funcionando igual: `--full` no la rompe, solo la reemplaza como forma
+recomendada.
 
 **E-07 (corte por presupuesto) queda SIEMPRE N-A acá**, a propósito: la
 medición real (`diseno/DIRECTRICES-NUEVAS.md`, 2026-09-26) muestra que ni
@@ -66,6 +76,15 @@ PARAMETROS = "sanic_mppp_tbl_parametros"
 # Bandera explícita para E-08 (ver el docstring del módulo). A propósito NO
 # hay forma de "recordarla": quien la necesita la escribe cada vez.
 BANDERA_E08 = "MPPP_E08_ALTO_RIESGO"
+
+# Casos que SOLO corren con `--full` (o `BANDERA_E08` sola) — `correr.py --listar` y el banner de
+# `--full` leen este atributo OPCIONAL del módulo (`correr.py::_listar()`/`_banner_full()`).
+CASOS_FULL = {
+    "E-08": "~300.000 filaids repetidos: la llamada real tarda ~150-170s y puede degradar el "
+            "sandbox de Dataverse Dev para cualquier otro usuario mientras corre. Riesgo YA MEDIDO "
+            "y ACEPTADO (100.000 OK · 250.000 OK en 40,6s · 300.000 revienta por memoria del "
+            "sandbox, antes de que el plugin llegue a su propio corte de 100s — 11-exportacion-excel.md).",
+}
 
 
 # ===========================================================================
@@ -474,7 +493,9 @@ def e08(ctx):
             f"degradar el sandbox de Dataverse Dev para cualquier otro usuario mientras corre. Se corre "
             f"a propósito solo si `ExportarParaDigitar.cs` cambió de forma que pudiera afectar este "
             f"límite, avisando al equipo y fuera de horario de otras pruebas, con: "
-            f"{BANDERA_E08}=si python3 herramientas/pruebas/correr.py E")
+            f"{BANDERA_E08}=si python3 herramientas/pruebas/correr.py E (o con --full, que la "
+            "incluye — decisión del aprobador 2026-09-28: 'no importa que degrade el ambiente, en "
+            "el modo FULL debería correr esta prueba').")
         return c
 
     filaid_real = ctx.extra["filas"][0]["sanic_mppp_tbl_filaid"]

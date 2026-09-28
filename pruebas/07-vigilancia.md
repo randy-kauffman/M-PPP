@@ -181,14 +181,22 @@ cobertura.
 
 ## Qué corre por default y qué no
 
-Cinco de los siete casos (V-03, V-04, V-05, V-06, V-07) dependen del schedule real de `MPPP-VIG`: con
-el margen de 32 minutos cada uno, los cinco juntos superan las **2 horas y media**. Un set así **no lo
-corre nadie de rutina** (mismo criterio que el set E con E-08). Por eso:
+Seis de los siete casos (V-02, V-03, V-04, V-05, V-06, V-07) dependen del schedule real de
+`MPPP-VIG` (V-02 de una sola vuelta; los otros cinco, de tres): un set con los seis prendidos
+supera las **3 horas**. Nadie corre eso de rutina (mismo criterio que el set E con E-08). Por eso:
 
-- **V-01 y V-02 corren siempre.** V-01 es 100% API, sin esperar nada (activo, recurrence real,
-  encadenamiento de los 5 bloques, el hallazgo de la etapa de arranque, comparación repo↔desplegado,
-  y los 4 parámetros nombrados). V-02 es manual por una razón distinta (ver su sección): siempre
-  queda `N-A` con el motivo.
+- **V-01 corre siempre.** Es 100% API, sin esperar nada (activo, recurrence real, encadenamiento de
+  los 5 bloques, el hallazgo de la etapa de arranque, comparación repo↔desplegado, y los 4
+  parámetros nombrados).
+- **V-02 queda `N-A` por default**, con el comando exacto para correrlo a propósito:
+
+  ```bash
+  MPPP_V02_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py V
+  ```
+
+  **Corrección 2026-09-28.** Hasta esta fecha V-02 era 100% manual: el arnés nunca tocaba el estado
+  de un flujo. El aprobador autorizó una excepción puntual — ver la sección de V-02 más abajo y
+  `CONVENCIONES.md` ("Excepción V-02") para las dos redes de seguridad con las que corre.
 - **V-03, V-04, V-05, V-06 y V-07 quedan `N-A` por default**, con el comando exacto para correrlos a
   propósito:
 
@@ -198,6 +206,10 @@ corre nadie de rutina** (mismo criterio que el set E con E-08). Por eso:
 
   Se corren así cuando `mppp-vig.json` cambió de forma que pudiera afectar alguno de los 5 bloques,
   avisando al equipo y fuera de horario de otras pruebas (comparten el mismo entorno con S/I/M/etc.).
+
+**`correr.py --full`** (2026-09-28, decisión del aprobador: "corré todas, todas sin importar nada")
+prende `MPPP_V02_ALTO_RIESGO` y `MPPP_V_LENTOS` a la vez, con un banner previo que avisa el costo y
+el riesgo antes de arrancar — ver `herramientas/pruebas/correr.py --listar` y su docstring.
 
 ---
 
@@ -280,41 +292,59 @@ sobre la versión anterior de este caso, que era 100% manual).
 
 **Qué prueba.** Que un correo que `MPPP-REC` no llegó a procesar se ingiera igual, por `MPPP-VIG`.
 
-**Necesita.** Apagar de verdad `Cloud Flow - MPPP - REC - Recibir correo nuevo` (rol de
-Maker/administrador de Power Automate); el REMITENTE; el adjunto `E01-feliz-formato11.xlsx`.
+**Corrección 2026-09-28 — de manual a automatizado, con excepción autorizada.** Hasta esta fecha
+este caso era 100% manual: la regla del proyecto era que el arnés nunca desactiva un flujo, sin
+excepción. El aprobador autorizó una excepción puntual, única en todo el arnés, para poder probar
+justo este escenario de verdad — ver `CONVENCIONES.md`, sección "Excepción V-02", para las dos
+redes de seguridad con las que `set_v.py::v02()` corre esto ahora. El texto que sigue describe el
+comportamiento AUTOMATIZADO actual; el procedimiento manual anterior queda reemplazado, no
+documentado aparte (era exactamente estos mismos pasos, hechos a mano).
 
-**Cómo.**
-1. **Apagá** `Cloud Flow - MPPP - REC` (Turn off) — a mano, en el portal.
-2. Mandá un correo nuevo con `E01-feliz-formato11.xlsx` al buzón de ingesta.
-3. Comprobá que **no** se creó ninguna Solicitud (REC está apagado).
-4. Esperá a que pasen los minutos de `vigilancia.minutos.sinvalidar` (leído en vivo por V-01) + una
-   corrida de VIG.
-5. **Volvé a prender** `MPPP-REC` al terminar.
+**Necesita.** El buzón de prueba real de Graph (`PP_MAIL_BUZON_3`, mismo que usa `set_m.py` como
+remitente — los sets no corren en paralelo, no hay colisión), autorizado sobre PR11; el adjunto
+`E01-feliz-formato11.xlsx`; `MPPP_V02_ALTO_RIESGO=si` (o `--full`); y que `MPPP-REC` esté
+**ACTIVO** antes de empezar — lo garantiza la RED 2 (`_verificar_y_recuperar_rec()`, corre siempre
+al arrancar `preparar()` del set, con o sin `MPPP_V02_ALTO_RIESGO`).
+
+**Cómo (`v02()` de `set_v.py`).**
+1. Confirma que `MPPP-REC` está Activo (precondición) y lo **apaga de verdad** (`PATCH
+   statecode=0`), releyendo el estado para confirmar que quedó apagado — nunca se confía en el
+   HTTP 200/204 del PATCH solo.
+2. Manda un correo REAL, por Graph, desde el buzón de prueba hacia `simulador.BUZON_INGESTA`, con
+   `E01-feliz-formato11.xlsx` adjunto y un asunto único (`ZZP-V02-<nonce>`).
+3. Espera 60s y comprueba que **no** se creó ninguna Solicitud (confirma que el apagado de MPPP-REC
+   es real, no un PATCH que la plataforma ignoró).
+4. Espera hasta que pasen los minutos de `vigilancia.minutos.sinvalidar` (leído en vivo) + 1 vuelta
+   de `MPPP-VIG` (~10 min) + colchón, poll por el asunto único.
+5. En el `finally` (corre SIEMPRE, incluso si algo de arriba reventó): **vuelve a encender**
+   `MPPP-REC` (`PATCH statecode=1`) y **relee el estado** para confirmar que quedó Activado. Si no
+   pudo, es un FALLA ruidoso del propio caso — RED 1 de la excepción, ver `CONVENCIONES.md`.
 
 **Qué tiene que pasar.**
 
 | Qué | Valor |
 |---|---|
-| Se crea la Solicitud | **sí**, la ingirió VIG |
+| MPPP-REC queda desactivado, verificado | **sí**, antes de mandar el correo |
+| Con REC apagado, no se crea sola ninguna Solicitud en el primer minuto | **confirmado** |
+| Se crea la Solicitud | **sí**, la ingirió VIG (dentro del margen: umbral + 1 vuelta + colchón) |
 | Bitácora `Ingresada` | origen **MPPP-VIG** (no MPPP-REC) |
 | El resto | igual que C-01: En proceso, 3 filas Validadas, acuse enviado |
+| MPPP-REC queda reencendido, verificado (RED 1) | **sí**, pase lo que pase arriba |
 
-**Cómo se verifica.** `ver_solicitud.py <numero>` después del paso 4, mirando el origen de la entrada
-`Ingresada` en la Bitácora.
+**Cómo se verifica.** `ver_solicitud.py <numero>` después del margen, mirando el origen de la
+entrada `Ingresada` en la Bitácora; el propio caso ya deja el estado final de `MPPP-REC` en su
+último `check`.
 
-**Cómo se sabe que falló.** No aparece ninguna Solicitud después del margen completo (32 min): o el
-correo no llegó de verdad a la bandeja (revisar el envío), o el bloque 1 no lo está viendo (mirar
-`vigilancia.minutos.sinvalidar` con V-01, y si el problema persiste, el hallazgo del arranque común
-de esta misma sección).
+**Cómo se sabe que falló.** No aparece ninguna Solicitud después del margen completo: o el correo
+no llegó de verdad a la bandeja (revisar el envío por Graph), o el bloque 1 no lo está viendo
+(mirar `vigilancia.minutos.sinvalidar` con V-01, y si el problema persiste, el hallazgo del
+arranque común de esta misma sección). Si el ÚLTIMO check (RED 1, reencendido y verificado) da
+FALSE, es la alarma más seria de todo el set: **hay que reencender `MPPP-REC` a mano YA** — los
+correos del banco no están entrando mientras siga apagado.
 
-**Automatizable.** Manual, **a propósito, por regla del proyecto**: el service principal
-`# PowerPlatform-Dev` SÍ tiene privilegio para apagar/prender un flujo por Web API (tiene System
-Administrator) — pero este set (como ningún otro) **nunca desactiva ni modifica un flujo de Power
-Automate**, sea cual sea el motivo. Se corre a mano, con el procedimiento de arriba, y se anota el
-resultado en la tabla de Resultados. (Atajo para no esperar el umbral completo: bajar
-`vigilancia.minutos.sinvalidar` a `1` antes del paso 4 y devolverlo a su valor original al terminar
-— anotarlo en las notas si se usa: cambia lo que se está probando, igual que documentaba la versión
-anterior de este archivo.)
+**Automatizable.** `API`, detrás de `MPPP_V02_ALTO_RIESGO=si` (o `--full`) — excepción autorizada,
+única en todo el arnés, a que "el arnés nunca desactiva un flujo" (`CONVENCIONES.md`). En modo
+normal (sin la bandera) sigue `N-A`, con el comando exacto para correrlo a propósito.
 
 ---
 
@@ -502,5 +532,7 @@ igual que sus hermanos).
 | V-06 vencimiento | | | |
 | V-07 envío iniciado sin confirmar (M-06) | | | |
 
-> **Acordate de dejar todo como estaba**: `MPPP-REC` prendido si V-02 lo apagó, y los parámetros con
-> sus valores originales si los bajaste para no esperar (V-02).
+> **V-02 (2026-09-28) ya deja `MPPP-REC` prendido solo, verificado, en su propio `finally`** — no
+> hace falta acordarse a mano. Si de todos modos algo raro pasó, comprobalo:
+> `python3 herramientas/dataverse_api.py GET "workflows?\$select=name,statecode&\$filter=name eq 'Cloud Flow - MPPP - REC - Recibir correo nuevo'"`
+> — tiene que decir `statecode: 1`.

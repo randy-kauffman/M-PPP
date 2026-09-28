@@ -145,6 +145,41 @@ autorizaciones reales del aprobador que hubo que restaurar a mano. De ahí salen
   nadie, pero si una persona dijo "estoy probando", ningún proceso decide que ya terminó.
 - **Todo caso limpia lo que creó**, y solo eso.
 
+### Excepción V-02 — apagar y reencender un flujo, autorizada
+
+La regla de arriba tiene una sola grieta, a propósito: **el arnés nunca toca el estado de un flujo
+de Power Automate, salvo el caso `V-02` de `pruebas/07-vigilancia.md`, y salvo únicamente el flujo
+`Cloud Flow - MPPP - REC - Recibir correo nuevo`.** El aprobador autorizó esta excepción puntual el
+2026-09-28: `V-02` prueba justo el escenario en que `MPPP-REC` está caído (un correo que queda en
+la bandeja hasta que `MPPP-VIG` lo recupera), y no hay forma de probarlo de verdad sin apagar
+`MPPP-REC` de verdad. El service principal `# PowerPlatform-Dev` tiene privilegio de sobra
+(System Administrator) para apagar/prender cualquier flujo — hasta acá, la regla del proyecto lo
+prohibía igual, sin excepción. Ahora hay una, y solo una.
+
+**Es lo más peligroso que hace el arnés, así que lleva DOS redes de seguridad** (`sets/set_v.py`):
+
+1. **Restaurar en el `finally`, explícito y verificado.** `v02()` apaga `MPPP-REC`, corre el
+   escenario, y en su propio `try/finally` lo vuelve a encender — pero no se conforma con que el
+   `PATCH` haya devuelto 200/204: **relee el estado del flujo DESPUÉS de reencenderlo** y confirma
+   que quedó `statecode=1` (Activado). Si no pudo, eso es un `c.check(..., False)` del propio caso
+   `V-02`: un **FALLA ruidoso**, que entra al resumen y al código de salida de `correr.py` — nunca
+   un mensaje que se imprime una vez y se pierde.
+2. **Verificar al ARRANCAR que no quedó nada apagado de una corrida anterior que murió a la mitad**
+   — la red que importa de verdad. Un `finally` no corre si el proceso muere de golpe (`Ctrl-C`,
+   corte de luz, panic) DESPUÉS de apagar `MPPP-REC` y ANTES de reencenderlo: la RED 1 no alcanza
+   sola. Por eso `preparar()` de `set_v.py`, en **toda** corrida del set (con o sin `--full`, corra
+   o no `V-02` esta vez), llama primero que nada a `_verificar_y_recuperar_rec()`: lee el estado
+   real de `MPPP-REC` y, si está apagado, lo reenciende y lo dice en voz alta (`ctx.avisar()`,
+   impreso por `correr.py` apenas `preparar()` termina) antes de seguir con cualquier otra cosa. Un
+   flujo de ingesta apagado en silencio significa correos del banco que no entran y nadie se entera
+   — eso es lo que esta red existe para que nunca pase.
+
+`V-02` solo corre con la bandera `MPPP_V02_ALTO_RIESGO=si` (o con `--full` de `correr.py`, que la
+incluye — ver su docstring). En modo normal sigue `N-A`, como cualquier caso caro o riesgoso de
+`--full`. **Ningún otro caso, de ningún otro set, toca el estado de un flujo** — si algún día hace
+falta otra excepción así, es una decisión del aprobador, no una extensión que se da por sentada
+copiando este patrón.
+
 ---
 
 ## 6. Sesiones de navegador
@@ -228,7 +263,10 @@ Todo set, antes de su primer caso, **verifica y deja listo TODO lo que necesita*
 Si algo no está, el set **lo prepara**. No lo asume, no lo pide por documentación, no falla pidiendo
 que alguien lo haga antes. El service principal `# PowerPlatform-Dev` tiene **System Administrator**
 en el entorno: puede asignar roles, sembrar parámetros y tocar configuración de solución. No hay
-nada del entorno que un set no pueda dejar listo por su cuenta.
+nada del entorno que un set no pueda dejar listo por su cuenta — con una sola excepción, autorizada
+puntualmente por el aprobador: el estado (activo/apagado) de un flujo de Power Automate. Un set NO
+lo toca para "dejar listo" nada, salvo el caso `V-02` (§5, "Excepción V-02"), que es la única
+excepción en todo el arnés.
 
 **Dentro del mismo set**, un caso SÍ puede apoyarse en lo que dejó el anterior, y puede cambiar
 datos, roles y configuración para llevar a cabo la prueba. La frontera es el set, no el caso.

@@ -246,7 +246,15 @@ agotamiento de memoria/hosts ANTES de que el chequeo de tiempo del plugin tenga 
 para cortar con su propio mensaje. A 300.000 el error real fue
 `SandboxFabricHostCommunicationException`; a 500.000, `System.OutOfMemoryException`. **Esto es un
 riesgo ACEPTADO, no un defecto a corregir en esta fase**: ninguna selección real de este negocio se
-acerca a ese volumen (7.500 filas/mes en producción).
+acerca a ese volumen (7.500 filas/mes en producción). Resumen del borde medido: **100.000 filas OK
+· 250.000 OK en 40,6s · 300.000 revienta por memoria del sandbox**, y revienta ANTES de que el
+plugin llegue a su propio corte de 100s — por eso el mensaje elegante de E-07 no sale a ese
+volumen. E-08 documenta ese borde, no lo descubre.
+
+**Corrección 2026-09-28.** Decisión del aprobador: *"no importa que degrade el ambiente, en el modo
+FULL debería correr esta prueba"*. `correr.py --full` prende `MPPP_E08_ALTO_RIESGO` junto con las
+banderas de V — ver `herramientas/pruebas/correr.py --listar` y su docstring. La bandera suelta
+sigue funcionando igual: `--full` no la rompe, solo la reemplaza como forma recomendada.
 
 **Necesita.** **NO CORRER DE RUTINA.** Esta llamada tarda ~150-170 s y puede degradar el sandbox de
 Dataverse para otros usuarios de Dev mientras corre. Solo se repite si `ExportarParaDigitar.cs`
@@ -260,6 +268,7 @@ puesta ANTES de invocar al motor:
 
 ```bash
 MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+python3 herramientas/pruebas/correr.py E --full   # equivalente, y la forma recomendada desde 2026-09-28
 ```
 
 Sin esa variable (una corrida normal, `--todos` incluido), el caso NUNCA hace la llamada de 300.000
@@ -280,8 +289,9 @@ es lo ESPERADO y documentado, no un hallazgo nuevo.
 significativamente respecto de la medición de referencia (250k sano / 300k+ revienta): indicaría
 una regresión de memoria en el código nuevo, y ahí sí amerita investigar.
 
-**Automatizable.** API, pero detrás de la bandera `MPPP_E08_ALTO_RIESGO=si` (ver "Necesita" arriba) —
-alto costo, no forma parte de una corrida de regresión habitual ni de `--todos`.
+**Automatizable.** API, pero detrás de la bandera `MPPP_E08_ALTO_RIESGO=si` (o `--full`, ver
+"Necesita" arriba) — alto costo, no forma parte de una corrida de regresión habitual ni de
+`--todos` (`--todos` solo, sin `--full`, tampoco la prende).
 
 ---
 
@@ -358,6 +368,6 @@ de cientos de ids seleccionados en la grilla, encontrar el culpable a mano serí
 | E-05 `filaid` inexistente revienta entero | | |
 | E-06 columnas protegidas salen en claro | | |
 | E-07 corte por presupuesto de tiempo | | siempre N-A en `set_e.py`; cobertura real es la unitaria |
-| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` |
+| E-08 riesgo de memoria a ~300k | | N-A por default; real solo con `MPPP_E08_ALTO_RIESGO=si` (o `--full`) |
 | E-09 privilegio de la Custom API | | |
 | E-10 `filaids` StringArray, posición del error | | |

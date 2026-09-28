@@ -61,6 +61,7 @@ python3 herramientas/pruebas/correr.py S            # un set
 python3 herramientas/pruebas/correr.py A,B,C        # varios, en ESE orden (no el canónico)
 python3 herramientas/pruebas/correr.py --todos      # todos los sets descubiertos, en orden canónico
 python3 herramientas/pruebas/correr.py --listar     # qué sets hay y cuántos casos, sin tocar Dev
+python3 herramientas/pruebas/correr.py --todos --full   # TODO prendido: ver la sección de abajo
 ```
 
 `correr.py` toma el semáforo (`semaforo.py`), aplica el canon de parámetros de `CONVENCIONES.md` §8.2
@@ -107,18 +108,20 @@ corriendo en paralelo (`CONVENCIONES.md` §5).
 
 ---
 
-## Casos de alto riesgo, apagados por default
+## Casos de alto riesgo, apagados por default — y el modo `--full`
 
-Dos banderas de entorno prenden casos que por default quedan `N-A` porque su costo (tiempo real,
-degradar el sandbox compartido de Dev para cualquier otro usuario) no se paga en cada corrida:
+Tres banderas de entorno prenden casos que por default quedan `N-A` porque su costo (tiempo real) o
+su riesgo (degradar el sandbox compartido de Dev, tocar un flujo real) no se paga en cada corrida:
 
 | Bandera | Qué prende | Por qué está apagada por default |
 |---|---|---|
 | `MPPP_E08_ALTO_RIESGO=si` | `E-08` (set E): ~300.000 filas hasta el límite real de memoria del sandbox | La llamada real tarda 150-170s y puede degradar el sandbox de Dataverse Dev para cualquier otro usuario mientras corre. Es un riesgo ya medido y aceptado, no un defecto — correrlo de nuevo no agrega cobertura, solo riesgo. |
+| `MPPP_V02_ALTO_RIESGO=si` | `V-02` (set V): apaga `Cloud Flow - MPPP - REC` DE VERDAD, corre la prueba, lo vuelve a encender | Es la única excepción de todo el arnés a "nunca se toca el estado de un flujo" — autorizada puntualmente por el aprobador el 2026-09-28, con dos redes de seguridad (`CONVENCIONES.md`, "Excepción V-02"). |
 | `MPPP_V_LENTOS=si` | `V-03` a `V-07` (set V): los bloques que dependen del schedule real de `MPPP-VIG` (recurrence de 10 minutos) | Con el margen que necesita este set (3 vueltas completas + colchón), los cinco casos juntos superan las dos horas y media. |
 
 ```bash
 MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+MPPP_V02_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py V
 MPPP_V_LENTOS=si python3 herramientas/pruebas/correr.py V
 ```
 
@@ -126,6 +129,37 @@ MPPP_V_LENTOS=si python3 herramientas/pruebas/correr.py V
 la medición real ya mostró que ni 250.000 posiciones de `filaids` se acercan al umbral, y forzar más
 volumen por API es el mismo riesgo de `E-08` sin agregar cobertura — esa cobertura puntual la da la
 prueba unitaria con reloj inyectado (`Aceptacion/ExportarParaDigitarApiAceptacion.cs`).
+
+### `--full` — un solo interruptor para "corré todas, todas sin importar nada"
+
+Decisión del aprobador (2026-09-28): en vez de tener que acordarse de las banderas sueltas de
+arriba, un solo parámetro las prende todas de una:
+
+```bash
+python3 herramientas/pruebas/correr.py --todos --full   # todo, con TODO prendido
+python3 herramientas/pruebas/correr.py V --full          # solo el set V, con lo suyo prendido
+python3 herramientas/pruebas/correr.py E --full          # solo el set E, con lo suyo prendido
+```
+
+`--full` es la forma **recomendada** de prender `MPPP_E08_ALTO_RIESGO`, `MPPP_V02_ALTO_RIESGO` y
+`MPPP_V_LENTOS` a la vez — pero no reemplaza a las banderas sueltas, las incluye: quien ya las usa
+por separado sigue funcionando exactamente igual.
+
+**Antes de arrancar, `--full` grita un banner** con qué casos extra va a correr, cuánto tarda de
+más y qué riesgos asume — nadie se tiene que enterar cuarenta minutos después de que el arnés está
+haciendo algo caro o riesgoso. `python3 herramientas/pruebas/correr.py --listar` también distingue,
+set por set, qué corre siempre y qué solo corre con `--full`.
+
+**Qué cuesta un `--full` completo (`--todos --full`):** además de los ~150-170s de `E-08`, el set V
+con TODO prendido (`V-02` + `V-03`..`V-07`) supera las **3 horas** — el schedule real de `MPPP-VIG`
+(10 minutos) no se puede acelerar desde afuera. Correr `V --full` o `E --full` por separado, para
+verificar un cambio puntual, es mucho más rápido que un `--todos --full` completo.
+
+**`B-01` (set B) queda afuera de `--full`, A PROPÓSITO.** No es un olvido: `B-01` renombra el rol
+`SR - MPPP - RPA` y rompe la puerta del bot para TODO el entorno mientras dura el renombre. El
+aprobador confirmó explícitamente que sigue `N-A` incluso con `--full` (`pruebas/09-rpa-fase2.md`);
+ya está cubierto por 8 pruebas unitarias (7 de rechazo). `--full` no tiene ninguna bandera que lo
+prenda — no existe.
 
 ---
 

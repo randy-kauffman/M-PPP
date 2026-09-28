@@ -90,6 +90,16 @@ class Contexto:
         self.creadas = []
         self.excels_extra = []
         self.extra = {}
+        self.avisos = []
+
+    def avisar(self, mensaje):
+        """Un mensaje que `preparar()` (o un caso) necesita que se vea EN VIVO, ni bien
+        `preparar()` termina — no un log perdido en un archivo aparte. `correr.py` los imprime
+        apenas vuelve `preparar()`, se haya preparado bien o no (2026-09-28: lo estrena
+        `set_v.py` para anunciar que tuvo que reencender `MPPP-REC` al arrancar, RED 2 de la
+        excepción V-02 — ver `CONVENCIONES.md`). Cualquier otro set lo puede usar igual para un
+        aviso que no puede esperar al resumen final."""
+        self.avisos.append(mensaje)
 
     def solicitud(self, **kw):
         sid, mid = sim.crear_solicitud(self.dv, **kw)
