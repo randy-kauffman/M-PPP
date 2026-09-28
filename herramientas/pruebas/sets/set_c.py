@@ -171,18 +171,19 @@ def cerrar(ctx):
 def _preparar_autorizacion_por_cliente(dv):
     """Create-if-missing: el Autorizado `REMITENTE_DN01` con una ÚNICA vía de
     autorización — `AutorizacionCliente` hacia el Cliente compartido
-    `PR - Pruebas MPPP SA` (dueño de `PR11`, `PR06`, `PR10`, `PRIN`, `PRNA`;
-    verificado hoy contra Dev) — y CERO `AutorizacionPlan` (nunca se le crea
-    una: es un correo inventado exclusivamente para esto, no hay otro
-    proceso que pueda tocarlo). Devuelve `(id_autorizado, id_autorizacioncliente)`
-    para que `cerrar()` los borre por GUID."""
-    cli = prep.uno(dv, "sanic_mppp_tbl_clientes", f"sanic_nombre eq '{prep.CLIENTE}'",
-                   "sanic_mppp_tbl_clienteid")
-    if cli is None:
-        raise RuntimeError(
-            f"el cliente compartido {prep.CLIENTE!r} no existe: verificar_datos_negocio() "
-            "debería haberlo creado antes de llegar acá")
-    idc = cli["sanic_mppp_tbl_clienteid"]
+    (dueño de `PR11`, `PR06`, `PR10`, `PRIN`, `PRNA`; verificado hoy contra
+    Dev) — y CERO `AutorizacionPlan` (nunca se le crea una: es un correo
+    inventado exclusivamente para esto, no hay otro proceso que pueda
+    tocarlo). Devuelve `(id_autorizado, id_autorizacioncliente)` para que
+    `cerrar()` los borre por GUID.
+
+    El Cliente se busca por `pc.cliente_compartido()` (CIF BAC, no nombre):
+    en Dev puede llevar la marca vieja `"PR - Pruebas MPPP SA"` en vez de la
+    nueva `ZZP-...` (ver el docstring de `preparar_datos.py`). Buscarlo acá
+    por `sanic_nombre` fue justamente el defecto del 2026-09-28: esta
+    búsqueda estaba duplicada en cinco lugares y la migración de marca solo
+    se corrigió en uno."""
+    idc, _nombre_cliente = pc.cliente_compartido(dv)
 
     aut = prep.uno(dv, "sanic_mppp_tbl_autorizados", f"sanic_nombre eq '{REMITENTE_DN01}'",
                     "sanic_mppp_tbl_autorizadoid")

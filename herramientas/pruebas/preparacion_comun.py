@@ -497,3 +497,39 @@ def crear_autorizacion_cliente(dv, autorizado_id, cliente_id):
                            f"cliente {cliente_id}) (HTTP {est}): {r}")
     from dataverse_api import Dataverse
     return Dataverse.id_creado(cab)
+
+
+def cliente_compartido(dv):
+    """`(id, nombre)` del Cliente compartido de `preparar_datos.py` (dueño de
+    PR11/PR06/PR10/PRIN/PRNA), localizado por `sanic_cifbac` — su clave de
+    negocio (clave alternativa `KEY - MPPP - Cliente - CIF BAC`) — NUNCA por
+    `sanic_nombre`: ese campo es decorativo, y en Dev el Cliente real de este
+    fixture puede llevar la marca vieja (`"PR - Pruebas MPPP SA"`, vivo desde
+    el 2026-09-23) en vez de la nueva (`prep.CLIENTE`, `ZZP-...`) — ver el
+    docstring de `preparar_datos.py`, "El fixture compartido del 2026-09-23...".
+
+    Devuelve también el `nombre` REAL leído (no asumas `prep.CLIENTE`): quien
+    arma un nombre calculado tipo `'<algo> - <Cliente>'` para comparar contra
+    un plugin (p. ej. `set_i.py::i06`) tiene que usar el nombre que el Cliente
+    tiene DE VERDAD en el entorno, no el literal nuevo — si el entorno todavía
+    tiene la marca vieja, comparar contra `prep.CLIENTE` da un FALLA que no
+    tiene nada que ver con el plugin que se está probando.
+
+    **Consolidado acá 2026-09-28** (defecto real: la migración de marca del
+    Cliente — buscar por CIF en vez de por nombre — solo se había corregido en
+    `preparar_datos.py`; la misma búsqueda por `sanic_nombre` seguía duplicada,
+    rota, en `set_c.py`, `set_r.py::_id_cliente_compartido`,
+    `set_u.py::_id_cliente_compartido` y `set_i.py` (casos I-06 e I-11) — cinco
+    copias de la misma consulta, y arreglar una sola dejó las otras cuatro en
+    rojo. No repitas esta búsqueda en un sexto lugar: importá esta función."""
+    cli = prep.uno(dv, "sanic_mppp_tbl_clientes", f"sanic_cifbac eq '{prep.CIF_BAC}'",
+                   "sanic_mppp_tbl_clienteid,sanic_nombre")
+    if cli is None:
+        raise RuntimeError(f"no se encontró el Cliente compartido (CIF BAC {prep.CIF_BAC!r}) "
+                           "(¿preparar_datos.py no corrió todavía?)")
+    return cli["sanic_mppp_tbl_clienteid"], cli["sanic_nombre"]
+
+
+def id_cliente_compartido(dv):
+    """Atajo de `cliente_compartido()` para quien solo necesita el GUID."""
+    return cliente_compartido(dv)[0]

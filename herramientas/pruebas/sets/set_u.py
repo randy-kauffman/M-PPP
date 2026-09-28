@@ -135,8 +135,12 @@ def preparar(ctx):
     ctx.extra["estructura"] = pc.verificar_estructura_plantilla(ctx.dv)
     pc.verificar_parametro_activo(ctx.dv, "autorizacion.modo")
 
-    cliente_id = _id_cliente_compartido(ctx.dv)
+    # `nombre` real del Cliente compartido (no `prep.CLIENTE`): en Dev puede llevar la marca vieja
+    # "PR - Pruebas MPPP SA" en vez de la nueva `ZZP-...` (ver `preparacion_comun.cliente_compartido()`).
+    # U-07 necesita el nombre REAL para armar el nombre calculado esperado de la AutorizacionCliente.
+    cliente_id, cliente_nombre = pc.cliente_compartido(ctx.dv)
     ctx.extra["cliente_compartido_id"] = cliente_id
+    ctx.extra["cliente_compartido_nombre"] = cliente_nombre
 
     autorizado_id = _crear_autorizado(ctx.dv, REMITENTE_SOLOCLIENTE)
     ctx.extra["autorizado_soloclienteid"] = autorizado_id
@@ -196,20 +200,13 @@ def cerrar(ctx):
 # Helpers locales. `_fijar_modo` y `_crear_autorizacion_cliente` se
 # consolidaron en `preparacion_comun.py` (2026-09-28: eran idénticas a las
 # copias de `set_c.py`/`set_r.py` — ver el docstring de esas funciones ahí).
-# Lo que queda acá (`_crear_autorizado`, `_id_cliente_compartido`,
-# `_crear_cliente_y_plan_ajenos`) es propio de este set o tiene una gemela
-# en `set_r.py`/`set_c.py` que no estaba en el alcance aprobado de esta
-# consolidación — queda documentado, no tocado.
+# `_id_cliente_compartido` se consolidó TAMBIÉN, el mismo día, en
+# `preparacion_comun.id_cliente_compartido()` (defecto real: buscaba el
+# Cliente compartido por `sanic_nombre`, y se rompió cuando la marca del
+# fixture migró de "PR" a "ZZP-" — ver el docstring de esa función).
+# `_crear_autorizado` y `_crear_cliente_y_plan_ajenos` son propios de este
+# set.
 # ===========================================================================
-def _id_cliente_compartido(dv):
-    est, r, _ = dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid"
-                                f"&$filter=sanic_nombre eq '{prep.CLIENTE}'")
-    if est != 200 or not r.get("value"):
-        raise RuntimeError(f"no se encontró el Cliente compartido {prep.CLIENTE!r} "
-                           "(¿preparar_datos.py no corrió todavía?)")
-    return r["value"][0]["sanic_mppp_tbl_clienteid"]
-
-
 def _crear_autorizado(dv, correo):
     """Create-if-missing, por `sanic_nombre` (el correo)."""
     est, r, _ = dv.call("GET", f"{AUTORIZADOS}?$select=sanic_mppp_tbl_autorizadoid"
@@ -507,7 +504,9 @@ def u07(ctx):
     idac = Dataverse.id_creado(cab)
     try:
         _, r2, _ = ctx.dv.call("GET", f"{AUTORIZACIONCLIENTES}({idac})?$select=sanic_nombre")
-        esperado = f"{REMITENTE} → {prep.CLIENTE}"
+        # El nombre REAL del Cliente (no `prep.CLIENTE`: en Dev puede llevar la marca vieja —
+        # ver `preparacion_comun.cliente_compartido()`), leído una vez en `preparar()`.
+        esperado = f"{REMITENTE} → {ctx.extra['cliente_compartido_nombre']}"
         c.check("sanic_nombre = '<correo del autorizado> → <nombre del cliente>' "
                 "(lo calcula el step, pisando lo que no se mandó)",
                 r2.get("sanic_nombre") == esperado, f"obtenido {r2.get('sanic_nombre')!r}")

@@ -23,7 +23,6 @@ _HERRAMIENTAS_PRUEBAS = os.path.dirname(_AQUI)
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
-import preparar_datos as prep  # noqa: E402
 import simulador as sim  # noqa: E402
 import generar_excel as genexcel  # noqa: E402
 
@@ -54,15 +53,7 @@ TIPO_TEXTO = 159460001  # sanic_mppp_ch_tipoparametro: Texto
 
 PARAMETROS = "sanic_mppp_tbl_parametros"
 AUTORIZADOS = "sanic_mppp_tbl_autorizados"
-CLIENTES = "sanic_mppp_tbl_clientes"
 AUTORIZACIONCLIENTES = "sanic_mppp_tbl_autorizacionclientes"
-
-# El Cliente compartido de `preparar_datos.py` (dueño de PR11/PR06/PR10/PRIN/PRNA).
-# Referenciado desde `prep.CLIENTE`, nunca repetido como literal (2026-09-28: la
-# marca de fixture se movió de "PR" a "ZZP-" sobre `sanic_nombre` en
-# `preparar_datos.py`; un literal acá se habría quedado obsoleto y esta
-# búsqueda habría dejado de encontrar el Cliente).
-CLIENTE_COMPARTIDO = prep.CLIENTE
 
 
 def _excel(nombre):
@@ -134,7 +125,7 @@ def preparar(ctx):
     ctx.extra["obligatoriedad_activa"] = pc.verificar_parametro_activo(ctx.dv, "plantilla.obligatoriedad")
     pc.verificar_parametro_activo(ctx.dv, "autorizacion.modo")
 
-    cliente_id = _id_cliente_compartido(ctx.dv)
+    cliente_id = pc.id_cliente_compartido(ctx.dv)
     autorizado_id = _crear_autorizado(ctx.dv, REMITENTE_MODOCLIENTE)
     ctx.extra["autorizado_modocliente_id"] = autorizado_id
     ctx.extra["autorizacioncliente_id"] = pc.crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_id)
@@ -169,19 +160,13 @@ def cerrar(ctx):
 # DN-01 — helpers locales. `_crear_autorizacion_cliente` se consolidó en
 # `preparacion_comun.crear_autorizacion_cliente()` (2026-09-28: era idéntica
 # a la copia de `set_u.py`, byte a byte salvo el texto de un mensaje de
-# error). Los que quedan acá (`_crear_autorizado`, `_id_cliente_compartido`)
-# también tienen gemelas en `set_u.py`, pero esa consolidación no estaba en
-# el alcance aprobado de esta tarea — queda documentado, no tocado.
+# error). `_id_cliente_compartido` se consolidó TAMBIÉN en
+# `preparacion_comun.id_cliente_compartido()` el 2026-09-28 (defecto real: la
+# copia de acá y su gemela en `set_u.py`/`set_c.py`/`set_i.py` seguían
+# buscando el Cliente por `sanic_nombre`, y se rompieron todas cuando la marca
+# de fixture migró de "PR" a "ZZP-" — ver el docstring de esa función). Lo que
+# queda acá (`_crear_autorizado`) es propio de este set.
 # ===========================================================================
-def _id_cliente_compartido(dv):
-    est, r, _ = dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid"
-                                f"&$filter=sanic_nombre eq '{CLIENTE_COMPARTIDO}'")
-    if est != 200 or not r.get("value"):
-        raise RuntimeError(f"no se encontró el Cliente compartido {CLIENTE_COMPARTIDO!r} "
-                           "(¿preparar_datos.py no corrió todavía?)")
-    return r["value"][0]["sanic_mppp_tbl_clienteid"]
-
-
 def _crear_autorizado(dv, correo):
     """Create-if-missing, por `sanic_nombre` (el correo, igual que
     `preparar_datos.py`)."""

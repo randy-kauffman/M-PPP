@@ -54,7 +54,6 @@ _RAIZ = os.path.dirname(os.path.dirname(_HERRAMIENTAS_PRUEBAS))
 sys.path.insert(0, _HERRAMIENTAS_PRUEBAS)
 
 import preparacion_comun as pc  # noqa: E402
-import preparar_datos as prep  # noqa: E402
 import simulador as sim  # noqa: E402
 from dataverse_api import Dataverse  # noqa: E402
 
@@ -231,18 +230,23 @@ def i05(ctx):
 def i06(ctx):
     c = pc.Caso("I-06", "El nombre calculado: Plan, AutorizacionPlan, AutorizacionCliente y Fila")
 
-    cli = ctx.dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid&$filter=sanic_nombre eq '{prep.CLIENTE}'")[1]["value"][0]
+    # Por CIF BAC, no por `sanic_nombre` (defecto real del 2026-09-28: esta búsqueda estaba
+    # duplicada en cinco lugares y solo se corrigió en `preparar_datos.py` — ver el docstring de
+    # `preparacion_comun.cliente_compartido()`). El `nombre` REAL importa: en Dev puede llevar la
+    # marca vieja "PR - Pruebas MPPP SA" en vez de `prep.CLIENTE`, y el nombre calculado del step
+    # usa lo que el Cliente tiene DE VERDAD, no el literal nuevo.
+    cli_id, cli_nombre = pc.cliente_compartido(ctx.dv)
     au = ctx.dv.call("GET", f"{AUTORIZADOS}?$select=sanic_mppp_tbl_autorizadoid&$filter=sanic_nombre eq '{REMITENTE}'")[1]["value"][0]
 
     # --- Plan: 'CODIGO - Cliente' ---
     est, r, cab = ctx.dv.call("POST", PLANES, {
         "sanic_codigo": "ZZNM", "sanic_tipoformato": 159460001, "sanic_moneda": 159460001,
-        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli['sanic_mppp_tbl_clienteid']})"})
+        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli_id})"})
     if est in (200, 201, 204):
         idp = Dataverse.id_creado(cab)
         _, r2, _ = ctx.dv.call("GET", f"{PLANES}({idp})?$select=sanic_nombre")
         ctx.dv.call("DELETE", f"{PLANES}({idp})")
-        esperado = f"ZZNM - {prep.CLIENTE}"
+        esperado = f"ZZNM - {cli_nombre}"
         c.check("Plan: nombre calculado 'CODIGO - Cliente'", r2.get("sanic_nombre") == esperado, f"obtenido {r2.get('sanic_nombre')!r}")
     else:
         c.check("se pudo crear el Plan sin nombre para probar el cálculo", False, f"HTTP {est}: {r}")
@@ -265,12 +269,12 @@ def i06(ctx):
     # --- AutorizacionCliente (fase 2, DN-01): 'correo → NOMBRE del cliente' (no el código: no tiene) ---
     est, r, cab = ctx.dv.call("POST", AUTORIZACIONCLIENTES, {
         "sanic_autorizadoid@odata.bind": f"/{AUTORIZADOS}({au['sanic_mppp_tbl_autorizadoid']})",
-        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli['sanic_mppp_tbl_clienteid']})"})
+        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli_id})"})
     if est in (200, 201, 204):
         idac = Dataverse.id_creado(cab)
         _, r2, _ = ctx.dv.call("GET", f"{AUTORIZACIONCLIENTES}({idac})?$select=sanic_nombre")
         ctx.dv.call("DELETE", f"{AUTORIZACIONCLIENTES}({idac})")
-        esperado = f"{REMITENTE} → {prep.CLIENTE}"
+        esperado = f"{REMITENTE} → {cli_nombre}"
         c.check("AutorizacionCliente: nombre calculado 'correo → NOMBRE del cliente' (DN-01, fase 2)",
                 r2.get("sanic_nombre") == esperado, f"obtenido {r2.get('sanic_nombre')!r}")
     else:
@@ -489,11 +493,14 @@ def i10(ctx):
 # ===========================================================================
 def i11(ctx):
     c = pc.Caso("I-11", "Integridad de una autorización por CLIENTE (duplicada, fase 2 DN-01)")
-    cli = ctx.dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid&$filter=sanic_nombre eq '{prep.CLIENTE}'")[1]["value"][0]
+    # Por CIF BAC, no por `sanic_nombre` — ver `preparacion_comun.cliente_compartido()` (defecto
+    # real del 2026-09-28: esta búsqueda estaba duplicada en cinco lugares, incl. acá, y solo se
+    # corrigió en `preparar_datos.py`).
+    cli_id, _cli_nombre = pc.cliente_compartido(ctx.dv)
     au = ctx.dv.call("GET", f"{AUTORIZADOS}?$select=sanic_mppp_tbl_autorizadoid&$filter=sanic_nombre eq '{REMITENTE}'")[1]["value"][0]
     cuerpo = {
         "sanic_autorizadoid@odata.bind": f"/{AUTORIZADOS}({au['sanic_mppp_tbl_autorizadoid']})",
-        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli['sanic_mppp_tbl_clienteid']})"}
+        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cli_id})"}
     est1, r1, cab1 = ctx.dv.call("POST", AUTORIZACIONCLIENTES, cuerpo)
     if est1 not in (200, 201, 204):
         c.check("se pudo crear la PRIMERA AutorizacionCliente (precondición de este caso)", False, f"HTTP {est1}: {r1}")
