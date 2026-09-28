@@ -288,6 +288,115 @@ def verificar_parametro_activo(dv, nombre):
     return fila
 
 
+def verificar_parametro_entero_positivo(dv, nombre):
+    """Que exista una versión activa de `nombre` Y que su valor sea un
+    entero positivo. Para los parámetros numéricos de fase 1 cuyo CONTENIDO,
+    no solo su existencia, le importa a quien lo consume (un valor no
+    numérico o negativo revienta al primer consumidor real, en vez de quedar
+    detectado acá, antes de que corra un solo caso). Devuelve el entero."""
+    fila = verificar_parametro_activo(dv, nombre)
+    crudo = (fila.get("sanic_valor") or "").strip()
+    try:
+        valor = int(crudo)
+    except ValueError:
+        raise RuntimeError(f"'{nombre}' activo no es un entero: {crudo!r}")
+    if valor <= 0:
+        raise RuntimeError(f"'{nombre}' activo tiene que ser un entero positivo: obtenido {valor}")
+    return valor
+
+
+# ===========================================================================
+# Verificaciones de CONTENIDO (no solo existencia) de los 6 parámetros de
+# fase 1 que quedaron sin verificación directa al disolver el set P
+# (`CONVENCIONES.md` §7, "nombrar no contar"; decisión del aprobador
+# 2026-09-28: la verificación viaja con el set que la necesita, no vuelve a
+# un set de preparación propio). Cada una la llama, desde su `preparar()`,
+# el set al que el reparto se la asignó — nunca un set lejano.
+# ===========================================================================
+def verificar_bac_codigo_007(dv):
+    """`plantilla.listas`, banco BAC = código `007` (`diseno/PENDIENTES.md`
+    sección B, D-46): el código de 3 dígitos con el que se construye la
+    referencia de formato 11 (`REFERENCIA_FORMATO_11`, caso R-10). Con el
+    código equivocado la referencia sale mal y ASÍ LLEGA A AS400. Que la fila
+    exista no alcanza: D-46 probó justo esto con un código inventado (`102`)
+    que también tiene 3 dígitos y pasa cualquier chequeo de forma — hay que
+    leer el valor y compararlo. Devuelve el JSON ya parseado."""
+    fila = verificar_parametro_activo(dv, "plantilla.listas")
+    crudo = fila.get("sanic_valor") or "{}"
+    try:
+        datos = json.loads(crudo)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"'plantilla.listas' no es JSON válido: {e}")
+    bancos = datos.get("banco") or []
+    bac = next((b for b in bancos if b.get("valor") == "BAC"), None)
+    if bac is None:
+        raise RuntimeError(f"'plantilla.listas' no trae el banco 'BAC' en su lista: {bancos}")
+    codigo = bac.get("codigo")
+    if codigo != "007":
+        raise RuntimeError(
+            f"'plantilla.listas': BAC tiene código {codigo!r}, se esperaba '007' — con este código la "
+            "referencia de formato 11 (REFERENCIA_FORMATO_11, caso R-10) sale mal y ASÍ LLEGA A AS400 "
+            "(diseno/PENDIENTES.md, sección B)")
+    return datos
+
+
+def verificar_lectura_limites(dv):
+    """`lectura.limites` (`03-contratos-custom-api.md` §249,
+    `ValidarSolicitud.cs::ParametroLimites`): los dos topes de bytes con los
+    que se lee el Excel adjunto, comprimido y descomprimido. `sanic_mppp_capi_validarsolicitud`
+    los lee como obligatorios ANTES de evaluar ninguna regla de Solicitud —
+    con una clave mal escrita o en 0, la lectura del primer Excel real
+    revienta ahí, no acá. Verifica que las DOS claves existan y sean enteros
+    positivos. Devuelve el JSON ya parseado."""
+    fila = verificar_parametro_activo(dv, "lectura.limites")
+    crudo = fila.get("sanic_valor") or "{}"
+    try:
+        datos = json.loads(crudo)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"'lectura.limites' no es JSON válido: {e}")
+    for clave in ("maximoBytesComprimido", "maximoBytesDescomprimido"):
+        valor = datos.get(clave)
+        if not isinstance(valor, int) or isinstance(valor, bool) or valor <= 0:
+            raise RuntimeError(f"'lectura.limites': {clave!r} tiene que ser un entero positivo, obtenido {valor!r}")
+    return datos
+
+
+def verificar_prefijos_reenvio(dv):
+    """`correo.prefijos.reenvio` (`ClasificarCorreo.cs::LeerPrefijosDeReenvio`):
+    lista JSON de textos contra la que se compara el asunto para decidir
+    'reenvío' (caso C-03). Verifica, NOMBRADO (CONVENCIONES §7, no un
+    conteo), que la lista no esté vacía y traiga el prefijo `FW:` del que
+    depende C-03 — que la fila exista no alcanza: una lista vacía o sin ese
+    prefijo deja pasar como 'nuevo' un correo que en realidad es un reenvío,
+    sin que ningún chequeo de forma lo note. Devuelve la lista."""
+    fila = verificar_parametro_activo(dv, "correo.prefijos.reenvio")
+    crudo = fila.get("sanic_valor") or "[]"
+    try:
+        prefijos = json.loads(crudo)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"'correo.prefijos.reenvio' no es JSON válido: {e}")
+    if not isinstance(prefijos, list) or not prefijos:
+        raise RuntimeError(f"'correo.prefijos.reenvio' tiene que ser una lista no vacía de textos: {prefijos!r}")
+    if "FW:" not in prefijos:
+        raise RuntimeError(f"'correo.prefijos.reenvio' no trae 'FW:' (lo usa el caso C-03): {prefijos!r}")
+    return prefijos
+
+
+def verificar_servicio_cuenta(dv):
+    """`servicio.cuenta` (`ListaBlancaStep`, CONVENCIONES §8.2): el UPN con
+    el que los cinco flujos escriben sus marcas de envío — sin él, la lista
+    blanca los trata como personas y les rechaza la escritura. Verifica que
+    el valor activo tenga forma de UPN/correo (no vacío, con `@` y algo a
+    los dos lados) — que la fila exista no alcanza: un valor vacío o sin
+    `@` deja a los flujos escribiendo como si fueran una persona común, sin
+    que ningún chequeo de forma lo note. Devuelve el valor."""
+    fila = verificar_parametro_activo(dv, "servicio.cuenta")
+    valor = (fila.get("sanic_valor") or "").strip()
+    if "@" not in valor or valor.startswith("@") or valor.endswith("@"):
+        raise RuntimeError(f"'servicio.cuenta' no tiene forma de UPN/correo: {valor!r}")
+    return valor
+
+
 # ===========================================================================
 # Roles de usuario — contra `systemuserroles_association`, nunca supuestos
 # (CONVENCIONES §8). Solo lo usan los sets que impersonan un rol (sesión de
@@ -305,3 +414,86 @@ def verificar_roles(dv, systemuserid, roles_esperados):
     actuales = {x["name"] for x in r.get("value", [])}
     faltan = set(roles_esperados) - actuales
     return not faltan, actuales
+
+
+def usuario_por_alias(dv, alias):
+    """El `systemuserid` de un usuario de prueba por su alias de dominio
+    (`User1`, `User2`, ...), igual que resuelve `comportamiento_roles.py`
+    (CONVENCIONES §6). Lanza si el alias no identifica exactamente un
+    usuario. Consolidado acá (2026-09-28): era IDÉNTICA en `set_a.py`,
+    `set_b.py` e `set_i.py` (firma `(dv, alias)`) y en `set_e.py` (misma
+    lógica, pero con la firma `(ctx, alias)`: unificada a `(dv, alias)` acá,
+    y el llamador de `set_e.py` ahora pasa `ctx.dv`). Es plomería pura, sin
+    ningún criterio de negocio adentro — exactamente lo que CONVENCIONES §8
+    pide consolidar."""
+    est, r, _ = dv.call(
+        "GET", "systemusers?$select=systemuserid,fullname"
+               f"&$filter=startswith(domainname,'{alias}@') and applicationid eq null")
+    filas = r.get("value", []) if est == 200 else []
+    if len(filas) != 1:
+        raise RuntimeError(f"{alias!r} no identifica un usuario único en el entorno: {filas}")
+    return filas[0]["systemuserid"]
+
+
+# ===========================================================================
+# DN-01 — Autorización por cliente. Consolidado acá (2026-09-28) lo que era
+# IDÉNTICO entre `set_c.py`, `set_r.py` y `set_u.py`:
+#
+# - `fijar_modo_autorizacion`: el PATCH directo del valor ACTIVO de
+#   `autorizacion.modo` era byte a byte igual en `set_c.py::_fijar_modo_autorizacion`
+#   y `set_u.py::_fijar_modo` (el propio `set_u.py` citaba a `set_c.py` como
+#   "mismo criterio" — ya eran la misma función con dos nombres).
+# - `crear_autorizacion_cliente`: el create-if-missing del VÍNCULO
+#   `AutorizacionCliente` (dado un `autorizado_id` YA CREADO) era también
+#   idéntico entre `set_r.py` y `set_u.py` — verificado línea por línea; la
+#   única diferencia era el texto del mensaje de error de una excepción
+#   (cosmético, no de comportamiento). Esto CORRIGE lo que se asumía al
+#   repartir esta tarea ("uno arma solo el vínculo, el otro también el
+#   Autorizado"): ninguna de las dos crea el Autorizado — las dos lo reciben
+#   ya creado, y cada set lo arma aparte con su propio `_crear_autorizado()`
+#   local (que SÍ es una tercera copia idéntica, pero no estaba en el
+#   alcance aprobado de esta consolidación: queda documentada, no tocada,
+#   para que el aprobador decida aparte).
+# ===========================================================================
+AUTORIZACIONCLIENTES = "sanic_mppp_tbl_autorizacionclientes"
+AUTORIZADOS = "sanic_mppp_tbl_autorizados"
+CLIENTES = "sanic_mppp_tbl_clientes"
+
+
+def fijar_modo_autorizacion(dv, valor):
+    """PATCH directo del valor ACTIVO de `autorizacion.modo`: mismo patrón
+    simple que usa `aplicar_canon` para llevarlo al canon, acá para escribir
+    el valor de PRUEBA que cada caso de DN-01 necesita (§8.2 solo versiona
+    un cambio de NEGOCIO; un valor efímero de prueba no lo es). Lanza si no
+    hay versión activa — no debería pasar nunca: ya lo comprobó `preparar()`."""
+    fila = verificar_parametro_activo(dv, "autorizacion.modo")
+    pid = fila["sanic_mppp_tbl_parametroid"]
+    est, r, _ = dv.call("PATCH", f"sanic_mppp_tbl_parametros({pid})", {"sanic_valor": valor})
+    if est not in (200, 204):
+        raise RuntimeError(f"no se pudo escribir autorizacion.modo={valor!r} (HTTP {est}): {r}")
+
+
+def crear_autorizacion_cliente(dv, autorizado_id, cliente_id):
+    """Create-if-missing (clave alternativa autorizado+cliente, DN-01): si ya
+    existe una `AutorizacionCliente` para este par (p. ej. de una corrida
+    anterior que no llegó a `cerrar()`), la reusa en vez de duplicarla. No
+    manda `sanic_nombre`: lo calcula un step (`<correo> → <cliente>`) y pisa
+    cualquier valor que se le mande. Asume que `autorizado_id` YA EXISTE:
+    arma solo el vínculo, nunca el Autorizado (ver la nota del módulo)."""
+    est, r, _ = dv.call(
+        "GET",
+        f"{AUTORIZACIONCLIENTES}?$select=sanic_mppp_tbl_autorizacionclienteid"
+        f"&$filter=_sanic_autorizadoid_value eq {autorizado_id} and _sanic_clienteid_value eq {cliente_id}")
+    if est == 200 and r.get("value"):
+        return r["value"][0]["sanic_mppp_tbl_autorizacionclienteid"]
+
+    cuerpo = {
+        "sanic_autorizadoid@odata.bind": f"/{AUTORIZADOS}({autorizado_id})",
+        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cliente_id})",
+    }
+    est, r, cab = dv.call("POST", AUTORIZACIONCLIENTES, cuerpo)
+    if est not in (200, 201, 204):
+        raise RuntimeError(f"no se pudo crear la AutorizacionCliente (autorizado {autorizado_id}, "
+                           f"cliente {cliente_id}) (HTTP {est}): {r}")
+    from dataverse_api import Dataverse
+    return Dataverse.id_creado(cab)

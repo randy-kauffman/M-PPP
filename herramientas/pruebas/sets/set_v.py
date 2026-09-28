@@ -80,6 +80,8 @@ PARAMETROS_UMBRAL = (
     "vigilancia.reintentos.maximo", "clasificacion.dias.vencimiento",
 )
 
+PARAMETROS_RETENCION = ("retencion.dias.general", "retencion.dias.noreconocidas")
+
 # --- choices (src/Sanic.Mppp.Plugins/Dominio/Choices.g.cs, valores verificados el 2026-09-27) ---
 INGRESADA, NORECON, RECH, ENPROC, PROC, CERR, NOESCORREO, VENCIDA = (
     159460001, 159460002, 159460004, 159460005, 159460006, 159460007, 159460008, 159460009)
@@ -99,6 +101,13 @@ def preparar(ctx):
       (`recursos/flujos/mppp-vig.json`, solo lectura): las usa V-01 para comparar sin esperar nada.
     - **Los 4 umbrales**, leídos EN VIVO (nunca hardcodeados: CONVENCIONES §7, "nombrar no contar")
       — de acá salen los márgenes exactos que V-02..V-07 usan para envejecer sus datos.
+    - **`retencion.dias.general` y `retencion.dias.noreconocidas`, CONTENIDO** (no solo que existan):
+      que el valor activo de cada uno sea un entero positivo. Ningún caso de ESTE set los consume
+      todavía (los usa el job de purga de fase 3, que no tiene set propio aún); se verifican acá
+      porque V ya lee, con el mismo patrón, los otros parámetros numéricos de fase 1
+      (`vigilancia.*`, `clasificacion.dias.vencimiento`) — es el hogar más cercano que existe hoy,
+      no una dependencia de código. Recupera la cobertura que perdió el antiguo P-06 al disolver el
+      set P (decisión del aprobador 2026-09-28: la verificación viaja con el set que la necesita).
     - **Los 5 flujos activos**: este set depende de los cinco más que ningún otro (V-05/V-07 dejan
       completar un acuse real antes de forzar el escenario "a medias", igual que hace el set M).
 
@@ -115,6 +124,11 @@ def preparar(ctx):
         fila = pc.verificar_parametro_activo(ctx.dv, nombre)
         umbrales[nombre] = int(fila["sanic_valor"])
     ctx.extra["umbrales"] = umbrales
+
+    retencion = {}
+    for nombre in PARAMETROS_RETENCION:
+        retencion[nombre] = pc.verificar_parametro_entero_positivo(ctx.dv, nombre)
+    ctx.extra["retencion"] = retencion
 
     faltan, apagados = pc.verificar_flujos_activos(ctx.dv)
     if faltan or apagados:
@@ -310,6 +324,13 @@ def v01(ctx):
     for nombre in PARAMETROS_UMBRAL:
         c.check(f"el parámetro {nombre!r} tiene una versión activa (valor real leído: "
                 f"{ctx.extra['umbrales'].get(nombre)!r})", nombre in ctx.extra["umbrales"])
+
+    # Cobertura del CONTENIDO (no solo existencia) de retencion.dias.general y
+    # retencion.dias.noreconocidas, nombrados uno por uno (CONVENCIONES §7): recuperan acá la
+    # verificación que perdió el antiguo P-06 al disolver el set P — ver preparar().
+    for nombre in PARAMETROS_RETENCION:
+        c.check(f"el parámetro {nombre!r} está activo y es un entero positivo (valor real leído: "
+                f"{ctx.extra['retencion'].get(nombre)!r})", nombre in ctx.extra["retencion"])
 
     return c
 

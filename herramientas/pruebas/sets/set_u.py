@@ -140,18 +140,18 @@ def preparar(ctx):
 
     autorizado_id = _crear_autorizado(ctx.dv, REMITENTE_SOLOCLIENTE)
     ctx.extra["autorizado_soloclienteid"] = autorizado_id
-    ctx.extra["autorizacioncliente_id"] = _crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_id)
+    ctx.extra["autorizacioncliente_id"] = pc.crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_id)
 
     cliente_ajeno_id, plan_ajeno_id = _crear_cliente_y_plan_ajenos(ctx.dv)
     ctx.extra["cliente_ajeno_id"] = cliente_ajeno_id
     ctx.extra["plan_ajeno_id"] = plan_ajeno_id
 
     # U-09 pide un Autorizado con AutorizacionCliente hacia MÁS DE UN cliente.
-    ctx.extra["autorizacioncliente_id_2"] = _crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_ajeno_id)
+    ctx.extra["autorizacioncliente_id_2"] = pc.crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_ajeno_id)
 
     autorizado_ajeno_id = _crear_autorizado(ctx.dv, REMITENTE_OTRO_CLIENTE)
     ctx.extra["autorizado_otroclienteid"] = autorizado_ajeno_id
-    ctx.extra["autorizacioncliente_ajena_id"] = _crear_autorizacion_cliente(
+    ctx.extra["autorizacioncliente_ajena_id"] = pc.crear_autorizacion_cliente(
         ctx.dv, autorizado_ajeno_id, cliente_ajeno_id)
 
 
@@ -193,8 +193,13 @@ def cerrar(ctx):
 
 
 # ===========================================================================
-# Helpers locales (no van a `preparacion_comun.py`: propios de este set, mismo
-# criterio que `set_r.py`/`set_c.py` con sus propios Autorizado/AutorizacionCliente).
+# Helpers locales. `_fijar_modo` y `_crear_autorizacion_cliente` se
+# consolidaron en `preparacion_comun.py` (2026-09-28: eran idénticas a las
+# copias de `set_c.py`/`set_r.py` — ver el docstring de esas funciones ahí).
+# Lo que queda acá (`_crear_autorizado`, `_id_cliente_compartido`,
+# `_crear_cliente_y_plan_ajenos`) es propio de este set o tiene una gemela
+# en `set_r.py`/`set_c.py` que no estaba en el alcance aprobado de esta
+# consolidación — queda documentado, no tocado.
 # ===========================================================================
 def _id_cliente_compartido(dv):
     est, r, _ = dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid"
@@ -214,28 +219,6 @@ def _crear_autorizado(dv, correo):
     est, r, cab = dv.call("POST", AUTORIZADOS, {"sanic_nombre": correo})
     if est not in (200, 201, 204):
         raise RuntimeError(f"no se pudo crear el Autorizado {correo!r} (HTTP {est}): {r}")
-    from dataverse_api import Dataverse
-    return Dataverse.id_creado(cab)
-
-
-def _crear_autorizacion_cliente(dv, autorizado_id, cliente_id):
-    """Create-if-missing (clave alternativa autorizado+cliente, U-11). No manda `sanic_nombre`: lo
-    calcula un step (`<correo> → <cliente>`) y pisa cualquier valor que se le mande (U-07)."""
-    est, r, _ = dv.call(
-        "GET",
-        f"{AUTORIZACIONCLIENTES}?$select=sanic_mppp_tbl_autorizacionclienteid"
-        f"&$filter=_sanic_autorizadoid_value eq {autorizado_id} and _sanic_clienteid_value eq {cliente_id}")
-    if est == 200 and r.get("value"):
-        return r["value"][0]["sanic_mppp_tbl_autorizacionclienteid"]
-
-    cuerpo = {
-        "sanic_autorizadoid@odata.bind": f"/{AUTORIZADOS}({autorizado_id})",
-        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cliente_id})",
-    }
-    est, r, cab = dv.call("POST", AUTORIZACIONCLIENTES, cuerpo)
-    if est not in (200, 201, 204):
-        raise RuntimeError(f"no se pudo crear la AutorizacionCliente (autorizado {autorizado_id}, "
-                           f"cliente {cliente_id}) (HTTP {est}): {r}")
     from dataverse_api import Dataverse
     return Dataverse.id_creado(cab)
 
@@ -262,18 +245,6 @@ def _crear_cliente_y_plan_ajenos(dv):
         "sanic_clienteid@odata.bind": f"/{CLIENTES}({idc})",
     })
     return idc, idp
-
-
-def _fijar_modo(dv, valor):
-    """PATCH directo del valor ACTIVO de `autorizacion.modo` (mismo patrón que
-    `preparacion_comun.aplicar_canon`, acá para escribir el valor de PRUEBA que cada caso necesita:
-    §8.2 solo versiona un cambio de NEGOCIO, un valor efímero de prueba no lo es — mismo criterio
-    que ya usa `set_c.py::_fijar_modo_autorizacion`)."""
-    fila = pc.verificar_parametro_activo(dv, "autorizacion.modo")
-    pid = fila["sanic_mppp_tbl_parametroid"]
-    est, r, _ = dv.call("PATCH", f"{PARAMETROS}({pid})", {"sanic_valor": valor})
-    if est not in (200, 204):
-        raise RuntimeError(f"no se pudo escribir autorizacion.modo={valor!r} (HTTP {est}): {r}")
 
 
 def _clasificar_o_d59(ctx, c, sid, etiqueta):
@@ -366,7 +337,7 @@ def u01(ctx):
     valor = (fila.get("sanic_valor") or "").strip()
     c.check("autorizacion.modo activo = 'plan' (o vacío) ANTES de tocar nada (estado de hoy del entorno)",
             valor == "" or valor.lower() == "plan", f"obtenido {valor!r}")
-    _fijar_modo(ctx.dv, "plan")
+    pc.fijar_modo_autorizacion(ctx.dv, "plan")
 
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba U-01 compatibilidad",
                                      cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
@@ -383,7 +354,7 @@ def u01(ctx):
 
 def u02(ctx):
     c = pc.Caso("U-02", "Modo 'cliente': un correo autorizado SOLO por cliente entra, en los DOS niveles")
-    _fijar_modo(ctx.dv, "cliente")
+    pc.fijar_modo_autorizacion(ctx.dv, "cliente")
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE_SOLOCLIENTE, asunto="Prueba U-02 modo cliente",
                                      cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     c.check("REMITENTE_RECONOCIDO (nivel Correo): la Solicitud entra (no 'No reconocida')",
@@ -404,7 +375,7 @@ def u02(ctx):
 
 def u03(ctx):
     c = pc.Caso("U-03", "Modo 'cliente': solo AutorizacionPlan (sin AutorizacionCliente) NO alcanza")
-    _fijar_modo(ctx.dv, "cliente")
+    pc.fijar_modo_autorizacion(ctx.dv, "cliente")
     sid, mid = ctx.solicitud(remitente=REMITENTE, asunto="Prueba U-03 solo AutorizacionPlan",
                               cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     rc = _clasificar_o_d59(ctx, c, sid, "U-03")
@@ -420,7 +391,7 @@ def u03(ctx):
 
 def u04(ctx):
     c = pc.Caso("U-04", "Valor basura en 'autorizacion.modo' degrada a 'plan', sin tumbar nada")
-    _fijar_modo(ctx.dv, "clienteX")
+    pc.fijar_modo_autorizacion(ctx.dv, "clienteX")
 
     sid1, mid1 = ctx.solicitud(remitente=REMITENTE_SOLOCLIENTE, asunto="Prueba U-04a basura (solo-cliente)",
                                 cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
@@ -443,7 +414,7 @@ def u04(ctx):
 
 def u05(ctx):
     c = pc.Caso("U-05", "Cambiar el modo no borra nada: AutorizacionPlan revive al volver a 'plan'")
-    _fijar_modo(ctx.dv, "plan")
+    pc.fijar_modo_autorizacion(ctx.dv, "plan")
     sid1, mid1, rc1, rv1 = ctx.procesar(remitente=REMITENTE, asunto="Prueba U-05 paso1 (modo plan)",
                                          cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     c.check("paso 1: entra en modo plan", rc1.get("procesar") is True, str(rc1))
@@ -452,7 +423,7 @@ def u05(ctx):
         c.check("paso 1: 3 filas Validada", len(filas1) == 3 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas1),
                 str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas1]))
 
-    _fijar_modo(ctx.dv, "cliente")
+    pc.fijar_modo_autorizacion(ctx.dv, "cliente")
     sid2, mid2 = ctx.solicitud(remitente=REMITENTE, asunto="Prueba U-05 paso2 (modo cliente, mismo correo)",
                                 cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     rc2 = _clasificar_o_d59(ctx, c, sid2, "U-05 paso2")
@@ -460,7 +431,7 @@ def u05(ctx):
         c.check("paso 2: el MISMO correo ahora NO entra (AutorizacionPlan queda muda en modo cliente)",
                 rc2.get("clasificacion") == "remitente_no_reconocido" and rc2.get("procesar") is False, str(rc2))
 
-    _fijar_modo(ctx.dv, "plan")
+    pc.fijar_modo_autorizacion(ctx.dv, "plan")
     sid3, mid3, rc3, rv3 = ctx.procesar(remitente=REMITENTE, asunto="Prueba U-05 paso4 (vuelta a modo plan)",
                                          cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     c.check("paso 4: vuelve a entrar exactamente como en el paso 1, sin haber tocado la AutorizacionPlan",
@@ -476,7 +447,7 @@ def u05(ctx):
 def u06(ctx):
     c = pc.Caso("U-06", "El mensaje al cliente es idéntico en los dos modos")
     # (a) modo plan: PRNA existe pero REMITENTE no tiene AutorizacionPlan sobre él (R-08, mismo Excel).
-    _fijar_modo(ctx.dv, "plan")
+    pc.fijar_modo_autorizacion(ctx.dv, "plan")
     sid_a, mid_a, rc_a, rv_a = ctx.procesar(remitente=REMITENTE, asunto="Prueba U-06a (modo plan, PRNA)",
                                              cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E08-sin-autorizacion.xlsx"))
     msg_a = None
@@ -490,7 +461,7 @@ def u06(ctx):
     # que tiene su propio plan activo), pero PRNA es del cliente COMPARTIDO -> también 'Sin
     # autorización', citando el MISMO plan PRNA. Evita 'No reconocida' (y con eso D-59): el correo
     # SÍ está autorizado en general, solo que no sobre el cliente dueño de PRNA.
-    _fijar_modo(ctx.dv, "cliente")
+    pc.fijar_modo_autorizacion(ctx.dv, "cliente")
     sid_b, mid_b, rc_b, rv_b = ctx.procesar(remitente=REMITENTE_OTRO_CLIENTE, asunto="Prueba U-06b (modo cliente, PRNA)",
                                              cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E08-sin-autorizacion.xlsx"))
     c.check("(b) el correo SÍ es reconocido (autorizado vía su propio cliente, ajeno al dueño de PRNA)",

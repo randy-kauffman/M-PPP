@@ -98,7 +98,7 @@ def preparar(ctx):
       necesita (para llegar a una transición LEGÍTIMA de Fila y ejercitar el
       step de claim), y si un día esos roles cambiaran, el resto de los 12
       casos de este set no tiene por qué dejar de correr. Se resuelven y
-      verifican DENTRO de I-13 (`_usuario_por_alias` + `pc.verificar_roles`),
+      verifican DENTRO de I-13 (`pc.usuario_por_alias` + `pc.verificar_roles`),
       no acá.
     - **El canon de configuración global** (§8.2). Lo aplica `correr.py` antes
       y después de CADA set, no cada set por separado.
@@ -129,26 +129,6 @@ def _regla(ctx, codigo):
     if est != 200 or not r.get("value"):
         raise RuntimeError(f"no se encontró la regla {codigo!r} (HTTP {est}): {r}")
     return r["value"][0]
-
-
-def _usuario_por_alias(dv, alias):
-    """El `systemuserid` de un usuario de prueba por su alias de dominio
-    (`User1`, `User2`, ...), igual que resuelve `comportamiento_roles.py`
-    (CONVENCIONES §6). Local a este módulo: I es el único set migrado que
-    necesita impersonar un rol de negocio real para llegar hasta el step de
-    claim (I-13, `03` §2) — ese step solo se ejercita con una transición de
-    Fila LEGÍTIMA (Ejecutivo/Supervisor), nunca con el service principal (que
-    tiene System Administrator pero ningún rol de negocio de MPPP: verificado
-    en vivo el 2026-09-27, `WhoAmI` + `systemuserroles_association` = solo
-    `['System Administrator']`)."""
-    est, r, _ = dv.call(
-        "GET",
-        "systemusers?$select=systemuserid,fullname"
-        f"&$filter=startswith(domainname,'{alias}@') and applicationid eq null")
-    filas = r.get("value", []) if est == 200 else []
-    if len(filas) != 1:
-        raise RuntimeError(f"{alias!r} no identifica un usuario único en el entorno: {filas}")
-    return filas[0]["systemuserid"]
 
 
 # ===========================================================================
@@ -346,8 +326,8 @@ def i07(ctx):
     # formulario? Se impersona con MSCRMCallerID (mismo patrón que I-13 y comportamiento_roles.py) y se verifica
     # el rol EN VIVO: sin eso, el resultado mentiría sobre lo que en realidad se probó.
     try:
-        ejecutivo_id = _usuario_por_alias(ctx.dv, "User1")
-        admin_planes_id = _usuario_por_alias(ctx.dv, "User3")
+        ejecutivo_id = pc.usuario_por_alias(ctx.dv, "User1")
+        admin_planes_id = pc.usuario_por_alias(ctx.dv, "User3")
     except RuntimeError as e:
         c.na(f"no se pudo resolver User1/User3 en el entorno: {e}")
         return c
@@ -560,8 +540,8 @@ def i12(ctx):
 def i13(ctx):
     c = pc.Caso("I-13", "El claim se libera en un estado terminal, y no antes (03 §2)")
     try:
-        ejecutivo_id = _usuario_por_alias(ctx.dv, "User1")
-        supervisor_id = _usuario_por_alias(ctx.dv, "User2")
+        ejecutivo_id = pc.usuario_por_alias(ctx.dv, "User1")
+        supervisor_id = pc.usuario_por_alias(ctx.dv, "User2")
     except RuntimeError as e:
         c.na(f"no se pudo resolver User1/User2 en el entorno: {e}")
         return c

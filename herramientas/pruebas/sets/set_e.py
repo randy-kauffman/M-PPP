@@ -209,22 +209,8 @@ def _limpiar_parametro_de_prueba(ctx):
     return []
 
 
-def _usuario_por_alias(ctx, alias):
-    """El `systemuserid` de un usuario de prueba por su alias de dominio,
-    igual que `comportamiento_roles.py` y `set_i.py._usuario_por_alias`
-    (CONVENCIONES §6). Local a este módulo por el mismo motivo que en `set_i.py`."""
-    est, r, _ = ctx.dv.call(
-        "GET",
-        "systemusers?$select=systemuserid,fullname"
-        f"&$filter=startswith(domainname,'{alias}@') and applicationid eq null")
-    filas = r.get("value", []) if est == 200 else []
-    if len(filas) != 1:
-        raise RuntimeError(f"{alias!r} no identifica un usuario único en el entorno: {filas}")
-    return filas[0]["systemuserid"]
-
-
 # El alias de DOMINIO (User3/User4) de cada papel de negocio (CONVENCIONES §6,
-# mismo mapeo que `comportamiento_roles.ALIAS`). `_usuario_por_alias` filtra
+# mismo mapeo que `comportamiento_roles.ALIAS`). `pc.usuario_por_alias` filtra
 # por dominio, no por el nombre del papel: pasarle "admin_planes" directo
 # buscaría un domainname que no existe y el caso daría FALLA por un motivo
 # que no es el que dice probar.
@@ -523,7 +509,7 @@ def e09(ctx):
     for papel, rol in (("admin_planes", "SR - MPPP - Administrador de planes"),
                        ("admin_tecnico", "SR - MPPP - Administrador tecnico")):
         try:
-            uid = _usuario_por_alias(ctx, _ALIAS_DOMINIO[papel])
+            uid = pc.usuario_por_alias(ctx.dv, _ALIAS_DOMINIO[papel])
         except RuntimeError as e:
             c.check(f"se pudo resolver {papel!r} en el entorno (precondición)", False, str(e))
             continue

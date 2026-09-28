@@ -48,8 +48,25 @@ def preparar(ctx):
       antiguo P-04.
     - **`plantilla.estructura`** con la forma que `ESTRUCTURA_PLANTILLA` da
       por sentada (hoja `Datos`, encabezado fila 12, datos desde la 13) —
-      antiguo P-06 (parcial: es el único de los 13 parámetros que estas 5
-      reglas de nivel Solicitud consultan).
+      antiguo P-06 (parcial).
+    - **`lectura.limites`, CONTENIDO** (no solo que exista): las dos claves
+      de tope de bytes (comprimido/descomprimido) que
+      `sanic_mppp_capi_validarsolicitud` lee como obligatorias ANTES de
+      evaluar ninguna regla de Solicitud (`ValidarSolicitud.cs`) — con una
+      falta o un valor no numérico, la lectura del primer Excel real de
+      CUALQUIER caso de este set revienta ahí. Recupera la cobertura que
+      perdió el antiguo P-06 al disolver el set P (decisión del aprobador
+      2026-09-28: la verificación viaja con el set que la necesita).
+    - **`plantilla.listas`, CONTENIDO — banco BAC = código `007`** (no solo
+      que exista): el código de 3 dígitos con el que se construye la
+      referencia de formato 11. `sanic_mppp_capi_validarsolicitud` lee este
+      parámetro como obligatorio en el mismo punto que `lectura.limites`, así
+      que un JSON malformado también revienta la validación de CUALQUIER
+      caso de este set antes de la primera regla. El contenido exacto
+      (BAC=007) lo vuelve a verificar, además, el set **R** (caso R-10, que
+      es quien realmente construye y compara la referencia) — acá alcanza
+      con que la forma sea válida y el banco esté. Recupera la cobertura que
+      perdió el antiguo P-06.
 
     **Lo que NO prepara, y por qué (para que no se lea como un olvido):**
 
@@ -75,6 +92,8 @@ def preparar(ctx):
     pc.verificar_excels()
     ctx.extra["estructura"] = pc.verificar_estructura_plantilla(ctx.dv)
     ctx.extra["encabezados"] = sim.cargar_encabezados(ctx.dv)
+    pc.verificar_lectura_limites(ctx.dv)
+    pc.verificar_bac_codigo_007(ctx.dv)
 
 
 def cerrar(ctx):

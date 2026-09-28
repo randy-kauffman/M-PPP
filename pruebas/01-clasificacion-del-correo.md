@@ -25,6 +25,8 @@ está documentada en `herramientas/pruebas/sets/set_c.py::preparar()` — acá s
 | Datos de negocio (`PR*`, fixture compartido) y `REMITENTE` autorizado sobre `PR11` | `preparacion_comun.verificar_datos_negocio()` (antiguo P-03) |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` (antiguo P-04); este archivo solo usa `E01-feliz-formato11.xlsx` |
 | `autorizacion.modo` activo (DN-01) | `preparacion_comun.verificar_parametro_activo()` — ya sembrado en Dev desde el 2026-09-26, no hace falta crearlo |
+| `correo.prefijos.reenvio`, CONTENIDO (no solo que exista): lista no vacía y trae `FW:` | `preparacion_comun.verificar_prefijos_reenvio()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
+| `servicio.cuenta`, CONTENIDO (no solo que exista): tiene forma de UPN/correo | `preparacion_comun.verificar_servicio_cuenta()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
 | Autorizado + `AutorizacionCliente` privados de DN-01 (`REMITENTE_DN01`, autorizado SOLO por cliente, cero `AutorizacionPlan`) | `sets/set_c.py::_preparar_autorizacion_por_cliente()` (función local, no está en `preparacion_comun.py` — ver "Funciones para consolidar" al final) |
 
 **Corré este set con**:
@@ -112,7 +114,10 @@ síntomas.
 `In-Reply-To`/`References` (un reenvío también las trae).
 
 **Necesita.** El `REMITENTE` de este set; el adjunto `E01-feliz-formato11.xlsx`; un
-`In-Reply-To` simulado (igual que C-02, a propósito: para aislar que lo que decide es el prefijo).
+`In-Reply-To` simulado (igual que C-02, a propósito: para aislar que lo que decide es el prefijo);
+que `correo.prefijos.reenvio` traiga, en su CONTENIDO (no solo que la fila exista), el prefijo
+`FW:` — verificado en `preparar()` (`preparacion_comun.verificar_prefijos_reenvio()`, 2026-09-28):
+sin ese prefijo en la lista, este caso da No es correo nuevo por una razón de datos, no del sistema.
 
 **Cómo.** Correo con asunto `FW: Prueba C-03 reenvio`, mismas cabeceras de "respuesta" que C-02,
 adjuntando `E01-feliz-formato11.xlsx`.

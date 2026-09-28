@@ -88,6 +88,17 @@ def preparar(ctx):
     - **`plantilla.estructura`** (encabezados que citan los mensajes de
       `LISTAS_VALIDAS`/`LARGOS_Y_FORMATO`) y **los encabezados** para armar
       esos mensajes exactos.
+    - **`plantilla.listas`, CONTENIDO — banco BAC = código `007`** (no solo
+      que exista): es el código de 3 dígitos con el que R-10 construye y
+      compara la referencia de formato 11 (`REFERENCIA_FORMATO_11`). Con el
+      código equivocado la referencia sale mal y ASÍ LLEGA A AS400
+      (`diseno/PENDIENTES.md` sección B) — un código inventado pero también
+      de 3 dígitos (p. ej. `102`, el caso real que destapó D-46) pasaría
+      cualquier chequeo de EXISTENCIA sin que nada se note; por eso acá se
+      lee el valor y se compara. Recupera la cobertura que perdió el antiguo
+      P-06 al disolver el set P (decisión del aprobador 2026-09-28: la
+      verificación viaja con el set que la necesita — y R es, literalmente,
+      el set que prueba la referencia).
     - **`plantilla.obligatoriedad` y `autorizacion.modo` activos** — solo se
       COMPRUEBA que exista una versión activa de cada uno (§8.2: su canon es
       "la versión activa más alta", no un valor fijo que este set deba
@@ -119,13 +130,14 @@ def preparar(ctx):
     pc.verificar_excels()
     ctx.extra["estructura"] = pc.verificar_estructura_plantilla(ctx.dv)
     ctx.extra["encabezados"] = sim.cargar_encabezados(ctx.dv)
+    pc.verificar_bac_codigo_007(ctx.dv)
     ctx.extra["obligatoriedad_activa"] = pc.verificar_parametro_activo(ctx.dv, "plantilla.obligatoriedad")
     pc.verificar_parametro_activo(ctx.dv, "autorizacion.modo")
 
     cliente_id = _id_cliente_compartido(ctx.dv)
     autorizado_id = _crear_autorizado(ctx.dv, REMITENTE_MODOCLIENTE)
     ctx.extra["autorizado_modocliente_id"] = autorizado_id
-    ctx.extra["autorizacioncliente_id"] = _crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_id)
+    ctx.extra["autorizacioncliente_id"] = pc.crear_autorizacion_cliente(ctx.dv, autorizado_id, cliente_id)
 
 
 def cerrar(ctx):
@@ -154,8 +166,12 @@ def cerrar(ctx):
 
 
 # ===========================================================================
-# DN-01 — helpers locales (no van a `preparacion_comun.py`: son propios de
-# este set, ninguno de los ya migrados los necesita).
+# DN-01 — helpers locales. `_crear_autorizacion_cliente` se consolidó en
+# `preparacion_comun.crear_autorizacion_cliente()` (2026-09-28: era idéntica
+# a la copia de `set_u.py`, byte a byte salvo el texto de un mensaje de
+# error). Los que quedan acá (`_crear_autorizado`, `_id_cliente_compartido`)
+# también tienen gemelas en `set_u.py`, pero esa consolidación no estaba en
+# el alcance aprobado de esta tarea — queda documentado, no tocado.
 # ===========================================================================
 def _id_cliente_compartido(dv):
     est, r, _ = dv.call("GET", f"{CLIENTES}?$select=sanic_mppp_tbl_clienteid"
@@ -176,31 +192,6 @@ def _crear_autorizado(dv, correo):
     est, r, cab = dv.call("POST", AUTORIZADOS, {"sanic_nombre": correo})
     if est not in (200, 201, 204):
         raise RuntimeError(f"no se pudo crear el Autorizado {correo!r} (HTTP {est}): {r}")
-    from dataverse_api import Dataverse
-    return Dataverse.id_creado(cab)
-
-
-def _crear_autorizacion_cliente(dv, autorizado_id, cliente_id):
-    """Create-if-missing (clave alternativa autorizado+cliente, `U-11`): si ya
-    existe una `AutorizacionCliente` para este par (p. ej. de una corrida
-    anterior que no llegó a `cerrar()`), la reusa en vez de duplicarla. No
-    manda `sanic_nombre`: lo calcula un step (`<correo> → <cliente>`) y pisa
-    cualquier valor que se le mande (`pruebas/10-autorizacion-cliente.md`, U-07)."""
-    est, r, _ = dv.call(
-        "GET",
-        f"{AUTORIZACIONCLIENTES}?$select=sanic_mppp_tbl_autorizacionclienteid"
-        f"&$filter=_sanic_autorizadoid_value eq {autorizado_id} and _sanic_clienteid_value eq {cliente_id}")
-    if est == 200 and r.get("value"):
-        return r["value"][0]["sanic_mppp_tbl_autorizacionclienteid"]
-
-    cuerpo = {
-        "sanic_autorizadoid@odata.bind": f"/{AUTORIZADOS}({autorizado_id})",
-        "sanic_clienteid@odata.bind": f"/{CLIENTES}({cliente_id})",
-    }
-    est, r, cab = dv.call("POST", AUTORIZACIONCLIENTES, cuerpo)
-    if est not in (200, 201, 204):
-        raise RuntimeError(f"no se pudo crear la AutorizacionCliente de {REMITENTE_MODOCLIENTE!r} "
-                           f"(HTTP {est}): {r}")
     from dataverse_api import Dataverse
     return Dataverse.id_creado(cab)
 

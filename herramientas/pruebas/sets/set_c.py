@@ -86,6 +86,23 @@ def preparar(ctx):
       versión 1, valor `plan`) — no se siembra acá porque no hace falta; si
       algún día faltara, este chequeo lo dice con un motivo claro en vez de
       dejar que C-09/C-10/C-11 fallen más adelante con un KeyError críptico.
+    - **`correo.prefijos.reenvio`, CONTENIDO** (no solo que exista): lista
+      JSON de prefijos con la que `ClasificarCorreo.cs` decide si un correo
+      es un reenvío — verifica, NOMBRADO (CONVENCIONES §7), que la lista no
+      esté vacía y traiga `FW:`, el prefijo del que depende **C-03**
+      (`ES_CORREO_NUEVO` = Cumplida "el prefijo del asunto manda"). Recupera
+      la cobertura que perdió el antiguo P-06 al disolver el set P (decisión
+      del aprobador 2026-09-28: la verificación viaja con el set que la
+      necesita).
+    - **`servicio.cuenta`, CONTENIDO** (no solo que exista): el UPN con el
+      que la lista blanca de escrituras (`ListaBlancaStep`,
+      `StepsDePlataforma.EsCodigoDeServidor`) reconoce a los cinco flujos
+      como "código de servidor" — verifica que tenga forma de UPN/correo, no
+      solo que la fila esté sembrada. Ningún caso de ESTE archivo ejercita
+      ese camino directamente (lo toca el guardado real de Fila/Solicitud, no
+      la clasificación del correo); se verifica acá porque no tiene un set
+      dedicado propio y, como `retencion.dias.*` en el set V, este es el
+      lugar existente más cercano — recupera la cobertura del antiguo P-06.
     - **El Autorizado y la `AutorizacionCliente` de DN-01** (`REMITENTE_DN01`,
       create-if-missing): un correo con **una única vía de autorización**
       —`AutorizacionCliente` hacia el Cliente compartido `PR - Pruebas MPPP
@@ -124,6 +141,8 @@ def preparar(ctx):
     pc.verificar_datos_negocio(ctx.dv, REMITENTE)
     pc.verificar_excels()
     pc.verificar_parametro_activo(ctx.dv, "autorizacion.modo")
+    pc.verificar_prefijos_reenvio(ctx.dv)
+    pc.verificar_servicio_cuenta(ctx.dv)
     ida, idac = _preparar_autorizacion_por_cliente(ctx.dv)
     ctx.extra["dn01_ids"] = (ida, idac)
 
@@ -181,20 +200,6 @@ def _preparar_autorizacion_por_cliente(dv):
         })
 
     return ida, idac
-
-
-def _fijar_modo_autorizacion(dv, valor):
-    """PATCH directo del valor ACTIVO de `autorizacion.modo`: mismo patrón
-    simple que usa `preparacion_comun.aplicar_canon` para llevarlo al canon,
-    acá para escribir el valor de PRUEBA que cada caso de DN-01 necesita
-    (§8.2 solo versiona un cambio de NEGOCIO; un valor efímero de prueba no
-    lo es). Lanza si no hay versión activa — no debería pasar nunca: ya lo
-    comprobó `preparar()`."""
-    fila = pc.verificar_parametro_activo(dv, "autorizacion.modo")
-    pid = fila["sanic_mppp_tbl_parametroid"]
-    est, r, _ = dv.call("PATCH", f"sanic_mppp_tbl_parametros({pid})", {"sanic_valor": valor})
-    if est not in (200, 204):
-        raise RuntimeError(f"no se pudo escribir autorizacion.modo={valor!r} (HTTP {est}): {r}")
 
 
 # ===========================================================================
@@ -381,7 +386,7 @@ def c08(ctx):
 
 def c09(ctx):
     c = pc.Caso("C-09", "DN-01 modo cliente: autorizado SOLO por AutorizacionCliente SÍ entra")
-    _fijar_modo_autorizacion(ctx.dv, "cliente")
+    pc.fijar_modo_autorizacion(ctx.dv, "cliente")
     sid, mid, rc, rv = ctx.procesar(
         remitente=REMITENTE_DN01, asunto="Prueba C-09 DN-01 modo cliente",
         cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
@@ -401,7 +406,7 @@ def c09(ctx):
 
 def c10(ctx):
     c = pc.Caso("C-10", "DN-01 modo plan: el MISMO correo (autorizado solo por cliente) YA NO entra")
-    _fijar_modo_autorizacion(ctx.dv, "plan")
+    pc.fijar_modo_autorizacion(ctx.dv, "plan")
     sid, mid = ctx.solicitud(
         remitente=REMITENTE_DN01, asunto="Prueba C-10 DN-01 modo plan",
         cantidad_adjuntos=1, cantidad_excel=1, excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
@@ -418,7 +423,7 @@ def c10(ctx):
 
 def c11(ctx):
     c = pc.Caso("C-11", "DN-01 valor basura en autorizacion.modo: degrada a plan, no tumba nada")
-    _fijar_modo_autorizacion(ctx.dv, "clienteX")
+    pc.fijar_modo_autorizacion(ctx.dv, "clienteX")
 
     # (a) el correo autorizado SOLO por cliente: la basura NO se interpreta como 'cliente'.
     sid1, mid1 = ctx.solicitud(

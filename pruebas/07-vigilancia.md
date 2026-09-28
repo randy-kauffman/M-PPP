@@ -210,7 +210,9 @@ FALLA a propósito a verificar que el blindaje sigue puesto), y que el trigger t
 Control en 1 (parte (b) de D-62).
 
 **Necesita.** Nada de negocio: solo lectura de la definición del flujo (`workflows.clientdata`, Web
-API) y de `recursos/flujos/mppp-vig.json` (solo lectura, nunca se edita desde este set).
+API) y de `recursos/flujos/mppp-vig.json` (solo lectura, nunca se edita desde este set); los 4
+umbrales y, desde el 2026-09-28, `retencion.dias.general`/`retencion.dias.noreconocidas` con una
+versión activa y CONTENIDO válido (entero positivo) — verificado en `preparar()`.
 
 **Cómo.** `GET workflows?$select=name,statecode,clientdata&$filter=name eq 'Cloud Flow - MPPP - VIG
 - Vigilar pendientes'`, se parsea `clientdata` (JSON) y se compara contra el JSON del repo y contra
@@ -235,6 +237,7 @@ lo documentado acá.
 | `triggers.Cada_10_minutos.runtimeConfiguration.concurrency.runs` | `1` (D-62, parte b) |
 | Lo desplegado == el repo | mismo `runAfter` y `type` en cada acción de nivel superior |
 | Los 4 parámetros (`vigilancia.minutos.sinvalidar`, `vigilancia.minutos.sinresponder`, `vigilancia.reintentos.maximo`, `clasificacion.dias.vencimiento`) | cada uno con una versión activa |
+| `retencion.dias.general` y `retencion.dias.noreconocidas`, CONTENIDO (no solo que existan, 2026-09-28) | cada uno con una versión activa y un valor entero positivo (`preparacion_comun.verificar_parametro_entero_positivo()`) — recupera la cobertura del antiguo P-06; ningún bloque de `MPPP-VIG` los consume hoy (los usa el futuro job de purga de fase 3), pero es el hogar más cercano que existe entre los parámetros numéricos de fase 1 |
 
 **D-62, corregido el 2026-09-28 (histórico: así estaba antes).** Hasta esa fecha, los cinco checks de
 la "etapa de arranque" de la tabla de arriba (`Parametro_sin_responder`...`Correos_que_quedaron_en_la_bandeja`)

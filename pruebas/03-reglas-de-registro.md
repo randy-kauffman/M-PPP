@@ -41,6 +41,7 @@ completo, y por qué, está en `herramientas/pruebas/sets/set_r.py::preparar()` 
 | Datos de negocio (`PR*`, fixture compartido, remitente autorizado por plan) | `preparacion_comun.verificar_datos_negocio()` |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
 | `plantilla.estructura` con la forma esperada | `preparacion_comun.verificar_estructura_plantilla()` |
+| `plantilla.listas`, CONTENIDO — banco BAC = código `007` (no solo que exista) | `preparacion_comun.verificar_bac_codigo_007()` — recupera la cobertura del antiguo P-06 (2026-09-28): es el código con el que R-10 construye y compara la referencia de formato 11 |
 | `plantilla.obligatoriedad` y `autorizacion.modo` activos (sin forzar valor: el canon de ambos es "la versión activa", DN-01/DN-03) | `preparacion_comun.verificar_parametro_activo()` |
 | Un Autorizado + una `AutorizacionCliente` (borrados por GUID en `cerrar()`, no por `marca_agua`: su nombre lo calcula un step y lo pisa — ver R-16), para R-16/R-17 (DN-01) | Web API directa (`preparar_datos.py` no la crea) |
 
@@ -278,7 +279,13 @@ no hace falta tocarlo a mano).
 
 **Qué prueba.** `REFERENCIA_FORMATO_11` con D-17 y DD-10, y que la recibida se guarde aparte.
 
-**Necesita.** La Solicitud de C-01 ya creada.
+**Necesita.** El `REMITENTE` de este set (autorizado sobre `PR11`); el adjunto
+`E01-feliz-formato11.xlsx` (este caso arma su propia Solicitud con `ctx.procesar()`, no depende de
+otro set ni de otro caso — `CONVENCIONES.md` §8); que `plantilla.listas` traiga, en su CONTENIDO
+(no solo que la fila exista), el banco `BAC` con código `007` — verificado en `preparar()`
+(`preparacion_comun.verificar_bac_codigo_007()`, 2026-09-28): con un código distinto de `007` (aunque
+también tenga 3 dígitos, como el `102` que documenta `diseno/PENDIENTES.md` sección B) la referencia
+esperada abajo no coincidiría, y este caso daría FALLA por una razón de datos, no del sistema.
 
 **Cómo.** Usá la Solicitud de **C-01** (`E01-feliz-formato11.xlsx`).
 

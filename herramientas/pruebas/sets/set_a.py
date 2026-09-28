@@ -128,25 +128,13 @@ def cerrar(ctx):
 # ===========================================================================
 # Helpers locales (no viven en preparacion_comun.py porque solo los necesita este set)
 # ===========================================================================
-def _usuario_por_alias(dv, alias):
-    """El `systemuserid` de un usuario de prueba por su alias de dominio, igual que
-    `set_i.py`/`set_b.py`/`comportamiento_roles.py` (CONVENCIONES §6)."""
-    est, r, _ = dv.call(
-        "GET", "systemusers?$select=systemuserid,fullname"
-               f"&$filter=startswith(domainname,'{alias}@') and applicationid eq null")
-    filas = r.get("value", []) if est == 200 else []
-    if len(filas) != 1:
-        raise RuntimeError(f"{alias!r} no identifica un usuario único en el entorno: {filas}")
-    return filas[0]["systemuserid"]
-
-
 def _preparar_personas(ctx):
     """Resuelve User1/User2 y verifica su rol, sin lanzar (igual criterio que `set_b.py`): la
     resolución del id es una precondición dura (si falla, lanza y el set entero no se prepara); el
     ROL correcto queda en `ctx.extra['personas_ok']`, y solo lo consultan los casos que
     impersonan (todos salvo los puramente GUI)."""
-    ejecutivo_id = _usuario_por_alias(ctx.dv, "User1")
-    supervisor_id = _usuario_por_alias(ctx.dv, "User2")
+    ejecutivo_id = pc.usuario_por_alias(ctx.dv, "User1")
+    supervisor_id = pc.usuario_por_alias(ctx.dv, "User2")
     ctx.extra["ejecutivo_id"] = ejecutivo_id
     ctx.extra["supervisor_id"] = supervisor_id
     ok_ej, roles_ej = pc.verificar_roles(ctx.dv, ejecutivo_id, ["SR - MPPP - Ejecutivo"])

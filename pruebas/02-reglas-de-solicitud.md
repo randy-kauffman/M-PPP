@@ -26,6 +26,8 @@ acá solo el resumen:
 | Datos de negocio (`PR*`, fixture compartido) | `preparacion_comun.verificar_datos_negocio()` (antiguo P-03) |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` (antiguo P-04) |
 | `plantilla.estructura` con la forma esperada | `preparacion_comun.verificar_estructura_plantilla()` (antiguo P-06, parcial) |
+| `lectura.limites`, CONTENIDO (no solo que exista): las dos claves de tope de bytes | `preparacion_comun.verificar_lectura_limites()` — recupera la cobertura del antiguo P-06 (2026-09-28) |
+| `plantilla.listas`, CONTENIDO — banco BAC = código `007` (no solo que exista) | `preparacion_comun.verificar_bac_codigo_007()` — recupera la cobertura del antiguo P-06 (2026-09-28); el mismo chequeo corre también en el set **R**, que es quien de verdad construye y compara la referencia (caso R-10) |
 
 **Corré este set con**:
 
