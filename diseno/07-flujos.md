@@ -1,8 +1,10 @@
 # 07. Diseño de los flujos de Power Automate
 
-Proyecto: 2026-001-referencias-planes-pago · Etapa 3 · Estado: **revisado con el aprobador el 2026-09-20**. Nada de esto está construido.
+Proyecto: 2026-001-referencias-planes-pago · Etapa 3 · Estado: **revisado con el aprobador el 2026-09-20; los cinco flujos están construidos, ACTIVOS y probados contra el entorno** (verificado hoy, 2026-09-28, por Web API: `statecode=1`/`statuscode=2` en los cinco — `MPPP-REC`, `MPPP-ING`, `MPPP-COM`, `MPPP-ENV`, `MPPP-VIG`).
 
-Reglas citadas: BP-PP-058, 059, 061, 122, 123, 196. Requisitos: RF-01, RF-03, RF-04, RF-09, RF-10, RNF-02, RNF-05. Decisiones de la definición: D-01, D-02, D-21, D-24, D-31. Decisiones de la etapa 3: `02` DD-03, DD-08, DD-09.
+> **Corregido el 2026-09-28.** Esta línea decía "Nada de esto está construido" — cierta cuando se escribió (2026-09-21), falsa desde que se construyeron los cinco flujos la semana del 2026-09-22. Además, dos cambios de diseño se sumaron DESPUÉS de esa construcción, los dos detectados y cerrados el mismo día 2026-09-28: **(a)** la etapa de arranque de `MPPP-VIG` ahora encadena con `["Succeeded","Failed"]` en vez de solo `["Succeeded"]`, y su trigger declara control de concurrencia (`PENDIENTES.md` D-62); **(b)** `MPPP-ING` guarda `sanic_outlookmessageid` con un `coalesce` de respaldo para que la re-ingesta no rompa cuando el id de Outlook cambia (`PENDIENTES.md` D-66). Detalle de cada uno en las secciones 3 y 6. **Este documento no mencionaba `runAfter`, `concurrency`, `MoveV2` ni `Immutable` antes de esta corrección** — verificado con `rg` sobre la versión previa.
+
+Reglas citadas: BP-PP-058, 059, 061, 122, 123, 196. Requisitos: RF-01, RF-03, RF-04, RF-09, RF-10, RNF-02, RNF-05. Decisiones de la definición: D-01, D-02, D-21, D-24, D-31. Decisiones de la etapa 3: `02` DD-03, DD-08, DD-09. Decisiones post-construcción: `PENDIENTES.md` D-62, D-66.
 
 ## 0. Decisiones de este documento
 
@@ -19,6 +21,8 @@ Reglas citadas: BP-PP-058, 059, 061, 122, 123, 196. Requisitos: RF-01, RF-03, RF
 | DF-09 | **Lo que no se procesa va a la bandeja "Por clasificar" y vence.** Estados No reconocida y **No es correo nuevo**; si nadie lo atiende ni lo descarta en `clasificacion.dias.vencimiento` días (inicial 30), pasa a **Vencida**, terminal. | Decisión del aprobador; aplica a los dos estados. Vencida y no Descartada, para distinguir "alguien decidió ignorarlo" de "nadie lo miró". |
 | DF-10 | **Sin cortacircuito por remitente, por ahora.** | Decisión del aprobador. Riesgo aceptado: un sistema ajeno que conteste cada mensaje nuestro con un correo **nuevo** (no una respuesta) desde la dirección de un autorizado no queda cubierto por DF-08. |
 | DF-11 | **Cada flujo tiene un identificador corto**, `MPPP-` + tres letras, que va en su nombre y es el valor que se anota como origen en la Bitácora. | El aprobador rechazó las letras A, B, C, W de la definición: no dicen nada. El identificador se reconoce aun sin saber de qué solución es el flujo (BP-PP-196). |
+| D-62 | **`MPPP-VIG`: la etapa de arranque encadena con `["Succeeded","Failed"]`** en sus cinco eslabones (`Parametro_sin_validar → Parametro_sin_responder → Parametro_reintentos → Parametro_vencimiento → Umbrales → Correos_que_quedaron_en_la_bandeja`), antes solo `["Succeeded"]`; y el trigger declara `runtimeConfiguration.concurrency.runs = 1`. Agregado el 2026-09-28. | Con solo `Succeeded`, una falla en CUALQUIER paso de arranque dejaba `Skipped` a los CINCO bloques de recuperación esa corrida — el mecanismo que existe para recuperarse de fallas se apagaba entero cuando había una falla. Se evaluó cortar en algún eslabón y se decidió que no: `Umbrales` ya trae `coalesce(...)` con valor de respaldo por cada parámetro, así que un `Parametro_*` que falla no deja el flujo con un umbral vacío. La concurrencia se agregó por evidencia de corridas superpuestas. **CERRADA** (`PENDIENTES.md` D-62, commit `d1cac41`). Ver nota de verificación en la sección 6: el trigger declarado NO coincide hoy con lo desplegado. |
+| D-66 | **`MPPP-ING`, paso 7b (`Guardar_el_identificador_nuevo`): `sanic_outlookmessageid` = `coalesce(id que devolvió `Mover_el_correo`, id con que se llamó a este flujo)`.** Agregado el 2026-09-28, arreglado por el aprobador. | Los IDs de mensaje de Outlook dejaban de ser válidos entre que se leían y se re-leían (`MoveV2` puede cambiar el id si el tenant no tiene "Immutable Id"), y eso rompía la re-ingesta que dispara `MPPP-VIG`: 898 eventos de error en dos horas, 0% de éxito. Con el `coalesce`, la columna nunca queda sin escribir aunque el paso de mover no devuelva id. **CERRADA** (`PENDIENTES.md` D-66). Verificado: los errores pararon a las 10:52:32Z; en los diez minutos siguientes, 12 eventos de origen `MPPP-VIG` y cero errores. |
 
 ## 1. Mapa
 
@@ -35,7 +39,7 @@ Todos son propiedad de la **cuenta de servicio** (D-01, estándar regional de BA
 ## 2. `MPPP-REC` — Recibir correo nuevo
 
 - **Disparador**: *When a new email arrives in a shared mailbox (V2)*. Buzón = `sanic_mppp_ev_buzoningesta`; carpeta = Bandeja de entrada; **Include Attachments = No** (los trae `MPPP-ING`; el disparador queda liviano y no falla por tamaño).
-- **Concurrencia del disparador**: activada, grado 5. Dos correos distintos no se pisan: cada uno tiene su clave.
+- **Concurrencia del disparador**: declarada grado 5 en `recursos/flujos/mppp-rec.json` (`runtimeConfiguration.concurrency.runs = 5`). Dos correos distintos no se pisan: cada uno tiene su clave. **Verificado hoy (2026-09-28) que el trigger DESPLEGADO no la tiene** (ver el recuadro de la sección 6, `MPPP-VIG`, que cubre los tres flujos): el repo la declara, el entorno no. Sin verificar la causa.
 - **Acción única**: *Run a Child Flow* → `MPPP-ING`, con el identificador de Outlook del mensaje y `origen = MPPP-REC`.
 - Sin condiciones ni lógica: todo lo que este flujo sabe hacer lo tiene que saber hacer la vigilancia.
 
@@ -53,7 +57,7 @@ Entrada: identificador de Outlook del mensaje y origen. Salida: identificador de
 | 5 | *Export email (V2)* → *Upload a file or an image* | El `.eml` a `sanic_correocrudo` (RF-10). Es lo que lee el plugin liviano. |
 | 6 | *Upload a file or an image* | El Excel a `sanic_exceloriginal`, si hay exactamente uno (D-31). |
 | 7 | *Move email (V2)* | A `sanic_mppp_ev_carpetaprocesados`. **El correo cambia de identificador al moverse**: el nuevo es el que devuelve esta acción. |
-| 7b | *Update a row* → Solicitud | **Acción propia, inmediatamente después de mover**: `sanic_outlookmessageid` = el identificador que devolvió el paso 7 (DF-04). Si falla, el flujo sigue: `MPPP-ENV` encuentra el mensaje por su Internet Message-ID en la carpeta de procesados y completa la columna en ese momento. |
+| 7b | *Update a row* → Solicitud | **Acción propia, inmediatamente después de mover, encadenada con `["Succeeded","Failed"]`**: `sanic_outlookmessageid` = `coalesce(id que devolvió el paso 7, id con que se llamó a este flujo)` (DF-04; `coalesce` agregado 2026-09-28, D-66). Corre aunque el paso 7 falle, y nunca deja la columna vacía: si `Mover_el_correo` no devuelve id, guarda el id de entrada en su lugar. Si aun así falla, el flujo sigue: `MPPP-ENV` encuentra el mensaje por su Internet Message-ID en la carpeta de procesados y completa la columna en ese momento. |
 | 8 | *Perform an unbound action* → `sanic_mppp_capi_clasificarcorreo` | Parámetro `solicitudid`. Devuelve `procesar` (sí/no) y `clasificacion`. Si `procesar` = no, la API ya dejó la Solicitud en No es correo nuevo o en No reconocida, con su aviso a los ejecutivos: **el flujo termina acá, sin validar y sin responderle a nadie**. |
 | 9 | *Perform an unbound action* → `sanic_mppp_capi_validarsolicitud` | Solo si `procesar` = sí. Parámetro `solicitudid`. Política de reintento de la acción: **ninguna**; el reintento lo gobierna la vigilancia, con su contador. |
 | 10 | Bitácora | Evento "Ingresada", con el origen recibido, actor "Cuenta de servicio". |
@@ -65,7 +69,7 @@ Entrada: identificador de Outlook del mensaje y origen. Salida: identificador de
 ## 4. `MPPP-COM` — Detectar comunicación pendiente
 
 - **Disparador**: *When a row is added, modified or deleted*, tabla Solicitud, cambio = Modified, **Select columns** = `sanic_estadoprocesamiento`, **Filter rows** = estado En proceso, Rechazada o Procesada. No corre en cada actualización de la Solicitud (D-24) ni se dispara con las escrituras de `MPPP-ENV`, que no tocan el estado salvo para cerrar, y Cerrada queda fuera del filtro.
-- **Concurrencia del disparador**: grado 1 (DF-06).
+- **Concurrencia del disparador**: declarada grado 1 en `recursos/flujos/mppp-com.json` (DF-06). **Verificado hoy (2026-09-28) que el trigger DESPLEGADO no la tiene** (mismo hallazgo que en `MPPP-REC` y `MPPP-VIG`, ver el recuadro de la sección 6). Sin verificar la causa.
 - **Acción única**: *Run a Child Flow* → `MPPP-ENV`, con el identificador de la Solicitud y `origen = MPPP-COM`.
 
 ## 5. `MPPP-ENV` — Enviar comunicación al cliente
@@ -96,6 +100,10 @@ El cuerpo lo arma el código, nunca el flujo (DD-08). Si el paso 3 falla, la com
 
 Disparador: recurrencia, cada 10 minutos. La mayoría de las ejecuciones termina en segundos sin nada que hacer. Es un sondeo, pero contra nuestro propio estado y contra un buzón que no avisa de "correo que quedó sin procesar": no aplica BP-PP-059.
 
+**Encadenamiento (D-62, 2026-09-28).** La etapa de arranque (los cuatro `Parametro_*` + `Umbrales` + el bloque 1, `Correos_que_quedaron_en_la_bandeja`) y los cuatro eslabones ENTRE los cinco bloques de recuperación usan `runAfter: ["Succeeded","Failed"]`: una falla en un paso no corta la cadena, cada bloque corre igual. Antes del 2026-09-28, la etapa de arranque encadenaba solo con `["Succeeded"]`, y una falla ahí saltaba los cinco bloques de recuperación esa corrida entera. Verificado hoy contra el repo Y contra el `clientdata` desplegado (ver recuadro abajo): los nueve eslabones (5 de arranque + 4 entre bloques) tienen `["Succeeded","Failed"]` en el entorno, igual que en `recursos/flujos/mppp-vig.json`.
+
+> **Hallazgo sin resolver, verificado hoy 2026-09-28 por Web API directa contra `workflows?$select=clientdata`** (no contra el repo, y no contra lo que dice `PENDIENTES.md`). El trigger `Cada_10_minutos` desplegado **NO tiene** `runtimeConfiguration.concurrency`, aunque `recursos/flujos/mppp-vig.json` sí lo declara (`runs: 1`) y aunque `PENDIENTES.md` D-62 y `pruebas/07-vigilancia.md` (sección "D-62 corregido") registran haberlo verificado desplegado ese mismo día. **No es un caso aislado de `MPPP-VIG`**: el mismo chequeo contra el trigger de `MPPP-REC` (el repo declara `runs: 5`) y el de `MPPP-COM` (el repo declara `runs: 1`) muestra que tampoco tienen la propiedad en el entorno ahora mismo, y esos dos nunca tuvieron un D- dedicado a verificar el punto. Lo que SÍ sigue desplegado correctamente son los nueve `runAfter` con `Failed` (ver párrafo de arriba) — eso no cambió. **No se pudo confirmar la causa**: coincide en el tiempo con el arreglo manual de D-67 (el aprobador corrigiendo a mano el trigger de `MPPP-VIG` en el portal, el mismo 2026-09-28, por el disparador que parecía no dispararse), pero eso no explica que `MPPP-REC` y `MPPP-COM` también carezcan de la propiedad. Se marca **sin verificar la causa** y se reporta; esta auditoría es de documentación y no corrige flujos ni datos del entorno — corresponde abrir un ID nuevo en `PENDIENTES.md` para decidir si se re-aplica.
+
 | # | Qué busca | Cómo | Qué hace |
 |---|---|---|---|
 | 1 | Correos que quedaron en la bandeja de entrada | *Get emails (V3)*, Bandeja de entrada, recibidos hace más de `vigilancia.minutos.sinvalidar`, tope 25 | `MPPP-ING` por cada uno, con `origen = MPPP-VIG` |
@@ -119,5 +127,8 @@ Los umbrales salen de la tabla de Parámetros, leídos al empezar cada ejecució
 
 ## 8. Pendiente
 
-- **Probar con correos reales**, al construir: un correo nuevo, una respuesta y un reenvío, desde Outlook y desde Gmail, contra el buzón de Dev, para confirmar que el criterio de `03` §0 los separa bien. Que reenvíos y respuestas llevan las mismas cabeceras es conocimiento general, no está verificado.
-- **Idioma base del Dev de BAC**: a conversar con el aprobador (`PENDIENTES.md`).
+> **Corregido el 2026-09-28.** Esta sección se escribió antes de construir (2026-09-21); desde entonces se construyó y se probó todo. Los dos puntos originales se resolvieron parcial o totalmente, y se agrega lo que esta auditoría encontró sin resolver.
+
+- ~~Probar con correos reales, al construir: un correo nuevo, una respuesta y un reenvío, desde Outlook y desde Gmail, contra el buzón de Dev, para confirmar que el criterio de `03` §0 los separa bien.~~ **Con Outlook, resuelto con evidencia real**: `pruebas/01-clasificacion-del-correo.md`, casos C-01 a C-07 — incluye correo real contra el buzón de Dev por Graph (C-05, el correo se mueve y cambia de identificador; C-06) y un reenvío real distinguido de una respuesta por el prefijo del asunto, no por las cabeceras (C-03). **Con Gmail como remitente, sigue sin probarse**: no se encontró evidencia en `pruebas/` ni en `PENDIENTES.md` de un envío real desde una cuenta Gmail contra el buzón de ingesta. Marcado **sin verificar**.
+- ~~Idioma base del Dev de BAC: a conversar con el aprobador.~~ **Resuelto**: `PENDIENTES.md` D-3 — el aprobador ya activó español a mano en el Dev (entorno de base inglés); no hace falta un paso nuevo acá.
+- **Nuevo, sin resolver (encontrado en esta auditoría, 2026-09-28)**: el control de concurrencia del trigger de `MPPP-REC`, `MPPP-COM` y `MPPP-VIG` está declarado en el repo pero **no está presente en el entorno desplegado**, verificado por Web API directa. Ver el recuadro de la sección 6. Corresponde abrir un ID nuevo en `PENDIENTES.md`.
