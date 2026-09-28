@@ -382,6 +382,23 @@ propietario).
 propietario no está andando), o no aparecen en "Todos" (una regresión distinta, más grave: nadie
 vería nada para digitar).
 
+> ### Corrección — el caso comparaba por una columna que ninguna de las dos vistas trae
+>
+> Las dos primeras corridas de esta migración dieron FALLA acá: "las filas de la tanda semilla no
+> aparecen en 'Todos — por digitar'". Antes de escribirlo como un defecto del sistema, se reprodujo
+> a mano, pidiendo la fila devuelta por la vista **completa**, con todas sus claves — y las tres
+> filas SÍ estaban. La vista funciona bien. El caso comparaba por `sanic_nombre` (el número calculado
+> `<solicitud>-F<NN>`), y **ninguna de las dos vistas de Fila selecciona esa columna**: no es una de
+> las columnas de trabajo del diseño (`05-app-model-driven.md` §3 — la columna "Nombre" de esa tabla
+> es `sanic_nombrebeneficiario`, el beneficiario, no el número calculado de la Fila). El único
+> `sanic_nombre` que sí viaja en la respuesta es el del **Cliente**, bajo la clave anidada
+> `cliente.sanic_nombre` (viene del `<link-entity>` que arma la vista para mostrar el nombre del
+> cliente en pantalla) — por eso la comparación por `sanic_nombre` daba vacía siempre, sin que la
+> vista hubiera hecho nada mal. Corregido: se compara por `sanic_mppp_tbl_filaid` (el GUID), que las
+> dos vistas SÍ traen siempre, sea cual sea el diseño de columnas de negocio del día. Es la misma
+> lección de G-08: antes de escribir "esto es un defecto", hay que confirmar contra qué se está
+> comparando de verdad.
+
 **Automatizable.** API (`set_g.py:g04`, impersonación con `MSCRMCallerID`, sin navegador).
 
 ---
@@ -512,32 +529,48 @@ cliente (AutorizacionCliente)** · Parametro · Regla · **Motivo de accion** (e
   (`<TargetEntityType>` de las tres).
 - **Autorización (AutorizacionPlan)**: el campo de **archivo** `sanic_documentofirmado` está en el
   formulario, habilitado.
+- **Autorización por cliente (AutorizacionCliente)**: **desde el 2026-09-27 SÍ trae la misma
+  evidencia que AutorizacionPlan** — `sanic_documentofirmado` (archivo, 10 MB) y
+  `sanic_fechadocumento` (fecha), en una sección "Evidencia de la autorizacion", habilitados. Ver la
+  corrección de más abajo: esto no siempre fue así, y este mismo archivo llegó a acusarlo de defecto.
 - **Motivo de acción**: trae el campo `sanic_motivo`.
 
-> ### Hallazgo — AutorizacionCliente SÍ trae la sección de evidencia (defecto confirmado, no N-A)
+> ### Corrección — este caso estaba al revés: verificaba contra un documento viejo, no contra el sistema
 >
-> `05-app-model-driven.md` §4 dice textual: *"Sin sección de evidencia: esta tabla no tiene
-> `sanic_documentofirmado` ni `sanic_fechadocumento`, a diferencia de Autorización"* — y este mismo
-> archivo, antes de esta corrección, repetía la misma afirmación. **Verificado en vivo el
-> 2026-09-27, en dos niveles**:
+> Esta migración (2026-09-27, la misma jornada en que se agregó la evidencia) escribió primero este
+> caso citando `05-app-model-driven.md` §4, que decía textual: *"Sin sección de evidencia: esta tabla
+> no tiene `sanic_documentofirmado` ni `sanic_fechadocumento`, a diferencia de Autorización"*. Contra
+> esa cita, el caso afirmaba que `AutorizacionCliente` **NO** debía traer esos campos — y al verlos
+> presentes y habilitados en vivo, los reportó como un **defecto confirmado**.
 >
-> 1. La TABLA `sanic_mppp_tbl_autorizacioncliente` **sí tiene** las columnas
->    `sanic_documentofirmado` y `sanic_fechadocumento` (`EntityDefinitions(...)/Attributes`).
-> 2. El FORMULARIO "Autorizacion por cliente" **sí las muestra**, en una sección etiquetada
->    "Evidencia de la autorizacion" con los campos "Documento firmado" y "Fecha del documento",
->    `disabled="false"` — visibles y editables, tal cual en AutorizacionPlan.
+> **Era al revés.** El sistema estaba bien; el documento estaba viejo. El aprobador decidió, esa
+> MISMA jornada (2026-09-27), agregar la evidencia a la autorización por cliente, con esta orden
+> textual: *"Cuando entro a autorización x cliente, no está la columna de archivo adjunto para
+> adjuntar la autorización por escrito y la fecha de ese documento (al igual que en autorización por
+> plan)."* El motivo de negocio: una autorización por cliente habilita TODOS los planes de ese
+> cliente a la vez — es MÁS amplia que la de plan — y no tiene sentido que exija MENOS respaldo que
+> ella. La tabla, el formulario, `diseno/02-diccionario-datos.md` §2.4b, `diseno/06-inventario-
+> componentes.md` (3.13) y `diseno/DIRECTRICES-NUEVAS.md` se actualizaron ese mismo día.
+> `diseno/05-app-model-driven.md` §4 quedó afuera de esa ronda de corrección — y esa celda vieja
+> también describía una sección técnica "Datos" con `ownerid` que ya no existe (se quitó cuando
+> apareció la sección de evidencia, con campos de negocio reales). El aprobador ya corrigió esa celda
+> (con su propia nota fechada); este archivo no toca `diseno/`.
 >
-> Esto **contradice el diseño** (DN-01, aprobador: la vía por cliente autoriza TODOS los planes de
-> un cliente a la vez y a propósito no lleva evidencia propia, porque no hay "un documento" por
-> autorización sino por relación cliente-correo). Por CONVENCIONES §3 ("un defecto conocido no es
-> N-A"), este caso queda escrito **contra el diseño**, así que hoy da **FALLA a propósito** — no se
-> apaga ni se "arregla" acá. Falta que el aprobador decida y, si corresponde, se registre en
-> `diseno/PENDIENTES.md` con su propio ID (fuera del alcance de este archivo: PENDIENTES.md no es de
-> este set).
+> **Por qué importa dejarlo escrito, no solo corregido.** Es la misma familia de error que ya costó
+> caro hoy con los conteos (CONVENCIONES §7: "12 parámetros" que nunca fueron 12; "8 steps" que
+> incluían uno que nunca existió). Un dato — sea un número o una afirmación de "esta tabla no tiene
+> tal columna" — que no se vuelve a mirar contra la plataforma envejece, y nadie lo nota hasta que
+> alguien lo usa como vara para medir algo que sí cambió. La lección para este archivo: **verificar
+> "en vivo" no es solo correr un comando contra Dataverse — es también preguntarse, cuando el
+> resultado contradice al diseño, cuál de los dos envejeció**, en vez de asumir que el documento
+> manda por default.
+>
+> El caso quedó **invertido** en `set_g.py:g08`: ahora verifica que `AutorizacionCliente` SÍ trae
+> las dos columnas, en la tabla y en el formulario, habilitadas.
 
 **FALLA si** falta alguno de los 10 formularios, si a Solicitud le falta alguna subgrilla, o si
-`AutorizacionCliente` NO trae evidencia (ver el hallazgo de arriba: hoy SÍ la trae, así que el caso
-falla).
+`AutorizacionCliente` NO trae su evidencia (el sistema estaría retrocediendo respecto de la decisión
+del aprobador del 2026-09-27).
 
 **Automatizable.** API (`systemforms`; `set_g.py:g08`).
 
@@ -701,11 +734,11 @@ que es exactamente lo que el aprobador descartó el 2026-09-25).
 | G-01 sitemap: 15 entradas, su vista exacta | | |
 | G-02 íconos | | GUI, sin arnés |
 | G-03 las 20 vistas | | |
-| G-04 cartera del ejecutivo | | |
+| G-04 cartera del ejecutivo | | corregido: el caso comparaba mal, ver nota en G-04 |
 | **G-05 columnas protegidas** | | el más importante |
 | G-06 (fusionado en G-00/G-00b) | | sin función propia |
 | G-07 sitemap por rol | | GUI, sin arnés |
-| G-08 los 10 formularios | | ver hallazgo AutorizacionCliente |
+| G-08 los 10 formularios | | corregido: el caso estaba al revés, ver nota en G-08 |
 | G-09 sin evidencia pero válida (D-42) | | |
 | G-10 notificaciones (DA-08) | | ver hallazgo appnotification |
 | G-11 multiidioma | | GUI, sin arnés |

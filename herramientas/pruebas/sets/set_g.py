@@ -441,6 +441,23 @@ def g03(ctx):
 # G-04 — La cartera del ejecutivo (RF-19, D-13)
 # ===========================================================================
 def g04(ctx):
+    """CORREGIDO el 2026-09-27, en la propia jornada de la migración: la
+    primera versión de este caso comparaba las filas por `sanic_nombre` (el
+    número calculado `<solicitud>-F<NN>`), y dio FALLA dos corridas seguidas
+    con el mismo síntoma ("faltaron" las tres de la tanda semilla en
+    'Todos - por digitar'). Se investigó en vivo, sin confiar en la primera
+    lectura ("otro agente en paralelo debe haber tocado mis filas"): se
+    reprodujo el caso a mano, se pidió la fila devuelta por la vista COMPLETA
+    (todas sus claves), y las tres SÍ estaban — la vista funciona bien. El
+    bug era del caso: **ninguna de las dos vistas de Fila selecciona
+    `sanic_nombre` como columna propia de Fila** (no está entre las columnas
+    de trabajo del diseño, `05-app-model-driven.md` §3 — la columna "Nombre"
+    de esa tabla es `sanic_nombrebeneficiario`, no el número calculado). El
+    único `sanic_nombre` que SÍ viaja en el JSON es el de Cliente, bajo la
+    clave `cliente.sanic_nombre` (viene del `<link-entity>`), y por eso la
+    comparación daba vacía siempre, sin que la vista hubiera hecho nada malo.
+    Corregido: se compara por `sanic_mppp_tbl_filaid` (el GUID), que las dos
+    vistas SÍ traen siempre, sea cual sea el diseño de columnas de negocio."""
     c = pc.Caso("G-04", "La cartera del ejecutivo: 'Mis clientes' filtra por propietario del Cliente")
     ent = ctx.extra["entorno"]
     sid = ctx.extra["sid_semilla"]
@@ -448,7 +465,13 @@ def g04(ctx):
     if not filas:
         c.na("la tanda semilla no dejó ninguna Fila (ver preparar())")
         return c
-    nombres_semilla = {f["sanic_nombre"] for f in filas}
+
+    est_ids, r_ids, _ = ctx.dv.call(
+        "GET", f"{sim.FILAS}?$select=sanic_mppp_tbl_filaid&$filter=_sanic_solicitudid_value eq {sid}")
+    if est_ids != 200 or not r_ids.get("value"):
+        c.na(f"no se pudieron releer los GUID de la tanda semilla (HTTP {est_ids})")
+        return c
+    ids_semilla = {f["sanic_mppp_tbl_filaid"] for f in r_ids["value"]}
 
     v_mis = _vista(ctx.dv, "sanic_mppp_tbl_fila", "Mis clientes - por digitar")
     v_todos = _vista(ctx.dv, "sanic_mppp_tbl_fila", "Todos - por digitar")
@@ -466,14 +489,14 @@ def g04(ctx):
     if est_mis != 200 or est_todos != 200:
         return c
 
-    nombres_en_mis = {f.get("sanic_nombre") for f in r_mis.get("value", [])}
-    nombres_en_todos = {f.get("sanic_nombre") for f in r_todos.get("value", [])}
+    ids_en_mis = {f.get("sanic_mppp_tbl_filaid") for f in r_mis.get("value", [])}
+    ids_en_todos = {f.get("sanic_mppp_tbl_filaid") for f in r_todos.get("value", [])}
 
     c.check("las filas del Cliente compartido NO aparecen en 'Mis clientes' del Ejecutivo "
             "(el Cliente PR - Pruebas MPPP SA es propiedad de la cuenta de servicio, no de User1)",
-            not (nombres_semilla & nombres_en_mis), f"aparecieron: {nombres_semilla & nombres_en_mis}")
+            not (ids_semilla & ids_en_mis), f"aparecieron: {ids_semilla & ids_en_mis}")
     c.check("esas mismas filas SÍ aparecen en 'Todos - por digitar' (es comodidad, no seguridad)",
-            nombres_semilla <= nombres_en_todos, f"faltaron: {nombres_semilla - nombres_en_todos}")
+            ids_semilla <= ids_en_todos, f"faltaron: {ids_semilla - ids_en_todos}")
     return c
 
 
@@ -574,19 +597,38 @@ def g08(ctx):
 
     x_ac = formularios.get("sanic_mppp_tbl_autorizacioncliente")
     if x_ac:
-        # `05-app-model-driven.md` §4 y DN-01 dicen textual que esta tabla NO
-        # tiene evidencia: "sin sección de evidencia... esta tabla no tiene
-        # sanic_documentofirmado ni sanic_fechadocumento, a diferencia de
-        # Autorización". Verificado en vivo el 2026-09-27: el formulario
-        # "Autorizacion por cliente" SÍ trae una sección "Evidencia de la
-        # autorizacion" con los dos campos, habilitados. Esto es una
-        # discrepancia REAL contra el diseño (defecto, no límite del
-        # entorno — CONVENCIONES §3): se deja el check tal como dice el
-        # diseño, así que hoy da FALLA a propósito, y se documenta en el MD.
-        c.check("AutorizacionCliente NO trae 'Documento firmado' (DN-01: sin evidencia, a diferencia de AutorizacionPlan)",
-                "sanic_documentofirmado" not in x_ac)
-        c.check("AutorizacionCliente NO trae 'Fecha del documento' (DN-01)",
-                "sanic_fechadocumento" not in x_ac)
+        # CORREGIDO el 2026-09-27, misma jornada: esta aserción decía "NO
+        # trae evidencia", citando `05-app-model-driven.md` §4 ("sin sección
+        # de evidencia... a diferencia de Autorización"). Esa celda del
+        # diseño quedó VIEJA el mismo día en que se escribió este caso: el
+        # aprobador decidió, esa misma jornada, que la autorización por
+        # cliente SÍ lleva el mismo respaldo firmado que la de plan
+        # ("no está la columna de archivo adjunto para adjuntar la
+        # autorización por escrito y la fecha de ese documento, al igual que
+        # en autorización por plan") — porque autorizar por cliente habilita
+        # TODOS los planes de ese cliente a la vez, así que es MÁS amplio que
+        # autorizar por plan, y no tiene sentido que exija MENOS respaldo.
+        # Se agregaron `sanic_documentofirmado` (archivo, 10 MB) y
+        # `sanic_fechadocumento` (fecha) a la TABLA y al FORMULARIO
+        # (`diseno/02-diccionario-datos.md` §2.4b, `diseno/06-inventario-
+        # componentes.md` 3.13, `diseno/DIRECTRICES-NUEVAS.md`), y
+        # `diseno/05-app-model-driven.md` §4 ya se corrigió (por el
+        # aprobador, no acá: este set no toca `diseno/`).
+        #
+        # La aserción vieja (que este mismo caso traía) verificaba contra un
+        # documento desactualizado y por eso acusó a un sistema CORRECTO de
+        # un defecto que no existía — la misma familia de error que ya costó
+        # caro con los conteos ("12 parámetros", "8 steps"): un dato que no
+        # se vuelve a mirar contra la plataforma envejece y nadie lo nota.
+        # Corregido: ahora se verifica que la evidencia SÍ esté, en los dos
+        # niveles (metadata de la tabla, ya implícito en que el `formxml` la
+        # pueda mostrar; y el propio `formxml`, con el control habilitado).
+        c.check("AutorizacionCliente SÍ trae 'Documento firmado' habilitado (decisión del aprobador, 2026-09-27: "
+                "la misma evidencia que AutorizacionPlan, porque autorizar por cliente es MÁS amplio, no menos)",
+                'control id="sanic_documentofirmado"' in x_ac and 'disabled="true"' not in
+                x_ac[x_ac.find('control id="sanic_documentofirmado"'):x_ac.find('control id="sanic_documentofirmado"') + 120])
+        c.check("AutorizacionCliente SÍ trae 'Fecha del documento' (misma decisión)",
+                "sanic_fechadocumento" in x_ac)
         c.check("AutorizacionCliente trae sus tres lookups (correo, autorizado, cliente)",
                 all(campo in x_ac for campo in ("sanic_nombre", "sanic_autorizadoid", "sanic_clienteid")))
 
