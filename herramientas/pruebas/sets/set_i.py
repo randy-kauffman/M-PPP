@@ -27,10 +27,20 @@ cambiaron respecto de la versión vieja, y las tres importan:
    `03` §2) — verificado contra `playbooks/steps/sanic_mppp_pkg_plugins.md` y
    contra `sdkmessageprocessingsteps` EN VIVO el 2026-09-27.
 
-**I-07 tiene un defecto CONFIRMADO** (`diseno/PENDIENTES.md`, entrada `I-07`):
-un `PATCH` directo a `sanic_referencia` se guarda (HTTP 204) en vez de ser
-rechazado. El caso sigue existiendo A PROPÓSITO y su FALLA es la señal
-correcta hasta que el aprobador decida — no se "arregla" apagando el caso.
+**I-07 se reescribió el 2026-09-27: el diagnóstico viejo medía la identidad
+equivocada.** La versión anterior hacía el `PATCH` prohibido con el service
+principal de este set (`# PowerPlatform-Dev`, que tiene `applicationid`), y
+`ListaBlancaStep` exime A PROPÓSITO a toda identidad de aplicación
+(`BaseDeStep.EsCodigoDeServidor`, `diseno/04-matriz-privilegios.md` §1) —
+igual que exime al código de servidor. El HTTP 204 que se registró como
+"defecto" era el sistema haciendo exactamente lo que el diseño pide. La
+pregunta que el caso tiene que responder es otra: **¿puede un HUMANO, con su
+rol de Ejecutivo, hacer ese mismo `PATCH` saltándose el formulario?** Eso se
+mide ahora impersonando con `MSCRMCallerID` (mismo patrón que I-13,
+`comportamiento_roles.py`), y además se prueban los dos bordes: un rol sin
+privilegio de escritura sobre Fila (Administrador de planes — tiene que
+frenarlo la falta de privilegio, no la lista blanca) y una columna que sí
+está permitida (`sanic_notainterna` — tiene que pasar).
 """
 import datetime
 import json
@@ -303,11 +313,13 @@ def i06(ctx):
 
 
 # ===========================================================================
-# I-07 — ListaBlancaStep. DEFECTO CONFIRMADO: este caso da FALLA a propósito
-# (diseno/PENDIENTES.md, entrada "I-07"). NO se apaga ni se "arregla" acá.
+# I-07 — ListaBlancaStep. Reescrito el 2026-09-27 (ver docstring del módulo):
+# la identidad que importa es la de un HUMANO, no la del service principal
+# (exento por diseño). Prueba la identidad correcta y los dos bordes: el rol
+# sin privilegio de escritura sobre Fila, y la columna que SÍ está permitida.
 # ===========================================================================
 def i07(ctx):
-    c = pc.Caso("I-07", "Lista blanca de escrituras (columna calculada por PATCH directo)")
+    c = pc.Caso("I-07", "Lista blanca de escrituras: identidad exenta vs. un humano (Ejecutivo), y sus dos bordes")
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba I-07", cantidad_adjuntos=1, cantidad_excel=1,
                                      excel_a_subir=pc.excel("E01-feliz-formato11.xlsx"))
     filas = sim.leer_filas(ctx.dv, sid)
@@ -321,9 +333,55 @@ def i07(ctx):
         if est == 200 and r.get("value"):
             fid = r["value"][0]["sanic_mppp_tbl_filaid"]
             break
-    est, r, _ = ctx.dv.call("PATCH", f"{sim.FILAS}({fid})", {"sanic_referencia": "ZZ-INTENTO-DIRECTO"})
-    c.check("un PATCH directo a sanic_referencia (columna que solo escribe la validación) es rechazado",
-            est == 400, f"HTTP {est}: {r.get('error')}")
+
+    # --- El service principal de este set (identidad de aplicación, `applicationid`) está EXENTO de la lista
+    # blanca A PROPÓSITO (BaseDeStep.EsCodigoDeServidor, diseno/04 §1). Esto NO mide la lista blanca: queda acá,
+    # documentado, para que no se repita el diagnóstico viejo (confundir "exento por diseño" con "defecto").
+    est_sp, r_sp, _ = ctx.dv.call("PATCH", f"{sim.FILAS}({fid})", {"sanic_referencia": "ZZ-INTENTO-SP"})
+    c.check("el service principal (identidad de aplicación, exenta por diseño, 04 §1) SÍ puede escribir "
+            "sanic_referencia — esperado, y NO es lo que este caso tiene que medir",
+            est_sp == 204, f"HTTP {est_sp}: {r_sp.get('error') if est_sp != 204 else '(sin error, esperado)'}")
+
+    # --- La pregunta correcta: ¿puede un HUMANO, con su rol de Ejecutivo, hacer el mismo PATCH saltándose el
+    # formulario? Se impersona con MSCRMCallerID (mismo patrón que I-13 y comportamiento_roles.py) y se verifica
+    # el rol EN VIVO: sin eso, el resultado mentiría sobre lo que en realidad se probó.
+    try:
+        ejecutivo_id = _usuario_por_alias(ctx.dv, "User1")
+        admin_planes_id = _usuario_por_alias(ctx.dv, "User3")
+    except RuntimeError as e:
+        c.na(f"no se pudo resolver User1/User3 en el entorno: {e}")
+        return c
+    ok_ej, roles_ej = pc.verificar_roles(ctx.dv, ejecutivo_id, ["SR - MPPP - Ejecutivo"])
+    if not ok_ej:
+        c.na(f"User1 no tiene el rol Ejecutivo que este caso asume (tiene {roles_ej}); con otro rol el resultado "
+             "no mediría lo que este caso dice medir")
+        return c
+
+    est_h, r_h, _ = ctx.dv.call("PATCH", f"{sim.FILAS}({fid})", {"sanic_referencia": "ZZ-INTENTO-DIRECTO"},
+                                 cabeceras={"MSCRMCallerID": ejecutivo_id})
+    c.check("un Ejecutivo (humano, sin exención) NO puede escribir sanic_referencia por Web API (ListaBlancaStep, 04 §1)",
+            est_h == 400 and "sanic_referencia" in str(r_h.get("error")), f"HTTP {est_h}: {r_h.get('error')}")
+
+    # --- Borde 1: un rol SIN privilegio de escritura sobre Fila (Administrador de planes, 04 §2). Tiene que
+    # frenarlo la falta de privilegio, no la lista blanca: son dos protecciones distintas y conviene saber cuál actúa.
+    ok_ap, roles_ap = pc.verificar_roles(ctx.dv, admin_planes_id, ["SR - MPPP - Administrador de planes"])
+    if ok_ap:
+        est_ap, r_ap, _ = ctx.dv.call("PATCH", f"{sim.FILAS}({fid})", {"sanic_notainterna": "prueba de borde I-07"},
+                                       cabeceras={"MSCRMCallerID": admin_planes_id})
+        c.check("el Administrador de planes no puede escribir NADA en Fila (falta de privilegio, 04 §2 — "
+                "no llega a la lista blanca)", est_ap in (401, 403),
+                f"HTTP {est_ap}: {r_ap.get('error') if isinstance(r_ap, dict) else r_ap}")
+    else:
+        c.na(f"User3 no tiene el rol Administrador de planes que este borde asume (tiene {roles_ap})")
+
+    # --- Borde 2: una columna que SÍ está permitida (sanic_notainterna, ReglasDeSteps.PermitidasEnFila) tiene
+    # que dejar pasar al mismo Ejecutivo. Si esta también se rechazara, el step sería más restrictivo que lo
+    # que dice el diseño, y eso también sería un hallazgo.
+    est_ok, r_ok, _ = ctx.dv.call("PATCH", f"{sim.FILAS}({fid})", {"sanic_notainterna": "prueba I-07 columna permitida"},
+                                   cabeceras={"MSCRMCallerID": ejecutivo_id})
+    c.check("un Ejecutivo SÍ puede escribir sanic_notainterna (columna permitida en la lista blanca, 04 §1)",
+            est_ok == 204, f"HTTP {est_ok}: {r_ok.get('error') if est_ok != 204 else ''}")
+
     return c
 
 

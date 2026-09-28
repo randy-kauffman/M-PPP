@@ -21,6 +21,13 @@ graves de todo el plan, y las tres se corrigen acá:
    `01-clasificacion-del-correo.md`)". El **código** de los dos casos ya usaba su propio fixture
    (`sets/set_i.py::preparar()`); lo que estaba mal era solo la prosa de este MD, que ya no cita
    ningún otro archivo (CONVENCIONES §8).
+4. **I-07 estaba mal PLANTEADO, no solo mal escrito** (corregido más tarde el mismo 2026-09-27):
+   el "defecto confirmado" que este archivo declaraba se medía con el **service principal**
+   (`applicationid`), una identidad **exenta de `ListaBlancaStep` por diseño** (`04` §1, código de
+   servidor) — nunca con un humano. Probado en vivo con `User1` (Ejecutivo, impersonado con
+   `MSCRMCallerID`): el `PATCH` a `sanic_referencia` **se rechaza** (HTTP 400). **No hay defecto.**
+   Ver el detalle completo en I-07; `diseno/PENDIENTES.md` (entrada `I-07`) queda pendiente de que
+   su dueño la cierre con esta evidencia.
 
 **Además, siguiendo CONVENCIONES §7 ("nombrar, no contar")**: en vez de repetir la vieja tabla de
 prosa "8 steps con su función", este archivo **nombra los 20 registros de step, uno por uno**, con
@@ -58,7 +65,7 @@ por qué no hace otras cosas (roles de Ejecutivo/Supervisor, canon), está docum
 |---|---|
 | Datos de negocio (`PR*`, fixture compartido, `REMITENTE` autorizado sobre PR11/PR06/PR10/PRIN) | `preparacion_comun.verificar_datos_negocio()` |
 | Los 15 Excel + el adjunto no-Excel | `preparacion_comun.verificar_excels()` |
-| Roles de Ejecutivo (User1) y Supervisor (User2) — SOLO los necesita I-13 | resueltos y verificados DENTRO de I-13, no en `preparar()` (si un día cambiaran, el resto de los 12 casos sigue corriendo igual) |
+| Roles de Ejecutivo (User1) y Supervisor (User2) — SOLO los necesita I-13; Ejecutivo (User1) y Administrador de planes (User3) — SOLO los necesita I-07 | resueltos y verificados DENTRO de cada caso, no en `preparar()` (si un día cambiaran, el resto de los 11 casos sigue corriendo igual) |
 
 **Corré este set con**:
 
@@ -240,40 +247,80 @@ el mismo cálculo que usa TODO el resto del plan para citar el número de fila.
 
 ## I-07 · Lista blanca de escrituras (columna calculada por PATCH directo)
 
-**Qué prueba.** `ListaBlancaStep`: que no se pueda escribir a mano, por Web API, una columna que
-solo llena la validación.
+**Reescrito el 2026-09-27: el diagnóstico viejo medía la identidad equivocada, no es un defecto.**
+Ver el detalle completo de la investigación y la evidencia abajo. **`diseno/PENDIENTES.md` (entrada
+`I-07`) todavía dice "ABIERTA": ese archivo es de otro dueño en esta ronda y no se tocó — hace
+falta que quien lo mantiene la cierre con la evidencia de acá.**
 
-**Necesita.** Una Fila propia de este caso (`ctx.procesar()` con `E01-feliz-formato11.xlsx`, 3
-filas Validadas) — este set ya no depende de la Fila de otro archivo (ver la corrección al
-principio de este documento).
+**Qué prueba.** `ListaBlancaStep` (`04` §1): que un **humano**, con su rol de negocio, no pueda
+escribir a mano por Web API una columna que solo llena la validación (`sanic_referencia`) —
+saltándose el formulario de solo lectura. Y de paso, sus dos bordes: que la protección que en
+verdad frena a un rol sin privilegio de escritura sobre Fila es otra (04 §2, no la lista blanca), y
+que una columna que SÍ está permitida (`sanic_notainterna`) no se vea afectada.
 
-**Cómo.** `PATCH` directo por Web API a `sanic_referencia` de una Fila recién validada, con un
-valor arbitrario (`"ZZ-INTENTO-DIRECTO"`).
+**Por qué el planteo viejo estaba mal.** La versión anterior de este caso hacía el `PATCH`
+prohibido con el **service principal** de este set (`# PowerPlatform-Dev`, `dataverse_api.py`),
+que tiene `applicationid`. `ListaBlancaStep.Execute` (`src/Sanic.Mppp.Plugins/Steps/StepsDePlataforma.cs`)
+empieza así:
 
-**Qué tiene que pasar en el DISEÑO.** El `PATCH` debería rechazarse: HTTP 400, con un mensaje que
-nombre `sanic_referencia` como columna no permitida.
+```csharp
+if (BaseDeStep.EsCodigoDeServidor(contexto, servicio))
+{
+    // 04 §1: el código de servidor no pasa por la lista blanca.
+    return;
+}
+```
 
-> **DEFECTO CONFIRMADO — este caso da FALLA a propósito, hasta que el aprobador decida.** El
-> `PATCH` se guarda con **HTTP 204** (éxito) en vez de ser rechazado: `ListaBlancaStep` **no**
-> bloquea esta columna. Registrado en `diseno/PENDIENTES.md`, entrada `I-07`: **ABIERTA, pospuesta
-> por el aprobador (2026-09-27), requiere su decisión** — o el step extiende su lista a
-> `sanic_referencia` (y probablemente a las demás columnas que solo escribe la validación), o el
-> riesgo se acepta porque el privilegio de escritura sobre Fila ya está acotado a Ejecutivo/
-> Supervisor por la matriz de `04`. **Este caso NO se apaga ni se "arregla" apagando la prueba que
-> lo detecta**: un defecto conocido, pospuesto a propósito, se sigue viendo en rojo hasta que se
-> resuelva — un FALLA que desaparece solo porque se dejó de mirar es peor que uno que se ve.
+y `BaseDeStep.EsCodigoDeServidor` trata como "código de servidor" a **toda identidad con
+`applicationid`**, no solo a SYSTEM — es exactamente lo que dice `diseno/04-matriz-privilegios.md`
+§1 ("Las dos claves alternativas..." — la exención de identidad de aplicación es la misma que ya
+usa I-12 para la puerta del RPA). El `HTTP 204` que el caso viejo registraba como "defecto" era
+el sistema haciendo lo que el diseño pide: el service principal **tiene que** poder escribir
+cualquier columna, porque es código de servidor a todos los efectos. El diagnóstico viejo nunca
+midió lo que decía medir. Y `ReglasDeSteps.cs` ya lo advertía desde el 2026-09-23 (comentario sobre
+`PermitidasEnFila`): *"todos los actores probados hasta entonces quedaban exentos de la lista
+blanca (el service principal por su `applicationid`, el administrador por ser `servicio.cuenta`,
+los plugins por su `Depth`). El primer humano que escribió una Fila desde la app chocó con esto de
+entrada."* Nadie había probado la lista blanca con un humano hasta ahora.
 
-**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-07`) — hoy tiene que dar
-**FALLA**, con el detalle `HTTP 204` (no 400).
+**Necesita.** Una Fila propia de este caso (`ctx.procesar()` con `E01-feliz-formato11.xlsx`) y los
+roles de Ejecutivo (`User1`) y Administrador de planes (`User3`), verificados EN VIVO contra
+`systemuserroles_association` dentro del propio caso (mismo criterio que I-13: si el rol no
+coincide, el caso da **N-A**, no un resultado que mentiría sobre lo que se probó).
 
-**Cómo se sabe que falló *de la forma esperada*.** El síntoma correcto es `HTTP 204` en el detalle
-del check (el `PATCH` se guardó). Si algún día aparece `HTTP 400` en su lugar, **este caso pasa a
-OK** y hay que actualizar `diseno/PENDIENTES.md` (cerrar la entrada `I-07`) y esta nota, porque el
-defecto se corrigió. Si aparece cualquier otro HTTP (500, timeout), eso sí es un defecto NUEVO —
-distinto del conocido — y hay que investigarlo aparte.
+**Cómo (4 pasos, verificados en el entorno el 2026-09-27, `MSCRMCallerID` para impersonar).**
 
-**Automatizable.** API (`correr.py I`, caso `I-07` — ya demostrado; no hace falta correrlo a mano
-para confirmar el defecto).
+| # | Quién | Qué | Qué pasó | Interpretación |
+|---|---|---|---|---|
+| 1 | Service principal (`applicationid`, sin impersonar) | `PATCH sanic_referencia` = `"ZZ-INTENTO-SP"` | **HTTP 204** — se guardó | Esperado: exento por diseño (código de servidor). **No mide la lista blanca.** |
+| 2 | **`User1` (Ejecutivo, humano)** | `PATCH sanic_referencia` = `"ZZ-INTENTO-DIRECTO"` | **HTTP 400**: *"No se puede guardar: la(s) columna(s) sanic_referencia no está(n) permitida(s) para este usuario."* | **La lista blanca FUNCIONA.** Un humano no puede saltarse el formulario. |
+| 3 | `User3` (Administrador de planes, borde 1) | `PATCH sanic_notainterna` = `"prueba de borde I-07"` | **HTTP 403**: *"...is missing prvReadsanic_mppp_tbl_fila privilege..."* | Lo frena la **falta de privilegio** (04 §2) — nunca llega a `ListaBlancaStep`. Protección distinta, y actúa antes. |
+| 4 | `User1` (Ejecutivo, borde 2) | `PATCH sanic_notainterna` = `"prueba I-07 columna permitida"` | **HTTP 204** — se guardó | La columna permitida **sí** pasa: el step no es más restrictivo que lo que dice el diseño. |
+
+**Qué tiene que pasar.** El paso 2 (el que en verdad mide `ListaBlancaStep` contra un humano) tiene
+que dar HTTP 400 con un mensaje que nombre `sanic_referencia`. Los pasos 1, 3 y 4 son de control:
+confirman que la exención de diseño existe, que el borde de privilegio actúa antes que la lista
+blanca, y que la columna permitida no se ve afectada.
+
+**Conclusión: NO ES UN DEFECTO. I-07 pasa a OK.** `ListaBlancaStep` protege exactamente lo que
+`04` §1 dice que protege, contra la identidad que en verdad importa (un humano con rol de negocio).
+El defecto que se había registrado en `diseno/PENDIENTES.md` (entrada `I-07`) era un artefacto de
+probar con la identidad equivocada — corresponde cerrar esa entrada con esta evidencia.
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-07`) — tiene que dar
+**OK**. Cuatro checks: el service principal exento (204, informativo), el Ejecutivo humano
+rechazado (400, con `sanic_referencia` en el mensaje), el Administrador de planes frenado por
+privilegio (401/403) y el Ejecutivo escribiendo la columna permitida (204).
+
+**Cómo se sabe que falló.** Si el paso 2 (Ejecutivo) da 200/201/204, la lista blanca **sí** tiene
+un agujero real con un humano — eso sería grave (cualquier Ejecutivo con acceso al Web API podría
+escribir `sanic_referencia` a mano) y hay que reabrir la investigación con el `plugintracelog`. Si
+el paso 3 (Administrador de planes) da otro HTTP que no sea 401/403 (por ejemplo 400 con el mensaje
+de la lista blanca), significa que SÍ tiene privilegio de escritura sobre Fila cuando no debería
+(revisar la matriz `04` §2 contra el entorno). Si el paso 4 (columna permitida) se rechaza, el step
+es más restrictivo que el diseño y hay que revisar `ReglasDeSteps.PermitidasEnFila`.
+
+**Automatizable.** API (`correr.py I`, caso `I-07`).
 
 ---
 
@@ -509,7 +556,7 @@ otros roles dan 400 por falta de rol y el resultado mentiría sobre lo que en re
 | I-04 autodependencia | | |
 | I-05 autorización por plan duplicada | | |
 | I-06 nombre calculado (4 tablas) | | |
-| **I-07 lista blanca** | | **FALLA esperado — defecto abierto, `diseno/PENDIENTES.md` entrada I-07** |
+| **I-07 lista blanca (humano vs. identidad exenta)** | | **OK — no es defecto (reescrito 2026-09-27); falta que se cierre `diseno/PENDIENTES.md` entrada I-07** |
 | **I-08 transición ilegal** | | |
 | I-09 paquete al día (13 tipos) | | |
 | I-10 los 20 steps, uno por uno | | |
