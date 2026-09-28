@@ -413,6 +413,38 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaSolicitud.Rechazada, m.Solicitud().GetAttributeValue<OptionSetValue>("sanic_estadoprocesamiento").Value);
         }
 
+        // ------------------------------------------------------------------ D-64: "Tenés filas por aprobar" (al supervisor)
+        [Fact]
+        public void La_primera_fila_que_pasa_a_digitada_avisa_al_supervisor()
+        {
+            var m = new Mundo(); // una sola fila, Validada -> Digitada
+
+            m.Correr(new PostTransicionDeFilaStep(), m.Ejecutivo, EstadoDeLaFila.Digitada);
+
+            var aviso = Assert.Single(m.Svc.Registros(TablasNativas.Notificacion));
+            Assert.Equal(m.Supervisor, aviso.GetAttributeValue<EntityReference>("ownerid").Id);
+            Assert.Contains("MPPP-00000123", (string)aviso["title"]);
+        }
+
+        [Fact]
+        public void La_segunda_fila_digitada_de_la_misma_tanda_no_duplica_el_aviso()
+        {
+            var m = new Mundo();
+            m.Svc.Sembrar(m.Fila(2, EstadoDeLaFila.Digitada)); // ya había otra digitada: la solicitud YA tenía filas por aprobar
+
+            m.Correr(new PostTransicionDeFilaStep(), m.Ejecutivo, EstadoDeLaFila.Digitada);
+
+            Assert.Empty(m.Svc.Registros(TablasNativas.Notificacion));
+        }
+
+        [Fact]
+        public void Aprobar_o_devolver_no_generan_el_aviso_de_filas_por_aprobar()
+        {
+            var m = new Mundo(EstadoDeLaFila.Digitada, digitadaPor: Guid.NewGuid());
+            m.Correr(new PostTransicionDeFilaStep(), m.Supervisor, EstadoDeLaFila.Aprobada);
+            Assert.Empty(m.Svc.Registros(TablasNativas.Notificacion));
+        }
+
         // ------------------------------------------------------------------ 7.12 atender por clasificar
         private static (ContextoDePluginSimulado ctx, OrganizationServiceEnMemoria svc, Guid id) Solicitud(EstadoDeLaSolicitud desde, EstadoDeLaSolicitud hacia, bool identidadDeAplicacion = false)
         {

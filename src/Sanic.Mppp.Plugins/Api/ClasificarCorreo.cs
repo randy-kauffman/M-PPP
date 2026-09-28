@@ -39,10 +39,21 @@ namespace Sanic.Mppp.Plugins.Api
         public bool YaProcesada { get; }
     }
 
-    /// <summary>Aviso dentro de la app a todos los ejecutivos (diseno/05 DA-08; diseno/03 §0 paso 5). La implementación sobre `appnotification` es de otra pieza.</summary>
+    /// <summary>
+    /// Los tres avisos dentro de la app que quedaron de DA-08 tras el recorte del aprobador del 2026-09-28
+    /// (diseno/05 DA-08, nota de corrección; el resto del contrato en diseno/03). La implementación sobre
+    /// `appnotification` es de otra pieza (<see cref="Datos.AvisosDataverse"/>).
+    /// </summary>
     public interface IAvisos
     {
+        /// <summary>A todos los ejecutivos, cuando un correo va a Por clasificar (diseno/03 §0 paso 5).</summary>
         void AvisarAEjecutivos(Guid solicitudId, string titulo, string cuerpo);
+
+        /// <summary>Al ejecutivo DUEÑO del cliente, cuando la solicitud deja filas por digitar (diseno/03 §1).</summary>
+        void AvisarFilasPorDigitar(Guid solicitudId, Guid clienteId, string titulo, string cuerpo);
+
+        /// <summary>A todos los supervisores, cuando la solicitud pasa a tener filas por aprobar (diseno/03 §4).</summary>
+        void AvisarFilasPorAprobar(Guid solicitudId, string titulo, string cuerpo);
     }
 
     /// <summary>

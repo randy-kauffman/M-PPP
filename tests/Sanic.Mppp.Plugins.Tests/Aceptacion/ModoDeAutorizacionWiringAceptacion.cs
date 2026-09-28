@@ -90,6 +90,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             public void AvisarAEjecutivos(Guid solicitudId, string titulo, string cuerpo)
             {
             }
+
+            public void AvisarFilasPorDigitar(Guid solicitudId, Guid clienteId, string titulo, string cuerpo)
+            {
+            }
+
+            public void AvisarFilasPorAprobar(Guid solicitudId, string titulo, string cuerpo)
+            {
+            }
         }
 
         [Fact]
@@ -172,7 +180,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             // ------------------------------------------------------------ nivel Registro: la MISMA autorización por
             // cliente tiene que validar la fila (recién acá se abre el Excel).
-            var resultado = new ValidarSolicitud(new SolicitudesDataverse(svc), catalogos, archivos, limites => new LectorOpenXml(limites)).Ejecutar(solicitudId, Ahora);
+            var resultado = new ValidarSolicitud(new SolicitudesDataverse(svc), catalogos, archivos, limites => new LectorOpenXml(limites), new AvisosSimulados()).Ejecutar(solicitudId, Ahora);
 
             Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (resultado.Estado, resultado.FilasTotales, resultado.FilasValidas, resultado.FilasRechazadas));
             var fila = Assert.Single(svc.Registros(TablasHistorico.Fila));

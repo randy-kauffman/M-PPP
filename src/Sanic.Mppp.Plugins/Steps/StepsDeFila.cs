@@ -489,6 +489,17 @@ namespace Sanic.Mppp.Plugins.Steps
             var filas = LeerFilasDeLaSolicitud(servicio, solicitudId, target.Id, hacia);
 
             var solicitud = solicitudes.Leer(solicitudId); // Consulta 2 (la Solicitud), ya bajo el bloqueo.
+
+            // D-64 (diseno/05 DA-08): "Tenés filas por aprobar", a los supervisores, la PRIMERA vez que esta
+            // Solicitud pasa a tener alguna fila Digitada — nunca una por fila. `filas` ya refleja el estado
+            // Digitada de la que se acaba de transicionar (la sustitución de arriba); si es la ÚNICA Digitada de
+            // la Solicitud, es porque antes de este Update no había ninguna: recién ahora "hay filas por aprobar".
+            // Si ya había otra (el ribbon o el RPA transicionando varias filas de la misma tanda), ya se avisó.
+            if (hacia == EstadoDeLaFila.Digitada && filas.Count(f => f.Estado == EstadoDeLaFila.Digitada) == 1)
+            {
+                new AvisosDataverse(servicio).AvisarFilasPorAprobar(solicitudId, TituloAvisoPorAprobar(solicitud.Numero), CuerpoAvisoPorAprobar(solicitud.Numero));
+            }
+
             if (!CierreDeSolicitud.CorrespondeProcesar(solicitud.Estado, filas.Select(f => f.Estado)))
             {
                 return;
@@ -511,6 +522,10 @@ namespace Sanic.Mppp.Plugins.Steps
 
             solicitudes.RegistrarEvento(solicitudId, PlomeriaDeFila.AhoraUtc(contexto), EventoDeBitacora.Procesada, OrigenDelEvento.Plugin, 0, null, null);
         }
+
+        private static string TituloAvisoPorAprobar(string numeroSolicitud) => $"Tenés filas por aprobar: solicitud {numeroSolicitud}";
+
+        private static string CuerpoAvisoPorAprobar(string numeroSolicitud) => $"La solicitud {numeroSolicitud} tiene filas por aprobar.";
 
         private static IList<FilaParaCierre> LeerFilasDeLaSolicitud(IOrganizationService servicio, Guid solicitudId, Guid filaQueTransiciono, EstadoDeLaFila haciaLaFilaQueTransiciono)
         {

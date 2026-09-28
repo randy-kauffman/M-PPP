@@ -77,6 +77,55 @@ namespace Sanic.Mppp.Plugins.Datos
 
         public void AvisarAEjecutivos(Guid solicitudId, string titulo, string cuerpo)
         {
+            ValidarArgumentos(solicitudId, titulo, cuerpo);
+            AvisarATodosConElRol(TablasNativas.RolEjecutivo, titulo, cuerpo);
+        }
+
+        /// <summary>D-64: "Tenés filas por aprobar", a todos los supervisores habilitados. Mismo contrato que
+        /// <see cref="AvisarAEjecutivos"/> (mismo número fijo de consultas, mismo criterio de "sin destinatarios no se
+        /// crea nada y no se lanza"), solo cambia el rol.</summary>
+        public void AvisarFilasPorAprobar(Guid solicitudId, string titulo, string cuerpo)
+        {
+            ValidarArgumentos(solicitudId, titulo, cuerpo);
+            AvisarATodosConElRol(TablasNativas.RolSupervisor, titulo, cuerpo);
+        }
+
+        /// <summary>
+        /// D-64: "Tenés filas por digitar", al ejecutivo DUEÑO del cliente (RF-19, D-23) — no a todos los ejecutivos.
+        /// Quien llama YA sabe qué cliente es (lo tiene en memoria del catálogo de planes: ninguna consulta extra por
+        /// esto). Dos consultas fijas: el `ownerid` del Cliente, y si ese dueño está habilitado hoy. Sin dueño, con
+        /// dueño que no es un usuario (un equipo: `appnotification` no admite notificar a un equipo, Microsoft Learn),
+        /// o con el dueño deshabilitado: no se crea nada y no se lanza (mismo criterio que <see cref="AvisarAEjecutivos"/>:
+        /// un dato de configuración incompleto no puede tumbar la validación de la solicitud).
+        /// </summary>
+        public void AvisarFilasPorDigitar(Guid solicitudId, Guid clienteId, string titulo, string cuerpo)
+        {
+            ValidarArgumentos(solicitudId, titulo, cuerpo);
+            if (clienteId == Guid.Empty)
+            {
+                throw new ArgumentException("El id del cliente no puede estar vacío.", nameof(clienteId));
+            }
+
+            // Consulta 1: el dueño del Cliente.
+            var cliente = _servicio.Retrieve(Tablas.Cliente, clienteId, new ColumnSet("ownerid"));
+            var dueno = cliente.GetAttributeValue<EntityReference>("ownerid");
+            if (dueno == null || !string.Equals(dueno.LogicalName, TablasNativas.Usuario, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // Consulta 2: si ese dueño está habilitado hoy.
+            var usuario = _servicio.Retrieve(TablasNativas.Usuario, dueno.Id, new ColumnSet("isdisabled"));
+            if (usuario.GetAttributeValue<bool>("isdisabled"))
+            {
+                return;
+            }
+
+            Crear(dueno.Id, titulo, cuerpo);
+        }
+
+        private static void ValidarArgumentos(Guid solicitudId, string titulo, string cuerpo)
+        {
             if (solicitudId == Guid.Empty)
             {
                 throw new ArgumentException("El id de la solicitud no puede estar vacío.", nameof(solicitudId));
@@ -91,20 +140,25 @@ namespace Sanic.Mppp.Plugins.Datos
             {
                 throw new ArgumentException("El cuerpo del aviso no puede estar vacío.", nameof(cuerpo));
             }
+        }
 
-            // Consulta 1: el rol Ejecutivo. Si no existe, nadie tiene que enterarse (DA-08): que nadie tenga el rol
-            // no puede tumbar la clasificación de un correo.
+        /// <summary>Lo común a <see cref="AvisarAEjecutivos"/> y <see cref="AvisarFilasPorAprobar"/>: todos los usuarios
+        /// HABILITADOS con ese rol (por `name`), con un número FIJO de consultas (a lo sumo tres).</summary>
+        private void AvisarATodosConElRol(string nombreDelRol, string titulo, string cuerpo)
+        {
+            // Consulta 1: el rol. Si no existe, nadie tiene que enterarse (DA-08): que nadie tenga el rol
+            // no puede tumbar la clasificación de un correo ni la validación de una solicitud.
             var consultaRol = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet(false) };
-            consultaRol.Criteria.AddCondition("name", ConditionOperator.Equal, TablasNativas.RolEjecutivo);
-            var rolesEjecutivo = _servicio.RetrieveMultiple(consultaRol).Entities.Select(e => e.Id).ToList();
-            if (rolesEjecutivo.Count == 0)
+            consultaRol.Criteria.AddCondition("name", ConditionOperator.Equal, nombreDelRol);
+            var roles = _servicio.RetrieveMultiple(consultaRol).Entities.Select(e => e.Id).ToList();
+            if (roles.Count == 0)
             {
                 return;
             }
 
             // Consulta 2: quiénes tienen ese rol asignado (repetido o no).
             var consultaAsignaciones = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet(ColumnaIdUsuario) };
-            consultaAsignaciones.Criteria.AddCondition("roleid", ConditionOperator.In, rolesEjecutivo.Cast<object>().ToArray());
+            consultaAsignaciones.Criteria.AddCondition("roleid", ConditionOperator.In, roles.Cast<object>().ToArray());
             // `systemuserroles` es una intersect entity: en Dataverse real sus columnas son `Uniqueidentifier`
             // crudos, no lookups. Leerla como `EntityReference` revienta con
             // "Unable to cast object of type 'System.Guid' to type 'Microsoft.Xrm.Sdk.EntityReference'" SIEMPRE
@@ -126,21 +180,23 @@ namespace Sanic.Mppp.Plugins.Datos
             consultaUsuarios.Criteria.AddCondition("isdisabled", ConditionOperator.Equal, false);
             var usuariosHabilitados = _servicio.RetrieveMultiple(consultaUsuarios).Entities.Select(e => e.Id);
 
-            var tituloRecortado = Recortar(titulo, TablasNativas.LargoTitulo);
-            var cuerpoRecortado = Recortar(cuerpo, TablasNativas.LargoCuerpo);
-
             // Un Create por destinatario (DA-08: "una por solicitud y por tanda, nunca una por fila" — acá la
-            // "tanda" es el correo sin procesar, y cada ejecutivo recibe la suya).
+            // "tanda" es el correo sin procesar, o la solicitud validada, y cada destinatario recibe la suya).
             foreach (var usuarioId in usuariosHabilitados)
             {
-                var aviso = new Entity(TablasNativas.Notificacion)
-                {
-                    ["title"] = tituloRecortado,
-                    ["body"] = cuerpoRecortado,
-                    ["ownerid"] = new EntityReference(TablasNativas.Usuario, usuarioId),
-                };
-                _servicio.Create(aviso);
+                Crear(usuarioId, titulo, cuerpo);
             }
+        }
+
+        private void Crear(Guid usuarioId, string titulo, string cuerpo)
+        {
+            var aviso = new Entity(TablasNativas.Notificacion)
+            {
+                ["title"] = Recortar(titulo, TablasNativas.LargoTitulo),
+                ["body"] = Recortar(cuerpo, TablasNativas.LargoCuerpo),
+                ["ownerid"] = new EntityReference(TablasNativas.Usuario, usuarioId),
+            };
+            _servicio.Create(aviso);
         }
 
         /// <summary>Recorta sin partir un par subrogado (un carácter Unicode fuera del plano básico ocupa dos `char`).</summary>

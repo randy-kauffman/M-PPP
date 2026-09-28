@@ -78,6 +78,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         {
             public readonly OrganizationServiceEnMemoria Svc = new OrganizationServiceEnMemoria();
             public readonly ArchivosDeMemoria Archivos = new ArchivosDeMemoria();
+            public readonly AvisosSimulados Avisos = new AvisosSimulados();
             /// <summary>El último lector que la fábrica armó. Nunca nulo, aunque Ejecutar reviente antes de pedirlo.</summary>
             public LectorQueCuenta Lector { get; private set; } = new LectorQueCuenta(new LimitesLectura());
 
@@ -99,9 +100,10 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                     return e;
                 }
 
-                var cliente = Svc.Sembrar(Activo(Tablas.Cliente, ("sanic_nombre", "ACME")));
-                PlanId = Svc.Sembrar(Activo(Tablas.Plan, ("sanic_codigo", "0042"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._11)), ("sanic_moneda", new OptionSetValue((int)Moneda.USD)), ("sanic_clienteid", new EntityReference(Tablas.Cliente, cliente))));
-                var autorizado = Svc.Sembrar(Activo(Tablas.Autorizado, ("sanic_nombre", "ana@acme.com"), ("sanic_clienteid", new EntityReference(Tablas.Cliente, cliente))));
+                EjecutivoDelCliente = Svc.Sembrar(new Entity(TablasNativas.Usuario) { ["fullname"] = "Eje Cutivo", ["isdisabled"] = false });
+                ClienteId = Svc.Sembrar(Activo(Tablas.Cliente, ("sanic_nombre", "ACME"), ("ownerid", new EntityReference(TablasNativas.Usuario, EjecutivoDelCliente))));
+                PlanId = Svc.Sembrar(Activo(Tablas.Plan, ("sanic_codigo", "0042"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._11)), ("sanic_moneda", new OptionSetValue((int)Moneda.USD)), ("sanic_clienteid", new EntityReference(Tablas.Cliente, ClienteId))));
+                var autorizado = Svc.Sembrar(Activo(Tablas.Autorizado, ("sanic_nombre", "ana@acme.com"), ("sanic_clienteid", new EntityReference(Tablas.Cliente, ClienteId))));
                 Svc.Sembrar(Activo(Tablas.AutorizacionPlan, ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)), ("sanic_planid", new EntityReference(Tablas.Plan, PlanId))));
 
                 if (conParametros)
@@ -149,6 +151,11 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             public Guid PlanId { get; }
 
+            public Guid ClienteId { get; private set; }
+
+            /// <summary>El dueño de <see cref="ClienteId"/> (RF-19, D-23): a quien tiene que llegar el aviso de "filas por digitar".</summary>
+            public Guid EjecutivoDelCliente { get; private set; }
+
             public void Parametro(string nombre, string valor, int version = 1)
             {
                 Svc.Sembrar(new Entity(Tablas.Parametro) { ["statecode"] = new OptionSetValue(0), ["sanic_nombre"] = nombre, ["sanic_version"] = version, ["sanic_valor"] = valor });
@@ -156,7 +163,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             public ResultadoDeValidacion Correr()
             {
-                return new ValidarSolicitud(new SolicitudesDataverse(Svc), new CatalogosDataverse(Svc), Archivos, FabricaDeLector).Ejecutar(SolicitudId, Ahora);
+                return new ValidarSolicitud(new SolicitudesDataverse(Svc), new CatalogosDataverse(Svc), Archivos, FabricaDeLector, Avisos).Ejecutar(SolicitudId, Ahora);
             }
 
             public Entity Solicitud() => Svc.Retrieve(TablasHistorico.Solicitud, SolicitudId, new ColumnSet(true));
@@ -168,6 +175,19 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             public IList<Entity> Resultados() => Svc.Registros(TablasHistorico.ResultadoRegla).OrderBy(r => (int)r["sanic_orden"]).ToList();
 
             public IList<Entity> Bitacora() => Svc.Registros(TablasHistorico.Bitacora);
+        }
+
+        private sealed class AvisosSimulados : IAvisos
+        {
+            public readonly List<(Guid solicitudId, string titulo, string cuerpo)> DeEjecutivos = new List<(Guid, string, string)>();
+            public readonly List<(Guid solicitudId, Guid clienteId, string titulo, string cuerpo)> PorDigitar = new List<(Guid, Guid, string, string)>();
+            public readonly List<(Guid solicitudId, string titulo, string cuerpo)> PorAprobar = new List<(Guid, string, string)>();
+
+            public void AvisarAEjecutivos(Guid solicitudId, string titulo, string cuerpo) => DeEjecutivos.Add((solicitudId, titulo, cuerpo));
+
+            public void AvisarFilasPorDigitar(Guid solicitudId, Guid clienteId, string titulo, string cuerpo) => PorDigitar.Add((solicitudId, clienteId, titulo, cuerpo));
+
+            public void AvisarFilasPorAprobar(Guid solicitudId, string titulo, string cuerpo) => PorAprobar.Add((solicitudId, titulo, cuerpo));
         }
 
         private sealed class ArchivosDeMemoria : IArchivos
@@ -263,6 +283,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var evento = Assert.Single(m.Bitacora());
             Assert.Equal((int)EventoDeBitacora.ValidacionTerminada, evento.GetAttributeValue<OptionSetValue>("sanic_evento").Value);
             Assert.Equal(1, m.Lector.Lecturas); // el Excel se abre UNA sola vez
+
+            // D-64: la solicitud dejó una fila por digitar (Validada) -> UN aviso al ejecutivo dueño del cliente,
+            // nunca uno por fila.
+            var aviso = Assert.Single(m.Avisos.PorDigitar);
+            Assert.Equal((m.SolicitudId, m.ClienteId), (aviso.solicitudId, aviso.clienteId));
+            Assert.Contains("MPPP-00000123", aviso.titulo);
+            Assert.Empty(m.Avisos.PorAprobar);
+            Assert.Empty(m.Avisos.DeEjecutivos);
         }
 
         [Fact]
@@ -342,6 +370,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var acuse = (string)m.Solicitud()["sanic_acusecontenido"];
             Assert.Contains("nada que procesar", acuse, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("<table", acuse);
+
+            // D-64: sin ninguna fila Validada no hay "filas por digitar": no se avisa a nadie.
+            Assert.Empty(m.Avisos.PorDigitar);
         }
 
         [Fact]
@@ -441,13 +472,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Los_argumentos_se_validan_y_la_fecha_tiene_que_ser_utc()
         {
             var m = new Mundo(Excel(Fila()));
-            var api = new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, m.FabricaDeLector);
+            var api = new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, m.FabricaDeLector, m.Avisos);
             Assert.Throws<ArgumentException>(() => api.Ejecutar(Guid.Empty, Ahora));
             Assert.Throws<ArgumentException>(() => api.Ejecutar(m.SolicitudId, DateTime.SpecifyKind(Ahora, DateTimeKind.Local)));
-            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(null, new CatalogosDataverse(m.Svc), m.Archivos, m.FabricaDeLector));
-            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), null, m.Archivos, m.FabricaDeLector));
-            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), null, m.FabricaDeLector));
-            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, null));
+            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(null, new CatalogosDataverse(m.Svc), m.Archivos, m.FabricaDeLector, m.Avisos));
+            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), null, m.Archivos, m.FabricaDeLector, m.Avisos));
+            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), null, m.FabricaDeLector, m.Avisos));
+            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, null, m.Avisos));
+            Assert.Throws<ArgumentNullException>(() => new ValidarSolicitud(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, m.FabricaDeLector, null));
         }
 
         /// <summary>

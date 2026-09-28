@@ -508,6 +508,16 @@ def a10(ctx):
 # ===========================================================================
 # A-11 — Atendido y Descartar, sobre Solicitudes "Por clasificar".
 # ===========================================================================
+def _notificaciones_de(ctx, ownerid, numero):
+    """`appnotification` del dueño `ownerid` cuyo título nombra la Solicitud `numero`
+    (D-64/D-65: `AvisosDataverse`, alcance `usuario` en `prvReadappnotification`)."""
+    est, r, _ = ctx.dv.call(
+        "GET", f"appnotifications?$select=title,body,_ownerid_value&$filter=_ownerid_value eq {ownerid}")
+    if est != 200:
+        raise RuntimeError(f"no se pudieron leer las notificaciones de {ownerid} (HTTP {est}): {r}")
+    return [n for n in r.get("value", []) if numero in (n.get("title") or "")]
+
+
 def a11(ctx):
     c = pc.Caso("A-11", "Atendido y Descartar, sobre Solicitudes")
     if not ctx.extra.get("personas_ok"):
@@ -516,38 +526,25 @@ def a11(ctx):
     ejecutivo = ctx.extra["ejecutivo_id"]
 
     # --- Atendido: No reconocida -> Cerrada ---
+    # Hasta el 2026-09-28 este caso daba FALLA: `sim.clasificar()` reventaba con
+    # `InvalidCastException` en `AvisosDataverse.AvisarAEjecutivos` (D-59) y, arreglado ESE, con
+    # "Read Privilege Check For Owner failed ... prvReadappnotification" (D-65) — TODO camino de
+    # clasificación con `procesar=false` (remitente no reconocido, respuesta, reenvío ilegible) pasa
+    # por ahí. Las dos están cerradas (`Datos/Avisos.cs`, `diseno/04-matriz-privilegios.md` §2): el
+    # aviso "a todos los ejecutivos, cuando un correo va a Por clasificar" (DA-08, el único que ya
+    # estaba construido antes del recorte de D-64) crea su notificación de verdad, y este caso ya no
+    # necesita ningún `try/except` para sobrevivirlo.
     sid1, mid1 = ctx.solicitud(remitente=REMITENTE_NO_AUTORIZADO, asunto="Prueba A-11 atendido",
                                 cantidad_adjuntos=1, cantidad_excel=1,
                                 excel_a_subir=pc.excel("E01-feliz-formato11.xlsx"))
-    try:
-        sim.clasificar(ctx.dv, sid1)
-    except RuntimeError as e:
-        # DEFECTO REAL encontrado el 2026-09-27 (no de esta migración, de la plataforma): TODO
-        # camino de clasificación con procesar=false (remitente no reconocido, respuesta, reenvío
-        # ilegible) llama a `AvisosDataverse.AvisarAEjecutivos`, que hace
-        # `e.GetAttributeValue<EntityReference>("systemuserid")` sobre una fila de `systemuserroles`
-        # — una tabla INTERSECT, cuyas columnas de relación son `Guid` crudo, no `EntityReference`.
-        # Confirmado leyendo `plugintracelogs` en vivo:
-        #   System.InvalidCastException: Unable to cast object of type 'System.Guid' to type
-        #   'Microsoft.Xrm.Sdk.EntityReference'.
-        #     at Sanic.Mppp.Plugins.Datos.AvisosDataverse.<>c.<AvisarAEjecutivos>b__4_1(Entity e)
-        # Pasa SIEMPRE que exista al menos un Ejecutivo habilitado (lo hay: User1) — es decir, pasa
-        # SIEMPRE que una Solicitud no se procese. Esto también rompe C-02/C-04 de `set_c.py`
-        # (mismo camino, `sim.clasificar` sobre un correo que no se procesa) — no es exclusivo de
-        # este caso. Se reporta FALLA con la evidencia completa; no se reintenta ni se lo maquilla
-        # como N-A (CONVENCIONES §3: "un defecto conocido no es N-A", y este ni siquiera tiene ID
-        # todavía en diseno/PENDIENTES.md).
-        c.check(
-            "sim.clasificar() no debería reventar: DEFECTO REAL en "
-            "AvisosDataverse.AvisarAEjecutivos (Datos/Avisos.cs) — GetAttributeValue<EntityReference> "
-            "sobre systemuserroles.systemuserid, que es Guid (tabla intersect), no EntityReference. "
-            "Rompe TODO camino de clasificación con procesar=false (también C-02/C-04 de set_c.py). "
-            "Reportar en diseno/PENDIENTES.md.",
-            False, str(e))
-        return c
+    sim.clasificar(ctx.dv, sid1)
     s1_antes = sim.leer_solicitud(ctx.dv, sid1)
+    numero1 = s1_antes.get("sanic_nombre")
     c.check("setup: la Solicitud quedó No reconocida (remitente sin autorización)",
             s1_antes.get("sanic_estadoprocesamiento") == NORECONOCIDA_SOL, str(s1_antes.get("sanic_estadoprocesamiento")))
+    avisos1 = _notificaciones_de(ctx, ejecutivo, numero1)
+    c.check("AvisarAEjecutivos creó EXACTAMENTE una notificación para el Ejecutivo (D-59 y D-65 cerradas)",
+            len(avisos1) == 1, str(avisos1))
     est, r, _ = _como(ctx, ejecutivo, "PATCH", f"{sim.SOLICITUDES}({sid1})", {"sanic_estadoprocesamiento": CERRADA_SOL})
     c.check("Atendido se aplica", est == 204, f"HTTP {est}: {_mensaje(r)}")
     s1 = sim.leer_solicitud(ctx.dv, sid1)
@@ -564,16 +561,14 @@ def a11(ctx):
                                 cantidad_adjuntos=1, cantidad_excel=1,
                                 excel_a_subir=pc.excel("E01-feliz-formato11.xlsx"),
                                 in_reply_to="original-simulado-a11@herramientas.local")
-    try:
-        sim.clasificar(ctx.dv, sid2)
-    except RuntimeError as e:
-        c.check(
-            "sim.clasificar() no debería reventar sobre la Solicitud 'No es correo nuevo' tampoco "
-            "(mismo defecto de AvisosDataverse.AvisarAEjecutivos que arriba)", False, str(e))
-        return c
+    sim.clasificar(ctx.dv, sid2)
     s2_antes = sim.leer_solicitud(ctx.dv, sid2)
+    numero2 = s2_antes.get("sanic_nombre")
     c.check("setup: la Solicitud quedó No es correo nuevo (asunto RE:)",
             s2_antes.get("sanic_estadoprocesamiento") == NOESNUEVO_SOL, str(s2_antes.get("sanic_estadoprocesamiento")))
+    avisos2 = _notificaciones_de(ctx, ejecutivo, numero2)
+    c.check("AvisarAEjecutivos creó EXACTAMENTE una notificación para el Ejecutivo también acá",
+            len(avisos2) == 1, str(avisos2))
     est, r, _ = _como(ctx, ejecutivo, "PATCH", f"{sim.SOLICITUDES}({sid2})", {"sanic_estadoprocesamiento": DESCARTADA_SOL})
     c.check("Descartar se aplica", est == 204, f"HTTP {est}: {_mensaje(r)}")
     s2 = sim.leer_solicitud(ctx.dv, sid2)

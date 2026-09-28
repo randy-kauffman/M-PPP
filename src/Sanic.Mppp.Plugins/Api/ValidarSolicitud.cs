@@ -72,18 +72,20 @@ namespace Sanic.Mppp.Plugins.Api
         private readonly CatalogosDataverse _catalogos;
         private readonly IArchivos _archivos;
         private readonly Func<LimitesLectura, ILectorPlantilla> _lector;
+        private readonly IAvisos _avisos;
 
         /// <summary>
         /// El lector llega como FÁBRICA, no ya armado: sus topes salen de `lectura.limites`, que recién se conoce adentro
         /// de <see cref="Ejecutar"/>. Armarlo afuera dejaría el tope de bytes descomprimidos (la defensa contra un zip
         /// bomba, LP-02) clavado en su valor por defecto, ignorando el parámetro.
         /// </summary>
-        public ValidarSolicitud(SolicitudesDataverse solicitudes, CatalogosDataverse catalogos, IArchivos archivos, Func<LimitesLectura, ILectorPlantilla> lector)
+        public ValidarSolicitud(SolicitudesDataverse solicitudes, CatalogosDataverse catalogos, IArchivos archivos, Func<LimitesLectura, ILectorPlantilla> lector, IAvisos avisos)
         {
             _solicitudes = solicitudes ?? throw new ArgumentNullException(nameof(solicitudes));
             _catalogos = catalogos ?? throw new ArgumentNullException(nameof(catalogos));
             _archivos = archivos ?? throw new ArgumentNullException(nameof(archivos));
             _lector = lector ?? throw new ArgumentNullException(nameof(lector));
+            _avisos = avisos ?? throw new ArgumentNullException(nameof(avisos));
         }
 
         public ResultadoDeValidacion Ejecutar(Guid solicitudId, DateTime ahoraUtc)
@@ -144,10 +146,11 @@ namespace Sanic.Mppp.Plugins.Api
             var filasParaGuardar = new List<FilaParaGuardar>();
             var filasParaRespuesta = new List<FilaParaRespuesta>();
             var estadosDeFilas = new List<EstadoDeLaFila>();
+            Guid? clienteConFilasPorDigitar = null;
 
             if (sobreDejaSeguir)
             {
-                ProcesarFilas(sobre, estructura, listas, obligatoriedad, solicitud.Numero, solicitud.Remitente, ahoraUtc, filasParaGuardar, filasParaRespuesta, estadosDeFilas);
+                clienteConFilasPorDigitar = ProcesarFilas(sobre, estructura, listas, obligatoriedad, solicitud.Numero, solicitud.Remitente, ahoraUtc, filasParaGuardar, filasParaRespuesta, estadosDeFilas);
             }
 
             var estadoFinal = EstadosPorReglas.DeLaSolicitud(resultadosSolicitud, estadosDeFilas);
@@ -181,8 +184,20 @@ namespace Sanic.Mppp.Plugins.Api
             // Ningún camino termina sin Bitácora (diseno/03 §1 paso 7).
             _solicitudes.RegistrarEvento(solicitudId, ahoraUtc, EventoDeBitacora.ValidacionTerminada, OrigenDelEvento.CustomAPI, 0, null, resumen);
 
+            // D-64 (diseno/05 DA-08): la solicitud dejó filas por digitar (al menos una Validada) -> UN aviso al
+            // ejecutivo DUEÑO del cliente, nunca uno por fila. `clienteConFilasPorDigitar` ya resolvió CUÁL cliente
+            // (el de la primera fila Validada con plan conocido) sin ninguna consulta extra.
+            if (clienteConFilasPorDigitar.HasValue)
+            {
+                _avisos.AvisarFilasPorDigitar(solicitudId, clienteConFilasPorDigitar.Value, TituloAvisoPorDigitar(solicitud.Numero), CuerpoAvisoPorDigitar(solicitud.Numero));
+            }
+
             return new ResultadoDeValidacion(estadoFinal, false, filasParaGuardar.Count, filasValidas, filasRechazadas, resumen);
         }
+
+        private static string TituloAvisoPorDigitar(string numeroSolicitud) => $"Tenés filas por digitar: solicitud {numeroSolicitud}";
+
+        private static string CuerpoAvisoPorDigitar(string numeroSolicitud) => $"La solicitud {numeroSolicitud} tiene filas por digitar.";
 
         /// <summary>Un parámetro ausente es un error real que nombra su código (diseno/03 §1 paso 3), nunca una regla fallida.</summary>
         private ParametroLeido ParametroObligatorio(string nombre)
@@ -220,9 +235,10 @@ namespace Sanic.Mppp.Plugins.Api
         /// <summary>
         /// Paso 5 y 6 (diseno/03 §1): evalúa las reglas de registro fila por fila. Los catálogos se cargan UNA vez: los
         /// planes de todos los números de plan de la plantilla en una sola consulta `In`, y las autorizaciones del
-        /// remitente aparte.
+        /// remitente aparte. Devuelve el cliente dueño de la PRIMERA fila que quedó Validada (con plan conocido), o
+        /// nulo si ninguna quedó Validada: es a ese cliente al que D-64 avisa "filas por digitar" (una vez, no por fila).
         /// </summary>
-        private void ProcesarFilas(
+        private Guid? ProcesarFilas(
             SobreEnValidacion sobre, ConfiguracionPlantilla estructura, ListasPlantilla listas, ObligatoriedadPlantilla obligatoriedad,
             string numeroDeSolicitud, string remitente, DateTime ahoraUtc,
             List<FilaParaGuardar> filasParaGuardar, List<FilaParaRespuesta> filasParaRespuesta, List<EstadoDeLaFila> estadosDeFilas)
@@ -230,7 +246,7 @@ namespace Sanic.Mppp.Plugins.Api
             var filasDeLaVentana = sobre.Lectura.Filas;
             if (filasDeLaVentana == null || filasDeLaVentana.Count == 0)
             {
-                return;
+                return null;
             }
 
             // Catálogo "vacío" solo para normalizar los números de plan (no hace falta la lista de planes para eso):
@@ -249,6 +265,7 @@ namespace Sanic.Mppp.Plugins.Api
             var reglasRegistro = _catalogos.ReglasActivasConId(NivelDeLaRegla.Registro);
             var definicionesRegistro = reglasRegistro.Select(r => r.Definicion).ToList();
             var motorFila = new MotorDeReglas<FilaEnValidacion>(ReglasDeRegistro.Evaluadores());
+            Guid? clienteConFilasPorDigitar = null;
 
             foreach (var filaPlantilla in filasDeLaVentana)
             {
@@ -259,6 +276,11 @@ namespace Sanic.Mppp.Plugins.Api
                 var mensaje = motivos.Count > 0 ? string.Join(" ", motivos) : null;
 
                 estadosDeFilas.Add(estadoFila);
+
+                if (estadoFila == EstadoDeLaFila.Validada && clienteConFilasPorDigitar == null && fila.Plan?.ClienteId != null)
+                {
+                    clienteConFilasPorDigitar = fila.Plan.ClienteId;
+                }
 
                 var numeroCuenta = fila.Recibido(CamposDeFila.NumeroCuenta);
                 var numeroIdentificacion = fila.Recibido(CamposDeFila.NumeroIdentificacion);
@@ -298,6 +320,8 @@ namespace Sanic.Mppp.Plugins.Api
                     Mensaje = mensaje,
                 });
             }
+
+            return clienteConFilasPorDigitar;
         }
 
         /// <summary>Arma el acuse (RF-04, DD-09). No reconocida no tiene acuse: no se le responde al cliente sin que la mire una persona (D-39).</summary>

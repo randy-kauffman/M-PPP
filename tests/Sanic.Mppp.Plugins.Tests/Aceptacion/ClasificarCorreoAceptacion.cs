@@ -112,6 +112,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             public readonly List<(Guid solicitudId, string titulo, string cuerpo)> Enviados = new List<(Guid, string, string)>();
 
             public void AvisarAEjecutivos(Guid solicitudId, string titulo, string cuerpo) => Enviados.Add((solicitudId, titulo, cuerpo));
+
+            public void AvisarFilasPorDigitar(Guid solicitudId, Guid clienteId, string titulo, string cuerpo)
+            {
+            }
+
+            public void AvisarFilasPorAprobar(Guid solicitudId, string titulo, string cuerpo)
+            {
+            }
         }
 
         // ------------------------------------------------------------------ los cuatro finales

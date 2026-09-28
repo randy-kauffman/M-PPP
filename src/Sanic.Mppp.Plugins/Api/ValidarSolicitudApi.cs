@@ -61,7 +61,7 @@ namespace Sanic.Mppp.Plugins.Api
                 var servicio = fabrica.CreateOrganizationService(null);
                 var validar = new ValidarSolicitud(
                     new SolicitudesDataverse(servicio), new CatalogosDataverse(servicio), new ArchivosDataverse(servicio),
-                    limites => new LectorOpenXml(limites));
+                    limites => new LectorOpenXml(limites), new AvisosDataverse(servicio));
 
                 var ahoraUtc = DateTime.SpecifyKind(contexto.OperationCreatedOn, DateTimeKind.Utc);
                 var resultado = validar.Ejecutar(solicitudId, ahoraUtc);

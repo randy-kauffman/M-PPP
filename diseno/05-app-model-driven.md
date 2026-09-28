@@ -14,9 +14,33 @@ Reglas citadas: BP-PP-091, 093, 094, 095, 100, 186. Requisitos: RF-03, RF-11 a R
 | DA-04 | **La "bandeja de trabajo" como página custom completa** —lista de solicitudes a la izquierda, filas a la derecha, detalle en panel lateral, al estilo de la Accelerator— **queda para la versión 1.1**, después de la fase 1. | Es donde más rinde una página custom, pero es también lo más caro de la app. La fase 1 sale con la grilla nativa y sus comandos, que ya resuelven la acción masiva. |
 | DA-05 | **Solo controles modernos. El Creator Kit no se usa para nada.** | Decisión del aprobador: **ninguna dependencia externa** por ahora. El Creator Kit no tiene soporte oficial de Microsoft y obligaría a instalar `CreatorKitCore` en Test y Prod antes que la solución. |
 | DA-06 | **Se ocultan todos los comandos genéricos que no se usan**, en cada tabla: Eliminar, Asignar, Compartir, Flujo, Enviar vínculo, Combinar, y "Nuevo" donde el alta no es de una persona (Solicitud, Fila, ResultadoRegla, Bitácora). | Es lo que más ensucia una model-driven y lo más barato de arreglar. Además, varios de esos comandos ofrecen acciones que la matriz de privilegios no permite. |
-| DA-08 | **Notificaciones dentro de la app desde la fase 1** (campana de la model-driven, tabla nativa `appnotification`). Las crea el código de servidor, no los botones: la Custom API de validación y el plugin posterior a la transición. **Una por solicitud y por tanda, nunca una por fila.** | Decisión del aprobador. Avisos: al ejecutivo del cliente, cuando una solicitud suya deja filas por digitar; a los supervisores, cuando una solicitud pasa a tener filas por aprobar; al ejecutivo que digitó, cuando le devuelven filas; a todos los ejecutivos, cuando un correo va a Por clasificar; a ejecutivos y supervisores, cuando una solicitud queda para revisar. Cada aviso abre la vista o la solicitud que corresponde. Es nativo: no agrega dependencias ni licencias. |
+| DA-08 | **Notificaciones dentro de la app desde la fase 1** (campana de la model-driven, tabla nativa `appnotification`). Las crea el código de servidor, no los botones: la Custom API de validación y el plugin posterior a la transición. **Una por solicitud y por tanda, nunca una por fila.** **Alcance recortado a DOS avisos, decisión del aprobador del 2026-09-28** (ver la nota de corrección abajo): "Tenés filas por digitar" (al ejecutivo dueño del cliente, cuando su solicitud deja filas por digitar) y "Tenés filas por aprobar" (a los supervisores, cuando una solicitud pasa a tener filas por aprobar). | Decisión del aprobador. Cada aviso abre la vista o la solicitud que corresponde. Es nativo: no agrega dependencias ni licencias. |
 | DA-09 | **Toda pantalla se valida primero en un mockup HTML 100 % funcional** (`diseno/mockups/`), con datos ficticios, antes de construir nada. | Estándar del aprobador para cualquier Power App (BP-PP-102): probar la interfaz y dar opinión cuesta minutos en un mockup y días en la plataforma. |
 | DA-07 | **La lógica no vive en los botones.** Un botón solo cambia `sanic_estado` (y `sanic_mensaje` o `sanic_notainterna`, según a quién vaya dirigido el texto); que la transición sea válida, quién puede hacerla y la segregación de funciones los decide el plugin (`03` §4). | BP-PP-051. Un usuario que llame al Web API sin pasar por la app encuentra las mismas reglas. La visibilidad de cada botón según el rol es comodidad, no seguridad. |
+
+> **Nota de corrección, 2026-09-28 (D-64, decisión del aprobador).** DA-08 nombraba **cinco** avisos: al ejecutivo del cliente
+> cuando su solicitud deja filas por digitar; a los supervisores cuando pasa a tener filas por aprobar; al ejecutivo que
+> digitó cuando le devuelven filas; a todos los ejecutivos cuando un correo va a Por clasificar; y a ejecutivos y
+> supervisores cuando una solicitud queda para revisar. El 2026-09-27 el set G (caso G-10) encontró que, de los cinco,
+> **cuatro no estaban implementados**: `Datos/Avisos.cs` exponía un solo método público (`AvisarAEjecutivos`) con un solo
+> llamador en todo el repositorio (`Api/ClasificarCorreo.cs`) — el aviso "a todos los ejecutivos, cuando un correo va a
+> Por clasificar". Ni `ValidarSolicitud.cs` ni ningún step posterior a la transición llamaban a `IAvisos` para nada más.
+>
+> **El aprobador decidió construir DOS de los cuatro que faltaban** — "Tenés filas por digitar" y "Tenés filas por
+> aprobar" — **y NO construir los otros tres** ("le devuelven filas", "correo va a Por clasificar" como aviso nuevo, y
+> "solicitud para revisar"): el menú ya tiene vistas propias que cubren esos tres casos (Fila "Mis clientes — devueltas",
+> Solicitud "Por clasificar" y Solicitud "Para revisar"; sus columnas se ampliaron el 2026-09-27, `06` §12.2), y **un
+> aviso que duplica una vista que el usuario ya mira es ruido**: el ruido entrena a la gente a ignorar la campana. Estos
+> tres avisos quedan **decididos a propósito como NO implementados**, no olvidados.
+>
+> **El aviso "a todos los ejecutivos, cuando un correo va a Por clasificar" es la única excepción**, y sigue existiendo:
+> es el que YA estaba construido, bajo el plan original de cinco, antes de esta decisión — `AvisarAEjecutivos`, llamado
+> desde `ClasificarCorreo.cs` cuando un correo no se procesa (ilegible, respuesta, o remitente no reconocido). Recortar
+> el alcance de los avisos que faltaban por construir no es motivo para retirar código ya construido y probado: sigue
+> funcionando tal cual, sin ampliarse. Estuvo bloqueado por D-59 (`InvalidCastException` en `systemuserroles`) y después
+> por D-65 (faltaba `prvReadappnotification`); con las dos cerradas, crea su notificación de verdad.
+>
+> **Regla dura que se mantiene sin cambios**: una notificación por solicitud y por tanda, nunca una por fila.
 
 ## 1. La app
 
@@ -173,7 +197,7 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 3. **Verificación del supervisor.** Le alcanza con las filas que extrajimos, y si duda **descarga el Excel original** desde la Solicitud. No hay visor del Excel dentro de la app en la fase 1.
 4. **Por clasificar** (correos no reconocidos y correos que no son nuevos). Los ven **todos** los ejecutivos. Para decidir les alcanza con remitente, asunto y fecha, y si no, descargan el correo original.
 5. **Catálogos.** El Administrador de planes carga **uno por uno en formularios**, y para cargas grandes usa la importación nativa desde Excel de model-driven. La migración inicial desde SharePoint es aparte (RF-16).
-6. **Avisos.** **Notificaciones dentro de la app desde la fase 1** (DA-08).
+6. **Avisos.** **Notificaciones dentro de la app desde la fase 1** (DA-08): "Tenés filas por digitar" y "Tenés filas por aprobar" (alcance recortado a estos dos, nota de corrección 2026-09-28).
 
 ## 7. Inventario que sale de este diseño (completa `06` §12)
 
