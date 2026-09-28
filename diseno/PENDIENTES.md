@@ -82,6 +82,14 @@ La matriz de obligatoriedad arranca con **todo obligatorio salvo Referencia** (D
 
 ## B. Verificaciones contra el entorno
 
+> **Descartadas por el aprobador el 2026-09-28.** Las tres verificaciones de entorno que quedaban abiertas en esta sección
+> —el acuse renderizado en Outlook de escritorio / Outlook web / Gmail, el comportamiento de `InitializeFileBlocksDownload` sobre una
+> columna de archivo VACÍA, y el riesgo residual de `SetState`/`SetStateDynamicEntity`— **se dan por cerradas sin verificar**, por
+> decisión explícita del aprobador ("olvidalas completamente"). Quedan escritas abajo como registro de lo que se sabía y se eligió
+> no perseguir, no como tareas. El riesgo de `SetState` ya estaba aceptado a conciencia desde el 2026-09-21 y su alcance de daño es
+> acotado: una persona con `W` podría DESACTIVAR una Fila o una Solicitud — no cambiar ninguna columna de negocio —, y queda en la
+> auditoría nativa, que desde hoy retiene 365 días.
+
 - **PARCIALMENTE CERRADO el 2026-09-22: nuestro ensamblado SÍ carga y ejecuta en el sandbox.** Prueba de humo: un `POST` a `sanic_mppp_tbl_parametros` con `sanic_nombre` = `"ZZ Ensayo Mal Formado"` devolvió `400` con el texto exacto de nuestro código — *"La columna 'sanic_nombre' no tiene un valor válido: El nombre del parámetro solo admite letras, dígitos y puntos."* Eso prueba de punta a punta: paquete subido → `pluginassembly` cargado → `plugintype` resuelto → step `Create de Parametro` PreOperation disparado → `NormalizarYValidarStep` ejecutado → `InvalidPluginExecutionException` propagada a quien llama. No quedó ninguna fila basura (el alta se rechazó). **Falta todavía** lo de OpenXml y lo del serializador JSON: ese camino no los toca.
 
 - **CERRADO el 2026-09-22 — prueba de humo de punta a punta, con la plantilla REAL del cliente.** `herramientas/prueba_humo_validacion.py` arma una copia de `datos/plantilla/Inclusiones_Exclusiones en PPP.xlsx` con dos filas ficticias, crea una Solicitud, le sube el Excel y llama `sanic_mppp_capi_validarsolicitud`. Resultado: `HTTP 200`, estado **En proceso**, 2 filas totales, 1 válida y 1 rechazada; acuse de 2673 caracteres; `sanic_versionparametros = estructura=1;listas=1;obligatoriedad=1`. Esto cierra de una vez **tres** de los ítems de abajo:
