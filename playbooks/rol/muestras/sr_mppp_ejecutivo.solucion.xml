@@ -36,6 +36,7 @@
         <RolePrivilege name="prvFlow" level="Global" />
         <RolePrivilege name="prvReadAppConfigMaster" level="Global" />
         <RolePrivilege name="prvReadAppModule" level="Global" />
+        <RolePrivilege name="prvReadappnotification" level="Basic" />
         <RolePrivilege name="prvReadAsyncOperation" level="Basic" />
         <RolePrivilege name="prvReadAttribute" level="Global" />
         <RolePrivilege name="prvReadAttributeMap" level="Global" />

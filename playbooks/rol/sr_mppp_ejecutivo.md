@@ -73,11 +73,13 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
       "borrar": "usuario"
     }
   },
-  "otros_privilegios": {}
+  "otros_privilegios": {
+    "prvReadappnotification": "usuario"
+  }
 }
 ```
 
-Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 14 de este playbook (13 + 1 de `AutorizacionCliente`, agregada por DN-01 el 2026-09-26). Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
+Un security role en la unidad de negocio raíz, con los privilegios del rol `App Opener` (los que tenga el entorno en el momento de construir) más los 15 de este playbook (13 + 1 de `AutorizacionCliente`, agregada por DN-01 el 2026-09-26, + 1 de `appnotification`, agregada por D-65 el 2026-09-28). Alcances: `usuario` = Basic (solo lo propio) · `unidad` = Local · `unidad_e_hijas` = Deep · `organizacion` = Global.
 
 Decisiones que este playbook toma y el diseño no traía:
 
@@ -89,6 +91,7 @@ Viene del diseño, no lo decide este playbook:
 
 - Privilegios: `04` §2, columna Ejecutivo.
 - `AutorizacionCliente` (DN-01, `DIRECTRICES-NUEVAS.md`, aprobador 2026-09-26): mismo privilegio `R:O` que `AutorizacionPlan` (`04` §2, nota agregada el 2026-09-26).
+- `appnotification` (D-65, 2026-09-28): `prvReadappnotification` en alcance **usuario** (Basic), y nada más — la tabla la crea siempre el código de servidor con SYSTEM (`Datos/Avisos.cs`), nunca este rol; sin este privilegio, Dataverse rechaza el `Create` del aviso con "Read Privilege Check For Owner failed" (`04` §2, nota agregada el 2026-09-28).
 - Nadie borra (`04` §2).
 - Tiene `escribir` sobre Fila y Solicitud, pero qué columnas puede tocar lo limita la lista blanca del plugin (`04` §1), no este rol.
 - Ejecutivo y Supervisor son mutuamente excluyentes por usuario (D-25): lo controla el plugin.
@@ -141,7 +144,7 @@ Otros privilegios:
 
 | Privilegio | Alcance |
 |---|---|
-| (ninguno) | |
+| `prvReadappnotification` | Basic |
 
 | # | Comprobación | Esperado |
 |---|---|---|
