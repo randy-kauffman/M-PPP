@@ -51,6 +51,20 @@ eventos Bitacora `Error` ("Fallo la ingesta del correo", origen MPPP-VIG) agrupa
 error "Fallo la ingesta del correo" -- NO corregida desde este playbook: es de otro componente,
 pendiente de que el coordinador le asigne su propio ID en `diseno/PENDIENTES.md`.
 
+**Correccion 2026-09-28 (segunda vuelta): esto quedo en el ARCHIVO pero no viajo al entorno.**
+`recursos/flujos/mppp-vig.json` ya traia `runtimeConfiguration.concurrency.runs = 1` en el trigger
+desde que se escribio este parrafo, pero nadie corrio
+`herramientas/construir/flujo.py playbooks/flujo/mppp-vig.md --completar` para subirlo: el
+`clientdata` DESPLEGADO en Dev seguia sin el nodo (confirmado por el coordinador leyendo
+`properties.definition.triggers.Cada_10_minutos.runtimeConfiguration`, ausente -- no buscando la
+palabra "concurrency" en el texto plano, que aparece igual en los `Foreach` por `repetitions`, ya
+presentes desde antes y sin relacion con esto). El caso V-01 del set V daba FALLA con razon. Se
+corrigio corriendo `--completar`, y se releyo el `clientdata` desplegado navegando hasta el nodo
+del trigger para confirmar `runtimeConfiguration.concurrency.runs = 1`, `recurrence` de 10 minutos
+intacto, y el flujo ACTIVO (`statecode=1, statuscode=2`). Leccion: un cambio en el `.json` del
+repositorio no es un cambio en el entorno hasta que `--completar` corre y alguien relee el
+`clientdata` desplegado -- no alcanza con mirar el archivo ni con la memoria de "ya lo aplique".
+
 ## Divergencias declaradas respecto del diseno
 
 - El bloque 5 (vencer los que nadie clasifico) corre en **todas** las ejecuciones, no "solo en la
