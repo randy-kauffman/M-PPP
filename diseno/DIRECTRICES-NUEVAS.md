@@ -276,6 +276,14 @@ Recibida del aprobador el **2026-09-26**, con instrucción de resolverla **de 0 
 Las decisiones de abajo las toma el arquitecto; quedan escritas acá para poder discutirlas después,
 no antes.
 
+> **Corrección fechada 2026-09-28.** Lo de arriba ("quedan escritas acá para poder discutirlas
+> después, no antes") ya se discutió: el aprobador **confirmó** el criterio sembrado de
+> `porGestion.Exclusion` (que la gestión Exclusión afloje `numeroCuenta`, `banco` y `moneda`) el
+> 2026-09-28. Dejó de ser una decisión unilateral del arquitecto a la espera de revisión y pasó a ser
+> una decisión de negocio tomada (`playbooks/datos/parametros.md`, `pruebas/03-reglas-de-registro.md`
+> R-18, `pruebas/12-obligatoriedad-gestion.md` O-02; commit `62be7af`). `Inclusion` y `Modificacion`
+> siguen sin entrada en `porGestion` — eso no cambió, sigue abierto a que el negocio lo pida.
+
 ## Lo que hay hoy
 
 `plantilla.obligatoriedad` es **global**: rige igual para toda fila, sin importar qué pide.
