@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Descubre, contra la app REAL, el `data-id` que Unified Interface le pone a
-// cada uno de los 7 botones de la barra de Fila. NO se corre en CI ni como
-// parte de la suite: es una herramienta manual, para usar UNA VEZ que exista
-// una sesion real, y volver a usar solo si Microsoft cambia algo.
+// cada uno de los botones de la barra de Fila. NO se corre en CI ni como
+// parte de la suite: es una herramienta manual, para usar cuando exista una
+// sesion real, y volver a usar solo si Microsoft cambia algo.
 //
 // Por que existe: `selectores.mjs` ubica los botones por su etiqueta visible
 // (estrategia recomendada por Microsoft, ver el comentario largo en ese
@@ -13,14 +13,22 @@
 // archivo solo: un cambio a un archivo centralizado se revisa antes de
 // guardarse).
 //
+// Requiere datos sembrados (ver setup/global-setup.mjs / sembrar_datos_gui.py):
+// selecciona las 3 filas Validada del fixture. `aprobar` y `devolver` NO se
+// pueden descubrir desde esta vista ("Mis clientes - por digitar" filtra por
+// Estado = Validada): esos dos solo admiten filas en Digitada, que viven en
+// la vista "Por aprobar" — fuera del alcance de este script por ahora.
+//
 // Uso:
+//   MPPP_USUARIO=ejecutivo node sembrar_datos_gui.py primero (o dejá que
+//   `npx playwright test` lo haga por vos via globalSetup), y despues:
 //   MPPP_USUARIO=ejecutivo node descubrir-selectores.mjs
 
 import { chromium } from "@playwright/test";
 import { usuarioActivo, verificarSesionExiste } from "./ayudantes/sesion.mjs";
 import { abrirApp, irASitemap, esperarGrilla, seleccionarFilas } from "./ayudantes/navegacion.mjs";
 import { localizarBoton } from "./ayudantes/ribbon.mjs";
-import { BOTONES_FILA, IDIOMA_POR_DEFECTO, etiquetaDe } from "./selectores.mjs";
+import { BOTONES_FILA, etiquetas } from "./selectores.mjs";
 import { SITEMAP } from "./config.mjs";
 
 async function main() {
@@ -36,21 +44,27 @@ async function main() {
     await abrirApp(pagina);
     await irASitemap(pagina, SITEMAP.porDigitar);
     await esperarGrilla(pagina);
-    await seleccionarFilas(pagina, 1); // con 1 fila alcanza: los 7 no llevan regla de estado
+    await seleccionarFilas(pagina, 3); // las 3 filas Validada del fixture
 
     console.log("");
     console.log("Copia estos valores de 'dataId' a mano en selectores.mjs, uno por boton:");
     console.log("---------------------------------------------------------------------");
 
     for (const boton of BOTONES_FILA) {
-      const etiqueta = etiquetaDe(boton, IDIOMA_POR_DEFECTO);
-      const locator = await localizarBoton(pagina, etiqueta);
-      if (!locator) {
-        console.log(`${boton.id}: NO SE ENCONTRO ("${etiqueta}"). Revisar antes que nada — ver caso ribbon.`);
+      const hallazgo = await localizarBoton(pagina, etiquetas(boton));
+      if (!hallazgo) {
+        console.log(
+          `${boton.id}: NO SE ENCONTRO con ninguna etiqueta conocida. Si es 'aprobar' o ` +
+            "'devolver', es esperado desde esta vista (necesitan una fila Digitada, vista " +
+            "'Por aprobar', fuera de alcance de este script)."
+        );
         continue;
       }
-      const dataId = await locator.getAttribute("data-id");
-      console.log(`${boton.id}: dataId = ${dataId ? `"${dataId}"` : "null (no tiene atributo data-id)"}`);
+      const dataId = await hallazgo.locator.getAttribute("data-id");
+      console.log(
+        `${boton.id} (hallado como "${hallazgo.etiqueta}"): dataId = ` +
+          `${dataId ? `"${dataId}"` : "null (no tiene atributo data-id)"}`
+      );
     }
 
     console.log("---------------------------------------------------------------------");

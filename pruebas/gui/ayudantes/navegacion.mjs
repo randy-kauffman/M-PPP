@@ -45,17 +45,53 @@ export async function irASitemap(page, etiqueta) {
   await porTitulo.click();
 }
 
-/** Espera a que la grilla tenga al menos una fila renderizada (o quede vacia a proposito). */
+// Mensaje de "vista vacia". Confirmado EN VIVO el 2026-09-27 contra esta app
+// (en ingles, idioma de la sesion de prueba disponible): "We didn't find
+// anything to show here". La variante en espanol es la traduccion esperada
+// de la plataforma, NO confirmada todavia contra esta app — si no calza, el
+// peor caso es caer en el branch de "timeout" de abajo, nunca un falso OK.
+//
+// Importante, tambien confirmado en vivo: `[role="grid"]` NO es un selector
+// confiable aca (no aparecio ni con la grilla vacia ni con datos, viendolo
+// con Playwright); `[row-index]` si es confiable (documentado por Microsoft
+// y verificado). Por eso `esperarGrilla` corre las dos señales en carrera
+// (datos vs. vacio) y NUNCA usa `[role="grid"]`.
+const PATRON_VACIO = /didn.?t find anything|no encontramos nada|no se encontraron/i;
+
+/**
+ * Espera a que la grilla termine de cargar, y distingue "vista vacia" de
+ * "todavia no cargo" — son dos causas de falla completamente distintas
+ * (la primera es de datos/siembra, la segunda puede ser de la app misma).
+ *
+ * @param {object} opciones
+ * @param {boolean} opciones.permitirVacia si es false (default) y la vista
+ *   carga vacia, TIRA un error explicito en vez de dejar que el resto del
+ *   caso falle con un timeout generico esperando `[row-index="0"]`.
+ */
 export async function esperarGrilla(page, { permitirVacia = false } = {}) {
   const primeraFila = page.locator('[row-index="0"]');
-  if (permitirVacia) {
-    await page
-      .locator('[role="grid"]')
-      .first()
-      .waitFor({ state: "visible", timeout: 15_000 });
-    return;
+  const mensajeVacio = page.getByText(PATRON_VACIO).first();
+
+  const resultado = await Promise.race([
+    primeraFila.waitFor({ state: "visible", timeout: 20_000 }).then(() => "con-datos"),
+    mensajeVacio.waitFor({ state: "visible", timeout: 20_000 }).then(() => "vacia"),
+  ]).catch(() => "timeout");
+
+  if (resultado === "vacia" && !permitirVacia) {
+    throw new Error(
+      'La vista quedó VACÍA ("We didn\'t find anything to show here" o equivalente). ' +
+        "NO es un timeout de selector de boton: es la vista sin filas. Revisar la siembra " +
+        "de datos (pruebas/gui/sembrar_datos_gui.py) antes de sospechar del ribbon."
+    );
   }
-  await primeraFila.waitFor({ state: "visible", timeout: 15_000 });
+  if (resultado === "timeout") {
+    throw new Error(
+      'Pasaron 20s sin que aparezca ni una fila ([row-index="0"]) ni el mensaje de vista ' +
+        "vacía. Puede ser que la vista siga cargando, o que el texto de 'vacío' haya " +
+        "cambiado de idioma/redacción (ver PATRON_VACIO en este archivo)."
+    );
+  }
+  // "con-datos" y permitirVacia=true: se sigue de largo en cualquier caso.
 }
 
 /** Cuenta cuantas filas tiene la grilla actualmente cargada. */

@@ -1,81 +1,99 @@
-// Caso "ribbon": los 7 botones propios de la barra de Fila tienen que
-// DIBUJARSE. Es exactamente la clase de defecto que motivo este arnes: el
-// boton "Descargar para digitar" existia en el servidor (verificado por API)
-// y no se dibujaba — la causa era la metadata compilada del ribbon. Ninguna
-// prueba de API detecta eso; esta si, porque mira el DOM real.
+// Caso "ribbon": los botones propios de la barra de Fila tienen que
+// DIBUJARSE cuando corresponde. Es exactamente la clase de defecto que
+// motivo este arnes: el boton "Descargar para digitar" existia en el
+// servidor (verificado por API) y no se dibujaba — la causa era la metadata
+// compilada del ribbon. Ninguna prueba de API detecta eso; esta si, porque
+// mira el DOM real.
+//
+// ALCANCE VERIFICADO (2026-09-27, contra la app real, no supuesto): esta
+// vista ("Mis clientes - por digitar") filtra Fila por Estado = Validada
+// (diseno/05-app-model-driven.md). De los 7 botones, 5 tienen un EnableRule
+// que admite Validada (digitada, rechazadaas400, anular, atendida,
+// descargarparadigitar — ver TRANSICIONES_VALIDAS en selectores.mjs) y esos
+// son los que este caso puede probar acá. `aprobar` y `devolver` SOLO
+// admiten Estado = Digitada: no hay forma de que aparezcan seleccionando
+// filas de ESTA vista, por diseño de negocio, no por un bug. Probarlos
+// necesita la vista "Por aprobar" con una fila Digitada — pendiente, listado
+// en el README junto con los demás casos de `pruebas/05-app-y-comandos.md`
+// todavía sin cubrir.
 //
 // Ausente vs deshabilitado son diagnosticos OPUESTOS y el reporte los separa:
-//   - AUSENTE     -> sospechar metadata de ribbon (RibbonDiffXml/Command Checker)
+//   - AUSENTE cuando SÍ se esperaba -> sospechar metadata de ribbon
 //   - DESHABILITADO -> sospechar el EnableRule contra la seleccion actual
+//   - AUSENTE cuando NO se esperaba (aprobar/devolver acá) -> comportamiento correcto
 
 import { test, expect } from "@playwright/test";
 import { usuarioActivo, verificarSesionExiste } from "../ayudantes/sesion.mjs";
 import { abrirApp, irASitemap, esperarGrilla, seleccionarFilas } from "../ayudantes/navegacion.mjs";
 import { verificarBotones, formatearDiagnostico } from "../ayudantes/ribbon.mjs";
-import { BOTONES_FILA, IDIOMA_POR_DEFECTO } from "../selectores.mjs";
+import { BOTONES_FILA, ESTADOFILA, botonesEsperados } from "../selectores.mjs";
 import { SITEMAP } from "../config.mjs";
+
+const CANTIDAD_FILAS_VALIDADA = 3; // las 3 filas Validada que siembra sembrar_datos_gui.py
 
 const usuario = usuarioActivo();
 test.use({ storageState: verificarSesionExiste(usuario) });
 
-test.describe("Ribbon de Fila — presencia de los 7 botones (DN-02 y fase 1)", () => {
-  test("con una fila seleccionada, los 7 botones estan presentes y habilitados", async ({ page }) => {
-    await abrirApp(page);
-    await irASitemap(page, SITEMAP.porDigitar);
-    await esperarGrilla(page);
-    await seleccionarFilas(page, 1);
-
-    const resultados = await verificarBotones(page, BOTONES_FILA, IDIOMA_POR_DEFECTO);
-
-    // Se imprime el diagnostico de cada boton SIEMPRE (pase o falle), porque
-    // es justo lo que el reporte tiene que decir: cual esta ausente y cual
-    // deshabilitado, no un si/no generico.
-    for (const resultado of resultados) {
-      console.log(formatearDiagnostico(resultado));
-    }
-
-    const ausentes = resultados.filter((r) => !r.presente);
-    const deshabilitados = resultados.filter((r) => r.presente && !r.habilitado);
-
-    expect(
-      ausentes,
-      `Botones AUSENTES (no se dibujaron): ${ausentes.map((r) => r.id).join(", ") || "ninguno"}. ` +
-        `Sospechar metadata de ribbon compilada: regenerar desde Command Checker.`
-    ).toHaveLength(0);
-
-    expect(
-      deshabilitados,
-      `Botones presentes pero DESHABILITADOS con una fila seleccionada: ` +
-        `${deshabilitados.map((r) => r.id).join(", ") || "ninguno"}. ` +
-        `Sospechar el EnableRule del comando, no la metadata.`
-    ).toHaveLength(0);
-  });
-
-  test("sin ninguna fila seleccionada, los 7 botones estan presentes pero deshabilitados (A-05)", async ({
+test.describe("Ribbon de Fila — presencia de los botones (DN-02 y fase 1)", () => {
+  test("con filas Validada seleccionadas, los 5 comandos que las admiten están presentes y habilitados", async ({
     page,
   }) => {
     await abrirApp(page);
     await irASitemap(page, SITEMAP.porDigitar);
     await esperarGrilla(page);
-    // Sin seleccionar nada: EnableRule Mscrm.SelectionCountAtLeastOne.
+    await seleccionarFilas(page, CANTIDAD_FILAS_VALIDADA);
 
-    const resultados = await verificarBotones(page, BOTONES_FILA, IDIOMA_POR_DEFECTO);
-    for (const resultado of resultados) {
-      console.log(formatearDiagnostico(resultado));
-    }
+    const idsEsperados = botonesEsperados([ESTADOFILA.VALIDADA]);
+    const resultados = await verificarBotones(page, BOTONES_FILA, idsEsperados);
 
-    const ausentes = resultados.filter((r) => !r.presente);
+    // Se imprime el diagnostico de cada boton SIEMPRE (pase o falle): es
+    // justo lo que el reporte tiene que decir, no un si/no generico.
+    for (const resultado of resultados) console.log(formatearDiagnostico(resultado));
+
+    const ausentesInesperados = resultados.filter((r) => !r.presente && r.esperado);
     expect(
-      ausentes,
-      `Botones AUSENTES sin seleccion: ${ausentes.map((r) => r.id).join(", ") || "ninguno"}. ` +
-        `Estos botones deben estar PRESENTES (solo deshabilitados), no ausentes.`
+      ausentesInesperados,
+      `Botones AUSENTES que SÍ se esperaban con Validada: ` +
+        `${ausentesInesperados.map((r) => r.id).join(", ") || "ninguno"}. ` +
+        `Sospechar metadata de ribbon compilada: regenerar desde Command Checker.`
     ).toHaveLength(0);
 
-    const habilitados = resultados.filter((r) => r.presente && r.habilitado);
+    const deshabilitadosInesperados = resultados.filter((r) => r.presente && !r.habilitado && r.esperado);
     expect(
-      habilitados,
-      `Botones que deberian estar deshabilitados sin seleccion, y no lo estan: ` +
-        `${habilitados.map((r) => r.id).join(", ") || "ninguno"}.`
+      deshabilitadosInesperados,
+      `Botones que deberían estar HABILITADOS con Validada y no lo están: ` +
+        `${deshabilitadosInesperados.map((r) => r.id).join(", ") || "ninguno"}.`
+    ).toHaveLength(0);
+
+    const presentesInesperados = resultados.filter((r) => r.presente && !r.esperado);
+    expect(
+      presentesInesperados,
+      `Botones presentes que NO deberían estarlo con solo Validada seleccionada (revisar ` +
+        `TRANSICIONES_VALIDAS en selectores.mjs, puede estar desactualizado): ` +
+        `${presentesInesperados.map((r) => r.id).join(", ") || "ninguno"}.`
+    ).toHaveLength(0);
+  });
+
+  test("sin ninguna fila seleccionada, ningún botón propio se dibuja", async ({ page }) => {
+    // Confirmado en vivo (2026-09-27): sin selección, la plataforma NO
+    // dibuja ninguno de los 7 botones propios (no quedan "grises": el grupo
+    // entero no aparece). Distinto de lo que documentaba una versión previa
+    // de este caso, corregida tras verificar contra la app real en vez de
+    // asumir el comportamiento clásico de ribbon.
+    await abrirApp(page);
+    await irASitemap(page, SITEMAP.porDigitar);
+    await esperarGrilla(page);
+    // Sin seleccionar nada.
+
+    const resultados = await verificarBotones(page, BOTONES_FILA, []); // nada esperado
+    for (const resultado of resultados) console.log(formatearDiagnostico(resultado));
+
+    const presentes = resultados.filter((r) => r.presente);
+    expect(
+      presentes,
+      `Sin selección, no se esperaba NINGÚN botón propio, y aparecieron: ` +
+        `${presentes.map((r) => r.id).join(", ") || "ninguno"}. Si esto cambió, puede ser un ` +
+        `cambio real de comportamiento de la plataforma — revisar antes de asumir bug.`
     ).toHaveLength(0);
   });
 });

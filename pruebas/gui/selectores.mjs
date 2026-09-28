@@ -14,39 +14,39 @@
 // son un hecho, no una suposicion.
 //
 // ---------------------------------------------------------------------------------
-// ESTRATEGIA DE SELECTOR (por que texto/rol y no un `data-id` inventado):
+// ESTRATEGIA DE SELECTOR (por que texto/rol es el PRIMARIO, y el `data-id` un respaldo):
 //
 // Se investigo en la documentacion oficial de Microsoft (Microsoft Learn,
 // "Power Platform Playwright samples > Locators", 2026-09) como el propio
 // toolkit oficial de Microsoft ubica botones del command bar en Playwright.
-// La recomendacion documentada es usar locators semanticos:
+// La recomendacion documentada es usar locators semanticos por nombre
+// accesible, no CSS por `data-id` crudo.
 //
-//     page.getByRole('button', { name: '<etiqueta visible>' })
+// CORREGIDO EN VIVO (2026-09-27, con evidencia real, no de entrada): el rol
+// de accesibilidad real de estos comandos es **"menuitem"**, no "button"
+// (confirmado leyendo el `error-context.md` que Playwright adjunta a una
+// corrida fallida: `region "Fila Commands" > menubar > menuitem "Mark as
+// entered..."`). Ademas, el NOMBRE accesible de cada item es la etiqueta
+// SEGUIDA del tooltip completo, pegados sin separador (ej.: `"Mark as
+// entered Marks the selected rows as entered in AS400."`) — por eso
+// `ayudantes/ribbon.mjs` matchea por PREFIJO (`^etiqueta`), no por texto
+// exacto. Los dos hallazgos salieron de mirar el DOM real, no de la
+// documentacion general de Microsoft (que no baja a ese nivel de detalle).
 //
-// El toolkit oficial (`power-platform-playwright-toolkit`, `CommandingComponent`)
-// hace lo mismo por debajo de `clickButton(nombre)`. En NINGUN lugar de esa
-// documentacion se recomienda un CSS selector por `data-id` crudo.
-//
-// Es CIERTO que en el DOM real de Unified Interface los botones del command bar
-// suelen llevar un atributo `data-id` (viene del Id interno del comando), pero
-// su valor exacto NO esta documentado publicamente y varia con la version de
-// la plataforma. Inventarlo aca seria exactamente el error que este arnes existe
-// para evitar (una prueba que "pasa" contra un selector que en realidad no
-// corresponde a nada).
-//
-// Por eso la estrategia es:
-//   1) PRIMARIO, ya verificable hoy: `getByRole('button', { name: etiqueta })`
-//      dentro del contenedor del command bar (toolbar/menubar), con la etiqueta
-//      en el idioma de la sesion activa. Es exactamente lo que Microsoft
-//      documenta y lo que ya funciona en A-13 (multiidioma) por construccion:
-//      cambia el idioma, cambia el locator, sin tocar el resto del arnes.
-//   2) SECUNDARIO, opcional, a completar SOLO con sesion real: `dataId`.
-//      Se deja en `null` a proposito. `descubrir-selectores.mjs` (este mismo
-//      directorio) abre la vista con una sesion real, ubica cada boton por su
-//      etiqueta (estrategia 1, que no depende de `data-id`) y vuelca a consola
-//      el `data-id` que encuentre en el DOM, para pegarlo aca a mano una vez
-//      confirmado. Mientras `dataId` sea `null`, el arnes usa solo la
-//      estrategia 1 y funciona igual.
+// Por eso la estrategia final es:
+//   1) PRIMARIO, verificado en vivo: `getByRole('menuitem', { name: /^(1033|3082)/ })`
+//      dentro del "Fila Commands" menubar, probando las DOS etiquetas del
+//      boton (no se puede asumir el idioma de la sesion: la sesion de prueba
+//      disponible tenia la UI en ingles). Ver `ayudantes/ribbon.mjs`.
+//   2) SECUNDARIO, opcional: `dataId`. Se completó corriendo
+//      `descubrir-selectores.mjs` con sesión real (2026-09-27) para 5 de los
+//      7 botones — los que se pueden seleccionar desde "Mis clientes - por
+//      digitar" (Estado = Validada). Sigue el patrón
+//      `<tabla>|NoRelationship|HomePageGrid|sanic.mppp.fila.<id>.HomepageGrid.Button`.
+//      `aprobar` y `devolver` quedan en `null`: solo se dibujan con una fila
+//      en Digitada seleccionada (vista "Por aprobar"), fuera del alcance del
+//      descubrimiento hecho hasta ahora — casi seguro siguen el mismo
+//      patrón, pero no se escribe un valor sin haberlo visto en el DOM.
 //
 // Si el dia de manana un boton no aparece y la causa es la metadata compilada
 // del ribbon (el defecto que motivo este arnes), la estrategia 1 lo va a
@@ -67,7 +67,7 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 10,
     etiqueta: { 1033: "Mark as entered", 3082: "Digitada" },
-    dataId: null, // PENDIENTE de descubrir con sesion real (ver nota arriba)
+    dataId: "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.digitada.HomepageGrid.Button",
   },
   {
     id: "aprobar",
@@ -76,6 +76,14 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 20,
     etiqueta: { 1033: "Approve", 3082: "Aprobar" },
+    // PENDIENTE: no se pudo descubrir. Este comando solo se dibuja con una
+    // fila EN ESTADO DIGITADA seleccionada (TRANSICIONES_VALIDAS.aprobar), y
+    // esa vive en la vista "Por aprobar", fuera del alcance de
+    // descubrir-selectores.mjs por ahora. Sigue el mismo patrón que los
+    // demás casi con certeza (ver dataId de 'digitada' más arriba):
+    // "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.aprobar.HomepageGrid.Button"
+    // pero NO se escribe como valor real sin haberlo visto en el DOM: sería
+    // inventarlo, exactamente lo que este archivo existe para evitar.
     dataId: null,
   },
   {
@@ -85,7 +93,7 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 30,
     etiqueta: { 1033: "Rejected in AS400", 3082: "Rechazada en AS400" },
-    dataId: null,
+    dataId: "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.rechazadaas400.HomepageGrid.Button",
   },
   {
     id: "anular",
@@ -94,7 +102,7 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 40,
     etiqueta: { 1033: "Annul", 3082: "Anular" },
-    dataId: null,
+    dataId: "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.anular.HomepageGrid.Button",
   },
   {
     id: "devolver",
@@ -103,6 +111,8 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 50,
     etiqueta: { 1033: "Send back", 3082: "Devolver" },
+    // PENDIENTE, mismo motivo que 'aprobar': solo se dibuja con una fila en
+    // Digitada seleccionada (vista "Por aprobar"), no descubierto todavía.
     dataId: null,
   },
   {
@@ -112,7 +122,7 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 60,
     etiqueta: { 1033: "Mark attended", 3082: "Atendida" },
-    dataId: null,
+    dataId: "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.atendida.HomepageGrid.Button",
   },
   {
     id: "descargarparadigitar",
@@ -121,7 +131,7 @@ export const BOTONES_FILA = [
     ubicaciones: ["HomepageGrid", "SubGrid"],
     secuencia: 70,
     etiqueta: { 1033: "Download for entry", 3082: "Descargar para digitar" },
-    dataId: null,
+    dataId: "sanic_mppp_tbl_fila|NoRelationship|HomePageGrid|sanic.mppp.fila.descargarparadigitar.HomepageGrid.Button",
   },
 ];
 
@@ -142,6 +152,70 @@ export function etiquetaDe(boton, idioma = IDIOMA_POR_DEFECTO) {
     throw new Error(`El boton '${boton.id}' no tiene etiqueta para el idioma ${idioma}.`);
   }
   return etiqueta;
+}
+
+// Las dos etiquetas posibles de un boton, en el orden en que conviene
+// probarlas. NO se puede asumir el idioma de la sesion: se comprobó en vivo
+// (2026-09-27) que la sesión de prueba disponible (`local/sesion-ejecutivo.json`)
+// tiene la UI en ingles (1033), aunque el sitemap y la convención del
+// proyecto son en español — el idioma de UI es una preferencia POR USUARIO
+// (Configuración personal → Idiomas), no algo que este arnés controle. Por
+// eso `ayudantes/ribbon.mjs` prueba las dos etiquetas de cada botón en vez
+// de asumir una.
+export function etiquetas(boton) {
+  return [boton.etiqueta[1033], boton.etiqueta[3082]].filter(Boolean);
+}
+
+// Estados de Fila (`sanic_mppp_ch_estadofila`, playbooks/choice-global/) que
+// habilitan cada comando con EnableRule propio — copiado TAL CUAL de
+// `TRANSICIONES_VALIDAS` en `recursos/js/comandos.js` (función `algunaAdmite`:
+// el botón se habilita si AL MENOS UNA fila seleccionada está en uno de estos
+// estados). Los comandos que NO aparecen acá (`atendida`,
+// `descargarparadigitar`) no tienen EnableRule de estado: alcanza con
+// seleccionar algo (`Mscrm.SelectionCountAtLeastOne`).
+//
+// Confirmado EN VIVO (2026-09-27) que esto importa de verdad para el DOM, no
+// solo en teoría: con una fila en Validada seleccionada, "Approve" y "Send
+// back" NO se dibujan (desaparecen del todo, no quedan grises) porque
+// ninguna fila seleccionada admite esas dos acciones — es el EnableRule
+// funcionando bien, NO el defecto de metadata que motivó este arnés. Un caso
+// de ribbon que no tenga esto en cuenta reporta un falso positivo.
+export const ESTADOFILA = {
+  RECHAZADA_EN_VALIDACION: 159460001,
+  SIN_AUTORIZACION: 159460002,
+  VALIDADA: 159460003,
+  DIGITADA: 159460004,
+  APROBADA: 159460005,
+  RECHAZADA_EN_AS400: 159460006,
+  ANULADA: 159460007,
+};
+
+export const TRANSICIONES_VALIDAS = {
+  digitada: [ESTADOFILA.VALIDADA],
+  aprobar: [ESTADOFILA.DIGITADA],
+  rechazadaas400: [ESTADOFILA.VALIDADA, ESTADOFILA.DIGITADA],
+  anular: [ESTADOFILA.VALIDADA, ESTADOFILA.DIGITADA],
+  devolver: [ESTADOFILA.DIGITADA],
+};
+
+/**
+ * Dado el conjunto de estados de Fila seleccionados (puede repetirse), qué
+ * botones de `BOTONES_FILA` debería mostrar la barra, presentes y
+ * habilitados. Espejo exacto de `algunaAdmite` en `recursos/js/comandos.js`.
+ */
+export function botonesEsperados(estadosSeleccionados) {
+  if (!estadosSeleccionados || estadosSeleccionados.length === 0) {
+    // Confirmado en vivo: sin selección, la plataforma no dibuja NINGUNO de
+    // los 7 botones propios (no es "presentes pero deshabilitados" — es
+    // ausencia total del grupo). Distinto de lo que asumía una versión
+    // anterior de este archivo, corregido tras verificar contra la app real.
+    return [];
+  }
+  return BOTONES_FILA.filter((boton) => {
+    const requeridos = TRANSICIONES_VALIDAS[boton.id];
+    if (!requeridos) return true; // sin EnableRule de estado: siempre que haya selección
+    return estadosSeleccionados.some((estado) => requeridos.includes(estado));
+  }).map((boton) => boton.id);
 }
 
 // Columnas esperadas del .xlsx de "Descargar para digitar" (DN-02), en orden.

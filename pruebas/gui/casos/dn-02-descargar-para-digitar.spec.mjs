@@ -21,7 +21,6 @@ import { verificarBoton, formatearDiagnostico } from "../ayudantes/ribbon.mjs";
 import { leerXlsx } from "../ayudantes/xlsx.mjs";
 import {
   botonPorId,
-  IDIOMA_POR_DEFECTO,
   COLUMNAS_EXPORTACION_ESPERADAS,
   PATRON_NOMBRE_ARCHIVO_EXPORTACION,
 } from "../selectores.mjs";
@@ -45,7 +44,7 @@ test.describe("DN-02 — Descargar para digitar", () => {
     await seleccionarFilas(page, CANTIDAD_FILAS_A_PROBAR);
 
     const boton = botonPorId("descargarparadigitar");
-    const diagnostico = await verificarBoton(page, boton, IDIOMA_POR_DEFECTO);
+    const diagnostico = await verificarBoton(page, boton); // sin EnableRule de estado: siempre esperado con selección
     console.log(formatearDiagnostico(diagnostico));
 
     expect(diagnostico.presente, "El boton 'Descargar para digitar' esta AUSENTE de la barra.").toBe(true);
@@ -54,10 +53,12 @@ test.describe("DN-02 — Descargar para digitar", () => {
       "El boton 'Descargar para digitar' esta deshabilitado con filas seleccionadas."
     ).toBe(true);
 
-    const etiqueta = diagnostico.etiqueta;
+    // Se clickea el locator YA resuelto por verificarBoton (rol "menuitem",
+    // no "button" — ver la nota en ayudantes/ribbon.mjs), en vez de volver a
+    // buscarlo por texto: evita repetir el mismo error de rol dos veces.
     const [descarga] = await Promise.all([
       page.waitForEvent("download", { timeout: 30_000 }),
-      page.getByRole("button", { name: etiqueta, exact: true }).first().click(),
+      diagnostico.locator.click(),
     ]);
 
     const nombreSugerido = descarga.suggestedFilename();
