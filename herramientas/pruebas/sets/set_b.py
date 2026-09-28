@@ -127,12 +127,19 @@ def preparar(ctx):
 
 
 def cerrar(ctx):
-    """Borra, por GUID, las Solicitudes que este set creó. Ninguna versión de
-    parámetro debería seguir viva a esta altura (B-11 la desactiva en su
-    propio `finally`); si algo se cayó a mitad, el canon-después de
-    `correr.py` sigue actuando como red de seguridad sobre el VALOR de la
-    fila activa, aunque no sobre cuál fila quedó activa (§8.2 lo documenta)."""
-    return ctx.limpiar_solicitudes()
+    """Borra, por GUID, las Solicitudes que este set creó Y las versiones de
+    parámetro que `_versionar_parametro` sembró (CONVENCIONES §8.2: limpiar es
+    DESACTIVAR (B-11 ya lo hace en su propio `finally`, paso 1) Y BORRAR (acá,
+    paso 2) — "desactivar no es limpiar"). Si algo se cayó a mitad, el
+    canon-después de `correr.py` sigue actuando como red de seguridad sobre el
+    VALOR de la fila activa, aunque no sobre cuál fila quedó activa (§8.2 lo
+    documenta)."""
+    errores = ctx.limpiar_solicitudes()
+    for pid in ctx.extra.get("parametros_creados", []):
+        est, r, _ = ctx.dv.call("DELETE", f"{PARAMETROS}({pid})")
+        if est not in (200, 204, 404):
+            errores.append(f"no se pudo borrar la versión de prueba de parámetro {pid} (HTTP {est}): {r}")
+    return errores
 
 
 # ===========================================================================
@@ -233,18 +240,38 @@ def _parametro_activo(dv, nombre):
     return r["value"][0]
 
 
+def _version_maxima_sembrada(dv, nombre):
+    """La versión más alta SEMBRADA de `nombre`, activa o no (CONVENCIONES
+    §8.2: "calcular la versión nueva como máximo sembrado + 1, no 'activa +
+    1' ... protege contra restos de una corrida que murió antes de limpiar").
+    Sin filtro de `statecode` a propósito: una versión desactivada (residuo de
+    una corrida vieja que no llegó a borrar) sigue contando para no chocar
+    con la clave alternativa (HTTP 412, el defecto real que dejó documentado
+    §8.2 sobre el set E)."""
+    est, r, _ = dv.call(
+        "GET", f"{PARAMETROS}?$select=sanic_version"
+               f"&$filter=sanic_nombre eq '{nombre}'&$orderby=sanic_version desc&$top=1")
+    if est != 200 or not r.get("value"):
+        raise RuntimeError(f"no se encontró ninguna versión sembrada de {nombre!r} (HTTP {est}): {r}")
+    return int(r["value"][0]["sanic_version"])
+
+
 def _versionar_parametro(ctx, nombre, valor):
-    """Crea una versión NUEVA (fila) de `nombre` con `valor`, más alta que la
-    vigente y activa (CONVENCIONES §8.2: versionar es agregar una fila, nunca
-    editar la anterior). Devuelve el GUID de la fila nueva, para volver al
-    canon DESACTIVÁNDOLA (nunca editándola ni borrando la que ya existía)."""
-    actual = _parametro_activo(ctx.dv, nombre)
-    nueva_version = int(actual["sanic_version"]) + 1
+    """Crea una versión NUEVA (fila) de `nombre` con `valor`, en
+    **máximo sembrado + 1** (CONVENCIONES §8.2, nunca "activa + 1": protege
+    contra restos de una corrida que murió antes de limpiar). Devuelve el
+    GUID de la fila nueva y lo registra en `ctx.extra["parametros_creados"]`
+    para que `cerrar()` la BORRE — desactivarla (el caso que llama a esto lo
+    hace en su propio `finally`) es solo el paso 1 de 2; borrarla es el 2
+    (§8.2: "desactivar no es limpiar")."""
+    nueva_version = _version_maxima_sembrada(ctx.dv, nombre) + 1
     est, r, cab = ctx.dv.call("POST", PARAMETROS, {
         "sanic_nombre": nombre, "sanic_valor": valor, "sanic_version": nueva_version})
     if est not in (200, 201, 204):
         raise RuntimeError(f"no se pudo crear la versión de prueba de {nombre!r} (HTTP {est}): {r}")
-    return Dataverse.id_creado(cab)
+    pid = Dataverse.id_creado(cab)
+    ctx.extra.setdefault("parametros_creados", []).append(pid)
+    return pid
 
 
 def _desactivar_parametro(ctx, pid):
@@ -381,20 +408,30 @@ def b06(ctx):
         # En una Function, ausente y 0 son indistinguibles: Dataverse pone la clave con
         # `default(int)` cuando el bot omite el parámetro. El contrato viejo pedía las dos
         # cosas a la vez y por eso un bot que lo seguía al pie de la letra recibía un 400.
-        ("maximo=0,claimminutos=5", False, "maximo=0"),
-        ("maximo=-3,claimminutos=5", True, "maximo negativo"),
-        ("claimminutos=5", False, "sin maximo: usa el defecto, NO es error"),
-        ("maximo=5", True, "sin claimminutos: no tiene defecto, SÍ es error"),
-        ("maximo=5,claimminutos=0", True, "claimminutos=0"),
+        # El tercer elemento es el HTTP esperado del RECHAZO (None = tiene que aceptar, 200).
+        ("maximo=0,claimminutos=5", None, "maximo=0"),
+        ("maximo=-3,claimminutos=5", 400, "maximo negativo"),
+        ("claimminutos=5", None, "sin maximo: usa el defecto, NO es error"),
+        # Corregido el 2026-09-28 (diagnóstico de D-60, evaluación del set B §Paso 4): este sub-caso
+        # esperaba HTTP 400, pero verificado en vivo contra Dev da HTTP 404 "Resource not found for
+        # the segment 'sanic_mppp_capi_obtenerfilaspendientes'". `claimminutos` está declarado
+        # `isoptional: false` en `customapirequestparameters`: sin él, el ruteo OData rechaza el
+        # segmento del recurso ANTES de resolver la Function — nunca llega al plugin, nunca pasa por
+        # D-9 ni por ninguna línea de C#. No es un defecto del sistema: la plataforma hace lo
+        # correcto, solo que MÁS TEMPRANO de lo que este caso asumía. Se corrige la expectativa, no
+        # el sistema (CONVENCIONES §3: un defecto conocido no es N-A, pero tampoco se inventa uno
+        # donde la plataforma actúa bien).
+        ("maximo=5", 404, "sin claimminutos: falta un parámetro `isoptional:false` del ruteo OData"),
+        ("maximo=5,claimminutos=0", 400, "claimminutos=0"),
     ]
-    for parametros, debe_rechazar, titulo in pruebas:
+    for parametros, estado_rechazo, titulo in pruebas:
         est, cuerpo = bot.llamar(f"{OBTENER}({parametros})")
-        if debe_rechazar:
-            texto = _texto_error(cuerpo)
-            c.check(f"{titulo}: rechazada con un mensaje que nombra el parámetro",
-                    est == 400 and bool(texto), f"HTTP {est}: {cuerpo}")
-        else:
+        if estado_rechazo is None:
             c.check(f"{titulo}: acepta con HTTP 200", est == 200, f"HTTP {est}: {cuerpo}")
+        else:
+            texto = _texto_error(cuerpo)
+            c.check(f"{titulo}: rechazada con HTTP {estado_rechazo} y un mensaje que nombra la causa",
+                    est == estado_rechazo and bool(texto), f"HTTP {est}: {cuerpo}")
     return c
 
 

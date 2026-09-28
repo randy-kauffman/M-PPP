@@ -263,13 +263,21 @@ tiene defecto solo para `maximo`).
    `claimminutos` no tiene defecto)
 5. `GET sanic_mppp_capi_obtenerfilaspendientes(maximo=5,claimminutos=0)`
 
-**Qué tiene que pasar.** 1, 2, 4 y 5 rechazan con un mensaje que nombra el parámetro y exige
-"entero mayor que cero"; 3 responde 200 con el defecto de 100.
+**Qué tiene que pasar.** 1, 2 y 5 rechazan con **HTTP 400** y un mensaje que nombra el parámetro y
+exige "entero mayor que cero"; 3 responde 200 con el defecto de 100; **4 rechaza con HTTP 404**
+("Resource not found for the segment"), NO 400 — verificado en vivo contra Dev el 2026-09-28
+(diagnóstico de D-60): `claimminutos` está declarado `isoptional: false` en
+`customapirequestparameters`, así que sin él el ruteo OData rechaza el segmento del recurso ANTES
+de resolver la Function — la llamada nunca llega al plugin, nunca pasa por D-9. No es un defecto
+del sistema: la plataforma actúa correctamente, solo que más temprano de lo que esta ficha asumía
+originalmente (que esperaba 400 para los cinco sub-casos por igual).
 
 **Cómo se verifica.** Código HTTP y mensaje de cada llamada.
 
-**Cómo se sabe que falló.** Si 3 rechaza (el defecto de `maximo` dejó de aplicarse), o si 4/5
-aceptan silenciosamente un valor sin sentido.
+**Cómo se sabe que falló.** Si 3 rechaza (el defecto de `maximo` dejó de aplicarse), si 1/2/5
+aceptan silenciosamente un valor sin sentido, o si 4 deja de dar 404 (por ejemplo, si un cambio de
+registro vuelve `claimminutos` opcional: ahí sí pasaría a valer 400 desde el plugin y esta ficha
+tendría que actualizarse de nuevo).
 
 **Automatizable.** API.
 
