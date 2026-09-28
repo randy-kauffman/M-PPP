@@ -44,7 +44,7 @@ Precondición: el paquete `sanic_mppp_pkg_plugins` tiene que estar registrado
     {
       "nombre": "maximo",
       "displayname": "CAPI_IP - MPPP - Maximo",
-      "descripcion": "Cuantas filas entregar como maximo en esta llamada. Ausente: 100. Tope 500 (un valor mayor se recorta, sin error). 0 o negativo se rechaza.",
+      "descripcion": "Cuantas filas entregar como maximo en esta llamada. Ausente o 0: 100. Tope 500 (un valor mayor se recorta, sin error). Negativo se rechaza.",
       "tipo": "Integer",
       "opcional": true
     },

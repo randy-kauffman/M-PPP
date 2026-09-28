@@ -377,7 +377,11 @@ def b06(ctx):
     _crear_validadas(ctx, "Prueba B-06 parametros invalidos")
 
     pruebas = [
-        ("maximo=0,claimminutos=5", True, "maximo=0"),
+        # D-61 (2026-09-28): `0` dejó de ser un error y pasó a significar el defecto (100).
+        # En una Function, ausente y 0 son indistinguibles: Dataverse pone la clave con
+        # `default(int)` cuando el bot omite el parámetro. El contrato viejo pedía las dos
+        # cosas a la vez y por eso un bot que lo seguía al pie de la letra recibía un 400.
+        ("maximo=0,claimminutos=5", False, "maximo=0"),
         ("maximo=-3,claimminutos=5", True, "maximo negativo"),
         ("claimminutos=5", False, "sin maximo: usa el defecto, NO es error"),
         ("maximo=5", True, "sin claimminutos: no tiene defecto, SÍ es error"),
