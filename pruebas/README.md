@@ -1,113 +1,163 @@
-# Pruebas funcionales de la fase 1
+# Pruebas funcionales — MPPP
 
 Proyecto: `2026-001-referencias-planes-pago` · Entorno: **Dev**
 
-Los 170 componentes de la fase 1 están construidos y verificados **estructuralmente**: existen,
-están bien formados y están en la solución. Lo que estas pruebas comprueban es otra cosa, la que
-importa: **que hagan lo que el diseño dice que hacen**.
-
-Ningún flujo se ejecutó nunca. Ningún comando de la barra se ejecutó nunca en un navegador.
+Los componentes de la fase 1 y de la fase 2 (RPA, DN-01/02/03) están construidos y verificados
+**estructuralmente**: existen, están bien formados y están en la solución. Lo que estas pruebas
+comprueban es otra cosa, la que importa: **que hagan lo que el diseño dice que hacen**.
 
 ---
 
 ## Cómo está organizado
 
-| Archivo | Qué cubre | Casos |
-|---|---|---|
-| [`00-preparacion.md`](00-preparacion.md) | Datos, buzón, carpeta. **Se hace una sola vez** | 6 |
-| [`01-clasificacion-del-correo.md`](01-clasificacion-del-correo.md) | `MPPP-REC`, `MPPP-ING`, el plugin liviano, reglas de nivel **Correo** | 8 |
-| [`02-reglas-de-solicitud.md`](02-reglas-de-solicitud.md) | Reglas de nivel **Solicitud**: adjunto, Excel, estructura, filas | 7 |
-| [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las 8 que deciden fila por fila | 14 |
-| [`04-comunicaciones.md`](04-comunicaciones.md) | `MPPP-COM`, `MPPP-ENV`: acuse y respuesta final, "como máximo una vez" | 7 |
-| [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los 8 comandos de la barra y el diálogo de motivo | 13 |
-| [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, perfil de columnas, sitemap, 20 vistas, 10 formularios | 12 |
-| [`07-vigilancia.md`](07-vigilancia.md) | `MPPP-VIG`: los 5 bloques de recuperación | 6 |
-| [`08-integridad-y-plugins.md`](08-integridad-y-plugins.md) | Steps de plugin, catálogo de reglas, claves únicas | 9 |
+Cada archivo de esta carpeta es un **set autocontenido** (`CONVENCIONES.md` §8: no depende de otro
+archivo, prepara por su cuenta todo lo que necesita) con su letra, corrido por
+`herramientas/pruebas/correr.py`:
 
-**82 casos.** Cada uno trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
+| Letra | Archivo | Qué cubre | Casos |
+|---|---|---|---|
+| C | [`01-clasificacion-del-correo.md`](01-clasificacion-del-correo.md) | `MPPP-REC`/`MPPP-ING`, el plugin liviano, reglas de nivel **Correo**, y DN-01 (autorización por cliente) en la clasificación | 11 |
+| S | [`02-reglas-de-solicitud.md`](02-reglas-de-solicitud.md) | Reglas de nivel **Solicitud**: adjunto, Excel, estructura, filas | 7 |
+| R | [`03-reglas-de-registro.md`](03-reglas-de-registro.md) | Reglas de nivel **Registro**: las que deciden fila por fila, más DN-01/DN-03 | 18 |
+| M | [`04-comunicaciones.md`](04-comunicaciones.md) | `MPPP-COM`/`MPPP-ENV`: acuse y respuesta final, correo **real** de punta a punta | 7 |
+| A | [`05-app-y-comandos.md`](05-app-y-comandos.md) | Los comandos de la barra y el diálogo de motivo, por API con `MSCRMCallerID` | 14 |
+| G | [`06-seguridad-vistas-formularios.md`](06-seguridad-vistas-formularios.md) | Roles, privilegios efectivos, sitemap, vistas, formularios | 14 |
+| V | [`07-vigilancia.md`](07-vigilancia.md) | `MPPP-VIG`: los 5 bloques de recuperación | 7 |
+| I | [`08-integridad-y-plugins.md`](08-integridad-y-plugins.md) | Steps de plugin, catálogo de reglas, claves únicas, la puerta del RPA | 13 |
+| B | [`09-rpa-fase2.md`](09-rpa-fase2.md) | El bot RPA: Custom API, claim, orden FIFO, catálogo de errores | 20 |
+| U | [`10-autorizacion-cliente.md`](10-autorizacion-cliente.md) | DN-01: autorización por cliente, con interruptor a plan | 11 |
+| E | [`11-exportacion-excel.md`](11-exportacion-excel.md) | DN-02: descargar a Excel lo que hay que digitar | 10 |
+| O | [`12-obligatoriedad-gestion.md`](12-obligatoriedad-gestion.md) | DN-03: la obligatoriedad se define por gestión | 10 |
+| H | [`13-construido-hoy.md`](13-construido-hoy.md) | Lo construido el 2026-09-27: sitemap, vistas, formulario, la lección del ribbon | 7 |
+
+**149 casos** (contados de los encabezados `### X-NN` de cada archivo el 2026-09-27, no de un número
+viejo). Cada uno trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
+
+> **Set G, nota al 2026-09-27.** El archivo documenta 14 casos (`G-06` quedó fusionada en `G-00`/
+> `G-00b`, así que no cuenta como caso aparte); `set_g.py` está en migración activa en paralelo a
+> este cierre, así que la cantidad de casos que corren HOY por `correr.py G` puede ser menor a 14
+> por un rato — `correr.py --listar` siempre dice la verdad del momento, más que este número.
+
+### El set P desapareció
+
+`00-preparacion.md` sigue existiendo, pero **ya no es un set** (no tiene letra, `correr.py` no lo
+corre). Sus seis verificaciones se mudaron a `herramientas/pruebas/preparacion_comun.py`
+(`verificar_datos_negocio`, `verificar_excels`, `verificar_flujos_activos`,
+`verificar_estructura_plantilla`, `verificar_parametro_activo`, `verificar_roles`), y cada set migrado
+llama las que necesita desde su propio `preparar()` — así, cada set queda autocontenido de verdad
+(`CONVENCIONES.md` §8) en vez de depender de "correr `00` primero".
+
+Lo que **sigue siendo puramente manual** — y por eso `00-preparacion.md` queda como referencia, no
+como set — son las tres cosas que no son Dataverse: la carpeta `Procesados` del buzón compartido
+(P-01), los permisos de ese buzón en el Exchange admin center (P-01b) y la elección de la casilla
+real desde la que se manda correo de prueba (P-02).
 
 ---
 
-## Antes de empezar
+## Cómo se corre
 
-1. Corré **[`00-preparacion.md`](00-preparacion.md)** entero. Sin eso, la mitad de los casos no
-   tiene sentido: citan planes y autorizaciones que hay que crear.
-2. Tené a mano la herramienta de lectura, que evita andar clickeando para ver qué pasó:
+```bash
+python3 herramientas/pruebas/correr.py S            # un set
+python3 herramientas/pruebas/correr.py A,B,C        # varios, en ESE orden (no el canónico)
+python3 herramientas/pruebas/correr.py --todos      # todos los sets descubiertos, en orden canónico
+python3 herramientas/pruebas/correr.py --listar     # qué sets hay y cuántos casos, sin tocar Dev
+```
 
-   ```bash
-   python3 herramientas/pruebas/ver_solicitud.py MPPP-00001234
-   python3 herramientas/pruebas/ver_solicitud.py --ultima
-   ```
+`correr.py` toma el semáforo (`semaforo.py`), aplica el canon de parámetros de `CONVENCIONES.md` §8.2
+antes y después de cada set, corre `preparar → CASOS → cerrar` (`cerrar` siempre, aunque algo reviente
+antes), e imprime en vivo caso por caso. Un set que no se pudo preparar no corre sus casos: cero casos
+corridos es un resultado honesto, casos verdes sobre un entorno mal preparado es una mentira.
 
-   Muestra, de una sola vez: estado de la Solicitud, sus contadores, **cada regla con su
-   resultado y su razón**, las filas con su estado y su mensaje, y la Bitácora completa.
+Tené a mano la herramienta de lectura, que evita andar clickeando para ver qué pasó:
+
+```bash
+python3 herramientas/pruebas/ver_solicitud.py MPPP-00001234
+python3 herramientas/pruebas/ver_solicitud.py --ultima
+```
+
+**Este documento (`README.md`) dice CÓMO está organizado el plan** — qué archivo cubre qué, cuántos
+casos tiene, cómo se corre. **`CONVENCIONES.md` dice CÓMO se escribe una prueba** — el formato de un
+caso, el contrato de un set, el canon de configuración, el manejo de datos y sesiones. Si estás
+escribiendo o migrando un caso, es `CONVENCIONES.md` lo que tenés que seguir; si estás buscando dónde
+vive algo, es este archivo.
 
 ---
 
 ## Cómo anotar los resultados
 
-Cada archivo termina con una tabla para llenar. Poné:
+Cada archivo termina con una tabla `## Resultados` para llenar (o ya llena, de la última corrida
+real). Los tres estados posibles:
 
 - **OK** — pasó exactamente lo esperado
 - **FALLA** — pasó otra cosa. Anotá qué pasó, con el número de solicitud
-- **N/A** — no se pudo correr, y por qué
+- **N/A** — no se pudo correr, y por qué (`c.na(motivo)` en el código)
 
-**Un caso que "casi" pasa es un FALLA.** Si el estado es el correcto pero el mensaje al cliente
-dice otra cosa, es un FALLA: el mensaje lo lee el cliente del banco.
+**Un caso que "casi" pasa es un FALLA.** Si el estado es el correcto pero el mensaje al cliente dice
+otra cosa, es un FALLA: el mensaje lo lee el cliente del banco.
 
 ---
 
-## Dos advertencias
+## Esto escribe en Dev
 
-**Esto escribe en Dev.** Los casos crean Solicitudes, Filas y Bitácora reales, y mandan correos
-reales desde el buzón. Todo con datos ficticios y con planes `PR*` que se borran después
-(`preparar_datos.py --limpiar`), pero el ruido en las tablas queda.
+Los casos crean Solicitudes, Filas y Bitácora reales, y algunos (el set M, y los casos "lentos" del
+set V) mandan correo real desde buzones de prueba dedicados. Todo con datos ficticios (prefijo `PR*`
+para el fixture de negocio compartido, `ZZP-`/`zz-` para lo que crea cada corrida) y cada set borra
+por GUID, en su propio `cerrar()`, lo que él mismo creó — nunca lo de otro set ni lo de otro agente
+corriendo en paralelo (`CONVENCIONES.md` §5).
 
-**El orden importa dentro de cada archivo.** Varios casos usan la Solicitud que dejó el anterior
-(sobre todo en `04` y `05`). Cada caso dice de qué depende.
+---
+
+## Casos de alto riesgo, apagados por default
+
+Dos banderas de entorno prenden casos que por default quedan `N-A` porque su costo (tiempo real,
+degradar el sandbox compartido de Dev para cualquier otro usuario) no se paga en cada corrida:
+
+| Bandera | Qué prende | Por qué está apagada por default |
+|---|---|---|
+| `MPPP_E08_ALTO_RIESGO=si` | `E-08` (set E): ~300.000 filas hasta el límite real de memoria del sandbox | La llamada real tarda 150-170s y puede degradar el sandbox de Dataverse Dev para cualquier otro usuario mientras corre. Es un riesgo ya medido y aceptado, no un defecto — correrlo de nuevo no agrega cobertura, solo riesgo. |
+| `MPPP_V_LENTOS=si` | `V-03` a `V-07` (set V): los bloques que dependen del schedule real de `MPPP-VIG` (recurrence de 10 minutos) | Con el margen que necesita este set (3 vueltas completas + colchón), los cinco casos juntos superan las dos horas y media. |
+
+```bash
+MPPP_E08_ALTO_RIESGO=si python3 herramientas/pruebas/correr.py E
+MPPP_V_LENTOS=si python3 herramientas/pruebas/correr.py V
+```
+
+`E-07` (corte por presupuesto de tiempo) queda siempre `N-A` en `correr.py`, por una razón distinta:
+la medición real ya mostró que ni 250.000 posiciones de `filaids` se acercan al umbral, y forzar más
+volumen por API es el mismo riesgo de `E-08` sin agregar cobertura — esa cobertura puntual la da la
+prueba unitaria con reloj inyectado (`Aceptacion/ExportarParaDigitarApiAceptacion.cs`).
+
+---
+
+## Rojo a propósito: los defectos abiertos que hacen fallar casos, y por qué eso está bien
+
+Estos siete defectos de `diseno/PENDIENTES.md` están **ABIERTOS**, pospuestos por el aprobador. Los
+casos que los cruzan dan **FALLA** a propósito, y así tiene que quedar hasta que alguien los cierre:
+**ese rojo es un sensor que sigue funcionando, no un defecto de las pruebas.** Si alguna vez ves uno
+de estos casos en verde sin que el defecto se haya cerrado en `PENDIENTES.md`, sospechá del cambio,
+no le creas a la corrida.
+
+| Defecto | Dónde pega | Casos que lo cruzan | Qué pasa |
+|---|---|---|---|
+| **D-59** | `Datos/Avisos.cs:109` | C-02, C-04, C-10, C-11 (set C); R-17 (set R); U-03, U-04, U-05 (set U) | Cast de `systemuserid` como `EntityReference` en vez de `Guid` sobre `systemuserroles`: el aviso a los ejecutivos falla siempre que un correo no se puede procesar. |
+| **D-60** | `Api/RegistrarResultadoRpa.cs` → `AplicarRechazada` | B-10, B-17 (set B) | `resultado: "rechazada"` revienta con error genérico incluso con un solo ítem válido; además viola "nunca todo o nada" (un ítem bueno se pierde en el mismo lote). |
+| **D-61** | `sanic_mppp_capi_obtenerfilaspendientes` | B-05, B-06 (set B) | `maximo` está declarado opcional pero omitirlo devuelve HTTP 400 en vez de aplicar el defecto documentado (100). |
+| **D-62** | `recursos/flujos/mppp-vig.json` (arranque) | V-01 (set V, en rojo a propósito) | La etapa de arranque de los 5 bloques de `MPPP-VIG` solo encadena con `["Succeeded"]`: si un paso de arranque falla, los CINCO bloques de recuperación se saltean esa corrida. |
+| **D-63** | `Steps/ReglasDeSteps.cs:26` (`PermitidasEnFila`) | A-14 (set A) | La lista blanca de escrituras sobre Fila no incluye `sanic_requiereatencionmanual`: el botón "Atendida" da HTTP 400 real, y la fila queda trabada (el bot no la puede tomar, la persona no la puede liberar). |
+| **D-64** | DA-08 — avisos de la app (`Datos/Avisos.cs`) | G-10 (set G) | DA-08 define 5 avisos en la campana; el código solo implementa 1, y ese es justo el que revienta por D-59. Cuatro de los cinco avisos no existen. |
+| **I-07** | `pruebas/08-integridad-y-plugins.md` | I-07 (set I) | Un `PATCH` directo a `sanic_referencia` por Web API se guarda y `ListaBlancaStep` no lo bloquea — la protección de solo lectura es del formulario, no del dato. |
 
 ---
 
 ## Qué NO cubren estas pruebas
 
-Para que no haya sorpresas después:
-
-- **Rendimiento real.** `E14-volumen-100.xlsx` mira que 100 filas entren en el presupuesto de
-  10 s (`03` §1), pero no es una prueba de carga: son 7.500 filas por mes en producción.
-- **Concurrencia real de carga.** Dos correos exactamente simultáneos, o dos supervisores
-  aprobando la misma fila en el mismo instante, no se prueban acá. **D-43 ya NO está abierta**:
-  se implementó el sistema de claim con vencimiento (`sanic_claimhasta`, fase 2). Los casos que
-  prueban ese mecanismo son de fase 2 y los está escribiendo otro agente en paralelo (`09-*.md`
-  en adelante); referenciá esos archivos cuando existan, no los IDs de sus casos (no los controla
-  este documento).
+- **Rendimiento real bajo volumen productivo.** Los casos de volumen (`E14`, `E-08`) miden el
+  presupuesto de la plataforma, no una prueba de carga con el tráfico real de producción.
+- **Concurrencia real de carga** (dos correos simultáneos, dos supervisores aprobando la misma fila
+  al mismo instante). El mecanismo de claim con vencimiento (`sanic_claimhasta`) ya está implementado
+  y probado (set B, set I), pero no bajo carga concurrente real.
 - **Migración desde SharePoint** (RF-16): es de Producción, no de Dev.
-- **Fases 2 y 3** (RPA, histórico) — salvo lo ya cerrado y mencionado arriba (D-43).
-
----
-
-## Qué corre solo y qué es manual
-
-`herramientas/pruebas/corredor.py` automatiza **45 de los 82 casos** contra Dev, sin correo real,
-usando `simulador.py` para llamar a las dos Custom API (clasificación y validación) igual que lo
-haría el flujo. Antes de correr algo a mano, fijate si ya lo cubre:
-
-```bash
-python3 herramientas/pruebas/corredor.py --cobertura   # solo imprime qué cubre y qué no, sin tocar Dev
-python3 herramientas/pruebas/corredor.py               # corre los 45 y limpia sus datos al final
-```
-
-| Archivo | Automatizados (API, `corredor.py`) | Manuales |
-|---|---|---|
-| `00` | P-03, P-04, P-05, P-06 | P-01, P-01b, P-02 |
-| `01` | C-01, C-02, C-03, C-04, C-07, C-08 | C-05, C-06 |
-| `02` | S-01 a S-07 (los 7) | — |
-| `03` | R-01 a R-14 (los 14) | — |
-| `04` | — | M-01 a M-07 (los 7): todos exigen `Mail.Send` real |
-| `05` | A-06, A-07, A-10 (proxy de servidor, `--con-comportamiento-roles`) | A-01 a A-05, A-08, A-09, A-11 a A-13: ribbon/UI de navegador |
-| `06` | G-06, G-12 (además `G-00`/`G-00b` corren aparte, con `verificar_accesos.py` y `comportamiento_roles.py`) | G-01 a G-05, G-07 a G-11: lo que SE VE en el navegador |
-| `07` | — | V-01 a V-06 (los 6): dependen del schedule real de Power Automate |
-| `08` | I-01 a I-09 (los 9) | — |
-
-`NO_CUBIERTOS` dentro de `corredor.py` trae el motivo exacto de cada caso manual, caso por caso.
-**No repitas a mano lo que ya corre solo**: corré `corredor.py` primero y dedicá el tiempo humano
-a lo que de verdad exige un navegador, un correo real o esperar un schedule.
+- **Fase 3** (histórico): todavía no construida.
+- **Lo que solo se ve en un navegador** (ribbon, íconos, multiidioma renderizado, recorte de sitemap
+  por rol): eso lo cubre el arnés de Playwright en `pruebas/gui/` (ver su propio README), no este
+  motor de casos por API.
