@@ -114,11 +114,27 @@ El bot **consulta**; la solución nunca lo llama a él (los bots de Automation A
 
 | Parámetro | Dirección | Tipo | Nota |
 |---|---|---|---|
-| `maximo` | entrada | Integer | **Cuántas filas entregar como máximo en esta llamada.** El bot pide lo que puede procesar: `maximo = 10` devuelve 10, no 100. Defecto 100; **tope 500** (un valor mayor se recorta al tope, sin error); 0 o negativo se rechaza. |
+| `maximo` | entrada | Integer | **Cuántas filas entregar como máximo en esta llamada.** El bot pide lo que puede procesar: `maximo = 10` devuelve 10, no 100. **Ausente o 0 → defecto 100**; **tope 500** (un valor mayor se recorta al tope, sin error); **negativo** se rechaza. |
 | `claimminutos` | entrada | Integer | **Por cuánto tiempo el bot reserva las filas que se lleva.** Entero **mayor que 0**; mayor que `rpa.minutos.claimmaximo` se recorta al tope, igual que `maximo`. Ver "El claim" más abajo. |
 | `filas` | salida | String (JSON) | Arreglo de filas en estado **Validada**, y de filas **Digitada** cuyo `digitadapor` es **exactamente el usuario que llama** (las que le falta aprobar). Ver "Qué filas entran" más abajo. |
 | `entregadas` | salida | Integer | Cuántas filas trae **este** lote. Evita que el bot tenga que parsear para contar, y hace evidente en el log si el lote vino corto. |
 | `pendientes` | salida | Integer | Cuántas quedan sin entregar **después** de este lote. Con esto el bot decide si vuelve a llamar enseguida o espera su próxima corrida; sin esto, 2.500 filas podrían esperar horas sin que nadie lo sepa. |
+
+> **Corregido el 2026-09-28 (D-61): "ausente → defecto 100" y "0 o negativo → error" no pueden convivir en una
+> Function.** El contrato decía las dos cosas a la vez, y son incompatibles: `sanic_mppp_capi_obtenerfilaspendientes`
+> es una Function, y en una Function **Dataverse pone la clave en `InputParameters` con el default del tipo**
+> (`default(int) == 0`) también cuando el bot omite el parámetro — nunca la deja afuera. Ausente y 0 llegan
+> exactamente igual: el código no tiene forma de distinguirlos. Probado en Dev, con sintaxis simple y con alias
+> OData: un bot que sigue el contrato al pie de la letra y **no manda `maximo`** recibía HTTP 400, porque el
+> código leía la clave, la encontraba con 0 y aplicaba la regla de "0 se rechaza".
+>
+> **Decisión del aprobador**: **0 pasa a significar "el defecto" (100)**, igual que la ausencia. Pedir cero filas
+> no le sirve a nadie — ni al bot, que no puede hacer nada con una respuesta vacía a propósito, ni al negocio, que
+> no gana nada frenando esa llamada con un error. Un **negativo** sí se sigue rechazando: a diferencia de 0, un
+> negativo **nunca** es el default de un `int` omitido, así que es distinguible de la ausencia — es un valor que
+> alguien mandó a propósito, y ahí el error sigue siendo la señal correcta.
+>
+> La tabla de arriba ya refleja el contrato corregido: **"Ausente o 0 → defecto 100"**.
 
 Por cada fila: `filaid`, solicitud, número de fila, estado, plan, **tipo de formato del plan**, gestión, clasificación, nombre, tipo y número de identificación, número de cuenta, moneda, banco **con su código de 3 dígitos**, `fechavalidada`, y **dos referencias**:
 

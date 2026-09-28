@@ -74,8 +74,49 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             new ObtenerFilasPendientesApi().Execute(ctx); // no lanza
         }
 
+        /// <summary>
+        /// D-61, corregido `diseno/03-contratos-custom-api.md` §2 (nota fechada 2026-09-28): en una Function,
+        /// Dataverse pone la clave en `InputParameters` con el DEFAULT del tipo (`default(int) == 0`) también
+        /// cuando el bot omite el parámetro — la clave queda PRESENTE, nunca ausente. Ausente y 0 son
+        /// indistinguibles, así que un bot que sigue el contrato al pie de la letra y no manda `maximo` hoy
+        /// recibe HTTP 400 real. El fixture reproduce eso (la clave presente con 0), no la remueve: removerla
+        /// modelaría una plataforma que no existe (lección de D-59). Decisión del aprobador: 0 pasa a significar
+        /// "el defecto" (100). Se prueba con 2 filas sembradas para distinguir "usa el defecto" de "cero filas":
+        /// si el código tratara 0 como límite literal, `entregadas` daría 0, no 2.
+        /// </summary>
+        [Fact]
+        public void Maximo_en_cero_se_trata_como_ausente_y_usa_el_defecto()
+        {
+            var (ctx, svc, _) = ArmarBot();
+            ctx.Contexto.InputParameters[ObtenerFilasPendientesApi.ParametroMaximo] = 0;
+
+            var planId = svc.Sembrar(new Entity(Tablas.Plan) { ["statecode"] = new OptionSetValue(Tablas.Activo), ["sanic_tipoformato"] = new OptionSetValue((int)Sanic.Mppp.Plugins.Dominio.TipoDeFormatoDelPlan._06) });
+            var solicitudId = svc.Sembrar(new Entity(TablasHistorico.Solicitud) { ["sanic_nombre"] = "MPPP-00000123" });
+            for (var i = 1; i <= 2; i++)
+            {
+                svc.Sembrar(new Entity(TablasHistorico.Fila)
+                {
+                    ["sanic_estado"] = new OptionSetValue((int)Sanic.Mppp.Plugins.Dominio.EstadoDeLaFila.Validada),
+                    ["sanic_fechavalidada"] = Ahora,
+                    ["sanic_numerofila"] = i,
+                    ["sanic_requiereatencionmanual"] = false,
+                    ["sanic_solicitudid"] = new EntityReference(TablasHistorico.Solicitud, solicitudId),
+                    ["sanic_planid"] = new EntityReference(Tablas.Plan, planId),
+                });
+            }
+
+            new ObtenerFilasPendientesApi().Execute(ctx); // no lanza: 0 es "el defecto", no "cero filas"
+
+            var salidas = ctx.Contexto.OutputParameters;
+            Assert.Equal(2, salidas[ObtenerFilasPendientesApi.SalidaEntregadas]);
+            Assert.Equal(0, salidas[ObtenerFilasPendientesApi.SalidaPendientes]);
+        }
+
+        /// <summary>
+        /// `-1` sigue siendo error: a diferencia de 0, un negativo NUNCA es el default de un `int` omitido
+        /// (`default(int) == 0`), así que es distinguible de la ausencia — es un valor que alguien mandó a propósito.
+        /// </summary>
         [Theory]
-        [InlineData(0)]
         [InlineData(-1)]
         [InlineData("no soy un entero")]
         public void Maximo_presente_pero_invalido_es_un_error_de_entrada(object valor)

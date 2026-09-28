@@ -13,8 +13,9 @@ namespace Sanic.Mppp.Plugins.Api
     /// pruebas `ObtenerFilasPendientesApiAceptacion`):
     ///  - <see cref="PuertaDelRpa.Exigir"/> es la PRIMERA línea de lógica (diseno/03 encabezado, D-9): antes de leer
     ///    cualquier parámetro de entrada, para no gastar nada en un llamador no autorizado;
-    ///  - `maximo` (Integer, OPCIONAL): ausente → defecto 100; presente y no es entero, o es 0 o negativo →
-    ///    <see cref="InvalidPluginExecutionException"/>; el recorte al tope (500) lo hace el dominio;
+    ///  - `maximo` (Integer, OPCIONAL): ausente O 0 → defecto 100 (corregido 2026-09-28: en una Function ausente
+    ///    y 0 son indistinguibles); presente y no es entero, o es negativo → <see cref="InvalidPluginExecutionException"/>;
+    ///    el recorte al tope (500) lo hace el dominio;
     ///  - `claimminutos` (Integer, REQUERIDO): ausente, no es entero, 0 o negativo → <see cref="InvalidPluginExecutionException"/>;
     ///  - salidas `filas` (String, JSON), `entregadas` (Integer), `pendientes` (Integer), con esos nombres exactos;
     ///  - el servicio se crea con SYSTEM (`CreateOrganizationService(null)`, diseno/04 §1); quien llama es
@@ -93,7 +94,14 @@ namespace Sanic.Mppp.Plugins.Api
             }
         }
 
-        /// <summary>`maximo`: OPCIONAL. Ausente → 100 (diseno/03 §2). Presente y no es un entero positivo → error.</summary>
+        /// <summary>
+        /// `maximo`: OPCIONAL. Ausente → 100 (diseno/03 §2, corregido 2026-09-28). En una Function, Dataverse
+        /// pone la clave en `InputParameters` con el default del tipo (`default(int) == 0`) también cuando el
+        /// bot la omite: ausente y 0 llegan IGUAL, indistinguibles. Por eso 0 se trata exactamente como ausente
+        /// → defecto 100. Un NEGATIVO sigue siendo error: a diferencia de 0, nunca es el default de un `int`
+        /// omitido, así que es distinguible — es un valor que alguien mandó a propósito. Lo mismo si no es un
+        /// entero.
+        /// </summary>
         private static int LeerMaximo(IPluginExecutionContext contexto)
         {
             if (!contexto.InputParameters.Contains(ParametroMaximo))
@@ -101,7 +109,17 @@ namespace Sanic.Mppp.Plugins.Api
                 return ReglasDelRpa.MaximoPorDefecto;
             }
 
-            if (!(contexto.InputParameters[ParametroMaximo] is int maximo) || maximo <= 0)
+            if (!(contexto.InputParameters[ParametroMaximo] is int maximo))
+            {
+                throw new InvalidPluginExecutionException($"El parámetro '{ParametroMaximo}' tiene que ser un entero mayor que cero.");
+            }
+
+            if (maximo == 0)
+            {
+                return ReglasDelRpa.MaximoPorDefecto; // ausente y 0 son indistinguibles en una Function (diseno/03 §2).
+            }
+
+            if (maximo < 0)
             {
                 throw new InvalidPluginExecutionException($"El parámetro '{ParametroMaximo}' tiene que ser un entero mayor que cero.");
             }
