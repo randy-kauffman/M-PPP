@@ -4,7 +4,10 @@
 hizo `git push`, ni tag, ni GitHub release: eso queda para quien apruebe.
 
 Preparado el 2026-09-28, rama `cierre/fase-1`, contra el release anterior
-**`v1.0.0`** (2026-09-24, "Fase 1 — solución unmanaged 1.0.0.0").
+**`v1.0.0`** (2026-09-24, "Fase 1 — solución unmanaged 1.0.0.0"). Esta versión
+del documento reemplaza al borrador anterior: el aprobador ya decidió la
+versión de la solución y el coordinador ya corrigió los datos de Dev; acá se
+reflejan los números finales.
 
 ---
 
@@ -74,12 +77,13 @@ identidad exenta por diseño (el propio service principal del arnés de pruebas
 cuenta como "código de servidor"); rehecho impersonando usuarios humanos reales,
 la lista blanca funciona como se diseñó.
 
-> **Nota de verificación del coordinador de este release**: la consigna original
-> decía "D-59 a D-66, más I-07". `PENDIENTES.md` muestra **D-67 también CERRADA
-> el 2026-09-28**, con el mismo patrón de evidencia que las otras ocho (commit,
-> ensamblado, verificación independiente). Se cuenta acá porque la tabla de
-> arriba ya suma nueve reparadas de punta a punta (D-59 a D-67); si el rango
-> pretendía excluir a D-67 a propósito, hace falta que el aprobador lo confirme.
+**Cerrado, confirmado por el aprobador**: el rango de defectos reparados es
+**D-59 a D-67 (nueve)**, con **I-07 aparte** porque no era defecto. El borrador
+anterior de este documento dejaba abierta la duda de si D-67 debía contarse
+(la consigna original decía "D-59 a D-66, más I-07"); `PENDIENTES.md` ya
+mostraba a D-67 cerrada el 2026-09-28 con el mismo patrón de evidencia que las
+otras ocho (commit, ensamblado, verificación independiente), y el aprobador
+confirmó que sí cuenta. Son nueve reparadas de punta a punta.
 
 ---
 
@@ -97,49 +101,54 @@ cuatro puntos, sobre todo D-69 (un caso de prueba en rojo) y D-71 (un riesgo de
 concurrencia real, sin mitigar, en los cuatro flujos vivos), son candidatos a
 condición de aceptación antes de publicar, no solo a nota al pie.
 
+**Resumen de estado del release**: **9 defectos cerrados** (D-59 a D-67) +
+**4 abiertos** (D-68 a D-71). El release cuenta las dos cosas.
+
 ---
 
-## 4. Versión propuesta
+## 4. Versión de la solución: `1.1.0.0`
 
-**Hallazgo previo a la propuesta**: el campo `version` de la solución en
-Dataverse **sigue en `1.0.0.0`** — nunca se incrementó desde `v1.0.0`, a pesar
-de toda la fase 2. Es distinto del *ensamblado* de plugins (`Sanic.Mppp.Plugins.dll`),
-que sí avanzó release a release y hoy está en **`1.0.19.0`** (`AssemblyVersion`/
-`FileVersion` del `.csproj`, verificado además dentro del `.nupkg` exportado hoy:
-el binario trae literalmente la cadena `1.0.19.0`, no `1.0.0.0`). Son dos
-números independientes y hoy están desalineados. **No toqué el campo `version`
-de la solución en Dev** — el export de hoy sigue llevando `1.0.0.0` adentro,
-a propósito, para no tomar por mi cuenta una decisión que es del aprobador.
+**Hallazgo que originó esta decisión**: el campo `version` de la solución en
+Dataverse **seguía en `1.0.0.0`** — nunca se había incrementado desde `v1.0.0`,
+a pesar de toda la fase 2. Es distinto del *ensamblado* de plugins
+(`Sanic.Mppp.Plugins.dll`), que sí avanzó release a release y hoy está en
+**`1.0.19.0`** (`AssemblyVersion`/`FileVersion` del `.csproj`). Son dos números
+independientes: uno versiona el paquete de la solución completa, el otro solo
+el binario de plugins.
 
-**Propuesta: `2.0.0.0`.**
+**Decisión del aprobador: `1.1.0.0`** (la alternativa conservadora sobre
+`2.0.0.0` que se había propuesto). Justificación: **todo lo nuevo de esta fase
+es aditivo y retrocompatible**, así que corresponde un incremento de *minor*,
+no uno de *major*, según semver estricto:
 
-Por qué no es un parche ni un minor menor:
-- Entró una **fase entera** (fase 2: automatización con bot, identidad y rol
-  propios, dos Custom API nuevas) — no un fix, no una feature chica.
-- Entraron **tres directivas de negocio** (DN-01, DN-02, DN-03) que tocan el
-  corazón del sistema: el modo de autorización (`AUTORIZACION_CORREO_PLAN`
-  cambia de vía según parámetro), una vía de exportación de datos sensibles
-  nueva, y una segunda forma de calcular obligatoriedad.
-- **Cierra el alcance original del proyecto**: la fase 3 quedó formalmente
-  descartada (`DIRECTRICES-NUEVAS.md`), así que esta no es "una fase más": es
-  la versión que entrega TODO lo que el proyecto se propuso, contra `v1.0.0`
-  que era fase 1 nada más.
-- Se repararon 9 defectos reales, varios graves (D-59, D-60 rompían caminos
-  centrales: avisos y el rechazo del bot).
+- DN-01 nace con el parámetro `autorizacion.modo` sembrado en `plan`
+  (comportamiento de hoy); nadie que no toque el parámetro nota diferencia.
+- DN-03 sin `porGestion` se comporta exactamente igual que antes; el ajuste es
+  opt-in por parámetro.
+- El bot RPA es una capacidad enteramente nueva y aditiva (dos Custom API y un
+  rol propio): no reemplaza ni modifica un camino existente.
+- Ningún consumidor existente de la solución se rompe con este release.
 
-**Alternativa más conservadora, con su tradeoff**: `1.1.0.0` (minor), si se
-interpreta semver estricto — nada de lo nuevo rompe un consumidor existente:
-DN-01 nace con el parámetro en `plan` (comportamiento de hoy), DN-03 sin
-`porGestion` se comporta igual que antes, y el bot es una capacidad ADITIVA
-(nadie que no lo use nota diferencia). El tradeoff: un `1.1.0.0` no comunica
-que el proyecto cerró su alcance completo, y alguien que solo mire el número
-puede subestimar el tamaño del cambio.
+El campo `version` de la solución en Dev ya fue actualizado a `1.1.0.0` por el
+coordinador (verificado: `solutions?$select=version` devuelve `1.1.0.0`), y
+los dos `.zip` de este release se re-exportaron después de esa actualización y
+después de publicar las personalizaciones — ya no llevan `1.0.0.0` adentro.
 
-**Decide el aprobador.** Si elige `2.0.0.0` o cualquier otro número, hace falta
-además **actualizar el campo `version` de la solución en Dev** (Web API o
-`pac`, fuera del alcance de este agente) y volver a exportar — los dos `.zip`
-de hoy quedan con `1.0.0.0` adentro y sirven de base de contenido, no de
-paquete final con el número ya puesto.
+### Hallazgos de esta corrida que quedaron resueltos en este release
+
+1. **La versión de la solución nunca se había incrementado desde fase 1.**
+   Quedaba en `1.0.0.0` pese a que la fase 2 agregó tres directivas de negocio
+   y un bot RPA completo. Corregido a `1.1.0.0` (ver arriba).
+2. **`plantilla.obligatoriedad` y `rpa.lote.maximo` tenían dos versiones
+   activas simultáneas** (v1 y v2 de cada uno), violando DD-02
+   ("cambiar de versión desactiva la anterior; la vigente nunca se edita").
+   El coordinador desactivó las versiones v1 duplicadas. Verificado en esta
+   corrida: **19 parámetros activos, 19 nombres distintos, cero duplicados**
+   (antes eran 21 filas activas para 19 nombres).
+
+Ninguno de los dos hallazgos tiene ticket propio en `diseno/PENDIENTES.md`
+(no son parte de D-68 a D-71): son correcciones de datos de release, no
+defectos de código, y ya están resueltas al día de esta corrida.
 
 ---
 
@@ -147,10 +156,16 @@ paquete final con el número ya puesto.
 
 | Archivo | Qué es | Verificado |
 |---|---|---|
-| `sanic_mppp_sol_mantenimientoppp_1_0_0_0_fase2cierre_20260928_unmanaged.zip` | Export unmanaged, `ExportSolution` (`Managed: false`), publicado ANTES de exportar (`PublishAllXml`). | `solution.xml`: `UniqueName=sanic_mppp_sol_mantenimientoppp`, `Version=1.0.0.0`, `Managed=0`. Trae las 5 Custom API (incluidas `exportarparadigitar`, `obtenerfilaspendientes`, `registrarresultadorpa`) y `sanic_mppp_tbl_autorizacioncliente`. El `.nupkg` de plugins trae el DLL con la cadena `1.0.19.0` (no `1.0.0.0`). |
-| `sanic_mppp_sol_mantenimientoppp_1_0_0_0_fase2cierre_20260928_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Managed=1`, mismo `UniqueName` y `Version`, mismo contenido de fase 2 y mismo DLL `1.0.19.0`. |
-| `sanic_mppp_tbl_parametros_activos_2026-09-28.xlsx` | 21 filas activas de `sanic_mppp_tbl_parametro` (19 nombres distintos; ver nota abajo). Columnas: Nombre, Versión, Tipo, Valor, Descripción. | Releído después de guardado; el valor de `servicio.cuenta` sale enmascarado. |
-| `sanic_mppp_tbl_reglas_activas_2026-09-28.xlsx` | 15 filas activas de `sanic_mppp_tbl_regla` (todas las reglas activas del catálogo). Columnas: Código, Nivel, Orden, Efecto, Dependencias, Estado. | Releído después de guardado; ningún valor sensible. |
+| `sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip` | Export unmanaged, `ExportSolution` (`Managed: false`), publicado ANTES de exportar (`PublishAllXml`, body `{}`). | `solution.xml`: `UniqueName=sanic_mppp_sol_mantenimientoppp`, `Version=1.1.0.0`, `Managed=0`. El `.nupkg` de plugins trae el DLL con la cadena `1.0.19.0` (no `1.0.0.0`; único valor `1.0.x.0` encontrado en el binario). |
+| `sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Version=1.1.0.0`, `Managed=1`, mismo `UniqueName`. Mismo DLL `1.0.19.0` dentro del `.nupkg`. |
+| `sanic_mppp_tbl_parametros_activos_2026-09-28.xlsx` | **19 filas activas** de `sanic_mppp_tbl_parametro` (19 nombres distintos, cero duplicados — ya no hay 21 filas para 19 nombres). Columnas: Nombre, Version, Tipo, Valor, Descripcion. | Releído después de guardado; el valor de `servicio.cuenta` sale enmascarado; el resto de los 19 valores se revisó de nuevo, uno por uno, contra la corrida anterior. |
+| `sanic_mppp_tbl_reglas_activas_2026-09-28.xlsx` | 15 filas activas de `sanic_mppp_tbl_regla` (sin cambios respecto a la corrida anterior — la corrección de datos fue solo sobre parámetros). Columnas: Codigo, Nivel, Orden, Efecto, Dependencias, Estado. | Releído después de guardado; ningún valor sensible; contenido idéntico fila por fila a la exportación previa. |
+
+Se borraron los cuatro artefactos de la corrida anterior con `1_0_0_0` /
+21 filas en el nombre o el contenido (creados en el commit `d358b11`): los
+dos `.zip` con `1.0.0.0` adentro, y los dos `.xlsx` quedaron regenerados en el
+mismo nombre de archivo (no versionan por número de release, así que
+"borrarlos" fue sobrescribirlos con el contenido corregido).
 
 ### Enmascarado en los Excel — qué se tapó y qué se revisó
 
@@ -163,15 +178,9 @@ paquete final con el número ya puesto.
   tenant id ni URL de entorno. `rpa.codigos`, `plantilla.listas` y
   `exportacion.columnas` traen JSON de configuración de negocio (catálogos de
   banco, mensajes al cliente, mapeo de columnas) sin identificadores del
-  tenant. Nada más se enmascaró.
-- **Hallazgo adicional, sin enmascarar (no es un secreto, es un dato)**:
-  `plantilla.obligatoriedad` y `rpa.lote.maximo` tienen **dos filas activas**
-  cada uno (versión 1 y versión 2), cuando DD-02 dice explícitamente que
-  cambiar de versión tiene que desactivar la anterior ("nunca se edita la
-  vigente"). Los dos Excel muestran las dos versiones tal como están en Dev
-  (fiel a "solo los activos"), pero esto es una inconsistencia de datos que
-  vale la pena que alguien revise y desactive la versión vieja — no es parte
-  de los D-68 a D-71 numerados, así que no se le abrió ticket por su cuenta.
+  tenant. Nada más se enmascaró. `plantilla.obligatoriedad` (ahora solo v2) y
+  `rpa.lote.maximo` (ahora solo v2) se revisaron también: mismo contenido que
+  la versión vigente de la corrida anterior, sin datos sensibles.
 
 ---
 
@@ -180,11 +189,25 @@ paquete final con el número ya puesto.
 ```
 python3 - <<'PY'
 import zipfile, re
-for n in ["sanic_mppp_sol_mantenimientoppp_1_0_0_0_fase2cierre_20260928_unmanaged.zip",
-          "sanic_mppp_sol_mantenimientoppp_1_0_0_0_fase2cierre_20260928_managed.zip"]:
+for n in ["sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip",
+          "sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_managed.zip"]:
     z = zipfile.ZipFile(f"solution/{n}")
     sol = z.read("solution.xml").decode()
     print(n, re.search(r"<Version>([^<]+)</Version>", sol).group(1),
           re.search(r"<Managed>([^<]+)</Managed>", sol).group(1))
+PY
+```
+
+Para el DLL de plugins dentro del `.nupkg` (confirma `1.0.19.0`, no la
+fecha del archivo):
+
+```
+python3 - <<'PY'
+import zipfile, io, re
+z = zipfile.ZipFile("solution/sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip")
+nupkg = z.read("pluginpackages/sanic_mppp_pkg_plugins/package/sanic_mppp_pkg_plugins.nupkg")
+nz = zipfile.ZipFile(io.BytesIO(nupkg))
+dll = nz.read("lib/net462/Sanic.Mppp.Plugins.dll").decode("latin1")
+print(sorted(set(re.findall(r"\b1\.0\.\d{1,2}\.0\b", dll))))
 PY
 ```
