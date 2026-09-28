@@ -25,8 +25,9 @@ sets; cada set (`sets/set_<letra>.py`) sabe únicamente de sus propios casos:
   sigue con el siguiente set. Cero casos corridos es un resultado honesto;
   casos verdes sobre un entorno mal preparado es una mentira.
 
-`corredor.py` sigue vivo mientras el resto de los sets (C, R, M, A, G, V, I)
-se migran uno por uno (CONVENCIONES §8.1: se serializa, no hay apuro).
+`corredor.py` se retiró el 2026-09-27, con los 12 sets ya migrados y después de
+verificar uno por uno que ninguno de sus 83 Ids quedaba huérfano. Este es el
+único corredor.
 """
 import argparse
 import os

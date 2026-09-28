@@ -53,6 +53,7 @@ Se corre DESPUES de `app.py`: la app y su sitemap tienen que existir ya.
         "sanic_mppp_tbl_plan",
         "sanic_mppp_tbl_autorizado",
         "sanic_mppp_tbl_autorizacionplan",
+        "sanic_mppp_tbl_autorizacioncliente",
         "sanic_mppp_tbl_parametro",
         "sanic_mppp_tbl_regla",
         "sanic_mppp_tbl_resultadoregla",
@@ -67,5 +68,5 @@ Se corre DESPUES de `app.py`: la app y su sitemap tienen que existir ya.
 ## 3. Precondiciones
 
 - La app `sanic_mppp_mda_mantenimientoppp` existe y ya tiene su sitemap enganchado (`app.py`).
-- Las 10 tablas existen en el entorno.
+- Las 12 tablas existen en el entorno.
 - La solucion es unmanaged y su publisher coincide con el de Identidad.
