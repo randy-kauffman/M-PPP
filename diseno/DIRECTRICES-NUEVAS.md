@@ -537,7 +537,18 @@ no hay filas confiables a las que asignarle un motivo.
 | `MPPP-CAR-010` | `plantilla = true` y además vino `archivo`: no se adivina cuál de las dos cosas se quiso |
 
 **Excel de resultado.** Las mismas columnas, con los valores tal como se leyeron, más una columna al
-final, **Resultado**, y la fila 1 de encabezados igual. Valores posibles de Resultado:
+final, **Resultado**, y la fila 1 de encabezados igual.
+
+> **Precisado el 2026-10-01 (arquitecto, al diseñar el armador): la columna Resultado es parte de la PLANTILLA.**
+> El diálogo le dice al usuario "corregí y volvé a subirlo". Si la columna Resultado solo apareciera en el archivo
+> de resultado, el modo estricto rechazaría el archivo corregido por traer una columna de más ("la celda L1 trae
+> un valor…"): una trampa. Por eso la plantilla vacía ya nace con **Resultado** como última columna (**L** en
+> `CargaCatalogos`, **G** en `ActivarDesactivar`), con su encabezado exigido como los demás y su contenido
+> **nunca leído** (es solo de salida). Plantilla, archivo de resultado y archivo corregido tienen la misma forma:
+> se baja, se corrige y se vuelve a subir tal cual. Cualquier cosa después de esa columna sigue siendo rechazo.
+> Las filas del archivo de resultado van en el **mismo número de fila** que en el archivo subido, para que "Fila 7"
+> en un mensaje sea la fila 7 que el usuario ve. Las celdas se escriben siempre como **texto** (nunca fórmula: un
+> valor que empieza con `=` queda como texto). Valores posibles de Resultado:
 
 - `Error: <motivo>` (puede haber varios en una fila, separados por ` | `; **se reportan todos los errores de la fila**, no solo el primero, para que se corrija de una vez).
 - `Advertencia: <motivo>`.
