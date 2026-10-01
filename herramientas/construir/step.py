@@ -21,7 +21,7 @@ Nunca borra un step ni una imagen. Un step de más se denuncia; sacarlo lo
 decide una persona.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -31,6 +31,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -411,6 +412,7 @@ def _procesar_step(dv, catalogo, s, solution_id, solucion, escribir, completar, 
 
     fila = _leer_step(dv, plugintype_id, mensaje_id, filtro_id)
     hubo_escritura = False
+    hubo_alta = False
 
     if fila is None:
         if not escribir:
@@ -423,11 +425,12 @@ def _procesar_step(dv, catalogo, s, solution_id, solucion, escribir, completar, 
         if fila is None:
             return "error", [f"{s['nombre']}: el alta no dio error pero el step no aparece al releer"]
         hubo_escritura = True
+        hubo_alta = True
 
     step_id = exigir_forma(
         fila.get("sdkmessageprocessingstepid"), str, C_STEPS, "sdkmessageprocessingstepid", no_vacio=True
     )
-    if escribir and completar and not hubo_escritura and _diferencias_del_step(s, fila):
+    if escribir and completar and not hubo_alta and _diferencias_del_step(s, fila):
         est, resp, _ = escribir_metadatos(
             dv, "PATCH", f"sdkmessageprocessingsteps({step_id})", _cuerpo_corregible(s), dormir=dormir, solucion=solucion
         )
@@ -460,7 +463,7 @@ def _procesar_step(dv, catalogo, s, solution_id, solucion, escribir, completar, 
 
     if difs:
         return ("error" if hubo_escritura else "difiere"), difs
-    return ("creado" if hubo_escritura else "ya_existia"), []
+    return estado_de_escritura(hubo_alta, hubo_escritura), []
 
 
 def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente, dormir):
@@ -469,7 +472,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     catalogo = Catalogo(dv)
     escribir = not solo_verificar
 
-    creados, existian, difs = [], [], []
+    creados, actualizados, existian, difs = [], [], [], []
     for s in datos["steps"]:
         accion, d = _procesar_step(dv, catalogo, s, solution_id, solucion, escribir, completar, dormir)
         if accion == "error":
@@ -478,16 +481,19 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
             difs.extend(d)
         elif accion == "creado":
             creados.append(s["nombre"])
+        elif accion == "actualizado":
+            actualizados.append(s["nombre"])
         else:
             existian.append(s["nombre"])
 
     if difs:
-        estado = "error" if creados else "difiere"
-        prefijo = "se escribió pero no quedó bien: " if creados else ""
+        estado = "error" if creados or actualizados else "difiere"
+        prefijo = "se escribió pero no quedó bien: " if creados or actualizados else ""
         return estado, componente, prefijo + "; ".join(difs)
 
-    resumen = f"{len(creados)} registrados y {len(existian)} que ya estaban, de {len(datos['steps'])}, en la solución '{solucion}'"
-    return ("creado" if creados else "ya_existia"), componente, resumen
+    resumen = (f"{len(creados)} registrados, {len(actualizados)} actualizados y {len(existian)} que ya estaban, "
+               f"de {len(datos['steps'])}, en la solución '{solucion}'")
+    return estado_de_escritura(bool(creados), bool(actualizados)), componente, resumen
 
 
 def construir(ruta_playbook, solo_verificar, fabrica_cliente, completar=False, dormir=None):

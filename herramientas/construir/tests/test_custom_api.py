@@ -375,7 +375,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = ca.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patches = [l for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(1, len(patches))
         self.assertEqual({"displayname", "executeprivilegename"}, set(patches[0]["cuerpo"]))
@@ -388,7 +388,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = ca.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         posts = [l for l in cliente.llamadas if l["metodo"] == "POST"]
         self.assertEqual(1, len(posts))
         self.assertEqual("yaprocesada", posts[0]["cuerpo"]["uniquename"])

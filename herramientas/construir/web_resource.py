@@ -14,7 +14,7 @@ created. It is necessary to publish them when they are updated."* La
 herramienta publica solo cuando hizo un `PATCH`.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import base64
 import os
@@ -26,6 +26,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -190,6 +191,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     crudo, contenido = leer_archivo(datos["archivo"])
     recurso = _leer_recurso(dv, datos["nombre"])
     hubo_escritura = False
+    hubo_alta = False
 
     if recurso is None:
         if solo_verificar:
@@ -208,6 +210,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if recurso is None:
             return "error", componente, "el alta no dio error pero el web resource no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
     elif completar and not solo_verificar:
         difs, corregibles = _diferencias(datos, recurso, contenido)
         if not [d for d in difs if "INMUTABLE" in d] and corregibles:
@@ -234,7 +237,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         prefijo = "se escribió pero no quedó bien: " if hubo_escritura else ""
         return estado, componente, prefijo + "; ".join(difs)
 
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"webresourceid {id_recurso}, {datos['recurso']} de {len(crudo)} bytes desde '{datos['archivo']}', "
         f"en la solución '{solucion}' con componenttype {fila.get('componenttype')}")
 

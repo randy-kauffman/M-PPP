@@ -468,7 +468,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = pp.construir(ruta, False, lambda: cliente, actualizar_contenido=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patches = [l for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(1, len(patches))
         self.assertEqual({"content"}, set(patches[0]["cuerpo"]))

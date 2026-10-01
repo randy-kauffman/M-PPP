@@ -30,7 +30,7 @@ Producción.
 los llama. El playbook lo declara con `activar`.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import json
 import os
@@ -42,6 +42,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -352,6 +353,7 @@ def _contra_entorno(dv, datos, identidad, definicion, solo_verificar, completar,
     estado, estatus = ESTADO_ACTIVO if datos["activar"] else ESTADO_INACTIVO
     flujo = _leer_flujo(dv, datos["nombre"])
     hubo_escritura = False
+    hubo_alta = False
 
     if flujo is None:
         if solo_verificar:
@@ -366,6 +368,7 @@ def _contra_entorno(dv, datos, identidad, definicion, solo_verificar, completar,
         if flujo is None:
             return "error", componente, "el alta del flujo no dio error pero no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
 
     id_flujo = exigir_forma(flujo.get("workflowid"), str, C_FLUJO, "workflowid", no_vacio=True)
     if flujo.get("ismanaged"):
@@ -438,7 +441,7 @@ def _contra_entorno(dv, datos, identidad, definicion, solo_verificar, completar,
             f"el flujo existe pero está en statecode {estado_actual[0]}/{estado_actual[1]} y el playbook "
             f"pide {estado}/{estatus}")
 
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"workflowid {id_flujo}, {'activado' if datos['activar'] else 'desactivado (es un flujo hijo)'}, "
         f"{len(datos['conexiones'])} conexion(es), {len(datos['variables'])} variable(s), "
         f"{len(datos['hijos'])} hijo(s), desde '{datos['archivo']}'")

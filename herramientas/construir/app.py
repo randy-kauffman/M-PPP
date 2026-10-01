@@ -24,7 +24,7 @@ se arman con `Url` apuntando a su `viewid`. Ese patrón NO se pudo verificar
 contra ningún sitemap del entorno: hay que mirarlo en la app una vez.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -35,6 +35,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -308,6 +309,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
 
     xml = sitemapxml(datos, iconos, vistas)
     hubo_escritura = False
+    hubo_alta = False
 
     # --- el sitemap ---
     sitemap = _leer_sitemap(dv, datos["sitemap"])
@@ -323,6 +325,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if sitemap is None:
             return "error", componente, "el alta del sitemap no dio error pero no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
     elif _normalizar_xml(sitemap.get("sitemapxml")) != _normalizar_xml(xml) and not solo_verificar:
         id_sm = exigir_forma(sitemap.get("sitemapid"), str, C_SITEMAP, "sitemapid", no_vacio=True)
         est, resp, _ = escribir_metadatos(
@@ -358,6 +361,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if app is None:
             return "error", componente, "el alta de la app no dio error pero no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
 
     id_app = exigir_forma(app.get("appmoduleid"), str, C_APP, "appmoduleid", no_vacio=True)
     if app.get("ismanaged"):
@@ -440,7 +444,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         return estado, componente, prefijo + "; ".join(difs)
 
     entradas = sum(len(g["entradas"]) for a in datos["areas"] for g in a["grupos"])
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"appmoduleid {id_app}, sitemapid {id_sitemap}, {len(datos['areas'])} areas y {entradas} entradas, "
         f"{len(datos['tablas'])} tablas, {len(datos['roles'])} roles, idiomas {datos['idiomas']}; ValidateApp sin errores")
 

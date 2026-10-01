@@ -313,7 +313,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = st.construir(self.escribir(), False, lambda: cliente)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         cuerpo = next(l["cuerpo"] for l in cliente.llamadas if l["ruta"] == "sdkmessageprocessingstepimages")
         self.assertEqual(0, cuerpo["imagetype"])  # PreImage
         self.assertEqual("Target", cuerpo["messagepropertyname"])
@@ -336,7 +336,7 @@ class ContraElEntorno(Base):
 
         cliente.responder("POST", "sdkmessageprocessingstepimages", crear_imagen)
         estado, _, _ = st.construir(self.escribir(), False, lambda: cliente, completar=False)
-        self.assertEqual("creado", estado)
+        self.assertEqual("actualizado", estado)
 
     def test_solo_verificar_denuncia_la_preimagen_que_falta_y_no_escribe(self):
         cliente = self.armar(
@@ -388,7 +388,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = st.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patches = [l for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(1, len(patches))
         self.assertEqual(0, patches[0]["cuerpo"]["rank"])

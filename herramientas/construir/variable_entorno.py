@@ -23,7 +23,7 @@ ejecución y nadie sabe por qué.
 difieren, se informa y se para.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -33,6 +33,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -194,6 +195,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     solution_id = comprobar_solucion_e_idioma(dv, identidad)
     definicion = _leer_definicion(dv, datos["nombre"])
     hubo_escritura = False
+    hubo_alta = False
 
     if definicion is None:
         if solo_verificar:
@@ -213,6 +215,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if definicion is None:
             return "error", componente, "el alta no dio error pero la definición no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
     elif completar and not solo_verificar:
         difs, corregibles = _diferencias(datos, definicion)
         if not [d for d in difs if "INMUTABLE" in d] and corregibles:
@@ -265,7 +268,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         return estado, componente, prefijo + "; ".join(difs)
 
     sin_valor = " (SIN VALOR en este entorno, a propósito)" if datos["valor"] is None else ""
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"environmentvariabledefinitionid {id_def}, tipo {datos['tipovalor']}{sin_valor}, "
         f"en la solución '{solucion}' con componenttype {fila.get('componenttype')}"
     )

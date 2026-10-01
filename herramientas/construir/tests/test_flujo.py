@@ -342,7 +342,7 @@ class ContraElEntorno(Base):
 
         cliente.responder("PATCH", lambda r: r.startswith("workflows("), parchear)
         estado, _, detalle = self.construir(completar=True, cliente=cliente)
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         cuerpos = [l["cuerpo"] for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(0, cuerpos[0].get("statecode"), "lo primero es apagarlo")
         self.assertIn("clientdata", cuerpos[1])

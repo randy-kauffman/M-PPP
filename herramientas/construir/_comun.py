@@ -423,8 +423,21 @@ def nombre_de_archivo(texto):
     return re.sub(r"[^a-z0-9]+", "_", sin_marcas).strip("_")
 
 
+ESTADOS_DE_EXITO = ("creado", "actualizado", "ya_existia")
+
+
+def estado_de_escritura(hubo_alta, hubo_escritura):
+    """El estado de éxito según lo que se escribió (aprobado el 2026-10-01): 'creado' si se DIO DE ALTA algo que no
+    existía, 'actualizado' si solo se corrigió algo que ya existía, 'ya_existia' si no se escribió nada. Antes las
+    herramientas decían 'creado' también al actualizar, y un agente no podía saber si había un componente duplicado."""
+    if hubo_alta:
+        return "creado"
+    return "actualizado" if hubo_escritura else "ya_existia"
+
+
 def salida(estado, componente, detalle):
     """Imprime la última línea del contrato (JSON de una sola línea) y
-    devuelve el código de salida: 0 solo para 'creado' y 'ya_existia'."""
+    devuelve el código de salida: 0 solo para los estados de éxito
+    ('creado', 'actualizado', 'ya_existia')."""
     print(json.dumps({"estado": estado, "componente": componente, "detalle": detalle}, ensure_ascii=False))
-    return 0 if estado in ("creado", "ya_existia") else 1
+    return 0 if estado in ESTADOS_DE_EXITO else 1

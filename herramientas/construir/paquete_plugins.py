@@ -23,7 +23,7 @@ Lo único que se puede actualizar es el contenido, y solo si se lo piden con
 `--actualizar-contenido`.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import base64
 import io
@@ -364,7 +364,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, actualizar_contenido, 
             if est not in (200, 204):
                 return "error", componente, f"la actualización del contenido devolvió HTTP {est} (se esperaba 204): {resp}"
             paquete = _leer_paquete(dv, datos["uniquename"])
-            accion = "creado"  # hubo escritura: el ciclo tiene que volver a verificar en Dev
+            accion = "actualizado"  # se reemplazó el contenido de un paquete que ya existía (aprobado 2026-10-01)
 
     difs, detalle = _verificar(dv, datos, solution_id, paquete)
     if difs:

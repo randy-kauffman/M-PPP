@@ -146,6 +146,25 @@ class Salida(unittest.TestCase):
         self.assertEqual(obj, {"estado": "creado", "componente": "sanic_mppp_ch_moneda", "detalle": "detalle"})
 
 
+class EstadoDeEscritura(unittest.TestCase):
+    """Aprobado el 2026-10-01: 'creado' solo si se dio de alta algo; 'actualizado' si solo se corrigió lo que ya existía."""
+
+    def test_alta_es_creado_aunque_ademas_se_haya_corregido_algo(self):
+        self.assertEqual("creado", c.estado_de_escritura(True, True))
+
+    def test_solo_correccion_es_actualizado(self):
+        self.assertEqual("actualizado", c.estado_de_escritura(False, True))
+
+    def test_sin_escritura_es_ya_existia(self):
+        self.assertEqual("ya_existia", c.estado_de_escritura(False, False))
+
+    def test_actualizado_sale_con_codigo_cero_como_los_otros_estados_de_exito(self):
+        import io, contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, c.salida("actualizado", "x", "y"))
+            self.assertEqual(1, c.salida("difiere", "x", "y"))
+
+
 class ExigirForma(unittest.TestCase):
     """`exigir_forma` es el único punto donde se valida el tipo de un valor
     leído de una respuesta del entorno."""

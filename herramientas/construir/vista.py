@@ -19,7 +19,7 @@ explícitamente después de ACTUALIZARLA. La herramienta publica solo cuando
 escribió un `PATCH`.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -30,6 +30,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -391,6 +392,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
 
     vista = _leer_vista(dv, datos["nombre"], datos["tabla"])
     hubo_escritura = False
+    hubo_alta = False
 
     if vista is None:
         if solo_verificar:
@@ -411,6 +413,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if vista is None:
             return "error", componente, "el alta no dio error pero la vista no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
     elif completar and not solo_verificar:
         difs, corregibles = _diferencias(datos, vista, fetch, layout)
         if not [d for d in difs if "INMUTABLE" in d] and corregibles:
@@ -466,7 +469,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         prefijo = "se escribió pero no quedó bien: " if hubo_escritura else ""
         return estado, componente, prefijo + "; ".join(difs)
 
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"savedqueryid {id_vista}, {datos['clase']} sobre {datos['tabla']}, {len(datos['columnas'])} columnas"
         f"{', por defecto' if datos['pordefecto'] else ''}; viaja dentro de la tabla, que está en la solución "
         f"'{solucion}' con rootcomponentbehavior {fila.get('rootcomponentbehavior')}")

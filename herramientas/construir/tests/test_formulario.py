@@ -307,7 +307,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = fo.construir(self.escribir(), False, lambda: cliente)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         self.assertNotIn("systemforms", [l["ruta"] for l in cliente.llamadas if l["metodo"] == "POST"])
         patch = next(l for l in cliente.llamadas if l["metodo"] == "PATCH")
         self.assertEqual(f"systemforms({FORM_ID})", patch["ruta"])
@@ -337,7 +337,7 @@ class ContraElEntorno(Base):
         cliente.responder("PATCH", lambda r: r.startswith("systemforms("), corregir)
         cliente.responder("POST", "PublishXml", (204, {}, {}))
         estado, _, detalle = fo.construir(self.escribir(), False, lambda: cliente)
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patch = next(l for l in cliente.llamadas if l["metodo"] == "PATCH")
         self.assertEqual(1, patch["cuerpo"]["formactivationstate"])
 

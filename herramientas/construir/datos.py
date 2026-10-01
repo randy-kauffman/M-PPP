@@ -22,7 +22,7 @@ pasa la validación del plugin, el alta se rechaza y acá se ve el motivo. Eso e
 bueno: es el mismo control que va a ver una persona.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -32,6 +32,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -320,7 +321,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         etiqueta = " / ".join(str(esperado[c]) for c in clave_leida)
         preparadas.append((cuerpo, esperado, clave_leida, etiqueta))
 
-    creadas, iguales, difs = [], [], []
+    creadas, corregidas, iguales, difs = [], [], [], []
     for cuerpo, esperado, clave_leida, etiqueta in preparadas:
         existente = _buscar_fila(dv, conjunto, primaria, clave_leida, esperado, esperado.keys())
 
@@ -363,19 +364,20 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
             if pendientes:
                 detalle = "; ".join(f"{c}: quedó {a!r} y el playbook dice {e!r}" for c, (a, e) in sorted(pendientes.items()))
                 return "error", componente, f"{etiqueta}: se corrigió pero sigue distinta — {detalle}"
-            creadas.append(etiqueta)
+            corregidas.append(etiqueta)
             continue
 
         detalle = "; ".join(f"{c} es {a!r} y el playbook dice {e!r}" for c, (a, e) in sorted(d.items()))
         difs.append(f"{etiqueta}: {detalle}")
 
     if difs:
-        estado = "error" if creadas else "difiere"
-        prefijo = "se escribió pero quedaron diferencias: " if creadas else ""
+        estado = "error" if creadas or corregidas else "difiere"
+        prefijo = "se escribió pero quedaron diferencias: " if creadas or corregidas else ""
         return estado, componente, prefijo + "; ".join(difs)
 
-    resumen = f"{len(creadas)} escritas y {len(iguales)} que ya estaban, de {len(datos['filas'])}, en {datos['tabla']}"
-    return ("creado" if creadas else "ya_existia"), componente, resumen
+    resumen = (f"{len(creadas)} creadas, {len(corregidas)} corregidas y {len(iguales)} que ya estaban, "
+               f"de {len(datos['filas'])}, en {datos['tabla']}")
+    return estado_de_escritura(bool(creadas), bool(corregidas)), componente, resumen
 
 
 def construir(ruta_playbook, solo_verificar, fabrica_cliente, completar=False, dormir=None):

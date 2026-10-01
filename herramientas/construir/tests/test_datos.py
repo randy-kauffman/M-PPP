@@ -223,7 +223,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = dt.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patches = [l for l in cliente.llamadas if l["metodo"] == "PATCH"]
         self.assertEqual(1, len(patches))
         self.assertEqual({"sanic_valor": "no"}, patches[0]["cuerpo"])

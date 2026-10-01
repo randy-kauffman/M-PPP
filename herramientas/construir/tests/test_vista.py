@@ -333,7 +333,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = vi.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         metodos = [(l["metodo"], l["ruta"]) for l in cliente.llamadas if l["metodo"] in ("PATCH", "POST")]
         self.assertEqual([("PATCH", f"savedqueries({VISTA_ID})"), ("POST", "PublishXml")], metodos)
         publicacion = next(l for l in cliente.llamadas if l["ruta"] == "PublishXml")
@@ -411,7 +411,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = vi.construir(self.escribir(), False, lambda: cliente)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patch = next(l for l in cliente.llamadas if l["metodo"] == "PATCH")
         self.assertEqual("savedqueries(otra-id)", patch["ruta"])
         self.assertEqual({"isdefault": False}, patch["cuerpo"])

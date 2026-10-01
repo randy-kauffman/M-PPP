@@ -271,7 +271,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = ap.construir(self.escribir(), False, lambda: cliente)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         rutas = [l["ruta"] for l in cliente.llamadas if l["metodo"] == "POST"]
         self.assertNotIn("appmodules", rutas)
         self.assertIn("PublishXml", rutas)

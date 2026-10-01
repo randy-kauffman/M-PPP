@@ -205,7 +205,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = wr.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         orden = [(l["metodo"], l["ruta"]) for l in cliente.llamadas if l["metodo"] in ("PATCH", "POST")]
         self.assertEqual([("PATCH", f"{wr.CONJUNTO}({RECURSO_ID})"), ("POST", "PublishXml")], orden)
         publicacion = next(l for l in cliente.llamadas if l["ruta"] == "PublishXml")

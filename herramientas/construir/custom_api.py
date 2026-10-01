@@ -25,7 +25,7 @@ privilegio de ejecución, isprivate, el plugin asociado) y agrega los parámetro
 que falten. Nunca borra ni pisa un campo inmutable.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -35,6 +35,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -409,6 +410,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     api = _leer_api(dv, datos["nombre"])
 
     hubo_escritura = False
+    hubo_alta = False
     if api is None:
         if solo_verificar:
             return "difiere", componente, f"la Custom API '{datos['nombre']}' no existe en el entorno"
@@ -427,6 +429,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
             if problema:
                 return "error", componente, f"la Custom API se creó pero {problema}"
         hubo_escritura = True
+        hubo_alta = True
     else:
         api_id = exigir_forma(api.get("customapiid"), str, C_API, "customapiid", no_vacio=True)
         if completar and not solo_verificar:
@@ -449,7 +452,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
                         return "error", componente, f"la corrección devolvió HTTP {est} (se esperaba 204): {resp}"
                     hubo_escritura = True
 
-    accion = "creado" if hubo_escritura else "ya_existia"
+    accion = estado_de_escritura(hubo_alta, hubo_escritura)
     if hubo_escritura:
         # Toda escritura se verifica contra una lectura fresca: lo que importa
         # no es que el POST diera 204, sino que el entorno haya quedado así.
@@ -468,8 +471,8 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         difs.append(f"la Custom API no figura como componente de la solución (solutionid {solution_id})")
 
     if difs:
-        estado = "error" if accion == "creado" else "difiere"
-        prefijo = "se escribió pero no quedó bien: " if accion == "creado" else ""
+        estado = "error" if accion != "ya_existia" else "difiere"
+        prefijo = "se escribió pero no quedó bien: " if accion != "ya_existia" else ""
         return estado, componente, prefijo + "; ".join(difs)
 
     return accion, componente, (

@@ -30,7 +30,7 @@ normaliza** el `classid` (se probó con una sonda): guarda el que se le manda,
 así que uno equivocado no falla al guardar y se ve roto recién en la app.
 
 Última línea de la salida: JSON de una línea con `estado`
-(creado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
+(creado | actualizado | ya_existia | difiere | bloqueado | error), `componente`, `detalle`.
 """
 import os
 import sys
@@ -42,6 +42,7 @@ sys.path.insert(0, _AQUI)
 sys.path.insert(0, os.path.dirname(_AQUI))
 
 from _comun import (  # noqa: E402
+    estado_de_escritura,
     Bloqueado,
     ErrorEntorno,
     ErrorPlaybook,
@@ -492,6 +493,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     xml = formxml(datos, etiquetas, controles, subgrillas)
     form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos))
     hubo_escritura = False
+    hubo_alta = False
 
     if form is None:
         if solo_verificar:
@@ -506,6 +508,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         if form is None:
             return "error", componente, "el alta no dio error pero el formulario no aparece al releer"
         hubo_escritura = True
+        hubo_alta = True
     else:
         difs, corregibles = _diferencias(datos, form, xml)
         if corregibles and not solo_verificar:
@@ -536,7 +539,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
         return estado, componente, prefijo + "; ".join(difs)
 
     cuantas = sum(len(s.get("campos", [])) for s in datos["secciones"])
-    return ("creado" if hubo_escritura else "ya_existia"), componente, (
+    return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"formid {id_form}, {len(datos['secciones'])} secciones, {cuantas} campos, "
         f"{len(subgrillas)} subgrillas, {len(datos['encabezado'])} en el encabezado"
         f"{', todo de solo lectura' if datos['solo_lectura'] else ''}; viaja dentro de la tabla")

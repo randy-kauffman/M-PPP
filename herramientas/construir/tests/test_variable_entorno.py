@@ -208,7 +208,7 @@ class ContraElEntorno(Base):
 
         estado, _, detalle = ve.construir(self.escribir(), False, lambda: cliente, completar=True)
 
-        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("actualizado", estado, detalle)
         patch = next(l for l in cliente.llamadas if l["metodo"] == "PATCH")
         self.assertEqual({"value": COMPONENTE["valor"]}, patch["cuerpo"])
         self.assertIsNone(patch["solucion"])  # el valor nunca viaja en la solucion
