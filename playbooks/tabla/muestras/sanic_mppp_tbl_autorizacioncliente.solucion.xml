@@ -565,6 +565,46 @@
                 <Description description="Cliente sobre cuyos planes se autoriza al correo (todos, sin enumerarlos)." languagecode="1033" />
               </Descriptions>
             </attribute>
+            <attribute PhysicalName="sanic_comentarios">
+              <Type>nvarchar</Type>
+              <Name>sanic_comentarios</Name>
+              <LogicalName>sanic_comentarios</LogicalName>
+              <RequiredLevel>none</RequiredLevel>
+              <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
+              <ValidForUpdateApi>1</ValidForUpdateApi>
+              <ValidForReadApi>1</ValidForReadApi>
+              <ValidForCreateApi>1</ValidForCreateApi>
+              <IsCustomField>1</IsCustomField>
+              <IsAuditEnabled>1</IsAuditEnabled>
+              <IsSecured>0</IsSecured>
+              <IntroducedVersion>1.1.0.0</IntroducedVersion>
+              <IsCustomizable>1</IsCustomizable>
+              <IsRenameable>1</IsRenameable>
+              <CanModifySearchSettings>1</CanModifySearchSettings>
+              <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+              <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+              <SourceType>0</SourceType>
+              <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+              <IsSortableEnabled>0</IsSortableEnabled>
+              <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+              <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+              <IsDataSourceSecret>0</IsDataSourceSecret>
+              <AutoNumberFormat />
+              <IsSearchable>0</IsSearchable>
+              <IsFilterable>0</IsFilterable>
+              <IsRetrievable>0</IsRetrievable>
+              <IsLocalizable>0</IsLocalizable>
+              <Format>text</Format>
+              <MaxLength>50</MaxLength>
+              <Length>100</Length>
+              <displaynames>
+                <displayname description="Comentarios" languagecode="1033" />
+              </displaynames>
+              <Descriptions>
+                <Description description="Comentario libre del Administrador de planes sobre esta autorización. Se puede cargar desde el Excel de carga masiva (DN-04)." languagecode="1033" />
+              </Descriptions>
+            </attribute>
             <attribute PhysicalName="sanic_documentofirmado">
               <Type>file</Type>
               <Name>sanic_documentofirmado</Name>
@@ -1128,15 +1168,23 @@
                       <sections>
                         <section showlabel="true" showbar="false" IsUserDefined="0" id="{B49C8215-C81A-5706-9CA2-897B39A8C439}" labelid="{71DF1598-E94F-5D32-9353-2ECBAB032015}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">
                           <labels>
-                            <label description="Datos" languagecode="1033" />
+                            <label description="Evidencia de la autorizacion" languagecode="1033" />
                           </labels>
                           <rows>
                             <row>
                               <cell id="{F98AFEDF-A075-546B-A619-7D6B2B65DAFD}" locklevel="0" colspan="1" rowspan="1" labelid="{97B003D5-FDF8-569D-A6AC-7FF55162575D}">
                                 <labels>
-                                  <label description="Owner" languagecode="1033" />
+                                  <label description="Documento firmado" languagecode="1033" />
                                 </labels>
-                                <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" disabled="false" />
+                                <control id="sanic_documentofirmado" classid="{0A7FF475-B016-4687-9CE5-042BFDBD6519}" datafieldname="sanic_documentofirmado" disabled="false" />
+                              </cell>
+                            </row>
+                            <row>
+                              <cell id="{9A942BF4-0FAB-5DFE-9539-AB55D1A3C1E8}" locklevel="0" colspan="1" rowspan="1" labelid="{BF8A2EE3-CCD7-5BE4-9CF8-2090BC3BB976}">
+                                <labels>
+                                  <label description="Fecha del documento" languagecode="1033" />
+                                </labels>
+                                <control id="sanic_fechadocumento" classid="{5B773807-9FB2-42db-97C3-7A91EFF8ADFF}" datafieldname="sanic_fechadocumento" disabled="false" />
                               </cell>
                             </row>
                           </rows>
@@ -1177,7 +1225,7 @@
               <LocalizedName description="Autorizacion por cliente" languagecode="1033" />
             </LocalizedNames>
             <Descriptions>
-              <Description description="Formulario principal de Autorizacion por cliente (DN-01): un correo autorizado sobre TODOS los planes de un cliente. Convive con Autorizacion (AutorizacionPlan) por plan; ninguna reemplaza a la otra. Esta tabla NO lleva evidencia: no tiene sanic_documentofirmado ni sanic_fechadocumento." languagecode="1033" />
+              <Description description="Formulario principal de Autorizacion por cliente (DN-01): un correo autorizado sobre TODOS los planes de un cliente. Convive con Autorizacion (AutorizacionPlan) por plan; ninguna reemplaza a la otra. La evidencia firmada se agregó el 2026-09-27 por decisión del aprobador." languagecode="1033" />
             </Descriptions>
           </systemform>
         </forms>
@@ -1376,10 +1424,10 @@
             <savedqueryid>{c575fe63-98ba-f111-aaad-000d3a301e02}</savedqueryid>
             <layoutxml>
               <grid name="resultset" jump="sanic_nombre" select="1" preview="1" icon="1">
-  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
-    <cell name="sanic_nombre" width="280" />
-  </row>
-</grid>
+                <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+                  <cell name="sanic_nombre" width="280" />
+                </row>
+              </grid>
             </layoutxml>
             <querytype>0</querytype>
             <fetchxml>
@@ -1411,20 +1459,20 @@
             <savedqueryid>{6a86fc5d-98ba-f111-aaad-000d3a301e02}</savedqueryid>
             <layoutxml>
               <grid name="resultset" jump="cliente.sanic_nombre" select="1" preview="1" icon="1">
-  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
-    <cell name="cliente.sanic_nombre" width="240" />
-    <cell name="cliente.sanic_cifbac" width="130" />
-    <cell name="sanic_nombre" width="260" />
-  </row>
-</grid>
+                <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+                  <cell name="cliente.sanic_nombre" width="240" />
+                  <cell name="cliente.sanic_cifbac" width="130" />
+                  <cell name="sanic_fechadocumento" width="140" />
+                </row>
+              </grid>
             </layoutxml>
             <querytype>0</querytype>
             <fetchxml>
               <fetch version="1.0" output-format="xml-platform" mapping="logical">
                 <entity name="sanic_mppp_tbl_autorizacioncliente">
                   <attribute name="sanic_mppp_tbl_autorizacionclienteid" />
-                  <attribute name="sanic_nombre" />
-                  <order attribute="sanic_nombre" descending="false" />
+                  <attribute name="sanic_fechadocumento" />
+                  <order attribute="sanic_fechadocumento" descending="true" />
                   <filter type="and">
                     <condition attribute="statecode" operator="eq" value="0" />
                   </filter>
@@ -1452,19 +1500,19 @@
             <savedqueryid>{b43d5489-93ba-f111-aaad-000d3a301e02}</savedqueryid>
             <layoutxml>
               <grid name="resultset" jump="autorizado.sanic_nombre" select="1" preview="1" icon="1">
-  <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
-    <cell name="autorizado.sanic_nombre" width="260" />
-    <cell name="sanic_nombre" width="260" />
-  </row>
-</grid>
+                <row name="result" id="sanic_mppp_tbl_autorizacionclienteid">
+                  <cell name="autorizado.sanic_nombre" width="260" />
+                  <cell name="sanic_fechadocumento" width="140" />
+                </row>
+              </grid>
             </layoutxml>
             <querytype>0</querytype>
             <fetchxml>
               <fetch version="1.0" output-format="xml-platform" mapping="logical">
                 <entity name="sanic_mppp_tbl_autorizacioncliente">
                   <attribute name="sanic_mppp_tbl_autorizacionclienteid" />
-                  <attribute name="sanic_nombre" />
-                  <order attribute="sanic_nombre" descending="false" />
+                  <attribute name="sanic_fechadocumento" />
+                  <order attribute="sanic_fechadocumento" descending="true" />
                   <filter type="and">
                     <condition attribute="statecode" operator="eq" value="0" />
                   </filter>
@@ -1583,7 +1631,136 @@
         </savedqueries>
       </SavedQueries>
       <RibbonDiffXml>
-        <CustomActions />
+        <CustomActions>
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Abandon.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Abandon" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddAppointment.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddCampaignResponse.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddCampaignResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddConnection.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddConnectionNew.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddConnectionToMe.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddEmail.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddFax.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddFax" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddFile.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddFile" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddLetter.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddLetter" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddNote.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddNote" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddOtherActivities.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddOtherActivities" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddPhone.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddPhone" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddRecurringAppointment.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddRecurringAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddServiceActivity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddServiceActivity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddTask.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddTask" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-AddToQueue.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Assign.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Convert-Case.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Convert.Case" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Convert-Opportunity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Convert.Opportunity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-CustomizeEntity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.CustomizeEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Delete.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-EditSalesProcess.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.EditSalesProcess" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-FinishStage.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.FinishStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Flows-RefreshCommandBar.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Flows-RefreshCommandBar-RunWorkflow.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Flows.RefreshCommandBar.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-FormDesign.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.FormDesign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-MailMerge.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-OpenActiveStage.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.OpenActiveStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Permissions.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Permissions" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Permissions-Sharing.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Permissions.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Permissions-SharingNonRefresh.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Permissions.SharingNonRefresh" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-PromoteToResponse.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.PromoteToResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-PublishAll.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.PublishAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-PublishEntity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.PublishEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-QueueItemDetail.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.QueueItemDetail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-Reports.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.Reports" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-RunScript.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-RunWorkflow.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-SaveAsComplete.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.SaveAsComplete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-SendSelected.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.SendSelected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-SuggestProduct.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.SuggestProduct" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-SwitchProcess.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.SwitchProcess" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_autorizacioncliente-WordTemplate.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_autorizacioncliente.WordTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddAppointment.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddCampaignResponse.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddCampaignResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddConnection.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddConnectionNew.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddConnectionToMe.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddFax.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddFax" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddFile.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddFile" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddLetter.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddLetter" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddNote.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddNote" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddOtherActivities.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddOtherActivities" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddPhone.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddPhone" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddRecurringAppointment.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddRecurringAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddServiceActivity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddServiceActivity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddTask.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddTask" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-AddToQueue.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Assign.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-BulkDelete.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.BulkDelete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-CustomizeEntity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.CustomizeEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-CustomizePreviewPane.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.CustomizePreviewPane" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Delete.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-DeleteMenu.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.DeleteMenu" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-DesignView.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.DesignView" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Detect.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Detect" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Detect-All.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Detect.All" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Detect-Selected.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Detect.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-DocumentTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.DocumentTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-DynamicPivotTable.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.DynamicPivotTable" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-DynamicWorkesheet.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.DynamicWorkesheet" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ExportSelectedToExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ExportSelectedToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ExportTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ExportTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ExportToExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ExportToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ExportToExcelOnline.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ExportToExcelOnline" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Flows-RefreshCommandBar.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Flows-RefreshCommandBar-RunWorkflow.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Flows.RefreshCommandBar.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Import.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Import" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ImportData.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ImportData" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ImportDataFromCSV.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ImportDataFromCSV" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ImportDataFromExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ImportDataFromExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-ImportDataFromXML.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.ImportDataFromXML" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-MailMerge.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-MBPF-ConvertTo.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.MBPF.ConvertTo" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-modern-SendDirectEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.modern.SendDirectEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-OpenActiveStage.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.OpenActiveStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-PublishAll.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.PublishAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-PublishEntity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.PublishEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-RunReport.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.RunReport" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-RunScript.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-RunWorkflow.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Send.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Send" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-SendDirectEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.SendDirectEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Send-Selected.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Send.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Send-View.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Send.View" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-Sharing.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-StaticWorksheet.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.StaticWorksheet" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-StaticWorksheetAll.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.StaticWorksheetAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_autorizacioncliente-WordTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_autorizacioncliente.WordTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AddConnection.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AddConnectionNew.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AddConnectionToMe.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AddEmail.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AddToQueue.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AdvMergeRecords.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AdvMergeRecords" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Assign.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-AssociateParentChildCase.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.AssociateParentChildCase" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-BulkDelete.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.BulkDelete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Delete.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Detect.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Detect" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Detect-All.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Detect.All" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Detect-Selected.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Detect.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-DocumentTemplate.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.DocumentTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-ExportSelectedToExcel.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.ExportSelectedToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-ExportToExcel.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.ExportToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-ExportToExcelOnline.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.ExportToExcelOnline" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Flows-RefreshCommandBar.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-MailMerge.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-modern-AddEmail.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.modern.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Remove.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Remove" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-RunReport.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.RunReport" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-RunScript.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-RunWorkflow.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-SendSelected.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.SendSelected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-Sharing.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_autorizacioncliente-WordTemplate.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_autorizacioncliente.WordTemplate" />
+        </CustomActions>
         <Templates>
           <RibbonTemplates Id="Mscrm.Templates" />
         </Templates>

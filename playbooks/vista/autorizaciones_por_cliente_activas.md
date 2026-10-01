@@ -47,6 +47,10 @@ desde las columnas, el orden y el filtro.
     {
       "nombre": "sanic_nombre",
       "ancho": 280
+    },
+    {
+      "nombre": "sanic_comentarios",
+      "ancho": 220
     }
   ],
   "orden": [
@@ -70,6 +74,10 @@ desde las columnas, el orden y el filtro.
   }
 }
 ```
+
+**Actualizado el 2026-10-01 (DN-04):** se agrega la columna `sanic_comentarios` (T(50)) después del
+nombre. Es la vista por defecto de la entrada "Autorizaciones - Clientes", donde el Administrador de
+planes revisa lo que cargó en masa.
 
 ## 3. Precondiciones
 

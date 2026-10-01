@@ -52,6 +52,10 @@ desde las columnas, el orden y el filtro.
     {
       "nombre": "sanic_fechadocumento",
       "ancho": 140
+    },
+    {
+      "nombre": "sanic_comentarios",
+      "ancho": 220
     }
   ],
   "orden": [
@@ -93,6 +97,10 @@ ser cierto: el aprobador decidió que el hueco de evidencia era real y había qu
 `playbooks/tabla/sanic_mppp_tbl_autorizacioncliente.md` §2, "Decisión del aprobador"), así que
 `AutorizacionCliente` ahora tiene `sanic_documentofirmado` y `sanic_fechadocumento`, igual que
 `AutorizacionPlan`, y esta vista se alinea con su hermana `correos_sobre_este_plan.md`.
+
+**Actualizado el 2026-10-01 (DN-04):** tercera columna, `sanic_comentarios` (T(50)), de la propia
+`AutorizacionCliente`. Su hermana `correos_sobre_este_plan.md` **no** la lleva: Comentarios existe solo
+en `AutorizacionCliente` (decisión del aprobador).
 
 ## 3. Precondiciones
 

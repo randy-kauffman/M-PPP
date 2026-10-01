@@ -60,7 +60,8 @@ respaldo documental.
       "titulo": "Evidencia de la autorizacion",
       "campos": [
         "sanic_documentofirmado",
-        "sanic_fechadocumento"
+        "sanic_fechadocumento",
+        "sanic_comentarios"
       ]
     }
   ]
@@ -75,6 +76,11 @@ la versión anterior de este playbook. Esa sección no venía del diseño: se ha
 cumple ese mínimo por sí sola con campos que sí vienen del negocio, así que el placeholder de
 `ownerid` ya no aporta nada y se retira. `ownerid` sigue estando disponible en el formulario por
 las vistas y la seguridad estándar de Dataverse; no hace falta declararlo a mano.
+
+**Actualizado el 2026-10-01 (DN-04, `diseno/DIRECTRICES-NUEVAS.md`):** se agrega `sanic_comentarios`
+al final de la sección "Evidencia de la autorizacion", después de la fecha del documento, como dice
+DN-04 §"Columna nueva". No se abre una sección propia para un solo campo de 50 caracteres: el
+comentario acompaña a la evidencia, que es lo que el Administrador de planes completa después del alta.
 
 ## 3. Precondiciones
 

@@ -63,6 +63,16 @@ Advertencias: en Dev existe otro publisher con el mismo prefijo de texto, "Sanic
       "requerida": false,
       "protegida": false,
       "auditoria": true
+    },
+    {
+      "nombre": "sanic_comentarios",
+      "displayname": "Comentarios",
+      "descripcion": "Comentario libre del Administrador de planes sobre esta autorización. Se puede cargar desde el Excel de carga masiva (DN-04).",
+      "tipo": "texto",
+      "largo": 50,
+      "requerida": false,
+      "protegida": false,
+      "auditoria": true
     }
   ]
 }
@@ -78,6 +88,7 @@ Decisiones que este playbook toma y el diseño no traía:
 | Nombres visibles de las columnas | `Nombre`, `Documento firmado`, `Fecha del documento` | Texto de negocio (`02` DD-19), igual que `AutorizacionPlan` |
 | La evidencia es obligatoria pero la columna **no** es requerida | `requerida: false` | Un archivo solo se puede cargar con el registro ya creado; la obligatoriedad se cumple cerrando por defecto. Mismo razonamiento que `AutorizacionPlan` (`02` §2.4) |
 | Tamaño máximo del documento | `10240` KB | 10 MB, mismo límite que `AutorizacionPlan` (`02` §2.4) |
+| Se agrega `sanic_comentarios`, T(50), opcional, auditada, nombre visible `Comentarios` | columna presente | **Decisión del aprobador, 2026-10-01, DN-04** (`diseno/DIRECTRICES-NUEVAS.md`; `02` §2.4b): "un campo de unos 50 caracteres de texto que diga Comentarios". Solo en esta tabla, no en `AutorizacionPlan` (también decisión del aprobador). Auditada por DD-18, como todo catálogo. El largo se puede ampliar después; achicar, no |
 | Se agregan `sanic_documentofirmado` y `sanic_fechadocumento`, aunque DN-01 "Diseño resuelto" no las mencionaba | columnas presentes | Decisión del aprobador, 2026-09-27 (ver nota abajo): la autorización por cliente habilita TODOS los planes de ese cliente de una vez, es decir es MÁS amplia que la autorización por plan; no tiene sentido que exija MENOS respaldo documental que ella |
 
 Viene del diseño, no lo decide este playbook: **auditoría nativa, notas y actividades** = activada · no · no (`02` DD-18: es un catálogo, mismo criterio que `AutorizacionPlan`).
@@ -116,7 +127,7 @@ python3 herramientas/construir/muestra_tabla.py playbooks/tabla/sanic_mppp_tbl_a
 |---|---|---|
 | 1 | `GET EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')` | 200 · `OwnershipType = UserOwned` · `IsManaged = false` · `IsCustomEntity = true` · `HasNotes = false` · `HasActivities = false` · `IsAuditEnabled = true` · `PrimaryNameAttribute = sanic_nombre` |
 | 2 | Nombre, plural y descripción en 1033 | los de la sección 2; ninguna etiqueta en otro idioma |
-| 3 | Columnas (3): tipo, requerida, protegida, auditoría, nombre visible, descripción y lo propio de su tipo | `sanic_nombre` texto 400 requerida · `sanic_documentofirmado` archivo hasta 10240 KB opcional · `sanic_fechadocumento` fecha sola opcional; todas auditadas |
+| 3 | Columnas (4): tipo, requerida, protegida, auditoría, nombre visible, descripción y lo propio de su tipo | `sanic_nombre` texto 400 requerida · `sanic_documentofirmado` archivo hasta 10240 KB opcional · `sanic_fechadocumento` fecha sola opcional · `sanic_comentarios` texto 50 opcional (desde 2026-10-01, DN-04); todas auditadas |
 | 4 | Ninguna columna propia de más | salvo lookups, que nacen con su relación |
 | 5 | Pertenece a la solución de la sección 1 | una fila en `solutioncomponents` (tipo de componente 1) |
 | 6 | Segunda ejecución sin `--solo-verificar` | estado `ya_existia`, código de salida 0 |
@@ -128,7 +139,7 @@ Se hacen todas las comprobaciones de la sección 5. Si todas pasan: `ya_existia`
 
 ## 7. Reversa
 
-`DELETE EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')`, posible mientras la tabla esté vacía y nada la referencie. **Irreversible desde que se crea**: el nombre lógico de la tabla y el de cada columna, el tipo de propiedad (`usuario`), el tipo de cada columna y el comportamiento de fecha sola de `sanic_fechadocumento`. Los largos se pueden ampliar después; achicarlos, no.
+`DELETE EntityDefinitions(LogicalName='sanic_mppp_tbl_autorizacioncliente')`, posible mientras la tabla esté vacía y nada la referencie. **Irreversible desde que se crea**: el nombre lógico de la tabla y el de cada columna, el tipo de propiedad (`usuario`), el tipo de cada columna y el comportamiento de fecha sola de `sanic_fechadocumento`. Los largos se pueden ampliar después; achicarlos, no. **`sanic_comentarios` (DN-04)**: se agrega con `tabla.py --agregar-columnas`; su reversa es `DELETE` de esa columna sola (`EntityDefinitions(...)/Attributes(LogicalName='sanic_comentarios')`), que borra lo que tenga cargado.
 
 ## 8. Fuera de alcance
 
