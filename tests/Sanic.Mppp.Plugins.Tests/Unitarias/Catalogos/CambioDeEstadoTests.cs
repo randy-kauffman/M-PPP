@@ -217,9 +217,22 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
         }
 
         [Fact]
-        public void Activar_una_autorizacion_ya_activa_no_cambia_y_no_advierte_aunque_el_correo_este_inactivo()
+        public void Activar_una_autorizacion_ya_activa_no_cambia_pero_advierte_si_su_correo_o_su_cliente_estan_inactivos()
         {
-            var fila = Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "123", correo: "maria.lopez@empresa.com")).Filas[0];
+            // Decisión del arquitecto (2026-10-01, revisión): quien pide ACTIVAR cree que la autorización opera, cambie o no el estado.
+            var correoInactivo = Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "123", correo: "maria.lopez@empresa.com")).Filas[0];
+            Assert.StartsWith("Sin cambios: ya estaba activo", correoInactivo.Texto);
+            Assert.Contains(correoInactivo.Advertencias, a => a.StartsWith("Correo: ", StringComparison.Ordinal));
+
+            var clienteInactivo = Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "789", correo: "pedro@empresa.com")).Filas[0];
+            Assert.StartsWith("Sin cambios: ya estaba activo", clienteInactivo.Texto);
+            Assert.Contains(clienteInactivo.Advertencias, a => a.StartsWith("CIF BAC / CIF COM: ", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Activar_una_autorizacion_ya_activa_con_todo_activo_no_advierte_nada()
+        {
+            var fila = Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "123", correo: "juan.perez@empresa.com")).Filas[0];
             Assert.Equal("Sin cambios: ya estaba activo", fila.Texto);
         }
 
@@ -340,6 +353,41 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
             var fila = Planificar(F(2, null, null, "123")).Filas[0];
             Assert.Matches(new Regex("^Tipo: .*(falta|vac)", RegexOptions.IgnoreCase), fila.Errores.First(e => e.StartsWith("Tipo: ", StringComparison.Ordinal)));
             Assert.Contains(fila.Errores, e => e.StartsWith("Accion: ", StringComparison.Ordinal));
+        }
+
+        // ------------------------------------------------------------------------------------------ segunda vuelta (revisión)
+        [Fact]
+        public void Una_repetida_con_otro_error_tambien_lleva_la_advertencia_de_repetida()
+        {
+            var plan = Planificar(F(2, "CLIENTE", "ACTIVAR", "789"), F(3, "CLIENTE", "ACTIVAR", "789", plan: "0A12"));
+            Assert.True(plan.TieneErrores);
+            Assert.Contains(plan.Filas[1].Errores, e => e.StartsWith("Codigo plan: ", StringComparison.Ordinal));
+            var advertencia = Assert.Single(plan.Filas[1].Advertencias, a => a.StartsWith("Accion: ", StringComparison.Ordinal));
+            Assert.Matches(@"\b2\b", advertencia);
+        }
+
+        [Fact]
+        public void El_estado_final_no_cuenta_las_filas_con_error()
+        {
+            // La fila 3 desactivaría Juan→Sol, pero tiene una celda de más: no entra al estado final. Sol sigue con sus 3 activas.
+            var plan = Planificar(
+                F(2, "CLIENTE", "DESACTIVAR", "123"),
+                F(3, "AUTORIZACION_CLIENTE", "DESACTIVAR", "123", plan: "0A12", correo: "juan.perez@empresa.com"));
+            Assert.True(plan.TieneErrores);
+            Assert.Contains("3 autorizaciones por cliente activas", Assert.Single(plan.Filas[0].Advertencias));
+        }
+
+        [Fact]
+        public void Opuestas_con_otro_error_en_una_de_las_filas_no_rompen_el_planificador_ni_inventan_cambios()
+        {
+            var plan = Planificar(
+                F(2, "PLAN", "ACTIVAR", plan: "0A12"),
+                F(3, "PLAN", "DESACTIVAR", plan: "0A12", correo: "juan.perez@empresa.com"),
+                F(4, "CORREO", "DESACTIVAR", correo: "juan.perez@empresa.com"));
+            Assert.True(plan.TieneErrores);
+            Assert.Empty(plan.Cambios);
+            Assert.Equal(0, plan.SinCambios);
+            Assert.Equal(2, plan.Filas[1].Errores.Count);
         }
     }
 }

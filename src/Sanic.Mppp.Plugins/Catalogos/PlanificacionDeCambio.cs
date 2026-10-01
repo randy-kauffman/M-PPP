@@ -17,7 +17,6 @@ namespace Sanic.Mppp.Plugins.Catalogos
         private readonly IndiceDeClientes _clientes;
         private readonly Dictionary<string, PlanExistente> _planesPorCodigo = new Dictionary<string, PlanExistente>(StringComparer.Ordinal);
         private readonly Dictionary<string, AutorizadoExistente> _autorizadosPorCorreo = new Dictionary<string, AutorizadoExistente>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<Guid, AutorizadoExistente> _autorizadosPorId = new Dictionary<Guid, AutorizadoExistente>();
         private readonly Dictionary<string, AutorizacionClienteExistente> _autorizacionesPorPar = new Dictionary<string, AutorizacionClienteExistente>(StringComparer.Ordinal);
 
         // Autorizaciones activas (por su propio estado) de cada cliente y de cada correo: primero las de la foto, después con el archivo aplicado.
@@ -35,6 +34,12 @@ namespace Sanic.Mppp.Plugins.Catalogos
             public FilaDeCambio Origen;
 
             public bool Consistente;
+
+            /// <summary>Todas las filas del grupo apuntan al mismo registro: si piden lo mismo, el cambio es de grupo, no de fila.</summary>
+            public bool Cambia;
+
+            /// <summary>Alguna fila del grupo no tiene errores: solo así cuenta para el estado final (DN-04, Excel 2, regla 6).</summary>
+            public bool Efectivo;
         }
 
         internal PlanificacionDeCambio(List<FilaDeCambio> filas, EstadoDeCatalogos estado)
@@ -49,7 +54,6 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
             foreach (var a in estado.Autorizados)
             {
-                _autorizadosPorId[a.Id] = a;
                 if (!string.IsNullOrWhiteSpace(a.Correo)) _autorizadosPorCorreo[a.Correo.Trim()] = a;
             }
 
@@ -69,6 +73,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
             foreach (var fc in _filas) Resolver(fc);
             foreach (var fc in _filas) Agrupar(fc);
             foreach (var g in _grupos) Decidir(g);
+            foreach (var g in _grupos) g.Efectivo = g.Consistente && g.Filas.Any(fc => !fc.F.TieneErrores);
             AplicarAlRecuento();
             foreach (var g in _grupos) AdvertirEfectos(g);
             return Armar();
@@ -195,8 +200,9 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
         private void Agrupar(FilaDeCambio fc)
         {
-            // Una fila con algún error no entra: el archivo no se graba, y sus problemas ya están dichos.
-            if (fc.Clave == null || !fc.Accion.HasValue || fc.F.TieneErrores) return;
+            // Opuestas y repetidas se detectan aunque la fila tenga otro error: se reporta todo de una vez (DN-04, Excel 2, regla 6).
+            // Lo que NO cuenta para el estado final son las filas con error: eso se filtra en Efectivo.
+            if (fc.Clave == null || !fc.Accion.HasValue) return;
 
             Grupo g;
             if (!_indice.TryGetValue(fc.Clave, out g))
@@ -242,14 +248,15 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 }
             }
 
-            if (g.Origen.ActivoActual == pedido)
-            {
-                g.Origen.Resultado = pedido ? "Sin cambios: ya estaba activo" : "Sin cambios: ya estaba inactivo";
-            }
-            else
+            g.Cambia = g.Origen.ActivoActual != pedido;
+            if (g.Cambia)
             {
                 g.Origen.Resultado = pedido ? "Activado" : "Desactivado";
                 g.Origen.Cambia = true;
+            }
+            else
+            {
+                g.Origen.Resultado = pedido ? "Sin cambios: ya estaba activo" : "Sin cambios: ya estaba inactivo";
             }
         }
 
@@ -267,7 +274,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
         {
             foreach (var g in _grupos)
             {
-                if (!g.Consistente || !g.Origen.Cambia || g.Origen.Tipo != TipoDeCatalogo.AutorizacionCliente) continue;
+                if (!g.Efectivo || !g.Cambia || g.Origen.Tipo != TipoDeCatalogo.AutorizacionCliente) continue;
 
                 var delta = g.Accion == AccionDeEstado.Activar ? 1 : -1;
                 Sumar(_activasPorCliente, g.Origen.Cliente.Id, delta);
@@ -275,12 +282,27 @@ namespace Sanic.Mppp.Plugins.Catalogos
             }
         }
 
-        /// <summary>Regla 6: se calcula sobre el estado final, con el archivo entero aplicado; y solo cuando la fila de verdad cambia el estado.</summary>
+        /// <summary>
+        /// Regla 6, sobre el estado final con el archivo aplicado. "Deja sin efecto N" solo sale si la fila de verdad desactiva algo;
+        /// la advertencia de vigencia sale siempre que se pide ACTIVAR una autorización que no va a operar, cambie o no su estado
+        /// (decisión del arquitecto, 2026-10-01: quien pide activar cree que opera).
+        /// </summary>
         private void AdvertirEfectos(Grupo g)
         {
-            if (!g.Consistente || !g.Origen.Cambia) return;
+            if (!g.Efectivo) return;
 
             var fc = g.Origen;
+            if (g.Accion == AccionDeEstado.Activar && fc.Tipo == TipoDeCatalogo.AutorizacionCliente)
+            {
+                if (!ActivoAlFinal("C:" + fc.Cliente.Id.ToString("N"), fc.Cliente.Activo))
+                    fc.F.Advertencia(Encabezados.Cliente + ": " + fc.Descripcion + " no va a estar vigente: el cliente " + fc.Cliente.CifBac + " está inactivo. Activalo también para que valga.");
+                if (!ActivoAlFinal("A:" + fc.Autorizado.Id.ToString("N"), fc.Autorizado.Activo))
+                    fc.F.Advertencia(Encabezados.Correo + ": " + fc.Descripcion + " no va a estar vigente: el correo " + MotivosDeCarga.Mostrar(fc.Autorizado.Correo) + " está inactivo. Activalo también para que valga.");
+                return;
+            }
+
+            if (!g.Cambia) return;
+
             if (g.Accion == AccionDeEstado.Desactivar && fc.Tipo == TipoDeCatalogo.Cliente)
             {
                 var n = Contar(_activasPorCliente, fc.Id);
@@ -291,20 +313,13 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 var n = Contar(_activasPorAutorizado, fc.Id);
                 if (n > 0) fc.F.Advertencia(Encabezados.Correo + ": desactivar " + fc.Descripcion + " deja sin efecto " + Autorizaciones(n) + ". Siguen activas, pero no valen mientras el correo esté inactivo.");
             }
-            else if (g.Accion == AccionDeEstado.Activar && fc.Tipo == TipoDeCatalogo.AutorizacionCliente)
-            {
-                if (!ActivoAlFinal("C:" + fc.Cliente.Id.ToString("N"), fc.Cliente.Activo))
-                    fc.F.Advertencia(Encabezados.Cliente + ": " + fc.Descripcion + " no va a estar vigente: el cliente " + fc.Cliente.CifBac + " está inactivo. Activalo también para que valga.");
-                if (!ActivoAlFinal("A:" + fc.Autorizado.Id.ToString("N"), fc.Autorizado.Activo))
-                    fc.F.Advertencia(Encabezados.Correo + ": " + fc.Descripcion + " no va a estar vigente: el correo " + MotivosDeCarga.Mostrar(fc.Autorizado.Correo) + " está inactivo. Activalo también para que valga.");
-            }
         }
 
         /// <summary>Estado de un cliente o un correo con el archivo aplicado: lo que pide el archivo si lo nombra, y si no, lo que ya tenía.</summary>
         private bool ActivoAlFinal(string clave, bool activoEnLaFoto)
         {
             Grupo g;
-            if (_indice.TryGetValue(clave, out g) && g.Consistente) return g.Accion == AccionDeEstado.Activar;
+            if (_indice.TryGetValue(clave, out g) && g.Efectivo) return g.Accion == AccionDeEstado.Activar;
             return activoEnLaFoto;
         }
 
