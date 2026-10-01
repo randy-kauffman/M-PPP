@@ -8,6 +8,12 @@ a los que apuntan las Custom API y los steps.
 (`playbooks/custom-api/sanic_mppp_capi_exportarparadigitar.md`). El código ya está en verde
 (1080 pruebas) y no se toca desde acá.
 
+**`CargarCatalogosApi` y `CambiarEstadoCatalogosApi` se agregaron el 2026-10-01 (DN-04)**, para
+`sanic_mppp_capi_cargarcatalogos` y `sanic_mppp_capi_cambiarestadocatalogos`. Ensamblado **1.0.20.0**
+(Dev tenía 1.0.19.0, verificado el 2026-10-01): sube solo el build, como pide el comentario del csproj, para que el
+sandbox no siga ejecutando el binario viejo. Se actualiza con `--actualizar-contenido` (la `version` del PAQUETE,
+1.0.0, es inmutable y no cambia).
+
 Antes de correr la herramienta hay que armar el .nupkg:
 
 ```
@@ -55,7 +61,9 @@ dotnet pack src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj -c 
     "Sanic.Mppp.Plugins.Api.ObtenerFilasPendientesApi",
     "Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi",
     "Sanic.Mppp.Plugins.Steps.RevisionAtendidaStep",
-    "Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi"
+    "Sanic.Mppp.Plugins.Api.ExportarParaDigitarApi",
+    "Sanic.Mppp.Plugins.Api.CargarCatalogosApi",
+    "Sanic.Mppp.Plugins.Api.CambiarEstadoCatalogosApi"
   ]
 }
 ```
