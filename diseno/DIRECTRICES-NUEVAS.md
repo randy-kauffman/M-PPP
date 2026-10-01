@@ -516,6 +516,14 @@ Las dos: Action, unbound, `isprivate = false`, plugin en `Api/`, mismo patrón q
 | Salida `filas` · `errores` · `advertencias` (Integer) | filas no vacías leídas, filas con error, filas con advertencia | ídem |
 | Salidas de conteo (Integer) | `clientescreados` · `planescreados` · `correoscreados` · `autorizacionescreadas` | `activados` · `desactivados` · `sincambios` |
 
+**"Hoy" es la fecha de Nicaragua** (precisado el 2026-10-01 al diseñar la pieza 4c): el plugin corre en UTC y una
+"Fecha documento" posterior a hoy es error. El envoltorio calcula hoy como la fecha UTC menos 6 horas (Nicaragua es UTC-6
+todo el año, sin horario de verano; el proyecto ya lo da por sentado en `TransicionesDeFila.cs`). No hay parámetro: un
+negocio con otra zona horaria es otro proyecto.
+
+**Los parámetros (`carga.filas.maximo`, `lectura.limites`) se leen con SYSTEM**: el Administrador de planes no tiene
+ningún privilegio sobre Parámetro (`04` §2). Los catálogos, en cambio, se leen y se escriben con el usuario que llama.
+
 **El privilegio de entrada es solo la puerta.** Cada `Create` y cada `Update` de la pasada 2 vuelve a
 pasar por la seguridad de la plataforma con el usuario que llama.
 
