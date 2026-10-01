@@ -191,7 +191,32 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var filas = new[] { Fila(2, ("A", "1")) };
             ArmadorDeExcelDeCatalogos.Resultado(e, filas, new Dictionary<int, string> { [2] = new string('r', 32767) });
             Assert.ThrowsAny<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, filas, new Dictionary<int, string> { [2] = new string('r', 32768) }));
-            Assert.ThrowsAny<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, ("C", new string('c', 32768))) }, new Dictionary<int, string> { [2] = "x" }));
+        }
+
+        [Fact]
+        public void Un_valor_del_usuario_de_mas_de_32767_caracteres_se_escribe_acortado_en_el_eco_sin_fallar()
+        {
+            // Revisión 4b (2026-10-01): el lector limita bytes, no celdas; una celda hostil enorme llega hasta acá. Su fila ya tiene
+            // error en el planificador y el eco es solo para que el usuario la vea (nunca se graba): se acorta, no tira la API.
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, ("C", new string('c', 40000))) }, new Dictionary<int, string> { [2] = "Error: Razon social: tiene 40000 caracteres" });
+            var c2 = Celdas(archivo, e.Hoja)["C2"].texto;
+            Assert.Equal(32767, c2.Length);
+            Assert.EndsWith("…", c2);
+            Assert.True(Releer(archivo, e).EsValido);
+        }
+
+        [Fact]
+        public void Un_caracter_que_XML_no_admite_se_reemplaza_y_nunca_tira_el_armado()
+        {
+            // Revisión 4b: un valor leído nunca lo trae (el lector rechaza el archivo antes), pero un mensaje armado con datos de
+            // Dataverse sí podría. Se reemplaza por U+FFFD; los pares subrogados válidos (un emoji) se conservan.
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, ("C", "a\u0001b 😀")) }, new Dictionary<int, string> { [2] = "Error: x\u0002y \uD800 z" });
+            var celdas = Celdas(archivo, e.Hoja);
+            Assert.Equal("a\uFFFDb 😀", celdas["C2"].texto);
+            Assert.Equal("Error: x\uFFFDy \uFFFD z", celdas["L2"].texto);
+            Assert.True(Releer(archivo, e).EsValido);
         }
 
         [Fact]
