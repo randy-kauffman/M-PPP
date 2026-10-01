@@ -200,6 +200,43 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(TipoDeRechazoLectura.Encabezado, r.Rechazo);
         }
 
+        // ============================================================================== encendido: citas acotadas (revisión 2026-10-01)
+        [Fact]
+        public void Estricto_ningun_mensaje_cita_un_valor_entero()
+        {
+            // DN-04 "Lectura del archivo": el Resultado va a una celda de Excel (tope 32.767). Con el modo estricto todo valor del
+            // archivo se cita acortado; con el modo apagado los textos no cambian (los lee un cliente del banco).
+            var enorme = new string('x', 30000);
+            var encabezado = Leer(true, Encabezado(uno: enorme, dos: enorme), Datos(6));
+            Assert.Equal(TipoDeRechazoLectura.Encabezado, encabezado.Rechazo);
+            Assert.All(encabezado.Errores, e => Assert.True(e.Length < 300, $"motivo de {e.Length} caracteres"));
+
+            var booleano = Leer(true, Encabezado(), Fila(6, CeldaBooleana("C6", enorme)));
+            Assert.Equal(TipoDeRechazoLectura.CeldaIlegible, booleano.Rechazo);
+            Assert.All(booleano.Errores, e => Assert.True(e.Length < 300, $"motivo de {e.Length} caracteres"));
+
+            var indice = Leer(true, Encabezado(), Fila(6, "<c r=\"C6\" t=\"s\"><v>" + new string('9', 5000) + "</v></c>"));
+            Assert.Equal(TipoDeRechazoLectura.CeldaIlegible, indice.Rechazo);
+            Assert.All(indice.Errores, e => Assert.True(e.Length < 300, $"motivo de {e.Length} caracteres"));
+        }
+
+        [Fact]
+        public void Apagado_el_encabezado_distinto_se_sigue_citando_como_hoy()
+        {
+            // No regresión: el texto del modo apagado es el de siempre, completo.
+            var r = Leer(false, Encabezado(dos: "Otro encabezado bastante largo para la prueba de no regresion"), Datos(6));
+            Assert.Equal("columna D5: se esperaba 'Campo Dos', se encontró 'Otro encabezado bastante largo para la prueba de no regresion'", Assert.Single(r.Errores));
+        }
+
+        [Fact]
+        public void Estricto_el_corte_en_un_valor_de_mas_oculta_lo_que_viene_despues_aunque_sea_otro_error()
+        {
+            // Consecuencia aceptada del corte (costo acotado): la prioridad entre rechazos vale sobre lo leído hasta el corte.
+            // Los dos son rechazos del archivo; el usuario corrige el primero y, si hay más, el siguiente intento los muestra.
+            var r = Leer(true, Encabezado(), Datos(6, Celda("F6", "x")), Fila(7, CeldaBooleana("C7", "basura")));
+            Assert.Equal(TipoDeRechazoLectura.ColumnaDeMas, r.Rechazo);
+        }
+
         // ============================================================================== tipo de rechazo, encendido o apagado
         [Theory]
         [InlineData(false)]
