@@ -222,6 +222,52 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Plantilla
             Assert.Contains("volvé", fila);
         }
 
+        // ---- DN-04, citas acotadas (tercera vuelta): 60 caracteres con "…", sin partir un par subrogado; apagado, como siempre ----
+        [Fact]
+        public void Estricto_el_encabezado_encontrado_se_cita_en_60_caracteres_con_puntos_suspensivos()
+        {
+            var largo = new string('x', 100);
+            var motivo = Assert.Single(Leer(true, Encabezado(uno: largo), Datos(6)).Errores);
+            Assert.Equal("columna C5: se esperaba 'Campo Uno', se encontró '" + new string('x', 59) + "…'", motivo);
+        }
+
+        [Fact]
+        public void Estricto_un_encabezado_de_hasta_60_caracteres_se_cita_entero()
+        {
+            var sesenta = new string('x', 60);
+            var motivo = Assert.Single(Leer(true, Encabezado(uno: sesenta), Datos(6)).Errores);
+            Assert.EndsWith("se encontró '" + sesenta + "'", motivo);
+        }
+
+        [Fact]
+        public void Estricto_el_recorte_no_parte_un_par_subrogado()
+        {
+            // El carácter 59 (índice 58) y el 60 (índice 59) forman el par: cortar en 59 lo partiría.
+            var texto = new string('x', 58) + "\U0001F600" + new string('y', 20);
+            var motivo = Assert.Single(Leer(true, Encabezado(uno: texto), Datos(6)).Errores);
+            Assert.EndsWith("se encontró '" + new string('x', 58) + "…'", motivo);
+        }
+
+        [Fact]
+        public void Estricto_el_booleano_invalido_y_el_indice_compartido_invalido_se_citan_acortados()
+        {
+            var largo = new string('7', 100);
+            var booleano = Assert.Single(Leer(true, Encabezado(), Fila(6, CeldaBooleana("C6", largo))).Errores);
+            Assert.Contains("('" + new string('7', 59) + "…')", booleano);
+            var indice = Assert.Single(Leer(true, Encabezado(), Fila(6, "<c r=\"C6\" t=\"s\"><v>" + largo + "</v></c>")).Errores);
+            Assert.Contains("('" + new string('7', 59) + "…')", indice);
+        }
+
+        [Fact]
+        public void Apagado_el_booleano_y_el_indice_invalidos_se_citan_enteros_como_hoy()
+        {
+            var largo = new string('7', 100);
+            var booleano = Assert.Single(Leer(false, Encabezado(), Fila(6, CeldaBooleana("C6", largo))).Errores);
+            Assert.Equal("celda C6: valor booleano inválido ('" + largo + "'); solo se acepta '1' o '0'", booleano);
+            var indice = Assert.Single(Leer(false, Encabezado(), Fila(6, "<c r=\"C6\" t=\"s\"><v>" + largo + "</v></c>")).Errores);
+            Assert.Equal("celda C6: índice de texto compartido inválido ('" + largo + "')", indice);
+        }
+
         private static string SoloFormato(string referencia) => $"<c r=\"{referencia}\" s=\"1\"/>";
     }
 }

@@ -8,6 +8,7 @@ using System.Text;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using Sanic.Mppp.Plugins.Steps;
 
 namespace Sanic.Mppp.Plugins.Plantilla
 {
@@ -232,6 +233,17 @@ namespace Sanic.Mppp.Plugins.Plantilla
             }
         }
 
+        private const int MaximoDeCaracteresCitados = 60;
+
+        // DN-04 ("Lectura del archivo"): el Resultado va a una celda de Excel (tope 32.767), así que con el modo estricto un valor del
+        // archivo se cita en 60 caracteres como mucho, con "…", sin partir un par subrogado (mismo criterio que el planificador de
+        // catálogos). Apagado, el texto sale como siempre: ese mensaje lo lee un cliente del banco.
+        private static string Citar(string valor, bool estricta)
+        {
+            if (!estricta || valor == null || valor.Length <= MaximoDeCaracteresCitados) return valor;
+            return TextoAscii.Recortar(valor, MaximoDeCaracteresCitados - 1) + "…";
+        }
+
         // LP-01: lo que dijo la librería (tipo + mensaje), para ITracingService. Nunca se le muestra al cliente.
         private static string DetalleTecnicoDe(Exception ex) => $"{ex.GetType()}: {ex.Message}";
 
@@ -372,7 +384,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 if (!celdasPorFila.ContainsKey(filaEncabezado))
                     return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.Encabezado, $"No se encontró la fila de encabezado (fila {filaEncabezado}).");
 
-                return DatosCrudosPlantilla.ConDatos(celdasPorFila, celdasDeMasEnColumna, celdasDeMasEnFila, textosCompartidos);
+                return DatosCrudosPlantilla.ConDatos(celdasPorFila, celdasDeMasEnColumna, celdasDeMasEnFila, textosCompartidos, estricta);
             }
         }
 
@@ -533,7 +545,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 CeldaCruda celda = null;
                 if (encabezados != null) encabezados.TryGetValue(campo.Columna, out celda);
 
-                LecturaCelda lectura = InterpretarCelda(celda);
+                LecturaCelda lectura = InterpretarCelda(celda, configuracion.EstructuraEstricta);
                 if (lectura.Error != null)
                 {
                     errorCelda = lectura.Error;
@@ -553,7 +565,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                     errores.Add(string.Format(
                         CultureInfo.InvariantCulture,
                         "columna {0}{1}: se esperaba '{2}', se encontró '{3}'",
-                        campo.Columna, configuracion.FilaEncabezado, esperado, encontrado));
+                        campo.Columna, configuracion.FilaEncabezado, esperado, Citar(encontrado, configuracion.EstructuraEstricta)));
                 }
             }
 
@@ -617,7 +629,8 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
         private static bool TraeValor(CeldaCruda celda)
         {
-            LecturaCelda lectura = InterpretarCelda(celda);
+            // Solo se mira si hay texto: el mensaje de la lectura no se usa, así que el modo da igual.
+            LecturaCelda lectura = InterpretarCelda(celda, estricta: true);
             return lectura.Error != null || !string.IsNullOrWhiteSpace(lectura.Texto);
         }
 
@@ -645,7 +658,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                     CeldaCruda celda = null;
                     if (celdasFila != null) celdasFila.TryGetValue(campo.Columna, out celda);
 
-                    LecturaCelda lectura = InterpretarCelda(celda);
+                    LecturaCelda lectura = InterpretarCelda(celda, configuracion.EstructuraEstricta);
                     if (lectura.Error != null)
                     {
                         errorCelda = lectura.Error;
@@ -675,7 +688,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
             return filas;
         }
 
-        private static LecturaCelda InterpretarCelda(CeldaCruda celda)
+        private static LecturaCelda InterpretarCelda(CeldaCruda celda, bool estricta)
         {
             if (celda == null) return LecturaCelda.ConTexto(string.Empty);
 
@@ -709,7 +722,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
                 return LecturaCelda.ConError(string.Format(
                     CultureInfo.InvariantCulture,
-                    "celda {0}: valor booleano inválido ('{1}'); solo se acepta '1' o '0'", referencia, crudo));
+                    "celda {0}: valor booleano inválido ('{1}'); solo se acepta '1' o '0'", referencia, Citar(crudo, estricta)));
             }
 
             if (celda.Tipo == TipoCeldaCruda.Error)
@@ -719,7 +732,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 string textoError = (crudo ?? string.Empty).Trim();
                 return LecturaCelda.ConTextoYAdvertencia(textoError, string.Format(
                     CultureInfo.InvariantCulture,
-                    "celda {0}: tiene un valor de error de Excel ('{1}')", referencia, textoError));
+                    "celda {0}: tiene un valor de error de Excel ('{1}')", referencia, Citar(textoError, estricta)));
             }
 
             // Numérico (default de Open XML), con o sin fórmula: el valor cacheado está igual en CellValue.
@@ -815,14 +828,15 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 Dictionary<int, Dictionary<string, CeldaCruda>> celdasPorFila,
                 List<CeldaDeMas> celdasDeMasEnColumna,
                 List<CeldaDeMas> celdasDeMasEnFila,
-                string[] textosCompartidos)
+                string[] textosCompartidos,
+                bool estricta)
             {
                 string error;
                 foreach (var fila in celdasPorFila.Values)
                 {
                     foreach (string columna in fila.Keys.ToList())
                     {
-                        CeldaCruda resuelta = ResolverTextoCompartido(fila[columna], textosCompartidos, out error);
+                        CeldaCruda resuelta = ResolverTextoCompartido(fila[columna], textosCompartidos, estricta, out error);
                         if (error != null) return ConError(TipoDeRechazoLectura.CeldaIlegible, error);
                         fila[columna] = resuelta;
                     }
@@ -831,7 +845,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 // DN-04: las celdas de más también pueden ser texto compartido; se resuelven acá por la misma razón.
                 foreach (CeldaDeMas deMas in celdasDeMasEnColumna.Concat(celdasDeMasEnFila))
                 {
-                    deMas.Celda = ResolverTextoCompartido(deMas.Celda, textosCompartidos, out error);
+                    deMas.Celda = ResolverTextoCompartido(deMas.Celda, textosCompartidos, estricta, out error);
                     if (error != null) return ConError(TipoDeRechazoLectura.CeldaIlegible, error);
                 }
 
@@ -843,7 +857,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 };
             }
 
-            private static CeldaCruda ResolverTextoCompartido(CeldaCruda celda, string[] textosCompartidos, out string error)
+            private static CeldaCruda ResolverTextoCompartido(CeldaCruda celda, string[] textosCompartidos, bool estricta, out string error)
             {
                 error = null;
                 if (celda.Tipo != TipoCeldaCruda.SharedString) return celda;
@@ -864,7 +878,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 {
                     error = string.Format(
                         CultureInfo.InvariantCulture,
-                        "celda {0}: índice de texto compartido inválido ('{1}')", referencia, crudo);
+                        "celda {0}: índice de texto compartido inválido ('{1}')", referencia, Citar(crudo, estricta));
                     return null;
                 }
 
