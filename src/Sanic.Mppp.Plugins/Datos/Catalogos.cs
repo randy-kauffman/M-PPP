@@ -365,13 +365,13 @@ namespace Sanic.Mppp.Plugins.Datos
 
         // ------------------------------------------------------------------ traducción Entity -> tipos del dominio
 
-        private static InvalidOperationException ErrorColumna(Entity registro, string columna)
+        internal static InvalidOperationException ErrorColumna(Entity registro, string columna)
         {
             return new InvalidOperationException(
                 $"La tabla '{registro.LogicalName}' tiene el registro {registro.Id} con la columna '{columna}' vacía o con un valor que no se puede traducir.");
         }
 
-        private static string RequeridoTexto(Entity registro, string columna)
+        internal static string RequeridoTexto(Entity registro, string columna)
         {
             if (registro.Contains(columna) && registro[columna] is string valor && valor.Length > 0)
             {
@@ -381,7 +381,7 @@ namespace Sanic.Mppp.Plugins.Datos
             throw ErrorColumna(registro, columna);
         }
 
-        private static string TextoOpcional(Entity registro, string columna)
+        internal static string TextoOpcional(Entity registro, string columna)
         {
             return registro.Contains(columna) ? registro[columna] as string : null;
         }
@@ -396,7 +396,7 @@ namespace Sanic.Mppp.Plugins.Datos
             throw ErrorColumna(registro, columna);
         }
 
-        private static TEnum RequeridoChoice<TEnum>(Entity registro, string columna) where TEnum : struct, Enum
+        internal static TEnum RequeridoChoice<TEnum>(Entity registro, string columna) where TEnum : struct, Enum
         {
             if (registro.Contains(columna) && registro[columna] is OptionSetValue opcion && Enum.IsDefined(typeof(TEnum), opcion.Value))
             {
@@ -406,7 +406,7 @@ namespace Sanic.Mppp.Plugins.Datos
             throw ErrorColumna(registro, columna);
         }
 
-        private static EntityReference RequeridoReferencia(Entity registro, string columna)
+        internal static EntityReference RequeridoReferencia(Entity registro, string columna)
         {
             if (registro.Contains(columna) && registro[columna] is EntityReference referencia)
             {
@@ -418,7 +418,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
         /// <summary>Como <see cref="RequeridoReferencia"/> pero SIN exigir: nulo si la columna falta o no es una referencia. Para
         /// columnas que un modo mira y el otro no (DN-01: `sanic_clienteid` del Plan).</summary>
-        private static EntityReference OpcionalReferencia(Entity registro, string columna)
+        internal static EntityReference OpcionalReferencia(Entity registro, string columna)
         {
             return registro.Contains(columna) ? registro[columna] as EntityReference : null;
         }
