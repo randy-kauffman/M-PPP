@@ -123,7 +123,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Contains("\"estadofila\":\"aprobada\"", resultado.ResultadosJson);
             var registro = Registro(svc, filaId);
             Assert.Equal((int)EstadoDeLaFila.Aprobada, ((OptionSetValue)registro["sanic_estado"]).Value);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
 
         [Fact]
@@ -169,7 +169,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaFila.RechazadaEnAS400, ((OptionSetValue)registro["sanic_estado"]).Value);
             Assert.Equal("Su operacion no pudo completarse.", registro["sanic_mensaje"]);
             Assert.Equal("CUENTA INACTIVA", registro["sanic_notainterna"]);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
 
         [Fact]
@@ -202,7 +202,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaFila.Validada, ((OptionSetValue)registro["sanic_estado"]).Value);
             Assert.True((bool)registro["sanic_requiereatencionmanual"]);
             Assert.Equal("condicion no mapeada XYZ", registro["sanic_notainterna"]);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
 
         [Fact]

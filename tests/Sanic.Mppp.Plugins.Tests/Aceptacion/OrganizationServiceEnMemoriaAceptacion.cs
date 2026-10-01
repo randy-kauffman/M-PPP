@@ -122,16 +122,29 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
-        public void Update_guarda_una_copia_y_un_valor_nulo_deja_el_atributo_en_nulo()
+        public void Update_guarda_una_copia_y_un_valor_nulo_vacia_la_columna_que_despues_no_se_devuelve()
         {
+            // Cambiado el 2026-10-01 (aprobado): antes fijaba que el atributo quedaba presente con null, y Dataverse no lo
+            // devuelve. Una prueba sobre el doble viejo pasaba leyendo registro["x"], y contra Dataverse real revienta.
             var svc = new OrganizationServiceEnMemoria();
             var id = svc.Create(Entidad(Plan, null, ("sanic_codigo", "0042")));
             var cambio = Entidad(Plan, id, ("sanic_codigo", null));
             svc.Update(cambio);
             cambio["sanic_codigo"] = "CAMBIADO";
             var leido = svc.Retrieve(Plan, id, new ColumnSet(true));
-            Assert.True(leido.Contains("sanic_codigo"));
-            Assert.Null(leido["sanic_codigo"]);
+            Assert.False(leido.Contains("sanic_codigo"));
+            Assert.Null(leido.GetAttributeValue<string>("sanic_codigo"));
+        }
+
+        [Fact]
+        public void Un_valor_nulo_al_crear_o_sembrar_no_se_guarda_como_en_Dataverse()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var creado = svc.Create(Entidad(Plan, null, ("sanic_codigo", "0042"), ("sanic_moneda", null)));
+            var sembrado = svc.Sembrar(Entidad(Plan, null, ("sanic_codigo", "0043"), ("sanic_moneda", null)));
+            Assert.False(svc.Retrieve(Plan, creado, new ColumnSet(true)).Contains("sanic_moneda"));
+            Assert.False(svc.Retrieve(Plan, sembrado, new ColumnSet(true)).Contains("sanic_moneda"));
+            Assert.Equal("0042", svc.Retrieve(Plan, creado, new ColumnSet(true))["sanic_codigo"]);
         }
 
         [Fact]

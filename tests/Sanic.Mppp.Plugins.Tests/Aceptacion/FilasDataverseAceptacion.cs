@@ -279,7 +279,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             var registro = svc.Registros(TablasHistorico.Fila).Single(f => f.Id == filaId);
             Assert.Equal((int)EstadoDeLaFila.Aprobada, ((OptionSetValue)registro["sanic_estado"]).Value);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
 
         [Fact]
@@ -295,7 +295,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaFila.RechazadaEnAS400, ((OptionSetValue)registro["sanic_estado"]).Value);
             Assert.Equal("Texto para el cliente", registro["sanic_mensaje"]);
             Assert.Equal("CUENTA INACTIVA (texto crudo de AS400)", registro["sanic_notainterna"]);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
 
         [Fact]
@@ -311,7 +311,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaFila.Digitada, ((OptionSetValue)registro["sanic_estado"]).Value); // no cambia
             Assert.True((bool)registro["sanic_requiereatencionmanual"]);
             Assert.Equal("El bot no reconoce esta condicion de AS400.", registro["sanic_notainterna"]);
-            Assert.Null(registro["sanic_claimhasta"]);
+            Assert.Null(registro.GetAttributeValue<DateTime?>("sanic_claimhasta"));   // vaciada: Dataverse no la devuelve
         }
     }
 }

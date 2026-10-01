@@ -252,6 +252,13 @@ namespace Sanic.Mppp.Plugins.Tests.Dobles
             var registro = BuscarObligatorio(entity.LogicalName, entity.Id);
             foreach (var atributo in entity.Attributes)
             {
+                // Como Dataverse: un Update con null VACÍA la columna, y una columna vacía no se devuelve (2026-10-01).
+                if (atributo.Value == null)
+                {
+                    registro.Attributes.Remove(atributo.Key);
+                    continue;
+                }
+
                 registro[atributo.Key] = ClonarValor(atributo.Value);
             }
 
@@ -534,6 +541,14 @@ namespace Sanic.Mppp.Plugins.Tests.Dobles
             var copia = new Entity(entidad.LogicalName, entidad.Id);
             foreach (var atributo in entidad.Attributes)
             {
+                // Como Dataverse: un valor nulo no se guarda ni se devuelve; la columna queda AUSENTE (Learn, "Query data":
+                // las columnas con valor nulo no vienen en la respuesta). Sin esto, una prueba que siembra null nunca
+                // ejercita el caso real de la columna ausente (revisión DN-04 4a, aprobado el 2026-10-01).
+                if (atributo.Value == null)
+                {
+                    continue;
+                }
+
                 copia[atributo.Key] = ClonarValor(atributo.Value);
             }
 
