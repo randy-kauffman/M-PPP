@@ -26,6 +26,20 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         private static readonly Guid UsuarioQueLlama = new Guid("00000000-0000-0000-0000-00000000cafe");
 
         // ================================================================================================ armado
+        /// <summary>
+        /// "Es la plantilla de esa estructura", comparando CONTENIDO: el generador de .xlsx no es determinista (hora del zip e Id
+        /// de relación aleatorio), así que dos plantillas armadas por separado nunca son iguales byte a byte. Corregido el
+        /// 2026-10-01: la primera versión de estas pruebas comparaba base64 y era imposible de cumplir (lo detectó el constructor).
+        /// </summary>
+        private static void EsLaPlantillaDe(EstructuraDeExcelDeCatalogo esperada, EstructuraDeExcelDeCatalogo otra, string base64)
+        {
+            var bytes = Convert.FromBase64String(base64);
+            var propia = new LectorOpenXml().Leer(bytes, esperada.ConfiguracionDeLectura(300));
+            Assert.True(propia.EsValido, string.Join(" | ", propia.Errores));
+            Assert.Empty(propia.Filas);
+            Assert.Equal(TipoDeRechazoLectura.HojaInexistente, new LectorOpenXml().Leer(bytes, otra.ConfiguracionDeLectura(300)).Rechazo);
+        }
+
         private static OrganizationServiceEnMemoria Sistema(string filasMaximo = null, string limites = null)
         {
             var s = new OrganizationServiceEnMemoria();
@@ -250,8 +264,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var cat = new OrganizationServiceEnMemoria();
             var sistema = new OrganizationServiceEnMemoria();
             var n = Nucleo(cat, sistema);
-            Assert.Equal(Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Plantilla(EstructuraDeExcelDeCatalogo.Carga)), n.Plantilla(EstructuraDeExcelDeCatalogo.Carga));
-            Assert.Equal(Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Plantilla(EstructuraDeExcelDeCatalogo.CambioDeEstado)), n.Plantilla(EstructuraDeExcelDeCatalogo.CambioDeEstado));
+            EsLaPlantillaDe(EstructuraDeExcelDeCatalogo.Carga, EstructuraDeExcelDeCatalogo.CambioDeEstado, n.Plantilla(EstructuraDeExcelDeCatalogo.Carga));
+            EsLaPlantillaDe(EstructuraDeExcelDeCatalogo.CambioDeEstado, EstructuraDeExcelDeCatalogo.Carga, n.Plantilla(EstructuraDeExcelDeCatalogo.CambioDeEstado));
             Assert.Empty(cat.Llamadas);
             Assert.Empty(sistema.Llamadas);
         }
@@ -269,13 +283,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         {
             var (fabrica, contexto) = Envoltorio(new OrganizationServiceEnMemoria(), new OrganizationServiceEnMemoria(), ("plantilla", true));
             new CargarCatalogosApi().Execute(fabrica);
-            Assert.Equal(Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Plantilla(EstructuraDeExcelDeCatalogo.Carga)), contexto.OutputParameters["resultado"]);
+            EsLaPlantillaDe(EstructuraDeExcelDeCatalogo.Carga, EstructuraDeExcelDeCatalogo.CambioDeEstado, (string)contexto.OutputParameters["resultado"]);
             Assert.Equal(false, contexto.OutputParameters["grabado"]);
             Assert.Equal(0, contexto.OutputParameters["filas"]);
 
             var (fabrica2, contexto2) = Envoltorio(new OrganizationServiceEnMemoria(), new OrganizationServiceEnMemoria(), ("plantilla", true));
             new CambiarEstadoCatalogosApi().Execute(fabrica2);
-            Assert.Equal(Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Plantilla(EstructuraDeExcelDeCatalogo.CambioDeEstado)), contexto2.OutputParameters["resultado"]);
+            EsLaPlantillaDe(EstructuraDeExcelDeCatalogo.CambioDeEstado, EstructuraDeExcelDeCatalogo.Carga, (string)contexto2.OutputParameters["resultado"]);
         }
 
         [Fact]
