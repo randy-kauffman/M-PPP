@@ -120,6 +120,28 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void Estricto_corta_en_el_primer_valor_despues_de_la_ventana_y_no_mira_lo_que_sigue()
+        {
+            // Costo acotado (DN-04, "costo acotado por diseño"): el primer valor después de la ventana ya es rechazo, así que el
+            // lector no sigue juntando celdas. Observable: lo que viene después (acá una fila que retrocede) ya no se mira,
+            // igual que LP-04/D-12 hace con la plantilla del cliente.
+            var r = Leer(true, Encabezado(), Datos(6), Fila(12, Celda("C12", "dato")), Fila(11, Celda("C11", "otro")));
+            Assert.Equal(TipoDeRechazoLectura.FilaDeMas, r.Rechazo);
+
+            // También cuando el valor es un texto compartido o un número, no solo un texto en línea.
+            var conNumero = Leer(true, Encabezado(), Datos(6), Fila(12, "<c r=\"C12\"><v>5</v></c>"), Fila(11, Celda("C11", "otro")));
+            Assert.Equal(TipoDeRechazoLectura.FilaDeMas, conNumero.Rechazo);
+        }
+
+        [Fact]
+        public void Estricto_corta_en_el_primer_valor_de_mas_tambien_en_columnas()
+        {
+            // Una celda de más con valor ya es rechazo: una celda posterior que retrocede en la misma fila no se mira.
+            var r = Leer(true, Encabezado(), Datos(6, Celda("F6", "x"), Celda("E6", "y")));
+            Assert.Equal(TipoDeRechazoLectura.ColumnaDeMas, r.Rechazo);
+        }
+
+        [Fact]
         public void Estricto_cincuenta_mil_filas_solo_con_formato_despues_de_la_ventana_se_recorren_rapido()
         {
             var filas = new List<string> { Encabezado(), Datos(6) };
