@@ -140,11 +140,11 @@ Quién la llama: el comando **"Descargar para digitar"** de la grilla de Filas (
 
 **No marca nada.** La descarga no deja rastro propio en Fila ni en Bitácora: es una lectura, y `sanic_mppp_capi_exportarparadigitar` no escribe ninguna tabla del proyecto.
 
-## 1c. `sanic_mppp_capi_cargarcatalogos` y 1d. `sanic_mppp_capi_cambiarestadocatalogos` — DN-04 (Action) · **diseñadas, sin construir**
+## 1c. `sanic_mppp_capi_cargarcatalogos` y 1d. `sanic_mppp_capi_cambiarestadocatalogos` — DN-04 (Action) · **construidas en Dev el 2026-10-01**
 
 > **Agregado el 2026-10-01.** Diseño cerrado con el aprobador ese día (`DIRECTRICES-NUEVAS.md`
 > DN-04). Las **reglas por fila**, el formato de los Excel y los textos del resumen viven allá; acá
-> va el contrato. D-72 (spike de transacción) **cerrada el 2026-10-01**: listas para construir.
+> va el contrato. D-72 (spike de transacción) **cerrada el 2026-10-01**. **Construidas y registradas en Dev el mismo día** (paquete 1.0.20.0; `customapiid` 44e46429… y a455003a…), con prueba de humo en verde contra el sandbox real (plantilla, MPPP-CAR-004, archivo con error de fila sin escrituras). Código: `Api/CatalogosMasivosApi.cs` y lo que une (`Catalogos/`, `Datos/CatalogosMasivos.cs`, `Exportacion/ExcelDeCatalogos.cs`, modo estricto de `Plantilla/LectorOpenXml.cs`). Falta la prueba con escrituras reales y un usuario Administrador de planes (D-73).
 
 Quién las llama: los comandos **"Carga masiva"** y **"Activar/Desactivar masivo"** de las grillas
 principales de Cliente, Plan, Autorizado y AutorizacionCliente (`recursos/js/comandos.js`,

@@ -132,7 +132,14 @@ que alguien corra `datos.py playbooks/datos/parametros.md --completar` sobre esa
 explicativo, así que no hay urgencia funcional; queda igual que la deriva de `rpa.lote.maximo` de
 arriba.
 
+**`carga.filas.maximo` se agregó el 2026-10-01 (DN-04, `diseno/DIRECTRICES-NUEVAS.md`)** con
+`parametro.py`, versión 1, valor **300**: decisión del aprobador ("arranquemos con 300 en un parámetro; lo vamos a
+medir para ajustarlo"). Lo leen las dos Custom API de catálogos masivos, con SYSTEM. Un archivo con más filas se
+rechaza entero (MPPP-CAR-006), nunca se corta. Si falta, no es entero o es menor que 1, el código usa 300. **Pendiente:
+medirlo en Dev** (pieza 6 de DN-04) y versionarlo con `parametro.py` si cambia.
+
 Valores con fuente:
+- `carga.filas.maximo`: `DIRECTRICES-NUEVAS.md` DN-04, decisión 8 del aprobador (2026-10-01); `02-diccionario-datos.md` §2.5.
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
@@ -384,6 +391,16 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "100",
       "sanic_descripcion": "Cuantos resultados acepta registrarresultadorpa en una llamada (03 §3). Un lote mas grande se rechaza ENTERO (MPPP-RPA-008), nunca se recorta. Lo manda el limite de 2 minutos de la operacion (BP-PP-053), no la cuota. **MEDIDO en Dev el 2026-09-26**: 0,33 s por item, lineal de 10 a 50 (10->3,9s · 25->7,9s · 50->16,7s). Con 100 son ~33 s, el 28% del presupuesto, con mas de 3x de margen para degradacion. **Hay que volver a medirlo en Produccion**: Dev vacio no es Produccion con carga y con tablas grandes."
+    },
+    {
+      "sanic_nombre": "carga.filas.maximo",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "300",
+      "sanic_descripcion": "Maximo de filas no vacias por archivo en la carga y la activacion masiva de catalogos (DN-04). Inicial 300, a medir en Dev y ajustar (decision del aprobador, 2026-10-01). Un archivo con mas filas se rechaza entero (MPPP-CAR-006), nunca se corta."
     }
   ]
 }

@@ -146,7 +146,7 @@ Un solo paquete, `sanic_mppp_pkg_plugins` (`Sanic.Mppp.Plugins`). Se construye p
 | 7.12 | `Steps/` atender no reconocida | | 1 |
 | 7.13 | `Api/ObtenerFilasPendientesApi`, `Api/RegistrarResultadoRpaApi` | | 2 |
 | 7.14 | `Api/ExportarParaDigitar`, `Api/ExportarParaDigitarApi`, `Exportacion/` (`ArmadorExportacionOpenXml`, Open XML SDK 3.1.0) | **Agregado el 2026-09-28 a este inventario** (DN-02, construido el 2026-09-26/27) | 2 |
-| 7.15 | `Api/CargarCatalogos(Api)`, `Api/CambiarEstadoCatalogos(Api)`, y el dominio de la lectura y validación de los dos Excel de catálogos | **Diseñado el 2026-10-01, DN-04, sin construir.** Reutiliza la normalización de `Steps/ReglasDeSteps.cs` y las reglas LP-01 a LP-07. D-72 cerrada el 2026-10-01 | DN-04 |
+| 7.15 | `Api/CargarCatalogos(Api)`, `Api/CambiarEstadoCatalogos(Api)`, y el dominio de la lectura y validación de los dos Excel de catálogos | **Construido el 2026-10-01, DN-04** (paquete 1.0.20.0). Reutiliza la normalización de `Steps/ReglasDeSteps.cs` y las reglas LP-01 a LP-07. D-72 cerrada el 2026-10-01 | DN-04 |
 
 ## 8. Registro de Custom API y steps — P-09
 
@@ -158,8 +158,8 @@ Un solo paquete, `sanic_mppp_pkg_plugins` (`Sanic.Mppp.Plugins`). Se construye p
 | 8.3 | Custom API | `sanic_mppp_capi_obtenerfilaspendientes` | 7.13 | 2 |
 | 8.4 | Custom API | `sanic_mppp_capi_registrarresultadorpa` | 7.13 | 2 |
 | 8.5 | Custom API | `sanic_mppp_capi_exportarparadigitar` (1 parámetro de entrada, 2 de salida) — **agregada el 2026-09-28 a este inventario; construida en Dev el 2026-09-26/27** (DN-02, `DIRECTRICES-NUEVAS.md`, contrato completo en `03-contratos-custom-api.md` §1b) | 7.14 | 2 |
-| 8.6 | Custom API | `sanic_mppp_capi_cargarcatalogos` (2 parámetros de entrada, 9 de salida) — **diseñada el 2026-10-01, DN-04, sin construir**, contrato en `03` §1c | 7.15 | DN-04 |
-| 8.7 | Custom API | `sanic_mppp_capi_cambiarestadocatalogos` (2 parámetros de entrada, 8 de salida) — **diseñada el 2026-10-01, DN-04, sin construir**, contrato en `03` §1d | 7.15 | DN-04 |
+| 8.6 | Custom API | `sanic_mppp_capi_cargarcatalogos` (2 parámetros de entrada, 9 de salida) — **construida en Dev el 2026-10-01**, DN-04, contrato en `03` §1c | 7.15 | DN-04 |
+| 8.7 | Custom API | `sanic_mppp_capi_cambiarestadocatalogos` (2 parámetros de entrada, 8 de salida) — **construida en Dev el 2026-10-01**, DN-04, contrato en `03` §1d | 7.15 | DN-04 |
 
 ## 9. Datos semilla — P-10
 
@@ -168,7 +168,7 @@ Un solo paquete, `sanic_mppp_pkg_plugins` (`Sanic.Mppp.Plugins`). Se construye p
 | 9.1 | Parámetros: `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `plantilla.estructura`, `plantilla.listas`, `plantilla.obligatoriedad`, `lectura.limites`, `retencion.dias.*` (2), `vigilancia.*` (3), `rpa.puedeaprobar` | 12 | tabla 3.5 |
 | 9.2 | Reglas de nivel Correo (2) y de nivel Solicitud (5) | 7 | tabla 3.6 |
 | 9.3 | Reglas de nivel Registro | 8 | tabla 3.6 |
-| 9.5 | Parámetro `carga.filas.maximo` = 300 (DN-04, 2026-10-01, sin sembrar) | 1 | tabla 3.5 |
+| 9.5 | Parámetro `carga.filas.maximo` = 300 (DN-04, sembrado en Dev el 2026-10-01, versión 1) | 1 | tabla 3.5 |
 | 9.4 | Migración única desde SharePoint: clientes, planes, autorizados, autorizaciones (RF-16) | datos reales | tablas 3.1–3.4, y los datos revisados por Banca Privada |
 
 ## 10. Configuración entre entornos — P-11
