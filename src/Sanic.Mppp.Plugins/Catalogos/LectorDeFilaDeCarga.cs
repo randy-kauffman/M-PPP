@@ -96,11 +96,14 @@ namespace Sanic.Mppp.Plugins.Catalogos
         }
 
         /// <summary>El valor de la celda por LETRA de columna, sin espacios a los lados; nulo si falta la clave, el valor es nulo o está en blanco (DN-04).</summary>
-        private static string Celda(IDictionary<string, string> valores, string campo)
+        private static string Celda(IDictionary<string, string> valores, string campo) => CeldaEnLetra(valores, ColumnasDeCarga.LetraDe(campo));
+
+        /// <summary>Lo mismo por la letra directa: el Excel de cambio de estado tiene otras columnas pero la misma regla de celda vacía.</summary>
+        internal static string CeldaEnLetra(IDictionary<string, string> valores, string letra)
         {
             if (valores == null) return null;
             string valor;
-            if (!valores.TryGetValue(ColumnasDeCarga.LetraDe(campo), out valor) || string.IsNullOrWhiteSpace(valor)) return null;
+            if (!valores.TryGetValue(letra, out valor) || string.IsNullOrWhiteSpace(valor)) return null;
             return valor.Trim();
         }
 
@@ -109,7 +112,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
         /// <see cref="ArgumentException"/> con un motivo legible; se atrapa solo acá (código propio, no un SDK) y pasa a ser
         /// el error de esta fila con el prefijo de la columna.
         /// </summary>
-        private static Campo<string> Normalizar(FilaDeTrabajo f, string encabezado, string crudo, Func<string, string> normalizar)
+        internal static Campo<string> Normalizar(FilaDeTrabajo f, string encabezado, string crudo, Func<string, string> normalizar)
         {
             var campo = new Campo<string>();
             if (crudo == null) return campo;
@@ -129,7 +132,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
         }
 
         // Los dos correos del archivo (D, el del ejecutivo, y H, el autorizado) caben en una columna de correo T(320) (diseno/02 §2.3).
-        private static Campo<string> LeerCorreo(FilaDeTrabajo f, string encabezado, string crudo)
+        internal static Campo<string> LeerCorreo(FilaDeTrabajo f, string encabezado, string crudo)
         {
             var campo = Normalizar(f, encabezado, crudo, Normalizacion.CorreoAutorizado);
             if (campo.Usable && campo.Valor.Length > MaximoCorreo)

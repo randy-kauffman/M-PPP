@@ -19,9 +19,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
         private readonly List<FilaDeTrabajo> _filas;
 
         // La foto de lo que existe, indexada. Las claves ya vienen normalizadas como las guarda el step.
-        private readonly Dictionary<string, ClienteExistente> _clientesPorBac = new Dictionary<string, ClienteExistente>(StringComparer.Ordinal);
-        private readonly Dictionary<string, ClienteExistente> _clientesPorCom = new Dictionary<string, ClienteExistente>(StringComparer.Ordinal);
-        private readonly Dictionary<Guid, ClienteExistente> _clientesPorId = new Dictionary<Guid, ClienteExistente>();
+        private readonly IndiceDeClientes _clientes;
         private readonly Dictionary<string, PlanExistente> _planesPorCodigo = new Dictionary<string, PlanExistente>(StringComparer.Ordinal);
         private readonly Dictionary<string, AutorizadoExistente> _autorizadosPorCorreo = new Dictionary<string, AutorizadoExistente>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, AutorizacionClienteExistente> _autorizacionesPorPar = new Dictionary<string, AutorizacionClienteExistente>(StringComparer.Ordinal);
@@ -42,13 +40,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
         internal Planificacion(List<FilaDeTrabajo> filas, EstadoDeCatalogos estado)
         {
             _filas = filas;
-
-            foreach (var c in estado.Clientes)
-            {
-                _clientesPorId[c.Id] = c;
-                if (!string.IsNullOrWhiteSpace(c.CifBac)) _clientesPorBac[c.CifBac] = c;
-                if (!string.IsNullOrWhiteSpace(c.CifCom)) _clientesPorCom[c.CifCom] = c;
-            }
+            _clientes = new IndiceDeClientes(estado.Clientes);
 
             foreach (var p in estado.Planes)
             {
@@ -104,38 +96,14 @@ namespace Sanic.Mppp.Plugins.Catalogos
             if ((f.CifBac.Presente && !f.CifBac.Valido) || (f.CifCom.Presente && !f.CifCom.Valido)) return;
             if (!f.CifBac.Presente && !f.CifCom.Presente) return;
 
-            ClienteExistente porBac = null, porCom = null;
-            if (f.CifBac.Usable) _clientesPorBac.TryGetValue(f.CifBac.Valor, out porBac);
-            if (f.CifCom.Usable) _clientesPorCom.TryGetValue(f.CifCom.Valor, out porCom);
-
-            ClienteExistente existente;
-            if (f.CifBac.Usable && f.CifCom.Usable)
+            var busqueda = _clientes.Buscar(f);
+            if (busqueda.Motivo != null)
             {
-                // Regla 2: los dos CIF tienen que decir lo mismo. Dos clientes distintos, o uno que existe y otro que no, es un error.
-                if (porBac != null && porCom != null && porBac.Id != porCom.Id)
-                {
-                    f.Error(Encabezados.Cliente + ": apuntan a dos clientes distintos (" + porBac.RazonSocial + " y " + porCom.RazonSocial + "). Dejá uno solo o corregí el que está mal.");
-                    return;
-                }
-
-                if (porBac != null && porCom == null)
-                {
-                    f.Error(Encabezados.Cliente + ": el CIF BAC " + f.CifBac.Valor + " es del cliente " + porBac.RazonSocial + ", pero el CIF COM " + f.CifCom.Valor + " no está grabado. Dejá uno solo o corregí el que está mal.");
-                    return;
-                }
-
-                if (porBac == null && porCom != null)
-                {
-                    f.Error(Encabezados.Cliente + ": el CIF COM " + f.CifCom.Valor + " es del cliente " + porCom.RazonSocial + ", pero el CIF BAC " + f.CifBac.Valor + " no está grabado. Dejá uno solo o corregí el que está mal.");
-                    return;
-                }
-
-                existente = porBac;
+                f.Error(busqueda.Motivo);
+                return;
             }
-            else
-            {
-                existente = porBac ?? porCom;
-            }
+
+            var existente = busqueda.Cliente;
 
             if (existente != null)
             {
@@ -370,8 +338,8 @@ namespace Sanic.Mppp.Plugins.Catalogos
         private string NombreDelCliente(Guid clienteId)
         {
             // La foto trae los clientes de las claves del archivo; el dueño de un plan existente puede no estar. Se dice igual, sin nombrarlo.
-            ClienteExistente cliente;
-            return _clientesPorId.TryGetValue(clienteId, out cliente) ? cliente.RazonSocial : "otro cliente";
+            var cliente = _clientes.PorId(clienteId);
+            return cliente != null ? cliente.RazonSocial : "otro cliente";
         }
 
         private static string TextoDeFormato(TipoDeFormatoDelPlan formato)
