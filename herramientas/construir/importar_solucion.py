@@ -670,8 +670,19 @@ def _verificar_ribbon(dv, cambio, identidad):
     for boton in cambio["botones"]:
         base = _base_id(identidad, cambio, boton)
         for ubicacion in boton["ubicaciones"]:
-            if f"{base}.{ubicacion}.Button" not in presentes:
+            if "menu" in boton:
+                # Un menú se verifica como se genera (`_menu_desplegable`): el ancla y CADA opción. La primera versión
+                # (2026-10-01) buscaba un `Button` donde había un `FlyoutAnchor` y dijo `error` con el ribbon bien hecho.
+                if f"{base}.{ubicacion}.FlyoutAnchor" not in presentes:
+                    faltan.append(f"falta el menú '{boton['id']}' en {ubicacion}")
+                for opcion in boton["menu"]:
+                    if f"{base}.{ubicacion}.{opcion['id']}.Button" not in presentes:
+                        faltan.append(f"al menú '{boton['id']}' le falta la opción '{opcion['id']}' en {ubicacion}")
+            elif f"{base}.{ubicacion}.Button" not in presentes:
                 faltan.append(f"falta el botón '{boton['id']}' en {ubicacion}")
+        for opcion in boton.get("menu", []):
+            if f'FunctionName="{opcion["funcion"]}"' not in ribbon:
+                faltan.append(f"la opción '{opcion['id']}' del menú '{boton['id']}' no llama a '{opcion['funcion']}'")
         # La regla se verifica aparte porque el botón puede estar y la regla no: el
         # 2026-09-23 se agregaron las cinco EnableRules y esta función dijo
         # `ya_existia` sin mirarlas, así que el cambio no se habría importado nunca.

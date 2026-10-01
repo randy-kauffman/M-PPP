@@ -418,6 +418,43 @@ class RibbonConMenu(unittest.TestCase):
         self.assertEqual(self.xml(), self.xml())
 
 
+class VerificacionDelMenu(unittest.TestCase):
+    """La verificación tiene que acompañar a lo que se genera (2026-10-01: la primera versión de los menús generaba un
+    FlyoutAnchor y la verificación seguía buscando un Button; el ribbon quedó bien en Dev y la herramienta dijo error)."""
+
+    def verificar(self, ribbon_real, boton=None):
+        cambio = dict(CAMBIO_RIBBON, botones=[boton or _boton_menu()], ocultar=[])
+        original = imp.ribbon_de_la_tabla
+        imp.ribbon_de_la_tabla = lambda dv, tabla: ribbon_real
+        try:
+            return imp._verificar_ribbon(None, cambio, IDENT)
+        finally:
+            imp.ribbon_de_la_tabla = original
+
+    def ribbon_generado(self, boton=None):
+        cambio = dict(CAMBIO_RIBBON, botones=[boton or _boton_menu()], ocultar=[])
+        return imp.ribbondiffxml(IDENT, cambio, COMPONENTE["idiomas"], [])
+
+    def test_un_menu_bien_desplegado_no_falta_nada(self):
+        self.assertEqual([], self.verificar(self.ribbon_generado()))
+
+    def test_falta_el_ancla_del_menu(self):
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        real = self.ribbon_generado().replace(f'Id="{base}.HomepageGrid.FlyoutAnchor"', 'Id="otra.cosa"')
+        self.assertTrue(any("cargamasiva" in f and "HomepageGrid" in f for f in self.verificar(real)), self.verificar(real))
+
+    def test_falta_una_opcion_del_menu(self):
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        real = self.ribbon_generado().replace(f'Id="{base}.HomepageGrid.plantilla.Button"', 'Id="otra.cosa"')
+        faltan = self.verificar(real)
+        self.assertTrue(any("plantilla" in f for f in faltan), faltan)
+
+    def test_una_opcion_que_no_llama_a_su_funcion(self):
+        real = self.ribbon_generado().replace('FunctionName="Sanic.Mppp.Comandos.plantillaCarga"', 'FunctionName="Otra.Cosa"')
+        faltan = self.verificar(real)
+        self.assertTrue(any("plantillaCarga" in f for f in faltan), faltan)
+
+
 class ValidacionDelMenu(Base):
     """Misma vía que `ValidacionOffline`: el playbook se valida entero sin red; un error no llama al entorno."""
 
