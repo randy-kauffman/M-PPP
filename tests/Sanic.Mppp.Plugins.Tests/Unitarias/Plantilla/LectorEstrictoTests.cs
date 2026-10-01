@@ -74,7 +74,8 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Plantilla
         [Fact]
         public void Estricto_una_celda_desordenada_despues_de_la_ventana_es_Desorden()
         {
-            var r = Leer(true, Encabezado(), Datos(6), Fila(12, Celda("F12", "x"), Celda("E12", "y")));
+            // Con solo formato (que no es un valor): el primer valor de más ya corta la lectura y no se mira lo que sigue.
+            var r = Leer(true, Encabezado(), Datos(6), Fila(12, SoloFormato("F12"), SoloFormato("E12")));
             Assert.Equal(TipoDeRechazoLectura.Desorden, r.Rechazo);
         }
 
@@ -164,6 +165,61 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Plantilla
             var r = new LectorOpenXml().Leer(System.Text.Encoding.UTF8.GetBytes("no soy un zip"), Ventana(true));
             Assert.Equal(TipoDeRechazoLectura.ArchivoIlegible, r.Rechazo);
             Assert.NotNull(r.DetalleTecnico);
+        }
+
+        // ---- DN-04, corte en el primer valor de más (segunda vuelta) ----
+        [Fact]
+        public void Estricto_corta_tambien_en_una_celda_de_texto_compartido_inexistente_y_termina_en_CeldaIlegible()
+        {
+            var r = Leer(true, Encabezado(), Datos(6), Fila(12, CeldaDanada("C12")), Fila(11, Celda("C11", "otro")));
+            Assert.Equal(TipoDeRechazoLectura.CeldaIlegible, r.Rechazo);
+        }
+
+        [Fact]
+        public void Estricto_las_filas_en_blanco_antes_del_primer_valor_no_cortan_y_lo_que_sigue_al_valor_no_se_mira()
+        {
+            var r = Leer(true, Encabezado(), Datos(6),
+                Fila(12, Celda("C12", "  ")), Fila(13, Celda("C13", "x")), Fila(11, Celda("C11", "otro")));
+            Assert.Equal(TipoDeRechazoLectura.FilaDeMas, r.Rechazo);
+            Assert.Contains("fila 13", Assert.Single(r.Errores));
+        }
+
+        [Fact]
+        public void Estricto_corta_en_el_primer_valor_de_mas_de_una_fila_de_la_ventana_y_no_mira_las_filas_que_siguen()
+        {
+            var r = Leer(true, Encabezado(), Datos(6, Celda("F6", "x")), Datos(8), Datos(7));
+            Assert.Equal(TipoDeRechazoLectura.ColumnaDeMas, r.Rechazo);
+        }
+
+        [Fact]
+        public void Estricto_un_booleano_de_mas_sin_valor_no_se_puede_decidir_y_corta_como_valor()
+        {
+            var r = Leer(true, Encabezado(), Datos(6, "<c r=\"F6\" t=\"b\"><v></v></c>", Celda("E6", "y")));
+            Assert.Equal(TipoDeRechazoLectura.ColumnaDeMas, r.Rechazo);
+        }
+
+        [Fact]
+        public void Estricto_un_texto_compartido_en_blanco_de_mas_no_cuenta_y_el_siguiente_con_valor_si()
+        {
+            var archivo = new Sanic.Mppp.Plugins.Tests.Apoyo.ConstructorXlsxDePrueba(Hoja)
+                .ConTexto("C5", "Campo Uno").ConTexto("D5", "Campo Dos")
+                .ConTexto("C6", "c").ConTexto("D6", "d")
+                .ConTexto("E6", "   ").ConTexto("F6", "x")
+                .Bytes();
+            var r = new LectorOpenXml().Leer(archivo, Ventana(true));
+            Assert.Equal(TipoDeRechazoLectura.ColumnaDeMas, r.Rechazo);
+            Assert.Contains("F6", Assert.Single(r.Errores));
+        }
+
+        [Fact]
+        public void Estricto_los_mensajes_nuevos_van_en_voseo()
+        {
+            var columna = Assert.Single(Leer(true, Encabezado(extra: Celda("E5", "x")), Datos(6)).Errores);
+            Assert.Contains("Borrá", columna);
+            Assert.Contains("volvé", columna);
+            var fila = Assert.Single(Leer(true, Encabezado(), Datos(6), Datos(12)).Errores);
+            Assert.Contains("Borrá", fila);
+            Assert.Contains("volvé", fila);
         }
 
         private static string SoloFormato(string referencia) => $"<c r=\"{referencia}\" s=\"1\"/>";

@@ -303,7 +303,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                         // una nota al pie mucho más abajo-. Lo que venga después del corte no se mira: detectar un
                         // desorden ahí exigiría seguir leyendo, que es el costo no acotado que LP-04 elimina.
                         // DN-04 (modo estricto): acá NO se corta; se sigue recorriendo para ver si alguna fila de más trae
-                        // un valor (se rechaza el archivo en vez de cortar en silencio), y LP-05 sigue rigiendo.
+                        // un valor (se rechaza el archivo en vez de cortar en silencio), y LP-05 sigue rigiendo hasta el primer valor de más.
                         bool pasadaLaVentana = indice > filaHasta;
                         if (pasadaLaVentana && !estricta) break;
 
@@ -315,6 +315,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
                         var celdas = new Dictionary<string, CeldaCruda>(StringComparer.Ordinal);
                         int ultimaColumnaResuelta = 0;
+                        bool cortar = false;
 
                         foreach (Cell celda in fila.Elements<Cell>())
                         {
@@ -346,21 +347,25 @@ namespace Sanic.Mppp.Plugins.Plantilla
                             // Los campos configurados que no llegaron a aparecer quedan como texto vacío.
                             if (!estricta) break;
 
-                            // DN-04 (modo estricto): se sigue recorriendo y se captura, sin interpretar, toda celda que traiga
-                            // <v> o <is>. Una celda solo con formato no es un valor y no se materializa. Si el valor es
-                            // vacío o texto en blanco lo decide el código de afuera del try, con InterpretarCelda.
-                            if (celda.CellValue != null || celda.InlineString != null)
+                            // DN-04 (modo estricto): una celda sin <v> ni <is> (solo formato) no es un valor y no se materializa.
+                            if (celda.CellValue == null && celda.InlineString == null) continue;
+
+                            // EXCEPCIÓN a "nada de lógica propia dentro del try" (DN-04, costo acotado; LP-01): el primer valor de
+                            // más ya es rechazo, así que se corta acá y lo que sigue no se mira (memoria O(1) después de la
+                            // ventana). Para poder cortar se hace SOLO un chequeo trivial sobre datos propios, que no puede
+                            // fallar por un bug nuestro: EsBlancoSeguro. Lo que no se puede decidir se captura y corta igual. La
+                            // interpretación y el armado del rechazo siguen AFUERA del try, con InterpretarCelda.
+                            CeldaCruda cruda = CapturarCeldaCruda(columnaTexto + indice.ToString(CultureInfo.InvariantCulture), celda);
+                            if (!EsBlancoSeguro(cruda, textosCompartidos))
                             {
-                                var deMas = new CeldaDeMas
-                                {
-                                    Fila = indice,
-                                    Celda = CapturarCeldaCruda(columnaTexto + indice.ToString(CultureInfo.InvariantCulture), celda)
-                                };
-                                (pasadaLaVentana ? celdasDeMasEnFila : celdasDeMasEnColumna).Add(deMas);
+                                (pasadaLaVentana ? celdasDeMasEnFila : celdasDeMasEnColumna).Add(new CeldaDeMas { Fila = indice, Celda = cruda });
+                                cortar = true;
+                                break;
                             }
                         }
 
                         if (!pasadaLaVentana) celdasPorFila[indice] = celdas;
+                        if (cortar) break;
                     }
                 }
 
@@ -369,6 +374,26 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
                 return DatosCrudosPlantilla.ConDatos(celdasPorFila, celdasDeMasEnColumna, celdasDeMasEnFila, textosCompartidos);
             }
+        }
+
+        // DN-04: true SOLO si la celda es blanca con certeza (nada que rechazar, se sigue leyendo). Un texto compartido con índice
+        // en rango se mira por su texto; fuera de rango, sin índice o booleano (un booleano sin valor es error de la celda, nunca
+        // "vacío", LP-07) no se decide acá: se trata como valor y termina en CeldaIlegible o en rechazo por lo de más.
+        private static bool EsBlancoSeguro(CeldaCruda celda, string[] textosCompartidos)
+        {
+            if (celda.Tipo == TipoCeldaCruda.SharedString)
+            {
+                int indice;
+                if (!int.TryParse(celda.ValorCrudo, NumberStyles.Integer, CultureInfo.InvariantCulture, out indice)
+                    || indice < 0 || indice >= textosCompartidos.Length)
+                    return false;
+
+                return string.IsNullOrWhiteSpace(textosCompartidos[indice]);
+            }
+
+            if (celda.Tipo == TipoCeldaCruda.Boolean) return false;
+
+            return string.IsNullOrWhiteSpace(celda.ValorCrudo);
         }
 
         private static int ColumnaMaximaConfigurada(ConfiguracionPlantilla configuracion)
@@ -572,7 +597,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
                 return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.ColumnaDeMas, string.Format(
                     CultureInfo.InvariantCulture,
-                    "La celda {0} trae un valor, pero la plantilla solo admite columnas hasta la {1}. Elimine el contenido de esa celda y vuelva a cargar el archivo.",
+                    "La celda {0} trae un valor, pero la plantilla solo admite columnas hasta la {1}. Borrá el contenido de esa celda y volvé a cargar el archivo.",
                     deMas.Celda.Referencia, NumeroAColumna(ultimaColumnaConfigurada)));
             }
 
@@ -583,7 +608,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
                 return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.FilaDeMas, string.Format(
                     CultureInfo.InvariantCulture,
-                    "La fila {0} trae datos (celda {1}), pero la plantilla solo admite filas hasta la {2}. Elimine el contenido de esa fila y vuelva a cargar el archivo.",
+                    "La fila {0} trae datos (celda {1}), pero la plantilla solo admite filas hasta la {2}. Borrá el contenido de esa fila y volvé a cargar el archivo.",
                     deMas.Fila, deMas.Celda.Referencia, ultimaFilaAdmitida));
             }
 
