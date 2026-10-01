@@ -56,9 +56,10 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
     public sealed class ResultadoLecturaPlantilla
     {
-        private ResultadoLecturaPlantilla(bool esValido, IList<string> errores, IList<FilaPlantilla> filas, IList<AdvertenciaLectura> advertencias, string detalleTecnico = null)
+        private ResultadoLecturaPlantilla(bool esValido, IList<string> errores, IList<FilaPlantilla> filas, IList<AdvertenciaLectura> advertencias, TipoDeRechazoLectura rechazo, string detalleTecnico = null)
         {
             EsValido = esValido;
+            Rechazo = rechazo;
             Errores = errores;
             Filas = filas;
             Advertencias = advertencias;
@@ -68,7 +69,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
         public bool EsValido { get; }
 
         /// <summary><see cref="TipoDeRechazoLectura.Ninguno"/> si es válido. FIRMA DEL ARQUITECTO.</summary>
-        public TipoDeRechazoLectura Rechazo => throw new System.NotImplementedException();
+        public TipoDeRechazoLectura Rechazo { get; }
 
         /// <summary>Motivos por los que el archivo es inválido, en texto para el cliente. Vacío si es válido.</summary>
         public IList<string> Errores { get; }
@@ -85,29 +86,44 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
         public static ResultadoLecturaPlantilla ConFilas(IList<FilaPlantilla> filas, IList<AdvertenciaLectura> advertencias)
         {
-            return new ResultadoLecturaPlantilla(true, new List<string>(), filas, advertencias);
+            return new ResultadoLecturaPlantilla(true, new List<string>(), filas, advertencias, TipoDeRechazoLectura.Ninguno);
         }
 
         public static ResultadoLecturaPlantilla ConError(string motivo)
         {
-            return new ResultadoLecturaPlantilla(false, new List<string> { motivo }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>());
+            return new ResultadoLecturaPlantilla(false, new List<string> { motivo }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), TipoDeRechazoLectura.SinClasificar);
         }
 
         /// <summary>El archivo no se pudo abrir o recorrer: al cliente, un texto nuestro; a la traza, lo que dijo la librería.</summary>
         public static ResultadoLecturaPlantilla ConErrorTecnico(string motivoParaElCliente, string detalleTecnico)
         {
-            return new ResultadoLecturaPlantilla(false, new List<string> { motivoParaElCliente }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), detalleTecnico);
+            return new ResultadoLecturaPlantilla(false, new List<string> { motivoParaElCliente }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), TipoDeRechazoLectura.ArchivoIlegible, detalleTecnico);
         }
 
         /// <summary>Rechazo con su tipo. FIRMA DEL ARQUITECTO.</summary>
-        public static ResultadoLecturaPlantilla ConError(TipoDeRechazoLectura rechazo, string motivo) => throw new System.NotImplementedException();
+        public static ResultadoLecturaPlantilla ConError(TipoDeRechazoLectura rechazo, string motivo)
+        {
+            ExigirTipoDeRechazo(rechazo);
+            return new ResultadoLecturaPlantilla(false, new List<string> { motivo }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), rechazo);
+        }
 
         /// <summary>Rechazo con su tipo y varios motivos. FIRMA DEL ARQUITECTO.</summary>
-        public static ResultadoLecturaPlantilla ConErrores(TipoDeRechazoLectura rechazo, IList<string> motivos) => throw new System.NotImplementedException();
+        public static ResultadoLecturaPlantilla ConErrores(TipoDeRechazoLectura rechazo, IList<string> motivos)
+        {
+            ExigirTipoDeRechazo(rechazo);
+            return new ResultadoLecturaPlantilla(false, motivos, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), rechazo);
+        }
+
+        // Un resultado inválido con tipo Ninguno sería contradictorio (EsValido = false pero "no hay rechazo"): es un error de programación.
+        private static void ExigirTipoDeRechazo(TipoDeRechazoLectura rechazo)
+        {
+            if (rechazo == TipoDeRechazoLectura.Ninguno)
+                throw new System.ArgumentException("Un rechazo no puede tener el tipo Ninguno: ese valor es solo del archivo válido.", nameof(rechazo));
+        }
 
         public static ResultadoLecturaPlantilla ConErrores(IList<string> motivos)
         {
-            return new ResultadoLecturaPlantilla(false, motivos, new List<FilaPlantilla>(), new List<AdvertenciaLectura>());
+            return new ResultadoLecturaPlantilla(false, motivos, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), TipoDeRechazoLectura.SinClasificar);
         }
     }
 }

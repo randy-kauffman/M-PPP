@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -57,7 +58,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
             byte[] contenido;
             string errorTamano;
             if (!CopiarAcotado(excel, _limites.TamanoMaximoBytesEntrada, out contenido, out errorTamano))
-                return ResultadoLecturaPlantilla.ConError(errorTamano);
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.PesoExcedido, errorTamano);
 
             return LeerDesdeBytesEnMemoria(contenido, configuracion);
         }
@@ -71,7 +72,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
             // Un byte[] ya está completo en memoria: su Length es un dato del CLR, no una promesa de un stream externo
             // que puede no cumplirse. No hace falta copia acotada.
             if (excel.LongLength > _limites.TamanoMaximoBytesEntrada)
-                return ResultadoLecturaPlantilla.ConError(FormatoTamanoEntradaExcedido(excel.LongLength));
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.PesoExcedido, FormatoTamanoEntradaExcedido(excel.LongLength));
 
             return LeerDesdeBytesEnMemoria(excel, configuracion);
         }
@@ -144,7 +145,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 // el cliente no puede terminar en un rechazo distinto según en qué punto exacto falló la lectura.
                 return detalleZip != null
                     ? ResultadoLecturaPlantilla.ConErrorTecnico(ArchivoIlegible, detalleZip)
-                    : ResultadoLecturaPlantilla.ConError(errorZip);
+                    : ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.PesoExcedido, errorZip);
             }
 
             // Lógica propia (no toca el SDK): se calcula ANTES del try de LP-01 para que ese try no tenga más
@@ -167,20 +168,29 @@ namespace Sanic.Mppp.Plugins.Plantilla
             }
 
             if (datos.Error != null)
-                return ResultadoLecturaPlantilla.ConError(datos.Error);
+                return ResultadoLecturaPlantilla.ConError(datos.TipoError, datos.Error);
 
             // A partir de acá: lógica propia, nada toca el SDK ni System.IO.Compression.
             string errorCelda;
             List<string> erroresEncabezado = ValidarEncabezados(configuracion, datos.CeldasPorFila, out errorCelda);
             if (errorCelda != null)
-                return ResultadoLecturaPlantilla.ConError(errorCelda);
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.CeldaIlegible, errorCelda);
             if (erroresEncabezado.Count > 0)
-                return ResultadoLecturaPlantilla.ConErrores(erroresEncabezado);
+                return ResultadoLecturaPlantilla.ConErrores(TipoDeRechazoLectura.Encabezado, erroresEncabezado);
 
             List<AdvertenciaLectura> advertencias;
             List<FilaPlantilla> filas = LeerFilasDeDatos(configuracion, datos.CeldasPorFila, out errorCelda, out advertencias);
             if (errorCelda != null)
-                return ResultadoLecturaPlantilla.ConError(errorCelda);
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.CeldaIlegible, errorCelda);
+
+            if (configuracion.EstructuraEstricta)
+            {
+                // DN-04: lo capturado más allá de la última columna o de la ventana se interpreta AQUÍ, con la misma función
+                // que el resto de las celdas (LP-01: decidir qué es un valor vacío es lógica propia, no del SDK).
+                ResultadoLecturaPlantilla rechazoDeMas = RechazoPorDeMas(configuracion, ultimaColumnaConfigurada, datos);
+                if (rechazoDeMas != null)
+                    return rechazoDeMas;
+            }
 
             return ResultadoLecturaPlantilla.ConFilas(filas, advertencias);
         }
@@ -237,17 +247,17 @@ namespace Sanic.Mppp.Plugins.Plantilla
             {
                 WorkbookPart workbookPart = documento.WorkbookPart;
                 if (workbookPart == null)
-                    return DatosCrudosPlantilla.ConError("El archivo no tiene un WorkbookPart (no es un libro de Excel válido).");
+                    return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.ArchivoIlegible, "El archivo no tiene un WorkbookPart (no es un libro de Excel válido).");
 
                 string hojaBuscada = (configuracion.Hoja ?? string.Empty).Trim();
                 Sheet hoja = workbookPart.Workbook.Descendants<Sheet>()
                     .FirstOrDefault(s => string.Equals(ObtenerNombreHoja(s), hojaBuscada, StringComparison.OrdinalIgnoreCase));
                 if (hoja == null)
-                    return DatosCrudosPlantilla.ConError($"No existe la hoja '{configuracion.Hoja}' en el archivo.");
+                    return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.HojaInexistente, $"No existe la hoja '{configuracion.Hoja}' en el archivo.");
 
                 var worksheetPart = workbookPart.GetPartById(hoja.Id) as WorksheetPart;
                 if (worksheetPart == null)
-                    return DatosCrudosPlantilla.ConError($"La hoja '{configuracion.Hoja}' no tiene contenido de worksheet.");
+                    return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.ArchivoIlegible, $"La hoja '{configuracion.Hoja}' no tiene contenido de worksheet.");
 
                 string[] textosCompartidos = ObtenerTextosCompartidos(workbookPart);
 
@@ -255,7 +265,10 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 int primeraFila = configuracion.PrimeraFila;
                 int filaHasta = configuracion.PrimeraFila + configuracion.CantidadFilas - 1;
 
+                bool estricta = configuracion.EstructuraEstricta;
                 var celdasPorFila = new Dictionary<int, Dictionary<string, CeldaCruda>>();
+                var celdasDeMasEnColumna = new List<CeldaDeMas>();
+                var celdasDeMasEnFila = new List<CeldaDeMas>();
                 int ultimaFilaResuelta = 0; // LP-06: primera fila sin r = anterior(0) + 1 = 1
 
                 using (OpenXmlReader reader = OpenXmlReader.Create(worksheetPart))
@@ -278,7 +291,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                         // invalida el archivo.
                         if (indice <= ultimaFilaResuelta)
                         {
-                            return DatosCrudosPlantilla.ConError(string.Format(
+                            return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.Desorden, string.Format(
                                 CultureInfo.InvariantCulture,
                                 "El archivo no está en orden: la fila {0} aparece después de la fila {1}.",
                                 indice, ultimaFilaResuelta));
@@ -289,11 +302,14 @@ namespace Sanic.Mppp.Plugins.Plantilla
                         // fila de la ventana corta la lectura SIN invalidar nada -caso legítimo: pocas filas llenas y
                         // una nota al pie mucho más abajo-. Lo que venga después del corte no se mira: detectar un
                         // desorden ahí exigiría seguir leyendo, que es el costo no acotado que LP-04 elimina.
-                        if (indice > filaHasta) break;
+                        // DN-04 (modo estricto): acá NO se corta; se sigue recorriendo para ver si alguna fila de más trae
+                        // un valor (se rechaza el archivo en vez de cortar en silencio), y LP-05 sigue rigiendo.
+                        bool pasadaLaVentana = indice > filaHasta;
+                        if (pasadaLaVentana && !estricta) break;
 
                         bool esEncabezado = indice == filaEncabezado;
                         bool esDeLaVentana = indice >= primeraFila && indice <= filaHasta;
-                        if (!esEncabezado && !esDeLaVentana) continue; // fuera de lo que se interpreta: no se mira su contenido.
+                        if (!pasadaLaVentana && !esEncabezado && !esDeLaVentana) continue; // fuera de lo que se interpreta: no se mira su contenido.
 
                         Row fila = (Row)reader.LoadCurrentElement();
 
@@ -310,30 +326,48 @@ namespace Sanic.Mppp.Plugins.Plantilla
                             // invalida el archivo.
                             if (columnaNumero <= ultimaColumnaResuelta)
                             {
-                                return DatosCrudosPlantilla.ConError(string.Format(
+                                return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.Desorden, string.Format(
                                     CultureInfo.InvariantCulture,
                                     "El archivo no está en orden: en la fila {0} la celda {1} aparece fuera de orden.",
                                     indice, columnaTexto + indice.ToString(CultureInfo.InvariantCulture)));
                             }
                             ultimaColumnaResuelta = columnaNumero;
 
+                            bool masAllaDeLaUltimaColumna = columnaNumero > ultimaColumnaConfigurada;
+                            if (!pasadaLaVentana && !masAllaDeLaUltimaColumna)
+                            {
+                                celdas[columnaTexto] = CapturarCeldaCruda(
+                                    columnaTexto + indice.ToString(CultureInfo.InvariantCulture), celda);
+                                continue;
+                            }
+
                             // LP-04 (aclaración D-12): una celda EN ORDEN pero más allá de la última columna configurada
                             // corta ESTA fila sin invalidar nada -caso legítimo: trae C, no trae D, y después trae Z-.
                             // Los campos configurados que no llegaron a aparecer quedan como texto vacío.
-                            if (columnaNumero > ultimaColumnaConfigurada) break;
+                            if (!estricta) break;
 
-                            celdas[columnaTexto] = CapturarCeldaCruda(
-                                columnaTexto + indice.ToString(CultureInfo.InvariantCulture), celda);
+                            // DN-04 (modo estricto): se sigue recorriendo y se captura, sin interpretar, toda celda que traiga
+                            // <v> o <is>. Una celda solo con formato no es un valor y no se materializa. Si el valor es
+                            // vacío o texto en blanco lo decide el código de afuera del try, con InterpretarCelda.
+                            if (celda.CellValue != null || celda.InlineString != null)
+                            {
+                                var deMas = new CeldaDeMas
+                                {
+                                    Fila = indice,
+                                    Celda = CapturarCeldaCruda(columnaTexto + indice.ToString(CultureInfo.InvariantCulture), celda)
+                                };
+                                (pasadaLaVentana ? celdasDeMasEnFila : celdasDeMasEnColumna).Add(deMas);
+                            }
                         }
 
-                        celdasPorFila[indice] = celdas;
+                        if (!pasadaLaVentana) celdasPorFila[indice] = celdas;
                     }
                 }
 
                 if (!celdasPorFila.ContainsKey(filaEncabezado))
-                    return DatosCrudosPlantilla.ConError($"No se encontró la fila de encabezado (fila {filaEncabezado}).");
+                    return DatosCrudosPlantilla.ConError(TipoDeRechazoLectura.Encabezado, $"No se encontró la fila de encabezado (fila {filaEncabezado}).");
 
-                return DatosCrudosPlantilla.ConDatos(celdasPorFila, textosCompartidos);
+                return DatosCrudosPlantilla.ConDatos(celdasPorFila, celdasDeMasEnColumna, celdasDeMasEnFila, textosCompartidos);
             }
         }
 
@@ -484,7 +518,12 @@ namespace Sanic.Mppp.Plugins.Plantilla
                 string encontrado = lectura.Texto.Trim();
                 string esperado = (campo.EncabezadoEsperado ?? string.Empty).Trim();
 
-                if (!string.Equals(encontrado, esperado, StringComparison.Ordinal))
+                // DN-04: en modo estricto, sin mayúsculas ni tildes (los espacios internos SÍ cuentan). Apagado, exacto (ordinal).
+                bool coincide = configuracion.EstructuraEstricta
+                    ? string.Equals(NormalizarEncabezado(encontrado), NormalizarEncabezado(esperado), StringComparison.Ordinal)
+                    : string.Equals(encontrado, esperado, StringComparison.Ordinal);
+
+                if (!coincide)
                 {
                     errores.Add(string.Format(
                         CultureInfo.InvariantCulture,
@@ -494,6 +533,67 @@ namespace Sanic.Mppp.Plugins.Plantilla
             }
 
             return errores;
+        }
+
+        // DN-04: minúsculas invariantes y sin diacríticos (FormD separa la letra de su tilde; se descartan las marcas sin
+        // espaciado). Los espacios internos se conservan. Un texto con sustitutos sueltos no se puede normalizar
+        // (ArgumentException): se compara tal cual, y como no puede coincidir con el esperado queda como encabezado distinto.
+        private static string NormalizarEncabezado(string texto)
+        {
+            string recortado = (texto ?? string.Empty).Trim();
+            string descompuesto;
+            try
+            {
+                descompuesto = recortado.Normalize(NormalizationForm.FormD);
+            }
+            catch (ArgumentException)
+            {
+                return recortado.ToLowerInvariant();
+            }
+
+            var sinTildes = new StringBuilder(descompuesto.Length);
+            foreach (char c in descompuesto)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                    sinTildes.Append(c);
+            }
+            return sinTildes.ToString().ToLowerInvariant();
+        }
+
+        // DN-04: lo que quedó más allá de la última columna (encabezado o ventana) y más allá de la ventana. Una celda cuenta
+        // solo si InterpretarCelda le encuentra texto no vacío (o no la puede interpretar: algo trae). Devuelve el primer
+        // rechazo, o null si no hay nada de más. Primero columnas (aparecen antes en el archivo), después filas.
+        private static ResultadoLecturaPlantilla RechazoPorDeMas(
+            ConfiguracionPlantilla configuracion, int ultimaColumnaConfigurada, DatosCrudosPlantilla datos)
+        {
+            foreach (CeldaDeMas deMas in datos.CeldasDeMasEnColumna)
+            {
+                if (!TraeValor(deMas.Celda)) continue;
+
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.ColumnaDeMas, string.Format(
+                    CultureInfo.InvariantCulture,
+                    "La celda {0} trae un valor, pero la plantilla solo admite columnas hasta la {1}. Elimine el contenido de esa celda y vuelva a cargar el archivo.",
+                    deMas.Celda.Referencia, NumeroAColumna(ultimaColumnaConfigurada)));
+            }
+
+            int ultimaFilaAdmitida = configuracion.PrimeraFila + configuracion.CantidadFilas - 1;
+            foreach (CeldaDeMas deMas in datos.CeldasDeMasEnFila)
+            {
+                if (!TraeValor(deMas.Celda)) continue;
+
+                return ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.FilaDeMas, string.Format(
+                    CultureInfo.InvariantCulture,
+                    "La fila {0} trae datos (celda {1}), pero la plantilla solo admite filas hasta la {2}. Elimine el contenido de esa fila y vuelva a cargar el archivo.",
+                    deMas.Fila, deMas.Celda.Referencia, ultimaFilaAdmitida));
+            }
+
+            return null;
+        }
+
+        private static bool TraeValor(CeldaCruda celda)
+        {
+            LecturaCelda lectura = InterpretarCelda(celda);
+            return lectura.Error != null || !string.IsNullOrWhiteSpace(lectura.Texto);
         }
 
         private static List<FilaPlantilla> LeerFilasDeDatos(
@@ -661,15 +761,25 @@ namespace Sanic.Mppp.Plugins.Plantilla
             public string ValorCrudo { get; set; }
         }
 
-        /// <summary>Lo que sale del único try de LP-01: datos propios, o un motivo de error.</summary>
+        /// <summary>DN-04: una celda con <c>&lt;v&gt;</c> o <c>&lt;is&gt;</c> más allá de la última columna o de la ventana, con su fila.</summary>
+        private sealed class CeldaDeMas
+        {
+            public int Fila { get; set; }
+            public CeldaCruda Celda { get; set; }
+        }
+
+        /// <summary>Lo que sale del único try de LP-01: datos propios, o un motivo de error con su tipo.</summary>
         private sealed class DatosCrudosPlantilla
         {
             public string Error { get; private set; }
+            public TipoDeRechazoLectura TipoError { get; private set; }
             public Dictionary<int, Dictionary<string, CeldaCruda>> CeldasPorFila { get; private set; }
+            public List<CeldaDeMas> CeldasDeMasEnColumna { get; private set; }
+            public List<CeldaDeMas> CeldasDeMasEnFila { get; private set; }
 
-            public static DatosCrudosPlantilla ConError(string error)
+            public static DatosCrudosPlantilla ConError(TipoDeRechazoLectura tipo, string error)
             {
-                return new DatosCrudosPlantilla { Error = error };
+                return new DatosCrudosPlantilla { Error = error, TipoError = tipo };
             }
 
             // Resuelve el índice de texto compartido a texto ACÁ (último lugar que conoce textosCompartidos, la tabla
@@ -678,53 +788,75 @@ namespace Sanic.Mppp.Plugins.Plantilla
             // es error del archivo, nunca un texto vacío silencioso.
             public static DatosCrudosPlantilla ConDatos(
                 Dictionary<int, Dictionary<string, CeldaCruda>> celdasPorFila,
+                List<CeldaDeMas> celdasDeMasEnColumna,
+                List<CeldaDeMas> celdasDeMasEnFila,
                 string[] textosCompartidos)
             {
+                string error;
                 foreach (var fila in celdasPorFila.Values)
                 {
                     foreach (string columna in fila.Keys.ToList())
                     {
-                        CeldaCruda celda = fila[columna];
-                        if (celda.Tipo != TipoCeldaCruda.SharedString) continue;
-
-                        string referencia = celda.Referencia ?? "?";
-                        string crudo = celda.ValorCrudo;
-
-                        if (string.IsNullOrEmpty(crudo))
-                        {
-                            return ConError(string.Format(
-                                CultureInfo.InvariantCulture,
-                                "celda {0}: hace referencia a texto compartido pero no trae índice", referencia));
-                        }
-
-                        int indice;
-                        if (!int.TryParse(crudo, NumberStyles.Integer, CultureInfo.InvariantCulture, out indice))
-                        {
-                            return ConError(string.Format(
-                                CultureInfo.InvariantCulture,
-                                "celda {0}: índice de texto compartido inválido ('{1}')", referencia, crudo));
-                        }
-
-                        if (indice < 0 || indice >= textosCompartidos.Length)
-                        {
-                            return ConError(string.Format(
-                                CultureInfo.InvariantCulture,
-                                "celda {0}: índice de texto compartido fuera de rango ({1}, la tabla tiene {2})",
-                                referencia, indice, textosCompartidos.Length));
-                        }
-
-                        fila[columna] = new CeldaCruda
-                        {
-                            Referencia = referencia,
-                            Tipo = TipoCeldaCruda.SharedStringResuelto,
-                            ValorCrudo = textosCompartidos[indice]
-                        };
+                        CeldaCruda resuelta = ResolverTextoCompartido(fila[columna], textosCompartidos, out error);
+                        if (error != null) return ConError(TipoDeRechazoLectura.CeldaIlegible, error);
+                        fila[columna] = resuelta;
                     }
+                }
+
+                // DN-04: las celdas de más también pueden ser texto compartido; se resuelven acá por la misma razón.
+                foreach (CeldaDeMas deMas in celdasDeMasEnColumna.Concat(celdasDeMasEnFila))
+                {
+                    deMas.Celda = ResolverTextoCompartido(deMas.Celda, textosCompartidos, out error);
+                    if (error != null) return ConError(TipoDeRechazoLectura.CeldaIlegible, error);
                 }
 
                 return new DatosCrudosPlantilla
                 {
-                    CeldasPorFila = celdasPorFila
+                    CeldasPorFila = celdasPorFila,
+                    CeldasDeMasEnColumna = celdasDeMasEnColumna,
+                    CeldasDeMasEnFila = celdasDeMasEnFila
+                };
+            }
+
+            private static CeldaCruda ResolverTextoCompartido(CeldaCruda celda, string[] textosCompartidos, out string error)
+            {
+                error = null;
+                if (celda.Tipo != TipoCeldaCruda.SharedString) return celda;
+
+                string referencia = celda.Referencia ?? "?";
+                string crudo = celda.ValorCrudo;
+
+                if (string.IsNullOrEmpty(crudo))
+                {
+                    error = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "celda {0}: hace referencia a texto compartido pero no trae índice", referencia);
+                    return null;
+                }
+
+                int indice;
+                if (!int.TryParse(crudo, NumberStyles.Integer, CultureInfo.InvariantCulture, out indice))
+                {
+                    error = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "celda {0}: índice de texto compartido inválido ('{1}')", referencia, crudo);
+                    return null;
+                }
+
+                if (indice < 0 || indice >= textosCompartidos.Length)
+                {
+                    error = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "celda {0}: índice de texto compartido fuera de rango ({1}, la tabla tiene {2})",
+                        referencia, indice, textosCompartidos.Length);
+                    return null;
+                }
+
+                return new CeldaCruda
+                {
+                    Referencia = referencia,
+                    Tipo = TipoCeldaCruda.SharedStringResuelto,
+                    ValorCrudo = textosCompartidos[indice]
                 };
             }
         }
