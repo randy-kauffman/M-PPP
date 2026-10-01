@@ -790,6 +790,105 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal("Creado: plan" + string.Concat(fila.Advertencias.Select(a => " | Advertencia: " + a)), fila.Texto);
         }
 
+        // ================================================================================================ huecos de la revisión (2026-10-01)
+        [Fact]
+        public void Correo_del_ejecutivo_de_mas_de_320_es_error_corto_y_no_entra_a_las_claves()
+        {
+            // Literal: un correo admite como máximo 320 caracteres (el mismo tope que la columna Correo, diseno/02 §2.3).
+            var de320 = new string('a', 320 - "@banco.com".Length) + "@banco.com";
+            var enorme = new string('a', 30000) + "@banco.com";
+
+            var conDe320 = Unica(Planificar(F(2, ClienteNuevo(ejecutivo: de320))));
+            Assert.DoesNotContain(conDe320.Errores, e => e.Contains("caracteres y el máximo"));  // 320 no es "demasiado largo"
+
+            foreach (var plan in new[]
+            {
+                Planificar(F(2, ClienteNuevo(ejecutivo: enorme))),     // cliente nuevo
+                Planificar(F(2, A("123"), D(enorme))),                 // cliente existente
+            })
+            {
+                var fila = Unica(plan);
+                UnErrorQueEmpiezaCon(fila, "Correo ejecutivo: ");
+                Assert.All(fila.Errores, e => Assert.True(e.Length < 400, $"motivo de {e.Length} caracteres"));
+                Assert.True(fila.Texto.Length < 1000, $"Resultado de {fila.Texto.Length} caracteres");
+            }
+
+            var claves = ClavesDeCarga.Extraer(new[] { F(2, ClienteNuevo(ejecutivo: enorme)) });
+            Assert.Empty(claves.CorreosDeEjecutivo);
+        }
+
+        [Fact]
+        public void Ningun_valor_enorme_en_ninguna_columna_produce_un_Resultado_enorme()
+        {
+            // Una celda de Excel admite 32.767 caracteres; el Resultado no puede acercarse. Cada columna, una por una.
+            var enorme = new string('x', 30000);
+            foreach (var letra in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" })
+            {
+                var valores = ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), H("n@empresa.com"), I("X") })
+                    .Where(v => v.Item1 != letra).Concat(new[] { (letra, enorme) }).ToArray();
+                var fila = Unica(Planificar(F(2, valores)));
+                Assert.NotEmpty(fila.Errores);
+                Assert.True(fila.Texto.Length < 2000, $"columna {letra}: Resultado de {fila.Texto.Length} caracteres");
+            }
+        }
+
+        [Theory]
+        [InlineData("31/12/1899")]
+        [InlineData("01/01/1000")]
+        [InlineData("01/01/0001")]
+        [InlineData("1")]   // serial 1 = 31/12/1899
+        public void Fecha_documento_anterior_a_1900_es_error_en_la_pasada_1(string valor)
+        {
+            // Dataverse no admite fechas anteriores a 1753; un documento firmado anterior a 1900 no existe en este negocio.
+            // Se rechaza en la fila, no en la escritura (que deshace toda la carga sin decir qué fila).
+            UnErrorQueEmpiezaCon(Unica(Planificar(F(2, A("123"), H("n@empresa.com"), I("X"), J(valor)))), "Fecha documento: ");
+        }
+
+        [Fact]
+        public void Fecha_documento_desde_el_1_de_enero_de_1900_vale()
+        {
+            SinErrores(Planificar(F(2, A("123"), H("n@empresa.com"), I("X"), J("01/01/1900"))));
+            SinErrores(Planificar(F(2, A("123"), H("n@empresa.com"), I("X"), J(Serial(new DateTime(1900, 1, 1))))));
+        }
+
+        [Fact]
+        public void Sobre_algo_que_ya_existe_lleva_error_solo_la_fila_que_contradice_lo_grabado()
+        {
+            // Decisión del arquitecto (revisión 2026-10-01, decisión 1 del constructor): lo existente se compara contra la foto,
+            // no fila contra fila. La fila que coincide con lo grabado está bien; la otra lleva el error.
+            var plan = Planificar(F(2, A("123"), C("Ferretería Sol")), F(3, A("123"), C("Otra Razon")));
+            Assert.True(plan.TieneErrores);
+            Assert.Empty(plan.Filas[0].Errores);
+            UnErrorQueEmpiezaCon(plan.Filas[1], "Razon social: ");
+        }
+
+        [Fact]
+        public void Un_CIF_BAC_solo_y_un_CIF_COM_solo_son_el_mismo_cliente_nuevo_si_otra_fila_trae_los_dos()
+        {
+            var plan = Planificar(
+                F(2, A("555"), E("N1"), Fo("06"), Mo("COR")),
+                F(3, B("NUE000000555"), E("N2"), Fo("06"), Mo("cor")),
+                F(4, ClienteNuevo()));
+            SinErrores(plan);
+            var cliente = Assert.Single(plan.Clientes);
+            Assert.Equal(2, cliente.FilaOrigen);
+            Assert.All(plan.Planes, p => Assert.Equal("000000555", p.Cliente.CifBacNuevo));
+            Assert.All(plan.Planes, p => Assert.Equal(Moneda.COR, p.Moneda));
+        }
+
+        [Fact]
+        public void Trescientas_filas_en_conflicto_dentro_de_un_mismo_grupo_no_se_vuelven_lentas_ni_enormes()
+        {
+            var filas = Enumerable.Range(0, 300).Select(i => F(i + 2, ClienteNuevo(razon: "Razon " + (i % 150).ToString(CultureInfo.InvariantCulture)))).ToArray();
+            var reloj = Stopwatch.StartNew();
+            var plan = PlanificadorDeCarga.Planificar(filas, Foto(), Hoy);
+            reloj.Stop();
+            Assert.True(plan.TieneErrores);
+            Assert.All(plan.Filas, f => UnErrorQueEmpiezaCon(f, "Razon social: "));
+            Assert.All(plan.Filas, f => Assert.True(f.Texto.Length < 1000, $"fila {f.NumeroFilaExcel}: {f.Texto.Length} caracteres"));
+            Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(2), $"tardó {reloj.Elapsed}");
+        }
+
         // ================================================================================================ claves para la foto
         [Fact]
         public void Las_claves_salen_normalizadas_sin_repetidos_y_sin_las_invalidas()

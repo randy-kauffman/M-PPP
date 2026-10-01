@@ -406,8 +406,9 @@ Botón (grilla) → JS: elegir .xlsx → base64 → Custom API (Action, plugin C
 - **Hoja**: tiene que existir una con el nombre exacto (sin distinguir mayúsculas). Las demás hojas se ignoran, así se puede agregar una de instrucciones.
 - **Encabezados en la fila 1**, en el orden exacto de la tabla del Excel. Se comparan sin distinguir mayúsculas, tildes ni espacios a los lados (mismo criterio que `plantilla.listas`). Si falta, sobra (hay un encabezado no vacío después de la última columna) o está fuera de orden **cualquiera**, se rechaza el archivo y el mensaje nombra **cuáles**.
 - **Datos desde la fila 2.** Una fila **totalmente vacía** se saltea: no tiene nada que perder. El número de fila de los mensajes es **el número de fila de Excel**, el que el usuario ve a la izquierda.
+- **Ningún mensaje cita un valor entero**: una celda enorme se cita acortada (60 caracteres) o no se cita, para que la columna Resultado nunca se acerque al tope de 32.767 caracteres de una celda de Excel.
 - **Celdas numéricas**: un CIF o un código de plan que Excel guardó como número (`123`, perdió los ceros) se lee como texto y se rellena. Un número en notación científica (`1.23E+08`) se rechaza en esa celda: no se puede reconstruir con certeza.
-- **Fechas**: se acepta una celda de fecha de Excel o texto `dd/mm/aaaa`. Cualquier otra forma es error de la celda. Una fecha futura es error (un documento firmado no puede tener fecha de mañana).
+- **Fechas**: se acepta una celda de fecha de Excel o texto `dd/mm/aaaa`. Cualquier otra forma es error de la celda. Una fecha futura es error (un documento firmado no puede tener fecha de mañana). **Una anterior al 01/01/1900 también** (precisado el 2026-10-01 en la revisión del código): Dataverse no admite fechas anteriores a 1753, y sin este tope la fecha pasaría la pasada 1 y reventaría la escritura entera en la pasada 2 sin decir qué fila.
 
 ## Excel 1 — Carga masiva · hoja `CargaCatalogos` · `sanic_mppp_capi_cargarcatalogos`
 
@@ -416,7 +417,7 @@ Botón (grilla) → JS: elegir .xlsx → base64 → Custom API (Action, plugin C
 | A | CIF BAC | dígitos, hasta 9; se rellena con ceros | siempre, A o B |
 | B | CIF COM | `^[A-Z0-9 ]{9}\d{3}$`, en mayúscula | siempre, A o B; **las dos** si se crea el cliente |
 | C | Razon social | texto, hasta 200 | se crea el cliente |
-| D | Correo ejecutivo | correo | se crea el cliente |
+| D | Correo ejecutivo | correo, hasta 320 | se crea el cliente |
 | E | Codigo plan | alfanumérico, hasta 4; se rellena con ceros | la fila trae un plan |
 | F | Tipo formato | `06`, `10` u `11` (`6` se acepta como `06`) | se crea el plan |
 | G | Moneda | `COR` o `USD` | se crea el plan |
@@ -454,7 +455,7 @@ de la fila. Por la desnormalización, el mismo cliente y el mismo correo se repi
 14. **No existe**: se crea con J y K. Nace **sin evidencia firmada**, como hoy (D-42): un archivo no puede viajar en una celda. Aparece en la vista "sin evidencia".
 
 **Coherencia dentro del archivo**
-15. **La misma clave tiene que tener los mismos datos en todas sus filas.** Para cliente, plan, correo y autorización, comparando entre las filas solo las celdas que vienen llenas (las vacías no contradicen). Ejemplo: `000123456` con dos razones sociales distintas → error **en todas las filas involucradas**, nombrándolas ("filas 3 y 9").
+15. **La misma clave tiene que tener los mismos datos en todas sus filas.** *Precisado el 2026-10-01 (revisión del código):* esto rige para lo que el archivo **crea**. Sobre lo que **ya existe**, cada fila se compara contra lo grabado (reglas 3, 6, 10 y 12), así que solo lleva error la fila que lo contradice; la que coincide está bien. Es más preciso que marcar todas: le dice al usuario cuál de las dos corregir. Para cliente, plan, correo y autorización, comparando entre las filas solo las celdas que vienen llenas (las vacías no contradicen). Ejemplo: `000123456` con dos razones sociales distintas → error **en todas las filas involucradas**, nombrándolas ("filas 3 y 9").
 16. Un mismo CIF BAC con dos CIF COM distintos en el archivo (o al revés) → error en esas filas.
 
 **Lo que NO es error.** Una fila donde todo ya existía queda "Sin cambios: todo ya existía". El
