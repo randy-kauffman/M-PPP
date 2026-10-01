@@ -22,6 +22,18 @@ namespace Sanic.Mppp.Plugins.Plantilla
         public IList<CampoPlantilla> Campos { get; set; }
 
         /// <summary>
+        /// DN-04 (Excel de catálogos): la estructura es un contrato, no una ventana tolerante. Encendido, el lector además
+        /// (1) rechaza el archivo si una fila POSTERIOR a la ventana trae algún valor no vacío, en cualquier columna, en vez de
+        /// cortar en silencio (D-12 sigue rigiendo para la plantilla del cliente); (2) rechaza un valor no vacío en una columna
+        /// posterior a la última configurada, en el encabezado o en una fila de la ventana; (3) compara los encabezados sin
+        /// distinguir mayúsculas, tildes ni espacios a los lados. Una celda sin valor (solo formato) o con texto en blanco NO
+        /// cuenta como valor. **Solo lo enciende el código**: <see cref="DesdeJson"/> nunca lo lee, así que el parámetro
+        /// `plantilla.estructura` no puede cambiar cómo se lee la plantilla del cliente. Apagado (por defecto) = comportamiento de siempre.
+        /// FIRMA DEL ARQUITECTO.
+        /// </summary>
+        public bool EstructuraEstricta { get; set; }
+
+        /// <summary>
         /// Lee el JSON del parámetro. Forma:
         /// {"hoja":"Plantilla","filaEncabezado":11,"primeraFila":12,"cantidadFilas":100,
         ///  "campos":[{"nombre":"numeroPlan","columna":"D","encabezado":"No. Plan"}]}

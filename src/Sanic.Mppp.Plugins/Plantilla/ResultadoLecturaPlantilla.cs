@@ -25,6 +25,35 @@ namespace Sanic.Mppp.Plugins.Plantilla
         public string Motivo { get; set; }
     }
 
+    /// <summary>
+    /// Por qué el lector rechazó el archivo (DN-04: la Custom API de catálogos lo traduce a su código MPPP-CAR sin mirar el texto).
+    /// FIRMA DEL ARQUITECTO.
+    /// </summary>
+    public enum TipoDeRechazoLectura
+    {
+        /// <summary>El archivo es válido.</summary>
+        Ninguno = 0,
+        /// <summary>Rechazo armado con las fábricas sin tipo (<see cref="ResultadoLecturaPlantilla.ConError(string)"/>,
+        /// <see cref="ResultadoLecturaPlantilla.ConErrores(IList{string})"/>). <c>LectorOpenXml</c> NUNCA devuelve este valor.</summary>
+        SinClasificar,
+        /// <summary>No se pudo abrir o recorrer como .xlsx (LP-01), o le falta el libro o la hoja de cálculo.</summary>
+        ArchivoIlegible,
+        /// <summary>Supera el tope de bytes de entrada (LP-02) o descomprimidos (LP-03).</summary>
+        PesoExcedido,
+        /// <summary>No existe la hoja configurada.</summary>
+        HojaInexistente,
+        /// <summary>Falta la fila de encabezado, o algún encabezado no es el esperado.</summary>
+        Encabezado,
+        /// <summary>Filas o celdas que retroceden o se repiten (LP-05).</summary>
+        Desorden,
+        /// <summary>Una celda que se interpreta no se puede leer (texto compartido inexistente, booleano inválido…).</summary>
+        CeldaIlegible,
+        /// <summary>Solo con <see cref="ConfiguracionPlantilla.EstructuraEstricta"/>: un valor en una columna posterior a la última configurada.</summary>
+        ColumnaDeMas,
+        /// <summary>Solo con <see cref="ConfiguracionPlantilla.EstructuraEstricta"/>: un valor en una fila posterior a la ventana.</summary>
+        FilaDeMas,
+    }
+
     public sealed class ResultadoLecturaPlantilla
     {
         private ResultadoLecturaPlantilla(bool esValido, IList<string> errores, IList<FilaPlantilla> filas, IList<AdvertenciaLectura> advertencias, string detalleTecnico = null)
@@ -37,6 +66,9 @@ namespace Sanic.Mppp.Plugins.Plantilla
         }
 
         public bool EsValido { get; }
+
+        /// <summary><see cref="TipoDeRechazoLectura.Ninguno"/> si es válido. FIRMA DEL ARQUITECTO.</summary>
+        public TipoDeRechazoLectura Rechazo => throw new System.NotImplementedException();
 
         /// <summary>Motivos por los que el archivo es inválido, en texto para el cliente. Vacío si es válido.</summary>
         public IList<string> Errores { get; }
@@ -66,6 +98,12 @@ namespace Sanic.Mppp.Plugins.Plantilla
         {
             return new ResultadoLecturaPlantilla(false, new List<string> { motivoParaElCliente }, new List<FilaPlantilla>(), new List<AdvertenciaLectura>(), detalleTecnico);
         }
+
+        /// <summary>Rechazo con su tipo. FIRMA DEL ARQUITECTO.</summary>
+        public static ResultadoLecturaPlantilla ConError(TipoDeRechazoLectura rechazo, string motivo) => throw new System.NotImplementedException();
+
+        /// <summary>Rechazo con su tipo y varios motivos. FIRMA DEL ARQUITECTO.</summary>
+        public static ResultadoLecturaPlantilla ConErrores(TipoDeRechazoLectura rechazo, IList<string> motivos) => throw new System.NotImplementedException();
 
         public static ResultadoLecturaPlantilla ConErrores(IList<string> motivos)
         {
