@@ -226,6 +226,10 @@ En la grilla principal de Filas, en la subgrilla de Filas de la Solicitud y en e
 | **Devolver** | Supervisor | Digitada | nota interna (diálogo) | Estado → Validada + `sanic_notainterna`. **La nota NO sale en el correo al cliente** (2026-09-24) |
 | **Atendido** · **Descartar** | Ejecutivo | Solicitud No reconocida o No es correo nuevo | confirmación | Estado → Cerrada · Descartada. Lo que nadie clasifica en 30 días pasa solo a Vencida (`07` DF-09) |
 | **Revisado** | Ejecutivo, Supervisor | Solicitud con `requiererevision` | confirmación | Apaga `requiererevision`. El step `RevisionAtendidaStep` deja el **motivo que había escrito la máquina** en la Bitácora, con quién y cuándo, y limpia `sanic_motivorevision` |
+| **Carga masiva** (DN-04, 2026-10-01, sin construir) | Administrador de planes | grilla principal de Cliente, Plan, Autorizado y AutorizacionCliente (no opera sobre la selección) | un `.xlsx`, hoja `CargaCatalogos` | `sanic_mppp_capi_cargarcatalogos`: crea Clientes, Planes, Correos y Autorizaciones por cliente, todo o nada; descarga el Excel de resultado y muestra el resumen |
+| **Activar/Desactivar masivo** (DN-04, 2026-10-01, sin construir) | Administrador de planes | ídem | un `.xlsx`, hoja `ActivarDesactivar` | `sanic_mppp_capi_cambiarestadocatalogos`: activa o desactiva registro por registro, todo o nada; ídem |
+
+> **DN-04: los dos comandos de catálogos no siguen el patrón de confirmación de los de arriba.** Cada uno es un **menú desplegable** con *Cargar archivo* y *Descargar plantilla* (decisión del aprobador, 2026-10-01). Piden un archivo, no actúan sobre filas seleccionadas, y mientras trabajan muestran el indicador nativo `Xrm.Utility.showProgressIndicator` con un mensaje por etapa. El flujo exacto del JS y los textos del resumen están en `DIRECTRICES-NUEVAS.md` DN-04 §Interfaz.
 
 > **Corregido el 2026-09-23.** Esta fila decía que Revisado pide una **nota**, y el comando la pedía y la escribía en `sanic_motivorevision`. Dos cosas estaban mal. La primera: esa columna **no es del operador** — la escriben `MPPP-VIG` y `MPPP-ENV` para explicar por qué hace falta revisar ("Validación fallida 3 veces", "Envío iniciado sin confirmar"), y es lo que el operador **lee** en la vista *Para revisar*; la nota se la habría comido. La segunda: la lista blanca de `04` §1 no admite esa columna de una persona, así que el botón **fallaba siempre**, y el plugin que esta tabla daba por hecho ("deja la nota en la Bitácora") **no existía**. Se resolvió como el **mockup aprobado el 2026-09-20**, que no pide texto. Evento nuevo de Bitácora: `Revision atendida` (159460021).
 
@@ -237,7 +241,7 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 2. **Acción masiva.** Selecciona varias filas y las marca juntas. El caso normal es "digité las 25 de esta plantilla". La grilla ofrece además **"Seleccionar todas" y "Desmarcar todas"** como comandos visibles, no solo la casilla del encabezado.
 3. **Verificación del supervisor.** Le alcanza con las filas que extrajimos, y si duda **descarga el Excel original** desde la Solicitud. No hay visor del Excel dentro de la app en la fase 1.
 4. **Por clasificar** (correos no reconocidos y correos que no son nuevos). Los ven **todos** los ejecutivos. Para decidir les alcanza con remitente, asunto y fecha, y si no, descargan el correo original.
-5. **Catálogos.** El Administrador de planes carga **uno por uno en formularios**, y para cargas grandes usa la importación nativa desde Excel de model-driven. La migración inicial desde SharePoint es aparte (RF-16).
+5. **Catálogos.** El Administrador de planes carga **uno por uno en formularios**, y para cargas grandes usa ~~la importación nativa desde Excel de model-driven~~ **el comando "Carga masiva"** (DN-04), y para activar o desactivar en lote, **"Activar/Desactivar masivo"**. La migración inicial desde SharePoint es aparte (RF-16). *(Corregido el 2026-10-01, DN-04: el aprobador confirmó que la importación nativa "le queda corto". Carga una tabla por archivo, no entiende datos desnormalizados, no busca un cliente por CIF ni resuelve el ejecutivo por su correo, y no valida el archivo entero antes de grabar.)*
 6. **Avisos.** **Notificaciones dentro de la app desde la fase 1** (DA-08): "Tenés filas por digitar" y "Tenés filas por aprobar" (alcance recortado a estos dos, nota de corrección 2026-09-28).
 
 ## 7. Inventario que sale de este diseño (completa `06` §12)
@@ -247,7 +251,7 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 | App y sitemap | 1 + 1 | |
 | Vistas | 20 | Lista cerrada en `05` §3 (`06` §12.2): 5 de Fila, 3 de Solicitud, activos + búsqueda de cada catálogo, y las 4 de AutorizacionPlan/AutorizacionCliente para subgrillas y "sin evidencia" |
 | Formularios | 9 | Uno por tabla con interfaz (ResultadoRegla y Bitácora solo se ven en subgrilla); incluye `AutorizacionCliente`, agregado el 2026-09-27 |
-| Comandos | 8 | Los de §5 |
+| Comandos | 8 | Los de §5. **Hoy son 10 construidos** (fase 2 sumó *Atendida* y *Descargar para digitar*, `06` §12.5), **+2 diseñados el 2026-10-01** (DN-04: *Carga masiva* y *Activar/Desactivar masivo*, en 4 grillas cada uno) |
 | Tabla técnica + su creación rápida | 1 + 1 | `sanic_mppp_tbl_motivoaccion`: el diálogo de motivo (DA-03 corregida) |
 | Web resources | ~10 | Íconos SVG del sitemap y de los botones |
 | Ocultamiento de comandos genéricos | 11 tablas | DA-06 (11 desde el 2026-09-28, D-69: `AutorizacionCliente` había quedado afuera) |

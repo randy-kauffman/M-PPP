@@ -330,3 +330,271 @@ alcanza con identificarlo, no hace falta repetir su cuenta ni su banco.
 2. Sus pruebas, con TDD, incluida **la de compatibilidad**: un parámetro sin `porGestion` se comporta idéntico a hoy.
 3. Sembrar el parámetro con la forma nueva, **conservando el comportamiento actual** hasta que el negocio diga qué aflojar en cada gestión.
 4. Documentarlo en `02` §Parámetros.
+
+---
+
+# DN-04 · Carga masiva y activación masiva de catálogos por Excel, y Comentarios en la autorización por cliente
+
+Recibida del aprobador el **2026-10-01**, **después** del release 1.1.0.0. Diseño discutido y cerrado
+con el aprobador el mismo día, punto por punto; nada de lo de abajo es decisión unilateral del
+arquitecto salvo donde se dice expresamente ("propuesta del arquitecto").
+
+## Lo que pide el negocio
+
+1. Una columna **Comentarios** (unos 50 caracteres) en la **autorización por cliente**.
+2. Un botón para **cargar un Excel** con Clientes, Planes, Correos y Autorizaciones **desnormalizados**:
+   la solución decide qué crear y qué ya existe.
+3. Un botón para **activar o desactivar** en masa Clientes, Planes, Correos y Autorizaciones,
+   también desde un Excel, **registro por registro** (incluida una sola autorización, un solo correo
+   o un solo plan).
+
+## Por qué no alcanza la importación nativa
+
+`05` §6 punto 5 decía que las cargas grandes se hacían con la importación nativa desde Excel de
+model-driven. No sirve para esto: carga **una tabla por archivo**, no entiende datos
+desnormalizados, no busca un cliente por CIF BAC **o** CIF COM, no resuelve el ejecutivo dueño por
+su correo y no valida todo el archivo antes de grabar. Confirmado por el aprobador: "le queda corto".
+
+## Decisiones cerradas con el aprobador (2026-10-01)
+
+| # | Decisión | Estado |
+|---|---|---|
+| 1 | **Solo autorizaciones por cliente** (`AutorizacionCliente`). Ningún Excel crea, activa ni desactiva `AutorizacionPlan`. "Por el momento" — si más adelante se pide la vía por plan, es una DN nueva | confirmado |
+| 2 | Para **crear** un Plan hacen falta código, tipo de formato, **moneda** y cliente. El Plan **no tiene nombre que se cargue**: `sanic_nombre` es calculado (`<código> - <cliente>`, `NombreCalculadoStep`) | confirmado ("cambiá el nombre por la moneda") |
+| 3 | Para **crear** un Cliente es obligatorio el **correo del ejecutivo encargado**. No es una columna nueva en Cliente: se resuelve a `ownerid`, que ya ES el ejecutivo asignado (RF-19, D-23) | confirmado |
+| 4 | **Sin cascada.** Desactivar un Cliente o un Correo no desactiva sus planes ni sus autorizaciones: dejan de valer solas, porque la vigencia ya exige que todo esté activo (`02` §2.4) | confirmado |
+| 5 | **Todo o nada.** Se valida el archivo entero sin grabar; con un solo error no se graba nada | confirmado |
+| 6 | **Comentarios solo en `AutorizacionCliente`**, no en `AutorizacionPlan` | confirmado |
+| 7 | **Dos Custom API** (carga y cambio de estado), **dos botones**, cada botón **en las cuatro grillas**: Clientes, Planes, Correos autorizados, Autorizaciones por cliente | confirmado |
+| 8 | **Tope de 300 filas por archivo, en un parámetro**, a medir contra Dev y ajustar | confirmado |
+| 9 | Motivos de error **claros y con el número de fila** | confirmado |
+| 10 | **Indicador de progreso nativo con un mensaje por etapa**, no barra de porcentaje. Un porcentaje real exige partir la carga en varias llamadas, y eso rompe el todo o nada (si falla la tercera tanda, las dos primeras ya quedaron grabadas) | confirmado |
+| 11 | **Sin mockup HTML** (excepción a la regla del proyecto): no hay pantallas nuevas, solo botones sobre grillas existentes. Lo único de interfaz nuevo, el resumen en pantalla, queda especificado abajo para que nadie lo invente | confirmado |
+
+## Columna nueva
+
+`sanic_mppp_tbl_autorizacioncliente.sanic_comentarios` · `T(50)` · opcional · auditada (DD-18) ·
+nombre visible "Comentarios" en 1033 (`01` §0). Va al formulario **Autorizacion por cliente**, en la
+sección de la evidencia, después de la fecha del documento, y a las vistas "Autorizaciones por
+cliente activas" y "Correos autorizados sobre este cliente". El largo se puede ampliar después; achicar, no.
+
+## Mecanismo (común a los dos botones)
+
+```
+Botón (grilla) → JS: elegir .xlsx → base64 → Custom API (Action, plugin C#)
+   → Pasada 1: leer y validar TODO, sin escribir
+       → con errores: no graba nada; devuelve el Excel de resultado
+       → sin errores: Pasada 2, graba todo en orden de dependencias
+   → devuelve el Excel de resultado + contadores → JS lo descarga, muestra el resumen, refresca la grilla
+```
+
+| Decisión | Cuál y por qué |
+|---|---|
+| **Escribe con el usuario que llama, no con SYSTEM** (propuesta del arquitecto) | Al revés que la unidad histórica (`04` §1). Los catálogos están auditados (DD-18): tiene que quedar **quién** dio de alta o desactivó cada cosa. Además los privilegios del Administrador de planes los aplica la plataforma en cada `Create`/`Update`, no una copia nuestra de la matriz |
+| **Lee usuarios y roles con SYSTEM** | Resolver el ejecutivo por correo y comprobar su rol no requiere privilegios de seguridad para el Administrador de planes, y no conviene dárselos. Es solo lectura, y los catálogos se siguen leyendo con el usuario |
+| **Nunca modifica un registro que ya existe** | La carga crea y vincula, nada más. Si un dato del archivo no coincide con lo grabado, la fila da error (abajo); corregir se hace en el formulario. Una carga masiva que "de paso" pisa razones sociales o dueños es un cambio que nadie revisó |
+| **Todo o nada en dos pasadas** | La pasada 1 no escribe. La pasada 2 corre dentro de la transacción de la Custom API: si una escritura falla (por ejemplo, alguien creó el mismo CIF entre las dos pasadas), la excepción deshace todo. **Pendiente de spike, D-72**: confirmar en Dev que la operación principal de la Custom API corre en transacción y que una excepción en la pasada 2 deja cero registros. Si no se confirma, el todo o nada necesita otro mecanismo y **no se construye hasta resolverlo** |
+| **Orden de escritura** | Clientes → Planes → Correos → Autorizaciones, sin importar el orden de las filas del archivo. Cada entidad se crea **una sola vez** aunque aparezca en varias filas |
+| **Normalizar antes de buscar** | El step `NormalizarYValidarStep` normaliza al grabar, pero la búsqueda ocurre antes. Si no se normaliza, `123` no encuentra al cliente `000000123`. **Se reutilizan las mismas funciones de normalización y validación de formato que usa el step** (`Steps/ReglasDeSteps.cs`): dos implementaciones de "qué es un CIF COM válido" terminan diciendo cosas distintas |
+| **Búsquedas por lote, no fila por fila** | Una consulta por tabla con todas las claves del archivo (condición `In`), no una por fila. 300 filas × 4 búsquedas serían 1.200 viajes |
+| **Presupuesto de 2 minutos** | Mismo criterio que `exportarparadigitar` (DN-02): umbral de 100 s. Si se alcanza, se corta con excepción (que deshace lo grabado) y un mensaje que pide partir el archivo. El tope de filas se calibra midiendo, no estimando |
+| **El archivo se lee con las reglas LP-01 a LP-07** (`03` §7) | Frontera de confianza única, tope de bytes comprimidos y descomprimidos (`lectura.limites`), orden exigido, nada se pierde en silencio. **Excepción a LP-08**: la hoja y los encabezados están **fijos en el código**, no en un parámetro. En la plantilla del cliente la estructura es configuración del negocio; acá cada columna tiene un significado que solo el código entiende, así que una columna nueva exige código nuevo igual. Ponerla en un parámetro sería configurable solo en apariencia |
+| **Las filas de más se rechazan, no se cortan** | En la plantilla del cliente, una fila más allá de la ventana corta la lectura (D-12). **Acá no**: con más filas no vacías que `carga.filas.maximo`, se rechaza el archivo entero. El usuario creería que cargó todo |
+
+### Lectura del archivo (los dos Excel)
+
+- **Hoja**: tiene que existir una con el nombre exacto (sin distinguir mayúsculas). Las demás hojas se ignoran, así se puede agregar una de instrucciones.
+- **Encabezados en la fila 1**, en el orden exacto de la tabla del Excel. Se comparan sin distinguir mayúsculas, tildes ni espacios a los lados (mismo criterio que `plantilla.listas`). Si falta, sobra (hay un encabezado no vacío después de la última columna) o está fuera de orden **cualquiera**, se rechaza el archivo y el mensaje nombra **cuáles**.
+- **Datos desde la fila 2.** Una fila **totalmente vacía** se saltea: no tiene nada que perder. El número de fila de los mensajes es **el número de fila de Excel**, el que el usuario ve a la izquierda.
+- **Celdas numéricas**: un CIF o un código de plan que Excel guardó como número (`123`, perdió los ceros) se lee como texto y se rellena. Un número en notación científica (`1.23E+08`) se rechaza en esa celda: no se puede reconstruir con certeza.
+- **Fechas**: se acepta una celda de fecha de Excel o texto `dd/mm/aaaa`. Cualquier otra forma es error de la celda. Una fecha futura es error (un documento firmado no puede tener fecha de mañana).
+
+## Excel 1 — Carga masiva · hoja `CargaCatalogos` · `sanic_mppp_capi_cargarcatalogos`
+
+| Col | Encabezado | Formato | Obligatoria cuando… |
+|---|---|---|---|
+| A | CIF BAC | dígitos, hasta 9; se rellena con ceros | siempre, A o B |
+| B | CIF COM | `^[A-Z0-9 ]{9}\d{3}$`, en mayúscula | siempre, A o B; **las dos** si se crea el cliente |
+| C | Razon social | texto, hasta 200 | se crea el cliente |
+| D | Correo ejecutivo | correo | se crea el cliente |
+| E | Codigo plan | alfanumérico, hasta 4; se rellena con ceros | la fila trae un plan |
+| F | Tipo formato | `06`, `10` u `11` (`6` se acepta como `06`) | se crea el plan |
+| G | Moneda | `COR` o `USD` | se crea el plan |
+| H | Correo | correo; se guarda en minúscula y sin espacios | la fila trae una autorización |
+| I | Nombre contacto | texto, hasta 100 | se crea el correo |
+| J | Fecha documento | fecha | opcional |
+| K | Comentarios | texto, hasta 50 | opcional |
+
+**Qué significa una fila.** Toda fila gira alrededor de **un cliente** (A y/o B). Opcionalmente trae
+**un plan de ese cliente** (E, F, G), y opcionalmente **un correo que queda autorizado sobre ese
+cliente** (H, I, J, K). La autorización es **implícita**: si hay correo, se autoriza sobre el cliente
+de la fila. Por la desnormalización, el mismo cliente y el mismo correo se repiten en varias filas
+(una por plan); eso es normal y se crea una sola vez.
+
+### Reglas por fila
+
+**Cliente**
+1. Sin A ni B → error: toda fila necesita su cliente.
+2. Se busca por A y por B, normalizados. Si vienen los dos y encuentran **clientes distintos**, o uno encuentra un cliente y el otro no existe → error: no coinciden con lo grabado.
+3. **Existe**: si C o D vienen y **no coinciden** con lo grabado (razón social sin distinguir mayúsculas ni espacios a los lados; ejecutivo = el dueño actual) → error. La carga no modifica. Si existe **inactivo** → advertencia: lo que se le cargue no va a estar vigente hasta activarlo.
+4. **No existe**: hacen falta A, B, C y D; si falta alguno → error, nombrando cuál. D tiene que ser **exactamente un** usuario **habilitado**, con ese correo y con el rol `SR - MPPP - Ejecutivo` (propuesta del arquitecto: un cliente a nombre de alguien que no es ejecutivo no aparece en "Mis clientes" de nadie, y nadie lo nota). Cero usuarios, varios usuarios, deshabilitado o sin el rol → error, nombrando cuál de esos casos es.
+
+**Plan** (solo si viene E)
+5. F o G sin E → error: son datos de un plan que no se nombró.
+6. **Existe**: su cliente tiene que ser el de la fila → si no, error nombrando el cliente real (el código de plan es único en todo el banco). Si F o G vienen y no coinciden con lo grabado → error. Inactivo → advertencia.
+7. **No existe**: hacen falta F y G; si falta alguno → error.
+
+**Correo y autorización** (solo si viene H)
+8. I, J o K sin H → error: son datos de una autorización sin correo.
+9. H con formato de correo inválido → error.
+10. **El correo existe**: si I viene y no coincide → error. Inactivo → advertencia.
+11. **El correo no existe**: hace falta I.
+12. **La autorización (correo, cliente) existe activa**: queda "ya existía". Si J o K vienen y no coinciden con lo grabado → error.
+13. **Existe inactiva** → error: se reactiva con el botón de Activar/Desactivar, no desde la carga.
+14. **No existe**: se crea con J y K. Nace **sin evidencia firmada**, como hoy (D-42): un archivo no puede viajar en una celda. Aparece en la vista "sin evidencia".
+
+**Coherencia dentro del archivo**
+15. **La misma clave tiene que tener los mismos datos en todas sus filas.** Para cliente, plan, correo y autorización, comparando entre las filas solo las celdas que vienen llenas (las vacías no contradicen). Ejemplo: `000123456` con dos razones sociales distintas → error **en todas las filas involucradas**, nombrándolas ("filas 3 y 9").
+16. Un mismo CIF BAC con dos CIF COM distintos en el archivo (o al revés) → error en esas filas.
+
+**Lo que NO es error.** Una fila donde todo ya existía queda "Sin cambios: todo ya existía". El
+archivo se puede volver a subir sin efectos (carga idempotente); si una carga se cortó, se repite
+entera.
+
+## Excel 2 — Activar / Desactivar · hoja `ActivarDesactivar` · `sanic_mppp_capi_cambiarestadocatalogos`
+
+| Col | Encabezado | Valores |
+|---|---|---|
+| A | Tipo | `CLIENTE` · `PLAN` · `CORREO` · `AUTORIZACION_CLIENTE` |
+| B | Accion | `ACTIVAR` · `DESACTIVAR` |
+| C | CIF BAC | para `CLIENTE` y `AUTORIZACION_CLIENTE` |
+| D | CIF COM | alternativo a C (o los dos, que tienen que apuntar al mismo cliente) |
+| E | Codigo plan | para `PLAN` |
+| F | Correo | para `CORREO` y `AUTORIZACION_CLIENTE` |
+
+Ejemplo (el que pidió el aprobador):
+
+| Tipo | Accion | CIF BAC | CIF COM | Codigo plan | Correo |
+|---|---|---|---|---|---|
+| CLIENTE | DESACTIVAR | 000123456 | | | |
+| CLIENTE | ACTIVAR | | ABC123456001 | | |
+| PLAN | DESACTIVAR | | | 0A12 | |
+| CORREO | DESACTIVAR | | | | juan.perez@empresa.com |
+| AUTORIZACION_CLIENTE | DESACTIVAR | 000123456 | | | maria.lopez@empresa.com |
+| AUTORIZACION_CLIENTE | ACTIVAR | | XYZ987654002 | | juan.perez@empresa.com |
+
+Qué hace cada fila: la 2 apaga el cliente (sus autorizaciones dejan de valer, aunque siguen activas).
+La 4 apaga **solo** ese plan. La 5 apaga el correo en **todos** los clientes donde está autorizado.
+La 6 apaga **solo** la autorización de María sobre ese cliente; María sigue autorizada sobre otros.
+
+### Reglas por fila
+
+1. Tipo o Accion fuera de su lista → error (se comparan sin distinguir mayúsculas ni espacios a los lados).
+2. **Cada Tipo exige sus claves y ninguna otra.** Si falta una → error; si sobra una (por ejemplo, un código de plan en una fila `CORREO`) → error: una celda que no se usa es una intención que no se cumple.
+3. El registro tiene que **existir** → si no, error. En `AUTORIZACION_CLIENTE`, la autorización (correo, cliente) tiene que existir; que el correo y el cliente existan por separado no alcanza.
+4. Ya está en el estado pedido → "Sin cambios", no es error.
+5. El mismo registro dos veces: con **acciones opuestas** → error en las dos filas; con la **misma acción** → se aplica una vez, y la segunda fila lleva advertencia de repetida.
+6. **Advertencias de efecto** (calculadas sobre el estado final, después de aplicar el archivo entero):
+   - Desactivar un `CLIENTE` o un `CORREO` → "deja sin efecto N autorizaciones por cliente activas".
+   - Activar una `AUTORIZACION_CLIENTE` cuyo cliente o correo queda inactivo → "no va a estar vigente: el cliente / el correo está inactivo".
+7. El cambio de estado es el nativo (`statecode`/`statuscode`): Activo/Inactivo (`02`, encabezado).
+
+## Contratos de las dos Custom API
+
+Las dos: Action, unbound, `isprivate = false`, plugin en `Api/`, mismo patrón que
+`exportarparadigitar` (`03` §1b).
+
+| | `sanic_mppp_capi_cargarcatalogos` | `sanic_mppp_capi_cambiarestadocatalogos` |
+|---|---|---|
+| `ExecutePrivilegeName` | `prvCreatesanic_mppp_tbl_cliente` (solo lo tiene el Administrador de planes, `04` §2) | `prvWritesanic_mppp_tbl_cliente` (ídem) |
+| Entrada `archivo` (String) | `.xlsx` en base64. Requerido salvo con `plantilla = true` | ídem |
+| Entrada `plantilla` (Boolean, opcional) | `true` → no lee nada: devuelve en `resultado` la **plantilla vacía** (hoja y encabezados) | ídem |
+| Salida `grabado` (Boolean) | `true` solo si la pasada 2 terminó | ídem |
+| Salida `resultado` (String) | Excel de resultado en base64 | ídem |
+| Salida `filas` · `errores` · `advertencias` (Integer) | filas no vacías leídas, filas con error, filas con advertencia | ídem |
+| Salidas de conteo (Integer) | `clientescreados` · `planescreados` · `correoscreados` · `autorizacionescreadas` | `activados` · `desactivados` · `sincambios` |
+
+**El privilegio de entrada es solo la puerta.** Cada `Create` y cada `Update` de la pasada 2 vuelve a
+pasar por la seguridad de la plataforma con el usuario que llama.
+
+**Errores de ARCHIVO** (no de fila): la llamada falla con un código y un texto propio. **Nunca llega
+al usuario el mensaje de la librería** (LP-01); ese va a la traza. No hay Excel de resultado, porque
+no hay filas confiables a las que asignarle un motivo.
+
+| Código | Cuándo |
+|---|---|
+| `MPPP-CAR-001` | `archivo` vacío o no es base64 válido |
+| `MPPP-CAR-002` | No es un `.xlsx` legible |
+| `MPPP-CAR-003` | Supera el peso de `lectura.limites` (comprimido o descomprimido) |
+| `MPPP-CAR-004` | No existe la hoja esperada (nombra cuál se esperaba) |
+| `MPPP-CAR-005` | Encabezados que faltan, sobran o están fuera de orden (los nombra) |
+| `MPPP-CAR-006` | Más filas no vacías que `carga.filas.maximo` (dice cuántas trae y cuál es el máximo) |
+| `MPPP-CAR-007` | Ninguna fila de datos |
+| `MPPP-CAR-008` | Se agotó el presupuesto de tiempo; **no se grabó nada** (pide partir el archivo) |
+| `MPPP-CAR-009` | Falló una escritura en la pasada 2; **no se grabó nada** (nombra la fila y el motivo de Dataverse) |
+| `MPPP-CAR-010` | `plantilla = true` y además vino `archivo`: no se adivina cuál de las dos cosas se quiso |
+
+**Excel de resultado.** Las mismas columnas, con los valores tal como se leyeron, más una columna al
+final, **Resultado**, y la fila 1 de encabezados igual. Valores posibles de Resultado:
+
+- `Error: <motivo>` (puede haber varios en una fila, separados por ` | `; **se reportan todos los errores de la fila**, no solo el primero, para que se corrija de una vez).
+- `Advertencia: <motivo>`.
+- `Creado: cliente, plan, correo, autorización` (lo que corresponda) · `Activado` · `Desactivado` · `Sin cambios: <por qué>`.
+- Si el archivo tuvo errores, las filas sin error dicen `Sin errores — no se grabó: el archivo tiene errores en otras filas`.
+
+**Formato de los motivos**: `<Columna>: <qué pasa>. <Qué hacer>.`, por ejemplo:
+- `CIF COM: "ABC12" no tiene el formato de CIF COM (9 letras o números y 3 dígitos). Corregilo.`
+- `CIF BAC / CIF COM: apuntan a dos clientes distintos (Ferretería Sol y Distribuidora Luna). Dejá uno solo o corregí el que está mal.`
+- `Correo ejecutivo: ana@banco.com no tiene el rol Ejecutivo. Pedí que se lo asignen o usá otro correo.`
+- `Razon social: el cliente 000123456 aparece con otra razón social en la fila 9. Usá la misma en las dos.`
+- `Codigo plan: el plan 0A12 ya existe y es de Distribuidora Luna, no de este cliente.`
+
+## Interfaz
+
+**Botones** (clásicos, `RibbonDiffXml` + `recursos/js/comandos.js`, como los demás, `06` §12.5):
+"Carga masiva" y "Activar/Desactivar masivo", **cada uno es un menú desplegable** (`FlyoutAnchor`, el primero
+del proyecto) con dos opciones: *Cargar archivo* (el flujo de abajo) y *Descargar plantilla* (llama a la
+Custom API con `plantilla = true` y descarga `CargaCatalogos.xlsx` o `ActivarDesactivar.xlsx`, con el
+indicador "Generando la plantilla…"). Los textos de las opciones también van en 1033 y 3082. con texto embebido **en 1033 y 3082** (`01` §0) e ícono
+propio (`recursos/svg/`). Van en la **grilla principal** de las cuatro tablas. Los ve **solo el
+Administrador de planes**: Ejecutivo y Supervisor solo leen catálogos. La regla real igual es el
+privilegio de la Custom API.
+
+**Flujo del JS** (mismo para los dos):
+1. Abre el selector de archivo (solo `.xlsx`). Si el usuario cancela, no pasa nada.
+2. `Xrm.Utility.showProgressIndicator("Leyendo el archivo…")` → lo pasa a base64.
+3. `"Validando y cargando el archivo… puede tardar hasta 2 minutos"` → llama a la Custom API.
+4. `"Preparando el resultado…"` → si vino `resultado`, lo descarga como `<nombre original>-resultado.xlsx`.
+5. Cierra el indicador y muestra un diálogo de resumen:
+   - **Grabado**: `"Carga terminada: 12 clientes, 30 planes, 8 correos y 45 autorizaciones creados. 3 filas con advertencias: revisá el archivo de resultado."`
+   - **Con errores**: `"No se grabó nada: 4 filas con errores. Revisá la columna Resultado del archivo que se descargó, corregí y volvé a subirlo."`
+   - **Error de archivo**: el texto del código `MPPP-CAR-00x`.
+6. Refresca la grilla.
+
+El indicador es modal: mientras está abierto no se puede volver a hacer clic.
+
+## Parámetro nuevo
+
+`carga.filas.maximo` · Número · **300**. Lo usan las dos Custom API. Hay que medirlo contra Dev
+(como DN-02) y ajustarlo. Si falta, se usa un valor quemado de 300 (mismo criterio que
+`rpa.horas.tolerancia`). El peso del archivo reutiliza `lectura.limites`.
+
+## Abierto
+
+| # | Punto | Estado |
+|---|---|---|
+| A | **D-72**: spike de transacción de la Custom API (arriba) | bloquea construir las dos Custom API |
+| B | **Plantillas vacías**: el usuario necesita de dónde bajar los dos Excel con los encabezados correctos. Un web resource no admite `.xlsx` | **cerrado 2026-10-01, aprobador**: la genera **la misma Custom API** (`plantilla = true`) a partir de **la misma definición de columnas que valida**, así el encabezado que se exige y el de la plantilla no pueden separarse. Una prueba lo fija: la plantilla generada, subida vacía, falla solo por `MPPP-CAR-007` (sin filas), nunca por encabezados |
+| C | **Versión de la solución**: esto sale después del release 1.1.0.0 | **cerrado 2026-10-01, aprobador: se publica como 1.2.0.0** |
+| D | **Cómo se pide la plantilla desde la app** | **cerrado 2026-10-01, aprobador: opción A, menú desplegable** (ver §Interfaz). Descartadas: dos botones más (16 en total, se llena la barra) y ofrecerla solo cuando falla (el usuario nuevo no tiene de dónde sacarla). `openConfirmDialog` **no sirve** para elegir entre cargar y bajar la plantilla: devuelve `confirmed = false` tanto con el segundo botón como con la X, así que cerrar el diálogo descargaría la plantilla |
+
+## Lo que hay que construir (con orden del aprobador, después de A)
+
+1. `sanic_comentarios` en `AutorizacionCliente`, más el formulario y las dos vistas.
+2. Dominio de la carga (lectura y validación por fila y entre filas), puro y con TDD estricto. Las pruebas de aceptación y las firmas las escribe el coordinador (ciclo de plugins).
+3. Dominio del cambio de estado, ídem.
+4. Las dos Custom API y su registro.
+5. Parámetro `carga.filas.maximo`.
+6. Los dos comandos en las cuatro grillas, el JS y los íconos.
+7. Medición de volumen contra Dev, y ajuste del tope.
+8. Casos de prueba nuevos en `pruebas/` (set de catálogos).

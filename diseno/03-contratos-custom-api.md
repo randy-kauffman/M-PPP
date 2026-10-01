@@ -140,6 +140,37 @@ Quién la llama: el comando **"Descargar para digitar"** de la grilla de Filas (
 
 **No marca nada.** La descarga no deja rastro propio en Fila ni en Bitácora: es una lectura, y `sanic_mppp_capi_exportarparadigitar` no escribe ninguna tabla del proyecto.
 
+## 1c. `sanic_mppp_capi_cargarcatalogos` y 1d. `sanic_mppp_capi_cambiarestadocatalogos` — DN-04 (Action) · **diseñadas, sin construir**
+
+> **Agregado el 2026-10-01.** Diseño cerrado con el aprobador ese día (`DIRECTRICES-NUEVAS.md`
+> DN-04). Las **reglas por fila**, el formato de los Excel y los textos del resumen viven allá; acá
+> va el contrato. **No se construyen hasta cerrar D-72** (spike de transacción, `PENDIENTES.md`).
+
+Quién las llama: los comandos **"Carga masiva"** y **"Activar/Desactivar masivo"** de las grillas
+principales de Cliente, Plan, Autorizado y AutorizacionCliente (`recursos/js/comandos.js`,
+`Xrm.WebApi.online.execute`). Solo el Administrador de planes. Nunca un flujo ni el bot.
+
+| | 1c `cargarcatalogos` | 1d `cambiarestadocatalogos` |
+|---|---|---|
+| Tipo | Action, unbound, `isprivate = false` | ídem |
+| `ExecutePrivilegeName` | `prvCreatesanic_mppp_tbl_cliente` | `prvWritesanic_mppp_tbl_cliente` |
+| Hoja esperada | `CargaCatalogos` | `ActivarDesactivar` |
+| Entrada `archivo` (String) | `.xlsx` en base64; requerido salvo con `plantilla = true` | ídem |
+| Entrada `plantilla` (Boolean, opcional) | `true` → devuelve la plantilla vacía en `resultado`, generada de la misma definición de columnas que valida. Con `archivo` además → `MPPP-CAR-010` | ídem |
+| Salida `grabado` (Boolean) | `true` solo si la pasada 2 terminó | ídem |
+| Salida `resultado` (String) | Excel de resultado en base64 | ídem |
+| Salidas `filas` · `errores` · `advertencias` (Integer) | | ídem |
+| Salidas de conteo (Integer) | `clientescreados` · `planescreados` · `correoscreados` · `autorizacionescreadas` | `activados` · `desactivados` · `sincambios` |
+
+**Algoritmo común:**
+1. Decodificar y leer con las reglas LP-01 a LP-07 (§7). La hoja y los encabezados están **fijos en el código** (excepción a LP-08, motivada en DN-04). Topes: `lectura.limites` y `carga.filas.maximo`. Los problemas de archivo fallan la llamada con `MPPP-CAR-001` a `007` (y `010`), sin Excel de resultado.
+2. **Pasada 1, sin escribir**: normalizar las claves con las **mismas funciones** que `NormalizarYValidarStep` (`Steps/ReglasDeSteps.cs`). Buscar por lote, una consulta `In` por tabla. Validar cada fila y la coherencia entre filas. Juntar **todos** los errores de cada fila.
+3. Con algún error → `grabado = false`, devolver el Excel de resultado. **No se escribe nada.**
+4. **Pasada 2**: escribir con el **servicio del usuario que llama** (`CreateOrganizationService(context.UserId)`, no SYSTEM: los catálogos son auditados y tiene que quedar quién hizo cada cosa). En 1c el orden es Clientes → Planes → Correos → Autorizaciones, cada entidad una sola vez. En 1d se cambia el estado nativo. **Usuarios y roles** (resolver el ejecutivo de la columna D en 1c) **se leen con SYSTEM**.
+5. Un fallo en la pasada 2 (`MPPP-CAR-009`) o el presupuesto de tiempo agotado (`MPPP-CAR-008`, umbral de 100 s como en §1b) lanza una excepción que **deshace todo lo escrito**. **Supuesto a verificar en D-72.**
+
+**No escriben Bitácora.** La traza de quién creó o desactivó qué la da la auditoría nativa de los catálogos (DD-18).
+
 ## 2. `sanic_mppp_capi_obtenerfilaspendientes` — fase 2 (Function)
 
 El bot **consulta**; la solución nunca lo llama a él (los bots de Automation Anywhere corren calendarizados).
