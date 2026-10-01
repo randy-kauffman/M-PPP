@@ -31,13 +31,54 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Exportacion
             Assert.Throws<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, valores) }, Textos((2, "x"))));
         }
 
+        private static Dictionary<string, string> CeldasPorReferencia(byte[] archivo, string hoja)
+        {
+            var r = new Dictionary<string, string>(StringComparer.Ordinal);
+            using (var ms = new System.IO.MemoryStream(archivo))
+            using (var doc = DocumentFormat.OpenXml.Packaging.SpreadsheetDocument.Open(ms, false))
+            {
+                var wb = doc.WorkbookPart;
+                var sheet = wb.Workbook.Descendants<DocumentFormat.OpenXml.Spreadsheet.Sheet>().Single(x => x.Name == hoja);
+                var ws = (DocumentFormat.OpenXml.Packaging.WorksheetPart)wb.GetPartById(sheet.Id);
+                var compartidos = wb.SharedStringTablePart.SharedStringTable.Elements<DocumentFormat.OpenXml.Spreadsheet.SharedStringItem>().Select(i => i.InnerText).ToArray();
+                foreach (var c in ws.Worksheet.Descendants<DocumentFormat.OpenXml.Spreadsheet.Cell>())
+                    r[c.CellReference.Value] = compartidos[int.Parse(c.CellValue.Text)];
+            }
+
+            return r;
+        }
+
         [Fact]
-        public void Un_caracter_que_XML_no_admite_es_error_antes_de_tocar_el_SDK()
+        public void Un_caracter_que_XML_no_admite_se_reemplaza_por_U_FFFD_y_no_tira_el_armado()
         {
             var e = EstructuraDeExcelDeCatalogo.Carga;
             var valores = new Dictionary<string, string> { ["C"] = "Cliente\u0001" };
-            Assert.Throws<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, valores) }, Textos((2, "x"))));
-            Assert.Throws<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, new Dictionary<string, string>()) }, Textos((2, "mal\u0000"))));
+            var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, valores) }, Textos((2, "mal\u0000")));
+            var celdas = CeldasPorReferencia(archivo, e.Hoja);
+            Assert.Equal("Cliente\uFFFD", celdas["C2"]);
+            Assert.Equal("mal\uFFFD", celdas["L2"]);
+        }
+
+        [Fact]
+        public void El_acortado_del_eco_no_parte_un_par_subrogado()
+        {
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            // El emoji (2 chars) queda justo en las posiciones 32765-32766: cortar en 32766 dejaría solo su mitad alta.
+            string largo = new string('x', 32765) + "😀" + new string('y', 100);
+            var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, new Dictionary<string, string> { ["C"] = largo }) }, Textos((2, "x")));
+            string c2 = CeldasPorReferencia(archivo, e.Hoja)["C2"];
+            Assert.True(c2.Length <= 32767);
+            Assert.EndsWith("…", c2);
+            Assert.False(char.IsHighSurrogate(c2[c2.Length - 2]), "no puede quedar media pareja antes de los puntos suspensivos");
+            Assert.Equal(new string('x', 32765) + "…", c2);
+        }
+
+        [Fact]
+        public void Un_resultado_de_mas_de_32767_caracteres_sigue_siendo_error_aunque_el_eco_se_acorte()
+        {
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            var valores = new Dictionary<string, string> { ["C"] = new string('c', 40000) };
+            Assert.Throws<ArgumentException>(() => ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, valores) }, Textos((2, new string('r', 32768)))));
         }
 
         [Fact]

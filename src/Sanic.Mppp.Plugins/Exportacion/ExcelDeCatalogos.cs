@@ -168,11 +168,13 @@ namespace Sanic.Mppp.Plugins.Exportacion
                     // La columna Resultado de la fila se reemplaza, así que su contenido viejo no se valida ni se escribe.
                     if (indice == posicionResultado) continue;
 
-                    ValidarTexto(par.Value, "La columna " + par.Key + " de la fila " + numero.ToString(CultureInfo.InvariantCulture), nameof(filas));
-                    celdas[indice] = par.Value;
+                    celdas[indice] = AcortarElEco(ReemplazarCaracteresInvalidos(par.Value));
                 }
 
-                ValidarTexto(resultado, "El resultado de la fila " + numero.ToString(CultureInfo.InvariantCulture), nameof(resultadoPorFila));
+                // El resultado es texto NUESTRO: pasarse del tope es un bug de quien lo armó, no un dato hostil.
+                resultado = ReemplazarCaracteresInvalidos(resultado);
+                if (resultado != null && resultado.Length > MaximoDeCaracteresPorCelda)
+                    throw new ArgumentException("El resultado de la fila " + numero.ToString(CultureInfo.InvariantCulture) + " tiene " + resultado.Length.ToString(CultureInfo.InvariantCulture) + " caracteres: el máximo de una celda es " + MaximoDeCaracteresPorCelda.ToString(CultureInfo.InvariantCulture) + ".", nameof(resultadoPorFila));
                 celdas[posicionResultado] = resultado;
                 filasResueltas.Add(new KeyValuePair<int, string[]>(numero, celdas));
             }
@@ -190,22 +192,44 @@ namespace Sanic.Mppp.Plugins.Exportacion
         // Filas máximas de una hoja de Excel (Learn, "Excel specifications and limits").
         private const int UltimaFilaDeExcel = 1048576;
 
-        private static void ValidarTexto(string texto, string donde, string parametro)
+        private const string PuntosSuspensivos = "\u2026";
+
+        // DN-04 (revisión 4b): el eco de lo que escribió el usuario nunca se graba y su fila ya tiene error; un valor de más de
+        // 32.767 caracteres (el lector limita bytes, no celdas) se acorta en vez de tumbar la Custom API. Termina en "…" y no
+        // parte un par subrogado.
+        private static string AcortarElEco(string texto)
         {
-            if (string.IsNullOrEmpty(texto)) return;
+            if (texto == null || texto.Length <= MaximoDeCaracteresPorCelda) return texto;
 
-            if (texto.Length > MaximoDeCaracteresPorCelda)
-                throw new ArgumentException(donde + " tiene " + texto.Length.ToString(CultureInfo.InvariantCulture) + " caracteres: el máximo de una celda es " + MaximoDeCaracteresPorCelda.ToString(CultureInfo.InvariantCulture) + ".", parametro);
+            int largo = MaximoDeCaracteresPorCelda - PuntosSuspensivos.Length;
+            if (char.IsHighSurrogate(texto[largo - 1])) largo--;
+            return texto.Substring(0, largo) + PuntosSuspensivos;
+        }
 
-            // XML 1.0 no admite ciertos caracteres de control ni sustitutos sueltos: el SDK fallaría recién al guardar, con el
-            // archivo a medio armar. Se rechaza antes.
+        // XML 1.0 no admite ciertos controles ni sustitutos sueltos y el SDK fallaría recién al guardar. Se reemplazan por U+FFFD
+        // (revisión 4b): ni el eco ni un mensaje armado con datos de Dataverse pueden tumbar el armado. Un par válido se conserva.
+        private static string ReemplazarCaracteresInvalidos(string texto)
+        {
+            if (string.IsNullOrEmpty(texto)) return texto;
+
+            System.Text.StringBuilder salida = null;
             for (int i = 0; i < texto.Length; i++)
             {
                 char c = texto[i];
-                if (XmlConvert.IsXmlChar(c)) continue;
-                if (i + 1 < texto.Length && XmlConvert.IsXmlSurrogatePair(texto[i + 1], c)) { i++; continue; }
-                throw new ArgumentException(donde + " trae un carácter que un archivo Excel no admite (posición " + i.ToString(CultureInfo.InvariantCulture) + ").", parametro);
+                bool valido = XmlConvert.IsXmlChar(c);
+                bool par = !valido && i + 1 < texto.Length && XmlConvert.IsXmlSurrogatePair(texto[i + 1], c);
+                if (valido || par)
+                {
+                    salida?.Append(c);
+                    if (par) { i++; salida?.Append(texto[i]); }
+                    continue;
+                }
+
+                if (salida == null) salida = new System.Text.StringBuilder(texto, 0, i, texto.Length);
+                salida.Append('\uFFFD');
             }
+
+            return salida == null ? texto : salida.ToString();
         }
 
         private static byte[] ArmarXlsx(EstructuraDeExcelDeCatalogo estructura, IList<KeyValuePair<int, string[]>> filas)
