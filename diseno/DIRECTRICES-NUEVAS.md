@@ -498,6 +498,7 @@ La 6 apaga **solo** la autorización de María sobre ese cliente; María sigue a
 6. **Advertencias de efecto** (calculadas sobre el estado final, después de aplicar el archivo entero):
    - Desactivar un `CLIENTE` o un `CORREO` → "deja sin efecto N autorizaciones por cliente activas".
    - Activar una `AUTORIZACION_CLIENTE` cuyo cliente o correo queda inactivo → "no va a estar vigente: el cliente / el correo está inactivo".
+     *Precisado el 2026-10-01 (revisión del código):* advierte **aunque la autorización ya estuviera activa** (la fila no cambia nada, pero quien pidió ACTIVAR cree que opera). En cambio, "deja sin efecto N" solo sale si la fila realmente desactiva algo. Las filas opuestas o repetidas se detectan aunque alguna tenga otro error (reportar todo de una vez); el estado final se calcula solo con las filas sin error, así que en un archivo con errores una advertencia de efecto puede ser aproximada, sin consecuencia porque ese archivo no se graba.
 7. El cambio de estado es el nativo (`statecode`/`statuscode`): Activo/Inactivo (`02`, encabezado).
 
 ## Contratos de las dos Custom API

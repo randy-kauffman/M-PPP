@@ -322,6 +322,54 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Empty(Unica(Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "456", correo: "juan.perez@empresa.com"))).Advertencias);
         }
 
+        // ================================================================================================ huecos de la revisión (2026-10-01)
+        [Fact]
+        public void Pedir_activar_una_autorizacion_que_ya_esta_activa_pero_no_vigente_tambien_advierte()
+        {
+            // Decisión del arquitecto: quien pide ACTIVAR cree que la autorización va a operar. Si su correo o su cliente queda
+            // inactivo, no opera, cambie o no el estado de la fila. María→Luna está activa, María está inactiva.
+            var plan = Planificar(F(2, "AUTORIZACION_CLIENTE", "ACTIVAR", "456", correo: "maria.lopez@empresa.com"));
+            SinErrores(plan);
+            Assert.Empty(plan.Cambios);
+            var fila = Unica(plan);
+            Assert.StartsWith("Sin cambios: ya estaba activo", fila.Texto);
+            Assert.Contains(fila.Advertencias, a => a.StartsWith("Correo: ", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Opuestas_y_repetidas_se_detectan_aunque_una_de_las_filas_tenga_otro_error()
+        {
+            // "Reportar todo de una vez" (DN-04): que la fila 3 tenga una celda de más no esconde que pide lo contrario que la 2.
+            var plan = Planificar(F(2, "CLIENTE", "ACTIVAR", "123"), F(3, "CLIENTE", "DESACTIVAR", "123", plan: "0A12"));
+            Assert.True(plan.TieneErrores);
+            Assert.Contains(plan.Filas[0].Errores, e => e.StartsWith("Accion: ", StringComparison.Ordinal) && Regex.IsMatch(e, @"\b3\b"));
+            Assert.Contains(plan.Filas[1].Errores, e => e.StartsWith("Accion: ", StringComparison.Ordinal) && Regex.IsMatch(e, @"\b2\b"));
+            Assert.Contains(plan.Filas[1].Errores, e => e.StartsWith("Codigo plan: ", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void Una_repetida_de_tres_filas_que_nombran_el_registro_de_formas_distintas_se_aplica_una_vez()
+        {
+            var plan = Planificar(
+                F(9, "CLIENTE", "ACTIVAR", "789"),
+                F(4, "CLIENTE", "ACTIVAR", cifCom: "ina000000003"),
+                F(6, "CLIENTE", "ACTIVAR", "000000789", "INA000000003"));
+            SinErrores(plan);
+            Assert.Equal(4, UnCambio(plan).FilaOrigen);
+            Assert.Equal(1, plan.Activados);
+            Assert.Equal(2, plan.SinCambios);
+            Assert.StartsWith("Activado", plan.Filas[1].Texto);
+        }
+
+        [Fact]
+        public void Las_claves_de_celdas_que_sobran_tambien_entran_a_la_foto()
+        {
+            // Decisión 9 del constructor, fijada: traer una clave de más solo cuesta una consulta, y la fila da error igual.
+            var claves = ClavesDeCambioDeEstado.Extraer(new[] { F(2, "CLIENTE", "ACTIVAR", "123", plan: "0A12", correo: "pedro@empresa.com") });
+            Assert.Equal(new[] { "0A12" }, claves.CodigosDePlan.ToArray());
+            Assert.Equal(new[] { "pedro@empresa.com" }, claves.Correos.ToArray());
+        }
+
         // ================================================================================================ todo o nada, texto y contadores
         [Fact]
         public void Con_un_error_en_cualquier_fila_no_cambia_nada()
