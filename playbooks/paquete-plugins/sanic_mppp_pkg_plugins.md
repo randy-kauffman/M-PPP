@@ -14,11 +14,19 @@ a los que apuntan las Custom API y los steps.
 sandbox no siga ejecutando el binario viejo. Se actualiza con `--actualizar-contenido` (la `version` del PAQUETE,
 1.0.0, es inmutable y no cambia).
 
-Antes de correr la herramienta hay que armar el .nupkg:
+Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
+(receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
+y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
+constructor comparando la fecha del .nupkg y buscando los tipos dentro del .dll empaquetado). Son artefactos de
+compilación ignorados por git: borrarlos no pierde nada.
 
 ```
+rm -rf src/Sanic.Mppp.Plugins/bin src/Sanic.Mppp.Plugins/obj src/Sanic.Mppp.Plugins.Paquete/bin src/Sanic.Mppp.Plugins.Paquete/obj
 dotnet pack src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj -c Release
 ```
+
+Comprobación antes de subir: el .nupkg tiene la fecha de hoy y su `Sanic.Mppp.Plugins.dll` contiene cada uno de los
+`tipos` de abajo (buscar el nombre de la clase en los bytes del .dll dentro del zip).
 
 ## 1. Identidad
 
