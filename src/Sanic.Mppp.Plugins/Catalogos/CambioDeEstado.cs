@@ -226,6 +226,12 @@ namespace Sanic.Mppp.Plugins.Catalogos
         /// fila repetidos → <see cref="ArgumentException"/>. Clave ausente, valor nulo o en blanco = celda vacía.</param>
         /// <param name="estado">La foto (normalizada como la guarda el step). Debe traer las autorizaciones por cliente de
         /// los clientes y correos nombrados, para contar el efecto de desactivarlos. Nula → <see cref="ArgumentNullException"/>.</param>
+        /// <summary>Como la otra sobrecarga, más los avisos del lector: cada uno es un ERROR de su fila (mismo contrato que
+        /// <see cref="PlanificadorDeCarga.Planificar(IReadOnlyList{FilaPlantilla}, EstadoDeCatalogos, DateTime, IReadOnlyList{AdvertenciaLectura})"/>).
+        /// FIRMA DEL ARQUITECTO.</summary>
+        public static PlanDeCambioDeEstado Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, IReadOnlyList<AdvertenciaLectura> avisos)
+            => throw new NotImplementedException();
+
         public static PlanDeCambioDeEstado Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado)
         {
             if (filas == null) throw new ArgumentNullException(nameof(filas));

@@ -911,6 +911,34 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.False(PlanificadorDeCarga.Planificar(new[] { F(2, A("123"), H("viejo@empresa.com")) }, foto, Hoy).TieneErrores);
         }
 
+        // ================================================================================================ avisos del lector (revisión 4c)
+        [Fact]
+        public void Un_aviso_del_lector_es_error_de_su_fila_con_el_encabezado_de_su_columna()
+        {
+            var filas = new[] { F(2, A("123"), H("n@empresa.com"), I("X"), K("#REF!")), F(3, A("456")) };
+            var avisos = new[] { new AdvertenciaLectura { NumeroFilaExcel = 2, Columna = "K", Motivo = "celda K2: tiene un valor de error de Excel ('#REF!')" } };
+            var plan = PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, avisos);
+            Assert.True(plan.TieneErrores);
+            Assert.Empty(plan.Autorizaciones);
+            var error = Assert.Single(plan.Filas[0].Errores, e => e.StartsWith("Comentarios: ", StringComparison.Ordinal));
+            Assert.Contains("#REF!", error);
+            Assert.Empty(plan.Filas[1].Errores);
+
+            // Sin avisos, las dos sobrecargas dicen lo mismo.
+            Assert.Equal(PlanificadorDeCarga.Planificar(filas, Foto(), Hoy).Filas.Select(f => f.Texto),
+                PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, new AdvertenciaLectura[0]).Filas.Select(f => f.Texto));
+        }
+
+        [Fact]
+        public void Un_aviso_mal_armado_es_error_de_quien_llama()
+        {
+            var filas = new[] { F(2, A("123")) };
+            Assert.Throws<ArgumentNullException>(() => PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, null));
+            Assert.ThrowsAny<ArgumentException>(() => PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, new AdvertenciaLectura[] { null }));
+            Assert.ThrowsAny<ArgumentException>(() => PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, new[] { new AdvertenciaLectura { NumeroFilaExcel = 9, Columna = "A", Motivo = "x" } }));
+            Assert.ThrowsAny<ArgumentException>(() => PlanificadorDeCarga.Planificar(filas, Foto(), Hoy, new[] { new AdvertenciaLectura { NumeroFilaExcel = 2, Columna = "Z", Motivo = "x" } }));
+        }
+
         // ================================================================================================ claves para la foto
         [Fact]
         public void Las_claves_salen_normalizadas_sin_repetidos_y_sin_las_invalidas()

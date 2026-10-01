@@ -17,6 +17,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
     /// por eso, a diferencia de `ObtenerFilasPendientesApiAceptacion`, acá NO hay una prueba de "llamador no
     /// autorizado".
     /// </summary>
+    [Collection(ColeccionesDePrueba.RelojDeApi)]
     public class ExportarParaDigitarApiAceptacion
     {
         private static readonly DateTime Ahora = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);

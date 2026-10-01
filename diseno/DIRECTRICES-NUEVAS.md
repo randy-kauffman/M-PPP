@@ -538,7 +538,7 @@ no hay filas confiables a las que asignarle un motivo.
 | `MPPP-CAR-003` | Supera el peso de `lectura.limites` (comprimido o descomprimido) |
 | `MPPP-CAR-004` | No existe la hoja esperada (nombra cuál se esperaba) |
 | `MPPP-CAR-005` | Encabezados que faltan, sobran o están fuera de orden (los nombra) |
-| `MPPP-CAR-006` | Más filas no vacías que `carga.filas.maximo` (dice cuántas trae y cuál es el máximo) |
+| `MPPP-CAR-006` | Más filas no vacías que `carga.filas.maximo` (dice cuál es el máximo; *precisado el 2026-10-01*: no dice cuántas trae, porque el lector corta en la primera de más para no recorrer un archivo hostil entero) |
 | `MPPP-CAR-007` | Ninguna fila de datos |
 | `MPPP-CAR-008` | Se agotó el presupuesto de tiempo; **no se grabó nada** (pide partir el archivo) |
 | `MPPP-CAR-009` | Falló una escritura en la pasada 2; **no se grabó nada** (nombra la fila y el motivo de Dataverse) |

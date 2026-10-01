@@ -19,6 +19,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
     /// IPlugin. Une las piezas ya probadas; acá se prueba el cableado: códigos MPPP-CAR, quién escribe, parámetros, todo o nada.
     /// Pruebas del ARQUITECTO: el constructor no las cambia.
     /// </summary>
+    [Collection(ColeccionesDePrueba.RelojDeApi)]
     public class CatalogosMasivosApiAceptacion
     {
         private static readonly DateTime Hoy = new DateTime(2026, 10, 1);
@@ -239,6 +240,55 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Contains("Entity Key violated", ex.Message);
             Assert.Contains("No se grabó nada", ex.Message);
             Assert.IsType<EscrituraDeCatalogoFallidaException>(ex.InnerException);
+        }
+
+        // ================================================================================================ revisión 4c (2026-10-01)
+        [Fact]
+        public void Una_celda_con_error_de_Excel_no_se_graba_en_silencio()
+        {
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            var celdas = new List<string> { XlsxCrudo.Celda("A2", "123"), XlsxCrudo.Celda("H2", "n@empresa.com"), XlsxCrudo.Celda("I2", "N"),
+                "<c r=\"K2\" t=\"e\"><v>#REF!</v></c>" };
+            var archivo = Convert.ToBase64String(XlsxCrudo.ConFilas(e.Hoja,
+                XlsxCrudo.Fila(1, e.Columnas.Select(c => XlsxCrudo.Celda(c.Letra + "1", c.Encabezado)).ToArray()),
+                XlsxCrudo.Fila(2, celdas.ToArray())));
+            var cat = Catalogos(out _);
+            var r = Nucleo(cat, Sistema()).Cargar(archivo);
+            Assert.False(r.Grabado);
+            Assert.Equal(1, r.Errores);
+            Assert.Empty(Escrituras(cat));
+        }
+
+        [Fact]
+        public void El_tope_de_peso_se_mira_antes_de_decodificar_el_base64()
+        {
+            // Observable: un base64 enorme Y además inválido da 003 (peso), no 001 (base64): no se llegó a decodificar.
+            var n = Nucleo(Catalogos(out _), Sistema(limites: @"{""maximoBytesComprimido"":1000,""maximoBytesDescomprimido"":20000000}"));
+            Assert.Equal("MPPP-CAR-003", Codigo(() => n.Cargar(new string('A', 100000) + "!!")));
+            Assert.Equal("MPPP-CAR-003", Codigo(() => n.CambiarEstado(new string('A', 100000) + "!!")));
+            // Uno chico e inválido sigue siendo 001.
+            Assert.Equal("MPPP-CAR-001", Codigo(() => n.Cargar("AAAA!!")));
+        }
+
+        [Fact]
+        public void Si_no_hay_nada_que_escribir_el_presupuesto_no_tira_el_resultado()
+        {
+            var cat = Catalogos(out _);
+            var n = Nucleo(cat, Sistema(), reloj: () => TimeSpan.FromSeconds(CatalogosMasivos.PresupuestoSegundos + 5));
+            var r = n.Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, Fila(2, ("A", "123"))));   // todo ya existía
+            Assert.True(r.Grabado);
+            Assert.Empty(Escrituras(cat));
+        }
+
+        [Fact]
+        public void El_motivo_de_Dataverse_en_el_009_va_recortado()
+        {
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), "missing privilege " + new string('x', 5000));
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(falla, Sistema()).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga,
+                Fila(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "ana@banco.com")))));
+            Assert.Equal("MPPP-CAR-009", ex.Codigo);
+            Assert.True(ex.Message.Length < 600, $"mensaje de {ex.Message.Length} caracteres");
+            Assert.Contains("missing privilege", ex.Message);
         }
 
         // ================================================================================================ cambio de estado

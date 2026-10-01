@@ -467,6 +467,17 @@ namespace Sanic.Mppp.Plugins.Catalogos
         /// dos filas con el mismo número de fila de Excel → <see cref="ArgumentException"/> (es un error de quien llama).</param>
         /// <param name="estado">La foto de lo que existe. Nula → <see cref="ArgumentNullException"/>.</param>
         /// <param name="hoy">La fecha de hoy (solo fecha) en la hora del negocio: una "Fecha documento" posterior es error.</param>
+        /// <summary>
+        /// Como la otra sobrecarga, más los avisos del lector (revisión 4c, 2026-10-01; LP-07 "nada se pierde callado"): cada
+        /// <see cref="AdvertenciaLectura"/> (un error de Excel como #REF!, un número que pudo redondearse) es un ERROR de su fila,
+        /// con el encabezado de su columna como prefijo y el motivo del lector. En un catálogo eso nunca es un dato válido.
+        /// <paramref name="avisos"/> nulo → <see cref="ArgumentNullException"/>; un aviso nulo, de una fila que no está en
+        /// <paramref name="filas"/> o de una columna que no es de la estructura → <see cref="ArgumentException"/>.
+        /// FIRMA DEL ARQUITECTO.
+        /// </summary>
+        public static PlanDeCarga Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, DateTime hoy, IReadOnlyList<AdvertenciaLectura> avisos)
+            => throw new NotImplementedException();
+
         public static PlanDeCarga Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, DateTime hoy)
         {
             if (filas == null) throw new ArgumentNullException(nameof(filas));

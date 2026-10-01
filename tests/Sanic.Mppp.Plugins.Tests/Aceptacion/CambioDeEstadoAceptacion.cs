@@ -382,6 +382,18 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(new[] { "pedro@empresa.com" }, claves.Correos.ToArray());
         }
 
+        [Fact]
+        public void Un_aviso_del_lector_es_error_de_su_fila_tambien_en_el_cambio_de_estado()
+        {
+            var filas = new[] { F(2, "CORREO", "DESACTIVAR", correo: "pedro@empresa.com") };
+            var plan = PlanificadorDeCambioDeEstado.Planificar(filas, Foto(),
+                new[] { new AdvertenciaLectura { NumeroFilaExcel = 2, Columna = "F", Motivo = "celda F2: tiene un valor de error de Excel ('#N/A')" } });
+            Assert.True(plan.TieneErrores);
+            Assert.Empty(plan.Cambios);
+            Assert.Contains(Unica(plan).Errores, e => e.StartsWith("Correo: ", StringComparison.Ordinal));
+            Assert.Throws<ArgumentNullException>(() => PlanificadorDeCambioDeEstado.Planificar(filas, Foto(), null));
+        }
+
         // ================================================================================================ todo o nada, texto y contadores
         [Fact]
         public void Con_un_error_en_cualquier_fila_no_cambia_nada()
