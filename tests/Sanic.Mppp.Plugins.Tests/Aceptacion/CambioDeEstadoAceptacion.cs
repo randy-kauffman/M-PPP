@@ -362,6 +362,18 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void Los_cambios_salen_ordenados_por_su_fila_de_origen()
+        {
+            // El escritor los aplica en este orden; si una escritura falla, la fila que se informa es predecible.
+            var plan = Planificar(
+                F(9, "CLIENTE", "DESACTIVAR", "456"),
+                F(3, "PLAN", "DESACTIVAR", plan: "0A12"),
+                F(5, "CLIENTE", "ACTIVAR", "789"));
+            SinErrores(plan);
+            Assert.Equal(new[] { 3, 5, 9 }, plan.Cambios.Select(c => c.FilaOrigen).ToArray());
+        }
+
+        [Fact]
         public void Las_claves_de_celdas_que_sobran_tambien_entran_a_la_foto()
         {
             // Decisión 9 del constructor, fijada: traer una clave de más solo cuesta una consulta, y la fila da error igual.
