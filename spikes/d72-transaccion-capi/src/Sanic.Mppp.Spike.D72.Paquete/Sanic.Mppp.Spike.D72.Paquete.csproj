@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPIKE D-72: se descarta. Mismo esqueleto que src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj. -->
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <PackageId>SanicMpppSpikeD72</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Sistemas Abiertos Nicaragua</Authors>
+    <Description>Spike D-72 (descartable).</Description>
+    <SignAssembly>false</SignAssembly>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <NoWarn>NU5100;NU5128</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.PowerApps.MSBuild.Plugin" Version="1.44.2" />
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.60" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Sanic.Mppp.Spike.D72/Sanic.Mppp.Spike.D72.csproj" />
+  </ItemGroup>
+</Project>

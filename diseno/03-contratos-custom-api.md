@@ -144,7 +144,7 @@ Quién la llama: el comando **"Descargar para digitar"** de la grilla de Filas (
 
 > **Agregado el 2026-10-01.** Diseño cerrado con el aprobador ese día (`DIRECTRICES-NUEVAS.md`
 > DN-04). Las **reglas por fila**, el formato de los Excel y los textos del resumen viven allá; acá
-> va el contrato. **No se construyen hasta cerrar D-72** (spike de transacción, `PENDIENTES.md`).
+> va el contrato. D-72 (spike de transacción) **cerrada el 2026-10-01**: listas para construir.
 
 Quién las llama: los comandos **"Carga masiva"** y **"Activar/Desactivar masivo"** de las grillas
 principales de Cliente, Plan, Autorizado y AutorizacionCliente (`recursos/js/comandos.js`,
@@ -167,7 +167,7 @@ principales de Cliente, Plan, Autorizado y AutorizacionCliente (`recursos/js/com
 2. **Pasada 1, sin escribir**: normalizar las claves con las **mismas funciones** que `NormalizarYValidarStep` (`Steps/ReglasDeSteps.cs`). Buscar por lote, una consulta `In` por tabla. Validar cada fila y la coherencia entre filas. Juntar **todos** los errores de cada fila.
 3. Con algún error → `grabado = false`, devolver el Excel de resultado. **No se escribe nada.**
 4. **Pasada 2**: escribir con el **servicio del usuario que llama** (`CreateOrganizationService(context.UserId)`, no SYSTEM: los catálogos son auditados y tiene que quedar quién hizo cada cosa). En 1c el orden es Clientes → Planes → Correos → Autorizaciones, cada entidad una sola vez. En 1d se cambia el estado nativo. **Usuarios y roles** (resolver el ejecutivo de la columna D en 1c) **se leen con SYSTEM**.
-5. Un fallo en la pasada 2 (`MPPP-CAR-009`) o el presupuesto de tiempo agotado (`MPPP-CAR-008`, umbral de 100 s como en §1b) lanza una excepción que **deshace todo lo escrito**. **Supuesto a verificar en D-72.**
+5. Un fallo en la pasada 2 (`MPPP-CAR-009`) o el presupuesto de tiempo agotado (`MPPP-CAR-008`, umbral de 100 s como en §1b) lanza una excepción que **deshace todo lo escrito**. **Verificado en Dev el 2026-10-01 (D-72, `spikes/d72-transaccion-capi/`)**: `IsInTransaction = true`, etapa 30; con el servicio del usuario y con SYSTEM. El fallo de una escritura se atrapa solo para relanzarlo como `MPPP-CAR-009`, **sin otra llamada al servicio**.
 
 **No escriben Bitácora.** La traza de quién creó o desactivó qué la da la auditoría nativa de los catálogos (DD-18).
 

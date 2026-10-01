@@ -1,0 +1,7 @@
+registros zz-d72-*: HTTP 200 count=0
+customapis zzspiked72: HTTP 200 count=0
+customapirequestparameters del spike: HTTP 200 count=0
+pluginpackages zzspiked72: HTTP 200 count=0
+pluginassemblies Sanic.Mppp.Spike.D72: HTTP 200 count=0
+plugintypes del spike: HTTP 200 count=0
+solutions zzspiked72: HTTP 200 count=0

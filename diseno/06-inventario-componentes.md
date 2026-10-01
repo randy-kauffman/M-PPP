@@ -146,7 +146,7 @@ Un solo paquete, `sanic_mppp_pkg_plugins` (`Sanic.Mppp.Plugins`). Se construye p
 | 7.12 | `Steps/` atender no reconocida | | 1 |
 | 7.13 | `Api/ObtenerFilasPendientesApi`, `Api/RegistrarResultadoRpaApi` | | 2 |
 | 7.14 | `Api/ExportarParaDigitar`, `Api/ExportarParaDigitarApi`, `Exportacion/` (`ArmadorExportacionOpenXml`, Open XML SDK 3.1.0) | **Agregado el 2026-09-28 a este inventario** (DN-02, construido el 2026-09-26/27) | 2 |
-| 7.15 | `Api/CargarCatalogos(Api)`, `Api/CambiarEstadoCatalogos(Api)`, y el dominio de la lectura y validación de los dos Excel de catálogos | **Diseñado el 2026-10-01, DN-04, sin construir.** Reutiliza la normalización de `Steps/ReglasDeSteps.cs` y las reglas LP-01 a LP-07. Bloqueado por D-72 | DN-04 |
+| 7.15 | `Api/CargarCatalogos(Api)`, `Api/CambiarEstadoCatalogos(Api)`, y el dominio de la lectura y validación de los dos Excel de catálogos | **Diseñado el 2026-10-01, DN-04, sin construir.** Reutiliza la normalización de `Steps/ReglasDeSteps.cs` y las reglas LP-01 a LP-07. D-72 cerrada el 2026-10-01 | DN-04 |
 
 ## 8. Registro de Custom API y steps — P-09
 

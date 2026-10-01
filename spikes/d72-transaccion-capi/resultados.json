@@ -1,0 +1,258 @@
+[
+ {
+  "modo": "exito",
+  "corrida": 1,
+  "marca": "exito1x141245",
+  "inicio_utc": "2026-10-01T20:12:45Z",
+  "http": 200,
+  "respuesta": {
+   "@odata.context": "https://org36e60d9d.crm.dynamics.com/api/data/v9.2/$metadata#Microsoft.Dynamics.CRM.sanic_mppp_capi_zzspiked72Response",
+   "entransaccion": true,
+   "etapa": 30,
+   "profundidad": 1,
+   "creados": 3
+  },
+  "registros_despues": 3,
+  "nombres": [
+   "zz-d72-exito1x141245-1@spike.invalid",
+   "zz-d72-exito1x141245-2@spike.invalid",
+   "zz-d72-exito1x141245-3@spike.invalid"
+  ],
+  "trazas": [
+   {
+    "plugintracelogid": "4d11a88c-ee99-4b7b-8b97-e99ce7a573b8",
+    "createdon": "2026-10-01T20:13:06Z",
+    "messageblock": "D72 modo=exito entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "87aedcdc-3983-4931-b9df-a1bf9d9352f6"
+   }
+  ]
+ },
+ {
+  "modo": "exito",
+  "corrida": 2,
+  "marca": "exito2x141245",
+  "inicio_utc": "2026-10-01T20:13:09Z",
+  "http": 200,
+  "respuesta": {
+   "@odata.context": "https://org36e60d9d.crm.dynamics.com/api/data/v9.2/$metadata#Microsoft.Dynamics.CRM.sanic_mppp_capi_zzspiked72Response",
+   "entransaccion": true,
+   "etapa": 30,
+   "profundidad": 1,
+   "creados": 3
+  },
+  "registros_despues": 3,
+  "nombres": [
+   "zz-d72-exito2x141245-1@spike.invalid",
+   "zz-d72-exito2x141245-2@spike.invalid",
+   "zz-d72-exito2x141245-3@spike.invalid"
+  ],
+  "trazas": [
+   {
+    "plugintracelogid": "a2b5258e-8959-4283-9500-429710516b6d",
+    "createdon": "2026-10-01T20:13:36Z",
+    "messageblock": "D72 modo=exito entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "7cbf80f2-b777-474d-a2fc-2a9be16c01a9"
+   }
+  ]
+ },
+ {
+  "modo": "excepcion",
+  "corrida": 1,
+  "marca": "excepcion1x141245",
+  "inicio_utc": "2026-10-01T20:13:39Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "b0333589-4326-44e1-937a-e3de23c5fffc",
+    "createdon": "2026-10-01T20:14:06Z",
+    "messageblock": "D72 modo=excepcion entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "a3d0fa15-1b40-4e9a-be3e-a2312c5c4d2f"
+   }
+  ]
+ },
+ {
+  "modo": "excepcion",
+  "corrida": 2,
+  "marca": "excepcion2x141245",
+  "inicio_utc": "2026-10-01T20:14:06Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "5a39faab-8559-44e3-a5a4-be0dd83b4dbc",
+    "createdon": "2026-10-01T20:14:36Z",
+    "messageblock": "D72 modo=excepcion entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "9d6b7388-fd18-42a9-8ca7-a8af2f43728c"
+   }
+  ]
+ },
+ {
+  "modo": "fallo_escritura",
+  "corrida": 1,
+  "marca": "falloescritura1x141245",
+  "inicio_utc": "2026-10-01T20:14:36Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-FALLO: Entity Key KEY - MPPP - Autorizado - Correo violated. A record with the same value for Correo already exists. A duplicate record cannot be created. Select one or more unique values and try again."
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "ff5e9142-0819-4c98-a5a6-b48cd5ba74cc",
+    "createdon": "2026-10-01T20:15:06Z",
+    "messageblock": "D72 modo=fallo_escritura entransaccion=True etapa=30 profundidad=1 creados=2",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-FALLO: Entity Key KEY - MPPP - Autorizado - Correo violated. A record with the same value for Correo already exists. A duplicate record cannot be created. Select one or more unique values and try again.\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "13ae2a8b-cbcc-4c7d-8651-1dccc3a4aba4"
+   }
+  ]
+ },
+ {
+  "modo": "fallo_escritura",
+  "corrida": 2,
+  "marca": "falloescritura2x141245",
+  "inicio_utc": "2026-10-01T20:15:08Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-FALLO: Entity Key KEY - MPPP - Autorizado - Correo violated. A record with the same value for Correo already exists. A duplicate record cannot be created. Select one or more unique values and try again."
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "32c2b26c-05a8-420b-a0da-5708f8ed0255",
+    "createdon": "2026-10-01T20:15:36Z",
+    "messageblock": "D72 modo=fallo_escritura entransaccion=True etapa=30 profundidad=1 creados=2",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-FALLO: Entity Key KEY - MPPP - Autorizado - Correo violated. A record with the same value for Correo already exists. A duplicate record cannot be created. Select one or more unique values and try again.\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "0d0f17c1-5464-4ec8-8f5c-0a850e55a851"
+   }
+  ]
+ },
+ {
+  "modo": "sistema",
+  "corrida": 1,
+  "marca": "sistema1x141245",
+  "inicio_utc": "2026-10-01T20:15:38Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "c3f6ee2c-9d31-4c28-a2eb-6fab7a0a6ad5",
+    "createdon": "2026-10-01T20:16:06Z",
+    "messageblock": "D72 modo=sistema entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "92c4aefd-a204-42aa-8b24-c498c11c2bec"
+   }
+  ]
+ },
+ {
+  "modo": "sistema",
+  "corrida": 2,
+  "marca": "sistema2x141245",
+  "inicio_utc": "2026-10-01T20:16:09Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "f1274736-e3a3-4514-a910-a9a0a7c75030",
+    "createdon": "2026-10-01T20:16:36Z",
+    "messageblock": "D72 modo=sistema entransaccion=True etapa=30 profundidad=1 creados=3",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "334f68cb-18ef-4ab5-947b-bbebbfb246c5"
+   }
+  ]
+ },
+ {
+  "modo": "mixto",
+  "corrida": 1,
+  "marca": "mixto1x141245",
+  "inicio_utc": "2026-10-01T20:16:39Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "3a738c70-6643-4cf5-83eb-1c0982857545",
+    "createdon": "2026-10-01T20:17:06Z",
+    "messageblock": "D72 modo=mixto entransaccion=True etapa=30 profundidad=1 creados=4",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "e4c0165d-9576-4993-8a77-9acdf83f5a62"
+   }
+  ]
+ },
+ {
+  "modo": "mixto",
+  "corrida": 2,
+  "marca": "mixto2x141245",
+  "inicio_utc": "2026-10-01T20:17:09Z",
+  "http": 400,
+  "respuesta": {
+   "error": "D72-EXCEPCION"
+  },
+  "registros_despues": 0,
+  "nombres": [],
+  "trazas": [
+   {
+    "plugintracelogid": "74e1828b-d538-47d7-aaeb-731a87f0e1bb",
+    "createdon": "2026-10-01T20:17:36Z",
+    "messageblock": "D72 modo=mixto entransaccion=True etapa=30 profundidad=1 creados=4",
+    "exceptiondetails": "System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]: D72-EXCEPCION\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePluginInternal(IRemotePluginRequest pluginRequest, ExecuteRequest executeRequest, Guid executionId, ISandboxFabricDuplexCommunicationHandler communicationHandler, Boolean returnTraceInfo, Guid organizationId, SandboxFabricCallTracker sandboxFabricCallTracker) +0x5d7\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricGrpcClient.ExecutePlugin(IRemotePluginRequest pluginRequest, IPluginExecutionContext executionContext, IPluginTracingService pluginTracingService, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISet`1 earlySerializedPropertiesList, SandboxFabricCallTracker sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x327\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.ExecutePlugin(ILifetimeScope scope, IExecutionContext context, ISandboxFabricDuplexCommunicationHandler communicationHandler, ISandboxClientSettings sandboxClientSettings, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxFabricGrpcClient sandboxFabricGrpcClient, ISandboxMemoryStreamProvider memoryStreamProvider) +0x16\r\nat Microsoft.Xrm.RemotePlugin.Grpc.SandboxFabricCodeUnit.Execute(ILifetimeScope scope, IExecutionContext context, SandboxFabricCallTracker& sandboxFabricCallTracker, ISandboxMemoryStreamProvider memoryStreamProvider) +0x107\r\nat Castle.Proxies.Invocations.ISandboxFabricCodeUnit_Execute.InvokeMethodOnTarget() +0x13\r\nat Castle.DynamicProxy.AbstractInvocation.Proceed() +0x2d\r\nat Microsoft.Xrm.RemotePlugin.Client.Interceptors.SandboxFabricPluginTraceInterceptor.Intercept(IInvocation invocation, IExecutionContext context, SandboxFabricCallTracker sandboxFabricCallTracker) +0x1f",
+    "depth": 1,
+    "mode": 0,
+    "messagename": "sanic_mppp_capi_zzspiked72",
+    "correlationid": "7bcf84db-fb03-4ac6-96ea-aaf849f6c9e2"
+   }
+  ]
+ }
+]
