@@ -1,6 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
+using Sanic.Mppp.Plugins.Catalogos;
+using Sanic.Mppp.Plugins.Datos;
 using Sanic.Mppp.Plugins.Exportacion;
+using Sanic.Mppp.Plugins.Plantilla;
 
 namespace Sanic.Mppp.Plugins.Api
 {
@@ -90,16 +98,210 @@ namespace Sanic.Mppp.Plugins.Api
         /// <summary>120 s del límite síncrono menos 20 de margen, como exportarparadigitar (diseno/03 §1b).</summary>
         public const int PresupuestoSegundos = 100;
 
+        /// <summary>Máximo de filas de una hoja de Excel menos la del encabezado: un valor mayor en el parámetro no cabe en la hoja.</summary>
+        private const int FilasMaximoQueCabenEnLaHoja = 1048575;
+
+        private const string ParametroLimites = "lectura.limites";
+
+        private readonly IOrganizationService _usuario;
+        private readonly IOrganizationService _sistema;
+        private readonly Func<TimeSpan> _transcurrido;
+        private readonly DateTime _hoy;
+
         /// <param name="hoy">La fecha de hoy en Nicaragua (solo fecha): la calcula el envoltorio.</param>
         public CatalogosMasivos(IOrganizationService usuario, IOrganizationService sistema, Func<TimeSpan> transcurrido, DateTime hoy)
-            => throw new NotImplementedException();
+        {
+            _usuario = usuario ?? throw new ArgumentNullException(nameof(usuario));
+            _sistema = sistema ?? throw new ArgumentNullException(nameof(sistema));
+            _transcurrido = transcurrido ?? throw new ArgumentNullException(nameof(transcurrido));
+            _hoy = DateTime.SpecifyKind(hoy.Date, DateTimeKind.Unspecified);
+        }
 
         /// <summary>La plantilla vacía de esa estructura, en base64. No consulta nada.</summary>
-        public string Plantilla(EstructuraDeExcelDeCatalogo estructura) => throw new NotImplementedException();
+        public string Plantilla(EstructuraDeExcelDeCatalogo estructura)
+        {
+            if (estructura == null) throw new ArgumentNullException(nameof(estructura));
+            return Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Plantilla(estructura));
+        }
 
-        public ResultadoDeCargaMasiva Cargar(string archivoBase64) => throw new NotImplementedException();
+        public ResultadoDeCargaMasiva Cargar(string archivoBase64)
+        {
+            var estructura = EstructuraDeExcelDeCatalogo.Carga;
+            var filas = LeerArchivo(archivoBase64, estructura);
 
-        public ResultadoDeCambioMasivo CambiarEstado(string archivoBase64) => throw new NotImplementedException();
+            var foto = new FotoDeCatalogosDataverse(_usuario, _sistema).ParaCarga(ClavesDeCarga.Extraer(filas));
+            var plan = PlanificadorDeCarga.Planificar(filas, foto, _hoy);
+
+            var resultado = Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Resultado(
+                estructura, filas, plan.Filas.ToDictionary(f => f.NumeroFilaExcel, f => f.Texto)));
+            var errores = plan.Filas.Count(f => f.Errores.Count > 0);
+            var advertencias = plan.Filas.Count(f => f.Advertencias.Count > 0);
+
+            // Con errores en alguna fila no se escribe NADA (todo o nada): el plan trae las listas de creación vacías.
+            if (plan.TieneErrores)
+                return new ResultadoDeCargaMasiva(false, resultado, filas.Count, errores, advertencias, 0, 0, 0, 0);
+
+            Escribir(escritor => escritor.Aplicar(plan));
+            return new ResultadoDeCargaMasiva(true, resultado, filas.Count, errores, advertencias,
+                plan.Clientes.Count, plan.Planes.Count, plan.Autorizados.Count, plan.Autorizaciones.Count);
+        }
+
+        public ResultadoDeCambioMasivo CambiarEstado(string archivoBase64)
+        {
+            var estructura = EstructuraDeExcelDeCatalogo.CambioDeEstado;
+            var filas = LeerArchivo(archivoBase64, estructura);
+
+            var foto = new FotoDeCatalogosDataverse(_usuario, _sistema).ParaCambioDeEstado(ClavesDeCambioDeEstado.Extraer(filas));
+            var plan = PlanificadorDeCambioDeEstado.Planificar(filas, foto);
+
+            var resultado = Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Resultado(
+                estructura, filas, plan.Filas.ToDictionary(f => f.NumeroFilaExcel, f => f.Texto)));
+            var errores = plan.Filas.Count(f => f.Errores.Count > 0);
+            var advertencias = plan.Filas.Count(f => f.Advertencias.Count > 0);
+
+            if (plan.TieneErrores)
+                return new ResultadoDeCambioMasivo(false, resultado, filas.Count, errores, advertencias, 0, 0, 0);
+
+            Escribir(escritor => escritor.Aplicar(plan));
+            return new ResultadoDeCambioMasivo(true, resultado, filas.Count, errores, advertencias, plan.Activados, plan.Desactivados, plan.SinCambios);
+        }
+
+        // ============================================================================================ lectura del archivo (MPPP-CAR-001 a 007)
+
+        private IReadOnlyList<FilaPlantilla> LeerArchivo(string archivoBase64, EstructuraDeExcelDeCatalogo estructura)
+        {
+            var bytes = Decodificar(archivoBase64);
+
+            // Los parámetros se leen con SYSTEM: el Administrador de planes no tiene privilegio sobre Parámetro (diseno/04 §2).
+            var parametros = new CatalogosDataverse(_sistema);
+            var maximo = FilasMaximoVigente(parametros.Parametro(ParametroFilasMaximo));
+            var limites = LimitesLectura.DesdeJson(parametros.Parametro(ParametroLimites)?.Valor);
+
+            var lectura = new LectorOpenXml(limites).Leer(bytes, estructura.ConfiguracionDeLectura(maximo));
+            if (!lectura.EsValido)
+                throw RechazoDelLector(lectura, estructura, maximo);
+
+            if (lectura.Filas.Count == 0)
+            {
+                throw new CargaMasivaRechazadaException("MPPP-CAR-007",
+                    "El archivo no tiene ninguna fila con datos. Completá al menos una fila debajo de los encabezados y volvé a subirlo.");
+            }
+
+            return lectura.Filas.ToList();
+        }
+
+        private static byte[] Decodificar(string archivoBase64)
+        {
+            byte[] bytes = null;
+            if (!string.IsNullOrWhiteSpace(archivoBase64))
+            {
+                try
+                {
+                    bytes = Convert.FromBase64String(archivoBase64);
+                }
+                catch (FormatException)
+                {
+                    // No es base64: se rechaza abajo con el mismo código que un archivo vacío.
+                }
+            }
+
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new CargaMasivaRechazadaException("MPPP-CAR-001",
+                    "No llegó un archivo válido. Elegí un archivo de Excel (.xlsx) y volvé a intentarlo.");
+            }
+
+            return bytes;
+        }
+
+        /// <summary>Ausente, no entero o menor que 1: el valor quemado. Mayor que lo que cabe en la hoja: lo que cabe.</summary>
+        private static int FilasMaximoVigente(ParametroLeido parametro)
+        {
+            if (parametro != null
+                && int.TryParse(parametro.Valor == null ? null : parametro.Valor.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var maximo)
+                && maximo >= 1)
+            {
+                return Math.Min(maximo, FilasMaximoQueCabenEnLaHoja);
+            }
+
+            return FilasMaximoPorDefecto;
+        }
+
+        /// <summary>
+        /// El texto es nuestro, en español y sin jerga de la librería. Lo que dijo el lector (el detalle técnico, y qué celda) va como
+        /// excepción interna: el envoltorio la deja en la traza y el usuario nunca la ve.
+        /// </summary>
+        private static CargaMasivaRechazadaException RechazoDelLector(ResultadoLecturaPlantilla lectura, EstructuraDeExcelDeCatalogo estructura, int maximo)
+        {
+            var detalle = new InvalidDataException("El lector rechazó el archivo (" + lectura.Rechazo + "): " + string.Join(" | ", lectura.Errores)
+                + (string.IsNullOrWhiteSpace(lectura.DetalleTecnico) ? string.Empty : ". Detalle técnico: " + lectura.DetalleTecnico));
+
+            switch (lectura.Rechazo)
+            {
+                case TipoDeRechazoLectura.PesoExcedido:
+                    return new CargaMasivaRechazadaException("MPPP-CAR-003",
+                        "El archivo pesa más de lo permitido. Quitale filas o partilo en varios archivos y subí cada uno por separado.", detalle);
+
+                case TipoDeRechazoLectura.HojaInexistente:
+                    return new CargaMasivaRechazadaException("MPPP-CAR-004",
+                        "No existe la hoja '" + estructura.Hoja + "' en el archivo. Descargá la plantilla con la opción \"Descargar plantilla\" y no le cambies el nombre a la hoja.", detalle);
+
+                case TipoDeRechazoLectura.Encabezado:
+                    return new CargaMasivaRechazadaException("MPPP-CAR-005",
+                        "Los encabezados del archivo no coinciden con la plantilla (" + string.Join("; ", lectura.Errores) + "). "
+                        + "Descargá la plantilla y no cambies, agregues ni quites columnas.", detalle);
+
+                case TipoDeRechazoLectura.ColumnaDeMas:
+                    return new CargaMasivaRechazadaException("MPPP-CAR-005",
+                        "El archivo tiene datos en columnas que la plantilla no tiene. " + string.Join(" ", lectura.Errores), detalle);
+
+                case TipoDeRechazoLectura.FilaDeMas:
+                    return new CargaMasivaRechazadaException("MPPP-CAR-006",
+                        "El archivo trae más de " + maximo.ToString(CultureInfo.InvariantCulture) + " filas con datos, que es el máximo por archivo. "
+                        + "Partilo en archivos más chicos y subí cada uno por separado.", detalle);
+
+                default: // ArchivoIlegible, CeldaIlegible, Desorden, SinClasificar
+                    return new CargaMasivaRechazadaException("MPPP-CAR-002",
+                        "El archivo no se pudo leer como un Excel (.xlsx): puede estar dañado o ser de otro formato. "
+                        + "Descargá la plantilla, pasá tus datos ahí y volvé a subirlo.", detalle);
+            }
+        }
+
+        // ============================================================================================ escritura (MPPP-CAR-008 y 009)
+
+        /// <summary>
+        /// Cuenta con el presupuesto ANTES de escribir (no solo dentro del escritor): si la pasada 1 ya se comió los 100 s no se
+        /// empieza. Las dos excepciones dejan subir la falla para que la transacción de la Custom API deshaga lo escrito (D-72), y
+        /// después de atraparlas no se hace NINGUNA llamada más al servicio.
+        /// </summary>
+        private void Escribir(Action<EscritorDeCatalogos> aplicar)
+        {
+            var presupuesto = TimeSpan.FromSeconds(PresupuestoSegundos);
+            if (_transcurrido() >= presupuesto)
+                throw TiempoAgotado(null);
+
+            try
+            {
+                aplicar(new EscritorDeCatalogos(_usuario, _transcurrido, presupuesto));
+            }
+            catch (PresupuestoDeEscrituraAgotadoException ex)
+            {
+                throw TiempoAgotado(ex);
+            }
+            catch (EscrituraDeCatalogoFallidaException ex)
+            {
+                throw new CargaMasivaRechazadaException("MPPP-CAR-009",
+                    "No se pudo grabar la fila " + ex.Fila.ToString(CultureInfo.InvariantCulture) + ": " + (ex.Motivo ?? string.Empty).TrimEnd(' ', '.') + ". "
+                    + "No se grabó nada. Corregí esa fila y volvé a subir el archivo.", ex);
+            }
+        }
+
+        private static CargaMasivaRechazadaException TiempoAgotado(Exception interna)
+        {
+            return new CargaMasivaRechazadaException("MPPP-CAR-008",
+                "Se agotó el tiempo máximo de procesamiento (" + PresupuestoSegundos.ToString(CultureInfo.InvariantCulture) + " segundos) antes de terminar de grabar. "
+                + "No se grabó nada. Partí el archivo en uno más chico y volvé a subirlo.", interna);
+        }
     }
 
     /// <summary>
@@ -126,7 +328,39 @@ namespace Sanic.Mppp.Plugins.Api
         public const string SalidaAutorizacionesCreadas = "autorizacionescreadas";
         public const string MensajeDeErrorGenerico = "No se pudo procesar el archivo. No se grabó nada. El equipo técnico ya tiene el detalle.";
 
-        public void Execute(IServiceProvider serviceProvider) => throw new NotImplementedException();
+        /// <summary>
+        /// Seam SOLO para pruebas (requiere <c>InternalsVisibleTo</c>): si no es null, se usa como reloj en vez del cronómetro real,
+        /// para probar el presupuesto sin esperar 100 s. Producción NUNCA la toca: queda en null.
+        /// </summary>
+        internal static Func<TimeSpan> RelojParaPruebas;
+
+        public void Execute(IServiceProvider serviceProvider)
+            => EjecucionDeCatalogosMasivos.Ejecutar(serviceProvider, "CargarCatalogos", RelojParaPruebas, (nucleo, archivo, plantilla, salidas) =>
+            {
+                if (plantilla)
+                {
+                    SalidasDeCarga(salidas, new ResultadoDeCargaMasiva(false, nucleo.Plantilla(EstructuraDeExcelDeCatalogo.Carga), 0, 0, 0, 0, 0, 0, 0));
+                    return "plantilla entregada";
+                }
+
+                var r = nucleo.Cargar(archivo);
+                SalidasDeCarga(salidas, r);
+                return "grabado=" + r.Grabado.ToString() + ", filas=" + r.Filas.ToString(CultureInfo.InvariantCulture)
+                    + ", errores=" + r.Errores.ToString(CultureInfo.InvariantCulture) + ", advertencias=" + r.Advertencias.ToString(CultureInfo.InvariantCulture);
+            });
+
+        private static void SalidasDeCarga(ParameterCollection salidas, ResultadoDeCargaMasiva r)
+        {
+            salidas[SalidaGrabado] = r.Grabado;
+            salidas[SalidaResultado] = r.ResultadoBase64;
+            salidas[SalidaFilas] = r.Filas;
+            salidas[SalidaErrores] = r.Errores;
+            salidas[SalidaAdvertencias] = r.Advertencias;
+            salidas[SalidaClientesCreados] = r.ClientesCreados;
+            salidas[SalidaPlanesCreados] = r.PlanesCreados;
+            salidas[SalidaCorreosCreados] = r.CorreosCreados;
+            salidas[SalidaAutorizacionesCreadas] = r.AutorizacionesCreadas;
+        }
     }
 
     /// <summary>Envoltorio de sanic_mppp_capi_cambiarestadocatalogos. Mismo contrato que <see cref="CargarCatalogosApi"/>.</summary>
@@ -136,6 +370,104 @@ namespace Sanic.Mppp.Plugins.Api
         public const string SalidaDesactivados = "desactivados";
         public const string SalidaSinCambios = "sincambios";
 
-        public void Execute(IServiceProvider serviceProvider) => throw new NotImplementedException();
+        /// <summary>Seam SOLO para pruebas: igual que <see cref="CargarCatalogosApi.RelojParaPruebas"/>.</summary>
+        internal static Func<TimeSpan> RelojParaPruebas;
+
+        public void Execute(IServiceProvider serviceProvider)
+            => EjecucionDeCatalogosMasivos.Ejecutar(serviceProvider, "CambiarEstadoCatalogos", RelojParaPruebas, (nucleo, archivo, plantilla, salidas) =>
+            {
+                if (plantilla)
+                {
+                    SalidasDeCambio(salidas, new ResultadoDeCambioMasivo(false, nucleo.Plantilla(EstructuraDeExcelDeCatalogo.CambioDeEstado), 0, 0, 0, 0, 0, 0));
+                    return "plantilla entregada";
+                }
+
+                var r = nucleo.CambiarEstado(archivo);
+                SalidasDeCambio(salidas, r);
+                return "grabado=" + r.Grabado.ToString() + ", filas=" + r.Filas.ToString(CultureInfo.InvariantCulture)
+                    + ", errores=" + r.Errores.ToString(CultureInfo.InvariantCulture) + ", advertencias=" + r.Advertencias.ToString(CultureInfo.InvariantCulture);
+            });
+
+        private static void SalidasDeCambio(ParameterCollection salidas, ResultadoDeCambioMasivo r)
+        {
+            salidas[CargarCatalogosApi.SalidaGrabado] = r.Grabado;
+            salidas[CargarCatalogosApi.SalidaResultado] = r.ResultadoBase64;
+            salidas[CargarCatalogosApi.SalidaFilas] = r.Filas;
+            salidas[CargarCatalogosApi.SalidaErrores] = r.Errores;
+            salidas[CargarCatalogosApi.SalidaAdvertencias] = r.Advertencias;
+            salidas[SalidaActivados] = r.Activados;
+            salidas[SalidaDesactivados] = r.Desactivados;
+            salidas[SalidaSinCambios] = r.SinCambios;
+        }
+    }
+
+    /// <summary>
+    /// Lo común a los dos envoltorios: proveedor de servicios, reloj del presupuesto (arranca al entrar), "hoy" en Nicaragua, los
+    /// dos servicios (el del usuario que llama para los catálogos y SYSTEM para parámetros, usuarios y roles), MPPP-CAR-010 y la
+    /// traducción de excepciones. Un <see cref="CargaMasivaRechazadaException"/> sale con su mensaje tal cual y con su detalle técnico
+    /// en la traza; cualquier otra excepción va a la traza completa y sale con el mensaje genérico.
+    /// </summary>
+    internal static class EjecucionDeCatalogosMasivos
+    {
+        internal static void Ejecutar(IServiceProvider serviceProvider, string nombre, Func<TimeSpan> relojParaPruebas,
+            Func<CatalogosMasivos, string, bool, ParameterCollection, string> trabajo)
+        {
+            // El presupuesto de tiempo corre desde que entra la llamada (diseno/03 §1b).
+            var cronometro = Stopwatch.StartNew();
+
+            if (serviceProvider == null)
+                throw new InvalidPluginExecutionException("No se recibió el proveedor de servicios del plugin.");
+
+            var contexto = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+            var fabrica = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+            var trace = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+            if (contexto == null || fabrica == null || trace == null)
+                throw new InvalidPluginExecutionException("Faltan servicios de la plataforma para ejecutar la Custom API.");
+
+            try
+            {
+                var archivo = contexto.InputParameters.Contains(CargarCatalogosApi.ParametroArchivo)
+                    ? contexto.InputParameters[CargarCatalogosApi.ParametroArchivo] as string
+                    : null;
+                var plantilla = contexto.InputParameters.Contains(CargarCatalogosApi.ParametroPlantilla)
+                    && contexto.InputParameters[CargarCatalogosApi.ParametroPlantilla] is bool pedida && pedida;
+
+                // Un archivo vacío no es un archivo: con plantilla = true y archivo en blanco se entrega la plantilla.
+                if (plantilla && !string.IsNullOrWhiteSpace(archivo))
+                {
+                    throw new CargaMasivaRechazadaException("MPPP-CAR-010",
+                        "Llegaron a la vez el pedido de la plantilla y un archivo, y no se puede adivinar cuál de las dos cosas querés. Pedí una sola por vez.");
+                }
+
+                trace.Trace("{0}", nombre + ": empieza. plantilla=" + plantilla.ToString() + ".");
+
+                // Nicaragua es UTC-6 todo el año, sin horario de verano (DN-04): "hoy" es esa fecha, no la del servidor.
+                var hoy = DateTime.SpecifyKind(DateTime.UtcNow.AddHours(-6).Date, DateTimeKind.Unspecified);
+                var reloj = relojParaPruebas; // una sola lectura: evita una carrera si una prueba lo cambia a mitad de camino
+                var nucleo = new CatalogosMasivos(
+                    fabrica.CreateOrganizationService(contexto.UserId),
+                    fabrica.CreateOrganizationService(null),
+                    reloj ?? (() => cronometro.Elapsed),
+                    hoy);
+
+                var resumen = trabajo(nucleo, archivo, plantilla, contexto.OutputParameters);
+                trace.Trace("{0}", nombre + ": termina. " + resumen + ".");
+            }
+            catch (InvalidPluginExecutionException)
+            {
+                throw;
+            }
+            catch (CargaMasivaRechazadaException ex)
+            {
+                // El texto es para el usuario; el detalle técnico (qué dijo el lector o Dataverse) queda para la traza.
+                trace.Trace("{0}", nombre + ": rechazo " + ex.Codigo + (ex.InnerException == null ? "." : ". Detalle: " + ex.InnerException));
+                throw new InvalidPluginExecutionException(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                trace.Trace("{0}", ex.ToString());
+                throw new InvalidPluginExecutionException(CargarCatalogosApi.MensajeDeErrorGenerico);
+            }
+        }
     }
 }
