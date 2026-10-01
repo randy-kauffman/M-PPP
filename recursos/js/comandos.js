@@ -108,7 +108,19 @@ Sanic.Mppp.Comandos = (function () {
             sinMotivo: "No reason was entered. Nothing was changed.",
             progreso: "Applying \"{accion}\"\u2026 {hechas} of {n}",
             descargando: "Preparing the Excel file\u2026",
-            errorDescarga: "The file could not be prepared:"
+            errorDescarga: "The file could not be prepared:",
+            // DN-04: carga y cambio de estado masivos de catalogos. Los textos del
+            // resumen son los que fija el contrato (DIRECTRICES-NUEVAS, DN-04).
+            leyendo: "Reading the file\u2026",
+            validando: "Validating and loading the file\u2026 it may take up to 2 minutes",
+            preparando: "Preparing the result\u2026",
+            generandoPlantilla: "Generating the template\u2026",
+            extensionInvalida: "The file must be an Excel workbook (.xlsx). Nothing was sent.",
+            sinArchivo: "The server did not return a file.",
+            cargaGrabada: "Load finished: {clientes} clients, {planes} plans, {correos} emails and {autorizaciones} authorizations created.",
+            estadoGrabado: "Status change finished: {activados} activated, {desactivados} deactivated and {sincambios} unchanged.",
+            conAdvertencias: "{advertencias} rows with warnings: check the result file.",
+            noGrabado: "Nothing was saved: {errores} rows with errors. Check the Result column of the downloaded file, fix it and upload it again."
         },
         3082: {
             confirmar: "¿Aplicar \"{accion}\" a {n} fila(s) seleccionada(s)?",
@@ -122,7 +134,17 @@ Sanic.Mppp.Comandos = (function () {
             sinMotivo: "No se escribio ningun motivo. No se cambio nada.",
             progreso: "Aplicando \"{accion}\"\u2026 {hechas} de {n}",
             descargando: "Preparando el archivo de Excel\u2026",
-            errorDescarga: "No se pudo preparar el archivo:"
+            errorDescarga: "No se pudo preparar el archivo:",
+            leyendo: "Leyendo el archivo\u2026",
+            validando: "Validando y cargando el archivo\u2026 puede tardar hasta 2 minutos",
+            preparando: "Preparando el resultado\u2026",
+            generandoPlantilla: "Generando la plantilla\u2026",
+            extensionInvalida: "El archivo tiene que ser un libro de Excel (.xlsx). No se envi\u00f3 nada.",
+            sinArchivo: "El servidor no devolvi\u00f3 ning\u00fan archivo.",
+            cargaGrabada: "Carga terminada: {clientes} clientes, {planes} planes, {correos} correos y {autorizaciones} autorizaciones creados.",
+            estadoGrabado: "Cambio de estado terminado: {activados} activados, {desactivados} desactivados y {sincambios} sin cambios.",
+            conAdvertencias: "{advertencias} filas con advertencias: revis\u00e1 el archivo de resultado.",
+            noGrabado: "No se grab\u00f3 nada: {errores} filas con errores. Revis\u00e1 la columna Resultado del archivo que se descarg\u00f3, correg\u00ed y volv\u00e9 a subirlo."
         }
     };
 
@@ -529,6 +551,23 @@ Sanic.Mppp.Comandos = (function () {
         return Math.max(1, Math.ceil(bytesAproximados / 1024));
     }
 
+    /*
+     * Descarga un `.xlsx` que viene en base64. Una sola copia para "Descargar para
+     * digitar" (DN-02) y para los menus de catalogos (DN-04): mismo
+     * `Xrm.Navigation.openFile` con `openMode: 2` (guardar), ya probado.
+     */
+    function abrirXlsx(base64, nombre) {
+        return Xrm.Navigation.openFile(
+            {
+                fileContent: base64,
+                fileName: nombre,
+                fileSize: tamanioEnKbDesdeBase64(base64),
+                mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            },
+            { openMode: 2 } // 2 = guardar (Learn, "openFile")
+        );
+    }
+
     function descargarParaDigitar(ids, control) {
         var t = idioma();
         if (!ids || !ids.length) {
@@ -540,15 +579,7 @@ Sanic.Mppp.Comandos = (function () {
                 return respuesta.json();
             });
         }).then(function (resultado) {
-            return Xrm.Navigation.openFile(
-                {
-                    fileContent: resultado.archivo,
-                    fileName: nombreDeArchivoExportacion(),
-                    fileSize: tamanioEnKbDesdeBase64(resultado.archivo),
-                    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                },
-                { openMode: 2 } // 2 = guardar (Learn, "openFile")
-            );
+            return abrirXlsx(resultado.archivo, nombreDeArchivoExportacion());
         }, function (error) {
             // Los dos rechazos de negocio (FilasNoEncontradasException,
             // PresupuestoDeExportacionAgotandoseException) llegan con su mensaje
@@ -561,6 +592,269 @@ Sanic.Mppp.Comandos = (function () {
                 confirmButtonLabel: t.cerrar
             });
         });
+    }
+
+    /*
+     * --- Carga masiva y cambio de estado masivo de catalogos (DN-04) ---
+     *
+     * Contrato: `diseno/DIRECTRICES-NUEVAS.md`, DN-04, "Contrato del JS". Igual que
+     * "Descargar para digitar", NO usa `ejecutar`/`aplicar`: es UNA llamada a una
+     * Custom API (Action, unbound) que lee, valida y graba todo el archivo en el
+     * servidor, todo o nada. El JS solo lleva el archivo, muestra el resultado y
+     * refresca. La logica de negocio vive en el plugin (DA-07).
+     */
+    var ROL_ADMINISTRADOR_DE_PLANES = "SR - MPPP - Administrador de planes";
+
+    var CATALOGOS = {
+        carga: {
+            api: "sanic_mppp_capi_cargarcatalogos",
+            plantilla: "CargaCatalogos.xlsx",
+            resumen: "cargaGrabada"
+        },
+        estado: {
+            api: "sanic_mppp_capi_cambiarestadocatalogos",
+            plantilla: "ActivarDesactivar.xlsx",
+            resumen: "estadoGrabado"
+        }
+    };
+
+    /*
+     * La Custom API como Action, mismo patron que `pedidoExportarParaDigitar`.
+     * Los parametros son opcionales (`archivo` o `plantilla`), asi que solo se
+     * declaran en `parameterTypes` los que realmente viajan: no se manda un
+     * parametro sin valor. `structuralProperty: 1` = tipo primitivo (Learn,
+     * "Xrm.WebApi.online.execute"); el 4 de `filaids` era una coleccion.
+     */
+    function pedidoCatalogos(config, parametros) {
+        var pedido = {};
+        var tipos = {};
+        if (parametros.archivo !== undefined) {
+            pedido.archivo = parametros.archivo;
+            tipos.archivo = { typeName: "Edm.String", structuralProperty: 1 };
+        }
+        if (parametros.plantilla !== undefined) {
+            pedido.plantilla = parametros.plantilla;
+            tipos.plantilla = { typeName: "Edm.Boolean", structuralProperty: 1 };
+        }
+        pedido.getMetadata = function () {
+            return {
+                boundParameter: null,
+                parameterTypes: tipos,
+                operationType: 0, // Action (Learn: 0 Action, 1 Function, 2 CRUD)
+                operationName: config.api
+            };
+        };
+        return pedido;
+    }
+
+    function mensajeDeError(error) {
+        // Los MPPP-CAR-00x llegan con su texto en `error.message` y se muestran TAL
+        // CUAL (DN-04): el texto ya dice que paso y que hacer.
+        return (error && error.message) || String(error);
+    }
+
+    function avisarError(error) {
+        return Xrm.Navigation.openAlertDialog({
+            text: mensajeDeError(error),
+            confirmButtonLabel: idioma().cerrar
+        });
+    }
+
+    /* El archivo entero en base64, SIN el prefijo `data:...;base64,` que agrega el FileReader. */
+    function archivoABase64(archivo) {
+        return new Promise(function (resolver, rechazar) {
+            var lector = new FileReader();
+            lector.onload = function () {
+                var url = String(lector.result || "");
+                resolver(url.substring(url.indexOf(",") + 1));
+            };
+            lector.onerror = function () {
+                rechazar(lector.error || new Error(String(archivo && archivo.name)));
+            };
+            lector.readAsDataURL(archivo);
+        });
+    }
+
+    // `<nombre original sin extension>-resultado.xlsx`. La extension ya se validó.
+    function nombreDelResultado(nombreOriginal) {
+        return String(nombreOriginal).replace(/\.xlsx$/i, "") + "-resultado.xlsx";
+    }
+
+    /*
+     * El selector que quedo de una llamada anterior. Si el navegador no dispara
+     * `cancel` (los viejos no lo hacen), el `input` quedaria en el documento; se
+     * retira al abrir el siguiente para que nunca se acumulen.
+     */
+    var selectorPendiente = null;
+
+    function retirarSelector() {
+        if (selectorPendiente && selectorPendiente.parentNode) {
+            selectorPendiente.parentNode.removeChild(selectorPendiente);
+        }
+        selectorPendiente = null;
+    }
+
+    /*
+     * Abre el selector de archivo. SINCRONICO a proposito: el navegador solo
+     * permite `input.click()` dentro del gesto del usuario, y un `await` o un
+     * `then` antes lo deja fuera del gesto (indicacion del arquitecto, DN-04). Por
+     * eso se llama directo desde la funcion que invoca el ribbon, sin nada en medio.
+     *
+     * Se agrega al `document` porque en algunos navegadores un `input` suelto no
+     * dispara `change`, y se saca al terminar. Cancelar no hace nada: no hay promesa
+     * que quede colgada, solo un manejador que nunca se llama.
+     *
+     * Mientras el selector esta abierto NO hay indicador (DN-04): arranca cuando llega
+     * el archivo.
+     */
+    function elegirArchivo(alElegir) {
+        retirarSelector();
+        var entrada = document.createElement("input");
+        entrada.type = "file";
+        entrada.accept = ".xlsx";
+        entrada.style.display = "none";
+        entrada.addEventListener("change", function () {
+            var archivo = entrada.files && entrada.files[0];
+            if (entrada === selectorPendiente) { retirarSelector(); }
+            if (archivo) { alElegir(archivo); }
+        });
+        entrada.addEventListener("cancel", function () {
+            if (entrada === selectorPendiente) { retirarSelector(); }
+        });
+        selectorPendiente = entrada;
+        document.body.appendChild(entrada);
+        entrada.click();
+    }
+
+    function textoDelResumen(t, config, salida) {
+        var n = function (valor) { return valor || 0; };
+        if (!salida.grabado) {
+            return armar(t.noGrabado, { errores: n(salida.errores) });
+        }
+        var texto = config.resumen === "cargaGrabada"
+            ? armar(t.cargaGrabada, {
+                clientes: n(salida.clientescreados),
+                planes: n(salida.planescreados),
+                correos: n(salida.correoscreados),
+                autorizaciones: n(salida.autorizacionescreadas)
+            })
+            : armar(t.estadoGrabado, {
+                activados: n(salida.activados),
+                desactivados: n(salida.desactivados),
+                sincambios: n(salida.sincambios)
+            });
+        if (salida.advertencias > 0) {
+            texto = texto + " " + armar(t.conAdvertencias, { advertencias: salida.advertencias });
+        }
+        return texto;
+    }
+
+    /*
+     * Lo que pasa DESPUES de elegir el archivo: indicador por etapa (un mensaje por
+     * etapa, no un porcentaje: DN-04 decision 10), la Custom API, la descarga del
+     * resultado, el resumen y el refresco de la grilla.
+     *
+     * Si la API falla (los MPPP-CAR) no hay Excel de resultado: se muestra el texto
+     * del error y nada mas. Si falla SOLO la descarga, la carga ya esta grabada: no
+     * se esconde el resumen detras de un error de descarga; se muestran los dos.
+     */
+    function procesarArchivo(config, archivo, control) {
+        var t = idioma();
+        return conProgreso(t.leyendo, function () {
+            return archivoABase64(archivo).then(function (base64) {
+                mostrarProgreso(t.validando);
+                return Xrm.WebApi.online.execute(pedidoCatalogos(config, { archivo: base64 }));
+            }).then(function (respuesta) {
+                return respuesta.json();
+            }).then(function (salida) {
+                if (!salida || !salida.resultado) {
+                    return { salida: salida || {}, falloDescarga: null };
+                }
+                mostrarProgreso(t.preparando);
+                return abrirXlsx(salida.resultado, nombreDelResultado(archivo.name)).then(
+                    function () { return { salida: salida, falloDescarga: null }; },
+                    function (error) { return { salida: salida, falloDescarga: mensajeDeError(error) }; }
+                );
+            });
+        }).then(function (resultado) {
+            if (resultado.salida.grabado) {
+                refrescar(control);
+            }
+            var texto = textoDelResumen(t, config, resultado.salida);
+            if (resultado.falloDescarga) {
+                texto = texto + "\n\n" + t.errorDescarga + " " + resultado.falloDescarga;
+            }
+            return Xrm.Navigation.openAlertDialog({ text: texto, confirmButtonLabel: t.cerrar });
+        }).then(null, avisarError);
+    }
+
+    function cargarArchivoDeCatalogos(config, control) {
+        elegirArchivo(function (archivo) {
+            // Por la extension, sin distinguir mayusculas, ANTES de leerlo o llamar a la API.
+            if (!/\.xlsx$/i.test(String(archivo.name))) {
+                Xrm.Navigation.openAlertDialog({
+                    text: idioma().extensionInvalida,
+                    confirmButtonLabel: idioma().cerrar
+                });
+                return;
+            }
+            procesarArchivo(config, archivo, control);
+        });
+    }
+
+    function descargarPlantillaDeCatalogos(config) {
+        var t = idioma();
+        return conProgreso(t.generandoPlantilla, function () {
+            return Xrm.WebApi.online.execute(pedidoCatalogos(config, { plantilla: true })).then(function (respuesta) {
+                return respuesta.json();
+            }).then(function (salida) {
+                if (!salida || !salida.resultado) {
+                    throw new Error(t.sinArchivo);
+                }
+                return abrirXlsx(salida.resultado, config.plantilla);
+            });
+        }).then(null, avisarError);
+    }
+
+    /*
+     * Los roles del usuario, sea cual sea la forma en que el cliente los entregue:
+     * un array, o una Collection con `getAll()` o con `getLength()` + `get(i)`
+     * (misma cautela que `filasDeLaGrilla`).
+     */
+    function rolesDelUsuario() {
+        var roles = Xrm.Utility.getGlobalContext().userSettings.roles;
+        if (!roles) { return []; }
+        if (Array.isArray(roles)) { return roles; }
+        if (typeof roles.getAll === "function") { return roles.getAll() || []; }
+        var lista = [];
+        var cuantos = typeof roles.getLength === "function" ? roles.getLength() : 0;
+        for (var i = 0; i < cuantos; i++) {
+            lista.push(roles.get(i));
+        }
+        return lista;
+    }
+
+    /*
+     * Regla de visibilidad del ancla y de las opciones de los menus (DN-04).
+     *
+     * ANTE LA DUDA, `false` (al reves que `algunaAdmite`, que muestra). Alli un boton
+     * oculto de mas deja a alguien sin poder trabajar; aca ocultar no le quita nada a
+     * quien deba verlo, porque la puerta real es el privilegio de la Custom API
+     * (`prvCreate`/`prvWrite` sobre Cliente, que solo tiene el Administrador de
+     * planes): quien no lo tiene recibiria un rechazo del servidor igual.
+     */
+    function esAdministradorDePlanes(control) {
+        try {
+            var roles = rolesDelUsuario();
+            for (var i = 0; i < roles.length; i++) {
+                if (roles[i] && roles[i].name === ROL_ADMINISTRADOR_DE_PLANES) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
     }
 
     return {
@@ -639,6 +933,13 @@ Sanic.Mppp.Comandos = (function () {
                 { sanic_requiereatencionmanual: false }, ids, control);
         },
         descargarParaDigitar: descargarParaDigitar,
+
+        // --- DN-04: menus de catalogos (el selector se abre SINCRONICAMENTE en el clic) ---
+        esAdministradorDePlanes: esAdministradorDePlanes,
+        cargarCatalogos: function (control) { cargarArchivoDeCatalogos(CATALOGOS.carga, control); },
+        cambiarEstadoCatalogos: function (control) { cargarArchivoDeCatalogos(CATALOGOS.estado, control); },
+        plantillaCarga: function (control) { return descargarPlantillaDeCatalogos(CATALOGOS.carga); },
+        plantillaCambioEstado: function (control) { return descargarPlantillaDeCatalogos(CATALOGOS.estado); },
 
         /*
          * --- las reglas del ribbon (EnableRule / CustomRule) ---
