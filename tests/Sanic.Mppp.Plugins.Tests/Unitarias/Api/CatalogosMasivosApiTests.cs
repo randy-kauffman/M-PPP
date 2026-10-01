@@ -18,6 +18,7 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Api
     /// del envoltorio con el reloj de pruebas, la traza (el detalle técnico NUNCA llega al usuario, va a la traza), los textos de
     /// los MPPP-CAR que nombran un dato vigente, la versión activa más alta de los parámetros y "hoy" en Nicaragua.
     /// </summary>
+    [Collection(ColeccionesDePrueba.RelojDeApi)]
     public class CatalogosMasivosApiTests
     {
         private static readonly DateTime Hoy = new DateTime(2026, 10, 1);
@@ -127,14 +128,25 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Api
         }
 
         [Fact]
-        public void Con_la_pasada_1_ya_pasada_del_presupuesto_responde_008_aunque_no_haya_nada_que_escribir()
+        public void Con_la_pasada_1_ya_pasada_del_presupuesto_y_algo_que_escribir_responde_008_sin_escribir()
         {
-            // Cuenta con el presupuesto ANTES de escribir, no solo dentro del escritor: este archivo no escribe nada (todo ya existe),
-            // así que el escritor no mira el reloj nunca, y solo la comprobación del núcleo puede dar el 008.
+            // Cuenta con el presupuesto ANTES de escribir, no solo dentro del escritor: el 008 sale sin una sola escritura.
             var cat = Catalogos();
             var n = Nucleo(cat, Sistema(), () => TimeSpan.FromSeconds(CatalogosMasivos.PresupuestoSegundos));
-            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => n.Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, Fila(2, ("A", "123")))));
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => n.Cargar(ArchivoDeUnaFilaQueCrea()));
             Assert.Equal("MPPP-CAR-008", ex.Codigo);
+            Assert.Empty(Escrituras(cat));
+        }
+
+        [Fact]
+        public void Si_no_hay_nada_que_escribir_el_presupuesto_no_se_mira_ni_en_el_cambio_de_estado()
+        {
+            // Revisión 4c: sin escrituras no hay nada que perder por el tiempo, así que se devuelve el resultado.
+            var cat = Catalogos();
+            var n = Nucleo(cat, Sistema(), () => TimeSpan.FromMinutes(5));
+            var r = n.CambiarEstado(Archivo(EstructuraDeExcelDeCatalogo.CambioDeEstado, Fila(2, ("A", "CLIENTE"), ("B", "ACTIVAR"), ("C", "123"))));   // ya estaba activo
+            Assert.True(r.Grabado);
+            Assert.Equal((1, 0, 0, 0, 1), (r.Filas, r.Errores, r.Activados, r.Desactivados, r.SinCambios));
             Assert.Empty(Escrituras(cat));
         }
 
@@ -360,6 +372,86 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Api
         {
             Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(null));
             Assert.Throws<InvalidPluginExecutionException>(() => new CambiarEstadoCatalogosApi().Execute(null));
+        }
+
+        // ------------------------------------------------------------------------------------------ revisión 4c
+        [Fact]
+        public void El_tope_de_peso_justo_no_da_003_y_un_byte_menos_si()
+        {
+            var archivo = Archivo(EstructuraDeExcelDeCatalogo.Carga, Fila(2, ("A", "123")));
+            var bytes = Convert.FromBase64String(archivo).Length;
+
+            string limites(long comprimido) => @"{""maximoBytesComprimido"":" + comprimido.ToString(CultureInfo.InvariantCulture) + @",""maximoBytesDescomprimido"":20000000}";
+            Assert.True(Nucleo(Catalogos(), Sistema(Parametro("lectura.limites", 1, limites(bytes)))).Cargar(archivo).Grabado);
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(Catalogos(), Sistema(Parametro("lectura.limites", 1, limites(bytes - 1)))).Cargar(archivo));
+            Assert.Equal("MPPP-CAR-003", ex.Codigo);
+        }
+
+        [Fact]
+        public void Un_texto_enorme_e_invalido_da_003_y_uno_chico_e_invalido_001_sin_decodificar_el_enorme()
+        {
+            var sistema = Sistema(Parametro("lectura.limites", 1, @"{""maximoBytesComprimido"":300}"));
+            Assert.Equal("MPPP-CAR-003", Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(Catalogos(), sistema).Cargar(new string('A', 5000) + "!")).Codigo);
+            Assert.Equal("MPPP-CAR-001", Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(Catalogos(), sistema).Cargar("AAAA!")).Codigo);
+        }
+
+        [Fact]
+        public void El_motivo_del_009_se_recorta_sin_partir_un_par_subrogado_y_la_traza_lo_trae_entero()
+        {
+            var motivo = new string('x', 298) + "\U0001F600" + new string('y', 200);   // el par subrogado cae justo en el corte
+            var falla = new ServicioQueFalla(Catalogos(), motivo);
+            var (fabrica, _) = Envoltorio(null, Sistema(), ("archivo", ArchivoDeUnaFilaQueCrea()));
+            fabrica.UsuarioPersonalizado = falla;
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica));
+
+            Assert.StartsWith("MPPP-CAR-009: ", ex.Message);
+            Assert.Contains("\u2026", ex.Message);
+            Assert.Contains("No se grabó nada", ex.Message);
+            Assert.True(ex.Message.Length < 600, ex.Message.Length.ToString(CultureInfo.InvariantCulture));
+            for (var i = 0; i < ex.Message.Length; i++)
+            {
+                if (char.IsHighSurrogate(ex.Message[i])) Assert.True(i + 1 < ex.Message.Length && char.IsLowSurrogate(ex.Message[i + 1]), "par subrogado partido");
+                if (char.IsLowSurrogate(ex.Message[i])) Assert.True(i > 0 && char.IsHighSurrogate(ex.Message[i - 1]), "par subrogado partido");
+            }
+
+            Assert.Contains(motivo, fabrica.Traza.Todo);   // el detalle completo queda en la traza
+        }
+
+        [Fact]
+        public void Un_motivo_corto_del_009_no_se_toca()
+        {
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(new ServicioQueFalla(Catalogos(), "Entity Key violated."), Sistema()).Cargar(ArchivoDeUnaFilaQueCrea()));
+            Assert.Contains("Entity Key violated. No se grabó nada", ex.Message);
+            Assert.DoesNotContain("\u2026", ex.Message);
+        }
+
+        [Fact]
+        public void Un_error_de_Excel_en_la_columna_Resultado_no_se_lee_ni_rechaza_el_archivo()
+        {
+            // La columna Resultado es solo de salida (DN-04): un archivo de resultado que el usuario corrigió y vuelve a subir puede
+            // traer cualquier cosa ahí, y el aviso del lector sobre esa columna no es un error de la fila.
+            var e = EstructuraDeExcelDeCatalogo.Carga;
+            var archivo = Convert.ToBase64String(XlsxCrudo.ConFilas(e.Hoja,
+                XlsxCrudo.Fila(1, e.Columnas.Select(c => XlsxCrudo.Celda(c.Letra + "1", c.Encabezado)).ToArray()),
+                XlsxCrudo.Fila(2, XlsxCrudo.Celda("A2", "123"), "<c r=\"" + e.ColumnaResultado.Letra + "2\" t=\"e\"><v>#REF!</v></c>")));
+            var r = Nucleo(Catalogos(), Sistema()).Cargar(archivo);
+            Assert.Equal(0, r.Errores);
+            Assert.True(r.Grabado);
+        }
+
+        [Fact]
+        public void Un_error_de_Excel_en_el_cambio_de_estado_no_se_graba_en_silencio()
+        {
+            var e = EstructuraDeExcelDeCatalogo.CambioDeEstado;
+            var archivo = Convert.ToBase64String(XlsxCrudo.ConFilas(e.Hoja,
+                XlsxCrudo.Fila(1, e.Columnas.Select(c => XlsxCrudo.Celda(c.Letra + "1", c.Encabezado)).ToArray()),
+                XlsxCrudo.Fila(2, XlsxCrudo.Celda("A2", "CLIENTE"), XlsxCrudo.Celda("B2", "DESACTIVAR"), XlsxCrudo.Celda("C2", "123"),
+                    "<c r=\"F2\" t=\"e\"><v>#N/A</v></c>")));
+            var cat = Catalogos();
+            var r = Nucleo(cat, Sistema()).CambiarEstado(archivo);
+            Assert.False(r.Grabado);
+            Assert.Equal(1, r.Errores);
+            Assert.Empty(Escrituras(cat));
         }
 
         // ------------------------------------------------------------------------------------------ dobles

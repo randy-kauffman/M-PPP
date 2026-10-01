@@ -476,12 +476,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         /// FIRMA DEL ARQUITECTO.
         /// </summary>
         public static PlanDeCarga Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, DateTime hoy, IReadOnlyList<AdvertenciaLectura> avisos)
-            => throw new NotImplementedException();
-
-        public static PlanDeCarga Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, DateTime hoy)
         {
             if (filas == null) throw new ArgumentNullException(nameof(filas));
             if (estado == null) throw new ArgumentNullException(nameof(estado));
+            if (avisos == null) throw new ArgumentNullException(nameof(avisos));
 
             // Se lee todo antes de planificar: de acá en adelante no se vuelve a tocar nada de lo que entregó quien llamó.
             var leidas = new List<FilaDeTrabajo>(filas.Count);
@@ -496,7 +494,11 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 leidas.Add(LectorDeFilaDeCarga.Leer(fila, leidas.Count, hoy));
             }
 
+            AvisosDelLector.Aplicar(avisos, ColumnasDeCarga.Todas, leidas);
             return new Planificacion(leidas, estado).Ejecutar();
         }
+
+        public static PlanDeCarga Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, DateTime hoy)
+            => Planificar(filas, estado, hoy, new AdvertenciaLectura[0]);
     }
 }

@@ -103,6 +103,12 @@ namespace Sanic.Mppp.Plugins.Api
 
         private const string ParametroLimites = "lectura.limites";
 
+        /// <summary>Holgura sobre 4*ceil(tope/3) para no rechazar por el relleno ni por un salto de línea suelto.</summary>
+        private const int MargenDeCaracteresDeBase64 = 16;
+
+        /// <summary>Lo más que se muestra del motivo de Dataverse en el 009; el detalle completo va a la traza.</summary>
+        private const int MaximoDeCaracteresDelMotivo = 300;
+
         private readonly IOrganizationService _usuario;
         private readonly IOrganizationService _sistema;
         private readonly Func<TimeSpan> _transcurrido;
@@ -127,10 +133,10 @@ namespace Sanic.Mppp.Plugins.Api
         public ResultadoDeCargaMasiva Cargar(string archivoBase64)
         {
             var estructura = EstructuraDeExcelDeCatalogo.Carga;
-            var filas = LeerArchivo(archivoBase64, estructura);
+            var filas = LeerArchivo(archivoBase64, estructura, out var avisos);
 
             var foto = new FotoDeCatalogosDataverse(_usuario, _sistema).ParaCarga(ClavesDeCarga.Extraer(filas));
-            var plan = PlanificadorDeCarga.Planificar(filas, foto, _hoy);
+            var plan = PlanificadorDeCarga.Planificar(filas, foto, _hoy, avisos);
 
             var resultado = Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Resultado(
                 estructura, filas, plan.Filas.ToDictionary(f => f.NumeroFilaExcel, f => f.Texto)));
@@ -141,7 +147,9 @@ namespace Sanic.Mppp.Plugins.Api
             if (plan.TieneErrores)
                 return new ResultadoDeCargaMasiva(false, resultado, filas.Count, errores, advertencias, 0, 0, 0, 0);
 
-            Escribir(escritor => escritor.Aplicar(plan));
+            // Sin nada que escribir no hay nada que perder por el tiempo: se devuelve el resultado, sin mirar el presupuesto.
+            if (plan.Clientes.Count + plan.Planes.Count + plan.Autorizados.Count + plan.Autorizaciones.Count > 0)
+                Escribir(escritor => escritor.Aplicar(plan));
             return new ResultadoDeCargaMasiva(true, resultado, filas.Count, errores, advertencias,
                 plan.Clientes.Count, plan.Planes.Count, plan.Autorizados.Count, plan.Autorizaciones.Count);
         }
@@ -149,10 +157,10 @@ namespace Sanic.Mppp.Plugins.Api
         public ResultadoDeCambioMasivo CambiarEstado(string archivoBase64)
         {
             var estructura = EstructuraDeExcelDeCatalogo.CambioDeEstado;
-            var filas = LeerArchivo(archivoBase64, estructura);
+            var filas = LeerArchivo(archivoBase64, estructura, out var avisos);
 
             var foto = new FotoDeCatalogosDataverse(_usuario, _sistema).ParaCambioDeEstado(ClavesDeCambioDeEstado.Extraer(filas));
-            var plan = PlanificadorDeCambioDeEstado.Planificar(filas, foto);
+            var plan = PlanificadorDeCambioDeEstado.Planificar(filas, foto, avisos);
 
             var resultado = Convert.ToBase64String(ArmadorDeExcelDeCatalogos.Resultado(
                 estructura, filas, plan.Filas.ToDictionary(f => f.NumeroFilaExcel, f => f.Texto)));
@@ -162,20 +170,40 @@ namespace Sanic.Mppp.Plugins.Api
             if (plan.TieneErrores)
                 return new ResultadoDeCambioMasivo(false, resultado, filas.Count, errores, advertencias, 0, 0, 0);
 
-            Escribir(escritor => escritor.Aplicar(plan));
+            if (plan.Cambios.Count > 0)
+                Escribir(escritor => escritor.Aplicar(plan));
             return new ResultadoDeCambioMasivo(true, resultado, filas.Count, errores, advertencias, plan.Activados, plan.Desactivados, plan.SinCambios);
         }
 
         // ============================================================================================ lectura del archivo (MPPP-CAR-001 a 007)
 
-        private IReadOnlyList<FilaPlantilla> LeerArchivo(string archivoBase64, EstructuraDeExcelDeCatalogo estructura)
+        /// <summary>
+        /// Devuelve las filas no vacías y, aparte, los avisos del lector (un #REF!, un número que pudo redondearse) para que el
+        /// planificador los vuelva errores de su fila. Los avisos de la columna Resultado se descartan: es solo de salida y nunca
+        /// se lee (un archivo de resultado corregido y vuelto a subir puede traer cualquier cosa ahí).
+        /// </summary>
+        private IReadOnlyList<FilaPlantilla> LeerArchivo(string archivoBase64, EstructuraDeExcelDeCatalogo estructura, out IReadOnlyList<AdvertenciaLectura> avisos)
         {
-            var bytes = Decodificar(archivoBase64);
+            if (string.IsNullOrWhiteSpace(archivoBase64))
+                throw ArchivoInvalido();
 
             // Los parámetros se leen con SYSTEM: el Administrador de planes no tiene privilegio sobre Parámetro (diseno/04 §2).
+            // Primero, porque el tope de peso se mira ANTES de decodificar: un texto enorme no se convierte en bytes para después rechazarlo.
             var parametros = new CatalogosDataverse(_sistema);
             var maximo = FilasMaximoVigente(parametros.Parametro(ParametroFilasMaximo));
             var limites = LimitesLectura.DesdeJson(parametros.Parametro(ParametroLimites)?.Valor);
+
+            // 4 caracteres de base64 por cada 3 bytes, más un margen chico: si el texto ya trae más que eso, los bytes pasarían el tope.
+            var maximoDeCaracteres = 4 * ((limites.TamanoMaximoBytesEntrada + 2) / 3) + MargenDeCaracteresDeBase64;
+            if (archivoBase64.Length > maximoDeCaracteres)
+            {
+                throw new CargaMasivaRechazadaException("MPPP-CAR-003",
+                    "El archivo pesa más de lo permitido. Quitale filas o partilo en varios archivos y subí cada uno por separado.",
+                    new InvalidDataException("El texto del archivo trae " + archivoBase64.Length.ToString(CultureInfo.InvariantCulture)
+                        + " caracteres: con el tope de " + limites.TamanoMaximoBytesEntrada.ToString(CultureInfo.InvariantCulture) + " bytes no puede ser un archivo válido. No se decodificó."));
+            }
+
+            var bytes = Decodificar(archivoBase64);
 
             var lectura = new LectorOpenXml(limites).Leer(bytes, estructura.ConfiguracionDeLectura(maximo));
             if (!lectura.EsValido)
@@ -187,29 +215,31 @@ namespace Sanic.Mppp.Plugins.Api
                     "El archivo no tiene ninguna fila con datos. Completá al menos una fila debajo de los encabezados y volvé a subirlo.");
             }
 
+            var letraDeResultado = estructura.ColumnaResultado.Letra;
+            avisos = lectura.Advertencias.Where(a => a == null || !string.Equals(a.Columna, letraDeResultado, StringComparison.Ordinal)).ToList();
             return lectura.Filas.ToList();
+        }
+
+        private static CargaMasivaRechazadaException ArchivoInvalido()
+        {
+            return new CargaMasivaRechazadaException("MPPP-CAR-001",
+                "No llegó un archivo válido. Elegí un archivo de Excel (.xlsx) y volvé a intentarlo.");
         }
 
         private static byte[] Decodificar(string archivoBase64)
         {
             byte[] bytes = null;
-            if (!string.IsNullOrWhiteSpace(archivoBase64))
+            try
             {
-                try
-                {
-                    bytes = Convert.FromBase64String(archivoBase64);
-                }
-                catch (FormatException)
-                {
-                    // No es base64: se rechaza abajo con el mismo código que un archivo vacío.
-                }
+                bytes = Convert.FromBase64String(archivoBase64);
+            }
+            catch (FormatException)
+            {
+                // No es base64: se rechaza abajo con el mismo código que un archivo vacío.
             }
 
             if (bytes == null || bytes.Length == 0)
-            {
-                throw new CargaMasivaRechazadaException("MPPP-CAR-001",
-                    "No llegó un archivo válido. Elegí un archivo de Excel (.xlsx) y volvé a intentarlo.");
-            }
+                throw ArchivoInvalido();
 
             return bytes;
         }
@@ -290,10 +320,21 @@ namespace Sanic.Mppp.Plugins.Api
             }
             catch (EscrituraDeCatalogoFallidaException ex)
             {
+                var motivo = Recortar((ex.Motivo ?? string.Empty).Trim());
                 throw new CargaMasivaRechazadaException("MPPP-CAR-009",
-                    "No se pudo grabar la fila " + ex.Fila.ToString(CultureInfo.InvariantCulture) + ": " + (ex.Motivo ?? string.Empty).TrimEnd(' ', '.') + ". "
+                    "No se pudo grabar la fila " + ex.Fila.ToString(CultureInfo.InvariantCulture) + ": " + motivo + (motivo.EndsWith("\u2026", StringComparison.Ordinal) ? " " : ". ")
                     + "No se grabó nada. Corregí esa fila y volvé a subir el archivo.", ex);
             }
+        }
+
+        /// <summary>El motivo de Dataverse puede ser larguísimo (un error con su detalle entero): se muestran unos 300 caracteres, sin partir un par subrogado.</summary>
+        private static string Recortar(string motivo)
+        {
+            if (motivo.Length <= MaximoDeCaracteresDelMotivo) return motivo.TrimEnd('.');
+
+            var largo = MaximoDeCaracteresDelMotivo - 1;
+            if (char.IsHighSurrogate(motivo[largo - 1])) largo--;
+            return motivo.Substring(0, largo) + "\u2026";
         }
 
         private static CargaMasivaRechazadaException TiempoAgotado(Exception interna)

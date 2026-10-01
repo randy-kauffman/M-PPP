@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Sanic.Mppp.Plugins.Plantilla;
@@ -230,12 +231,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         /// <see cref="PlanificadorDeCarga.Planificar(IReadOnlyList{FilaPlantilla}, EstadoDeCatalogos, DateTime, IReadOnlyList{AdvertenciaLectura})"/>).
         /// FIRMA DEL ARQUITECTO.</summary>
         public static PlanDeCambioDeEstado Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado, IReadOnlyList<AdvertenciaLectura> avisos)
-            => throw new NotImplementedException();
-
-        public static PlanDeCambioDeEstado Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado)
         {
             if (filas == null) throw new ArgumentNullException(nameof(filas));
             if (estado == null) throw new ArgumentNullException(nameof(estado));
+            if (avisos == null) throw new ArgumentNullException(nameof(avisos));
 
             // Se lee todo antes de planificar: de acá en adelante no se vuelve a tocar nada de lo que entregó quien llamó.
             var leidas = new List<FilaDeCambio>(filas.Count);
@@ -250,7 +249,11 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 leidas.Add(LectorDeFilaDeCambio.Leer(fila, leidas.Count));
             }
 
+            AvisosDelLector.Aplicar(avisos, ColumnasDeCambioDeEstado.Todas, leidas.Select(l => l.F));
             return new PlanificacionDeCambio(leidas, estado).Ejecutar();
         }
+
+        public static PlanDeCambioDeEstado Planificar(IReadOnlyList<FilaPlantilla> filas, EstadoDeCatalogos estado)
+            => Planificar(filas, estado, new AdvertenciaLectura[0]);
     }
 }

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Sanic.Mppp.Plugins.Dominio;
+using Sanic.Mppp.Plugins.Plantilla;
 
 namespace Sanic.Mppp.Plugins.Catalogos
 {
@@ -134,5 +136,42 @@ namespace Sanic.Mppp.Plugins.Catalogos
         }
 
         public bool TieneErrores => Errores.Count > 0;
+    }
+
+    /// <summary>
+    /// Los avisos del lector (revisión 4c, LP-07 "nada se pierde callado") como errores de su fila. Un catálogo no admite un dato que
+    /// el lector no pudo interpretar con seguridad (#REF!, un número que pudo redondearse): la fila falla con el encabezado de
+    /// su columna y el motivo del lector.
+    /// </summary>
+    internal static class AvisosDelLector
+    {
+        internal static void Aplicar(IReadOnlyList<AdvertenciaLectura> avisos, IReadOnlyList<ColumnaDeCatalogo> columnas, IEnumerable<FilaDeTrabajo> filas)
+        {
+            if (avisos == null) throw new ArgumentNullException(nameof(avisos));
+
+            var filasPorNumero = new Dictionary<int, FilaDeTrabajo>();
+            foreach (var fila in filas) filasPorNumero[fila.Numero] = fila;
+
+            var encabezados = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var columna in columnas) encabezados[columna.Letra] = columna.Encabezado;
+
+            // Primero se valida TODO: un aviso mal armado es error de quien llama y no deja a medias a las filas ya tocadas.
+            foreach (var aviso in avisos)
+            {
+                if (aviso == null)
+                    throw new ArgumentException("Los avisos no pueden traer elementos nulos.", nameof(avisos));
+                if (!filasPorNumero.ContainsKey(aviso.NumeroFilaExcel))
+                    throw new ArgumentException("Hay un aviso de la fila " + aviso.NumeroFilaExcel.ToString(CultureInfo.InvariantCulture) + ", que no está entre las filas.", nameof(avisos));
+                if (aviso.Columna == null || !encabezados.ContainsKey(aviso.Columna))
+                    throw new ArgumentException("Hay un aviso de la columna '" + aviso.Columna + "', que no es de la estructura.", nameof(avisos));
+            }
+
+            foreach (var aviso in avisos)
+            {
+                var motivo = (aviso.Motivo ?? string.Empty).Trim().TrimEnd('.');
+                var texto = motivo.Length == 0 ? "no se pudo leer el valor con seguridad" : motivo;
+                filasPorNumero[aviso.NumeroFilaExcel].Error(encabezados[aviso.Columna] + ": " + texto + ". Corregí o borrá esa celda y volvé a subir el archivo.");
+            }
+        }
     }
 }
