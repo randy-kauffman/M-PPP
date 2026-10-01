@@ -146,37 +146,58 @@ namespace Sanic.Mppp.Plugins.Datos
 
         private List<UsuarioCandidato> LeerUsuarios(IReadOnlyCollection<string> correos)
         {
+            // Sin correos de ejecutivo que resolver no se consulta nada, ni el rol.
+            if (correos.Count == 0) return new List<UsuarioCandidato>();
+
+            // Un rol que no existe en el entorno es un error de configuración, no "este usuario no es ejecutivo": cada fila diría eso
+            // y esconderían la causa. Se comprueba aunque ningún usuario coincida.
+            var roles = IdsDelRolEjecutivo();
+
             var consulta = NuevaConsulta(TablasNativas.Usuario, LogicalOperator.And, "internalemailaddress", "isdisabled");
             AgregarIn(consulta, "internalemailaddress", correos);
             var registros = LeerRegistros(_sistema, consulta);
             if (registros.Count == 0) return new List<UsuarioCandidato>();
 
-            var ejecutivos = IdsDeUsuariosConElRol(registros.Select(u => u.Id).ToList());
+            var ejecutivos = IdsDeUsuariosConElRol(registros.Select(u => u.Id).ToList(), roles);
             var usuarios = new List<UsuarioCandidato>(registros.Count);
             foreach (var u in registros)
             {
                 var correo = CatalogosDataverse.TextoOpcional(u, "internalemailaddress");
                 if (string.IsNullOrWhiteSpace(correo)) continue; // la consulta es por correo: sin él no hay a quién comparar.
 
-                var deshabilitado = u.Contains("isdisabled") && u["isdisabled"] is bool d && d;
-                usuarios.Add(new UsuarioCandidato(u.Id, correo, !deshabilitado, ejecutivos.Contains(u.Id)));
+                // Seguridad: un dato que falta falla cerrado. Solo es habilitado el usuario que DICE explícitamente isdisabled = false.
+                var habilitado = u.Contains("isdisabled") && u["isdisabled"] is bool d && !d;
+                usuarios.Add(new UsuarioCandidato(u.Id, correo, habilitado, ejecutivos.Contains(u.Id)));
             }
 
             return usuarios;
         }
 
         /// <summary>
-        /// Los usuarios de la lista que tienen el rol <see cref="RolEjecutivo"/>. El rol existe una vez POR UNIDAD DE NEGOCIO con el mismo
-        /// nombre, así que se buscan todos los ids con ese nombre. `systemuserroles` es una intersect entity: `systemuserid` y `roleid`
-        /// llegan como Guid crudo (no EntityReference), y se aceptan los dos por si el SDK cambia.
+        /// Los ids del rol <see cref="RolEjecutivo"/>: existe una vez POR UNIDAD DE NEGOCIO con el mismo nombre, así que se buscan todos.
+        /// Ninguno es <see cref="InvalidOperationException"/> que nombra el rol.
         /// </summary>
-        private HashSet<Guid> IdsDeUsuariosConElRol(IReadOnlyCollection<Guid> usuariosIds)
+        private List<Guid> IdsDelRolEjecutivo()
         {
             var consultaRol = NuevaConsulta(TablasNativas.Rol, LogicalOperator.And);
             consultaRol.Criteria.AddCondition("name", ConditionOperator.Equal, RolEjecutivo);
             var roles = LeerRegistros(_sistema, consultaRol).Select(r => r.Id).ToList();
-            if (roles.Count == 0) return new HashSet<Guid>();
+            if (roles.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "No existe el rol '" + RolEjecutivo + "' en el entorno, así que no se puede saber quién es ejecutivo. "
+                    + "Es un problema de configuración: importá la solución con sus roles de seguridad.");
+            }
 
+            return roles;
+        }
+
+        /// <summary>
+        /// Los usuarios de la lista que tienen alguno de esos roles. `systemuserroles` es una intersect entity: `systemuserid` y `roleid`
+        /// llegan como Guid crudo (no EntityReference), y se aceptan los dos por si el SDK cambia.
+        /// </summary>
+        private HashSet<Guid> IdsDeUsuariosConElRol(IReadOnlyCollection<Guid> usuariosIds, IReadOnlyCollection<Guid> roles)
+        {
             var consultaAsignaciones = NuevaConsulta(TablasNativas.UsuarioRol, LogicalOperator.And, "systemuserid", "roleid");
             AgregarIn(consultaAsignaciones, "systemuserid", usuariosIds);
             AgregarIn(consultaAsignaciones, "roleid", roles);
@@ -416,6 +437,16 @@ namespace Sanic.Mppp.Plugins.Datos
             if (plan == null) throw new ArgumentNullException(nameof(plan));
             if (plan.TieneErrores) throw new ArgumentException("El plan tiene errores: no se aplica.", nameof(plan));
 
+            // Un valor fuera del enum es un error de quien armó el plan, y se descubre ANTES de escribir nada: la transacción de la Custom API
+            // lo deshace igual, pero no hay por qué gastar el presupuesto de tiempo en escrituras que se van a perder.
+            foreach (var cambio in plan.Cambios)
+            {
+                if (!Enum.IsDefined(typeof(TipoDeCatalogo), cambio.Tipo))
+                    throw new ArgumentOutOfRangeException(nameof(plan), cambio.Tipo, "El tipo de catálogo del cambio de la fila " + cambio.FilaOrigen.ToString(CultureInfo.InvariantCulture) + " no existe.");
+                if (!Enum.IsDefined(typeof(AccionDeEstado), cambio.Accion))
+                    throw new ArgumentOutOfRangeException(nameof(plan), cambio.Accion, "La acción del cambio de la fila " + cambio.FilaOrigen.ToString(CultureInfo.InvariantCulture) + " no existe.");
+            }
+
             var avance = new Avance(plan.Cambios.Count);
             foreach (var cambio in plan.Cambios)
             {
@@ -435,7 +466,8 @@ namespace Sanic.Mppp.Plugins.Datos
                 case TipoDeCatalogo.Cliente: return Tablas.Cliente;
                 case TipoDeCatalogo.Plan: return Tablas.Plan;
                 case TipoDeCatalogo.Correo: return Tablas.Autorizado;
-                default: return Tablas.AutorizacionCliente;
+                case TipoDeCatalogo.AutorizacionCliente: return Tablas.AutorizacionCliente;
+                default: throw new ArgumentOutOfRangeException(nameof(tipo), tipo, "El tipo de catálogo no existe."); // ya se validó antes de escribir; sin caída silenciosa.
             }
         }
 
@@ -463,7 +495,7 @@ namespace Sanic.Mppp.Plugins.Datos
             catch (FaultException<OrganizationServiceFault> falla)
             {
                 var motivo = falla.Detail != null && !string.IsNullOrWhiteSpace(falla.Detail.Message) ? falla.Detail.Message : falla.Message;
-                throw new EscrituraDeCatalogoFallidaException(fila, motivo);
+                throw new EscrituraDeCatalogoFallidaException(fila, motivo, falla);
             }
 
             avance.Escritas++;
@@ -475,6 +507,17 @@ namespace Sanic.Mppp.Plugins.Datos
     {
         public EscrituraDeCatalogoFallidaException(int fila, string motivo)
             : base("Fila " + fila.ToString(System.Globalization.CultureInfo.InvariantCulture) + ": " + motivo)
+        {
+            Fila = fila;
+            Motivo = motivo;
+        }
+
+        /// <summary>
+        /// Igual que la anterior, y conserva la falla original de Dataverse como <see cref="Exception.InnerException"/>: la traza del
+        /// plugin la necesita entera (código de error, detalles), y el mensaje de arriba es solo lo que se muestra.
+        /// </summary>
+        public EscrituraDeCatalogoFallidaException(int fila, string motivo, Exception interna)
+            : base("Fila " + fila.ToString(System.Globalization.CultureInfo.InvariantCulture) + ": " + motivo, interna)
         {
             Fila = fila;
             Motivo = motivo;

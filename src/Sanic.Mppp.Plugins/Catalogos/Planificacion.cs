@@ -384,7 +384,9 @@ namespace Sanic.Mppp.Plugins.Catalogos
         {
             if (f.Nombre.Usable && !Iguales(f.Nombre.Valor, a.NombreContacto))
             {
-                f.Error(Encabezados.NombreContacto + ": el correo " + MotivosDeCarga.Mostrar(f.Correo.Valor) + " ya existe con el nombre \"" + MotivosDeCarga.Mostrar(a.NombreContacto) + "\", no \"" + MotivosDeCarga.Mostrar(f.Nombre.Valor)
+                // Lo grabado vacío se dice "sin nombre de contacto", no se cita entre comillas vacías (los correos anteriores a la columna no lo tienen).
+                var grabado = string.IsNullOrWhiteSpace(a.NombreContacto) ? "sin nombre de contacto" : "con el nombre \"" + MotivosDeCarga.Mostrar(a.NombreContacto.Trim()) + "\"";
+                f.Error(Encabezados.NombreContacto + ": el correo " + MotivosDeCarga.Mostrar(f.Correo.Valor) + " ya existe " + grabado + ", no con el nombre \"" + MotivosDeCarga.Mostrar(f.Nombre.Valor)
                         + "\". La carga no modifica correos que ya existen: usá el mismo nombre o dejá la celda vacía.");
             }
 
@@ -444,14 +446,16 @@ namespace Sanic.Mppp.Plugins.Catalogos
             // Regla 12: ya existía; si el archivo trae otra fecha o comentario, la carga no los pisa.
             if (f.Fecha.Usable && (au.FechaDocumento == null || au.FechaDocumento.Value.Date != f.Fecha.Valor))
             {
-                var grabada = au.FechaDocumento == null ? "sin fecha" : "fecha " + LectorDeFilaDeCarga.Dia(au.FechaDocumento.Value);
-                f.Error(Encabezados.FechaDocumento + ": la autorización de " + sobre + " ya existe con " + grabada + ", no con " + LectorDeFilaDeCarga.Dia(f.Fecha.Valor)
+                var grabada = au.FechaDocumento == null ? "sin fecha" : "con fecha " + LectorDeFilaDeCarga.Dia(au.FechaDocumento.Value);
+                f.Error(Encabezados.FechaDocumento + ": la autorización de " + sobre + " ya existe " + grabada + ", no con fecha " + LectorDeFilaDeCarga.Dia(f.Fecha.Valor)
                         + ". La carga no modifica autorizaciones que ya existen: usá la fecha grabada o dejá la celda vacía.");
             }
 
             if (f.Comentarios.Usable && !Iguales(f.Comentarios.Valor, au.Comentarios))
             {
-                f.Error(Encabezados.Comentarios + ": la autorización de " + sobre + " ya existe con otro comentario (\"" + MotivosDeCarga.Mostrar(au.Comentarios) + "\"). La carga no modifica autorizaciones que ya existen: usá el comentario grabado o dejá la celda vacía.");
+                var grabado = string.IsNullOrWhiteSpace(au.Comentarios) ? "sin comentario" : "con el comentario \"" + MotivosDeCarga.Mostrar(au.Comentarios.Trim()) + "\"";
+                f.Error(Encabezados.Comentarios + ": la autorización de " + sobre + " ya existe " + grabado + ", no con el comentario \"" + MotivosDeCarga.Mostrar(f.Comentarios.Valor)
+                        + "\". La carga no modifica autorizaciones que ya existen: usá el comentario grabado o dejá la celda vacía.");
             }
         }
 

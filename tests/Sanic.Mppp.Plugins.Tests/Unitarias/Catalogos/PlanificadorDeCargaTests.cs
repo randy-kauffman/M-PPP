@@ -323,5 +323,55 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
             Assert.Single(Planificar(Foto(), F(2, ("A", "123"), ("H", "n@empresa.com"), ("I", "X"), ("J", "1"))).Filas[0].Errores);
             Assert.False(Planificar(Foto(), F(2, ("A", "123"), ("H", "n@empresa.com"), ("I", "X"), ("J", "2"))).TieneErrores);
         }
+
+        // ------------------------------------------------------------------------------------------ lo grabado vacío (revisión 4a)
+        private static EstadoDeCatalogos FotoConAutorizacion(DateTime? fecha, string comentarios, string nombreContacto)
+            => new EstadoDeCatalogos(
+                new[] { new ClienteExistente(Sol, "000000123", "ABC123456001", "Ferretería Sol", Ana, true) },
+                new PlanExistente[0],
+                new[] { new AutorizadoExistente(G(30), "juan.perez@empresa.com", nombreContacto, true) },
+                new[] { new AutorizacionClienteExistente(G(40), G(30), Sol, fecha, comentarios, true) },
+                new[] { new UsuarioCandidato(Ana, "ana@banco.com", true, true) });
+
+        [Fact]
+        public void La_fecha_grabada_vacia_se_dice_sin_fecha_y_no_con_sin_fecha()
+        {
+            var foto = FotoConAutorizacion(null, "c", "Juan");
+            var error = Assert.Single(PlanificadorDeCarga.Planificar(new[] { F(2, ("A", "123"), ("H", "juan.perez@empresa.com"), ("J", "01/10/2024")) }, foto, Hoy).Filas[0].Errores);
+            Assert.StartsWith("Fecha documento: ", error);
+            Assert.Contains("ya existe sin fecha", error);
+            Assert.DoesNotContain("con sin", error);
+            Assert.Contains("01/10/2024", error);
+        }
+
+        [Fact]
+        public void La_fecha_grabada_se_cita_con_su_dia_y_la_del_archivo_tambien()
+        {
+            var foto = FotoConAutorizacion(new DateTime(2024, 9, 1), "c", "Juan");
+            var error = Assert.Single(PlanificadorDeCarga.Planificar(new[] { F(2, ("A", "123"), ("H", "juan.perez@empresa.com"), ("J", "02/10/2024")) }, foto, Hoy).Filas[0].Errores);
+            Assert.Contains("ya existe con fecha 01/09/2024, no con fecha 02/10/2024", error);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void El_comentario_y_el_nombre_grabados_vacios_se_dicen_sin_citar_comillas_vacias(string vacio)
+        {
+            var foto = FotoConAutorizacion(null, vacio, vacio);
+            var fila = PlanificadorDeCarga.Planificar(new[] { F(2, ("A", "123"), ("H", "juan.perez@empresa.com"), ("I", "Juan"), ("K", "algo")) }, foto, Hoy).Filas[0];
+            Assert.Contains("ya existe sin nombre de contacto", Assert.Single(fila.Errores, e => e.StartsWith("Nombre contacto: ", StringComparison.Ordinal)));
+            Assert.Contains("ya existe sin comentario", Assert.Single(fila.Errores, e => e.StartsWith("Comentarios: ", StringComparison.Ordinal)));
+            Assert.All(fila.Errores, e => Assert.DoesNotContain("\"\"", e));
+        }
+
+        [Fact]
+        public void El_comentario_y_el_nombre_grabados_se_citan_y_los_del_archivo_tambien()
+        {
+            var foto = FotoConAutorizacion(null, "Firmado", "Juan Pérez");
+            var fila = PlanificadorDeCarga.Planificar(new[] { F(2, ("A", "123"), ("H", "juan.perez@empresa.com"), ("I", "Juan P."), ("K", "Otro")) }, foto, Hoy).Filas[0];
+            Assert.Contains("ya existe con el nombre \"Juan Pérez\", no con el nombre \"Juan P.\"", fila.Errores.Single(e => e.StartsWith("Nombre contacto: ", StringComparison.Ordinal)));
+            Assert.Contains("ya existe con el comentario \"Firmado\", no con el comentario \"Otro\"", fila.Errores.Single(e => e.StartsWith("Comentarios: ", StringComparison.Ordinal)));
+        }
     }
 }

@@ -242,23 +242,40 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Datos
         }
 
         [Fact]
-        public void Si_el_rol_no_existe_en_el_entorno_nadie_es_ejecutivo_y_no_se_consultan_asignaciones()
+        public void Si_el_rol_no_existe_aunque_ningun_usuario_coincida_es_un_error_de_configuracion_que_lo_nombra()
         {
-            var s = new OrganizationServiceEnMemoria();
-            s.Sembrar(new Entity("systemuser", Ana) { ["internalemailaddress"] = "ana@banco.com", ["isdisabled"] = false });
-            var espia = new ServicioEspia(s);
-            var foto = new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), espia).ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "ana@banco.com")) }));
-            Assert.False(Assert.Single(foto.Usuarios).EsEjecutivo);
-            Assert.DoesNotContain(espia.Consultas, q => q.EntityName == "systemuserroles");
+            // Un rol que falta en el entorno no es "este usuario no es ejecutivo": es la causa de TODAS las filas, y no se esconde.
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), new OrganizationServiceEnMemoria())
+                    .ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "nadie@banco.com")) })));
+            Assert.Contains("SR - MPPP - Ejecutivo", ex.Message);
         }
 
         [Fact]
-        public void Un_usuario_sin_dato_de_deshabilitado_se_toma_como_habilitado()
+        public void Sin_correos_de_ejecutivo_no_se_consulta_ni_el_rol()
+        {
+            var espia = new ServicioEspia(new OrganizationServiceEnMemoria());
+            new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), espia).ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("A", "123")) }));
+            Assert.Empty(espia.Consultas);
+        }
+
+        [Fact]
+        public void Con_el_rol_pero_sin_asignaciones_nadie_es_ejecutivo_y_no_falla()
         {
             var s = new OrganizationServiceEnMemoria();
-            s.Sembrar(new Entity("systemuser", Ana) { ["internalemailaddress"] = "ana@banco.com" });
+            s.Sembrar(new Entity("role") { ["name"] = "SR - MPPP - Ejecutivo" });
+            s.Sembrar(new Entity("systemuser", Ana) { ["internalemailaddress"] = "ana@banco.com", ["isdisabled"] = false });
             var foto = new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), s).ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "ana@banco.com")) }));
-            Assert.True(Assert.Single(foto.Usuarios).Habilitado);
+            Assert.False(Assert.Single(foto.Usuarios).EsEjecutivo);
+        }
+
+        [Fact]
+        public void Un_usuario_con_isdisabled_nulo_tampoco_cuenta_como_habilitado()
+        {
+            var s = SistemaConEjecutiva();
+            s.Sembrar(new Entity("systemuser", Guid.NewGuid()) { ["internalemailaddress"] = "raro@banco.com", ["isdisabled"] = null });
+            var foto = new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), s).ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "raro@banco.com")) }));
+            Assert.False(Assert.Single(foto.Usuarios).Habilitado);
         }
 
         // ------------------------------------------------------------------------------------------ columnas
@@ -393,6 +410,44 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Datos
             var ex = Assert.Throws<PresupuestoDeEscrituraAgotadoException>(() =>
                 new EscritorDeCatalogos(cat2, () => TimeSpan.FromSeconds(100), TimeSpan.FromSeconds(100)).Aplicar(plan));
             Assert.Equal((0, 2), (ex.Escritas, ex.Total));
+        }
+
+        [Fact]
+        public void La_falla_viaja_como_InnerException_aunque_no_tenga_Detail()
+        {
+            var original = new FaultException<OrganizationServiceFault>(null, new FaultReason("clave duplicada"));
+            var ex = Assert.Throws<EscrituraDeCatalogoFallidaException>(() =>
+                new EscritorDeCatalogos(new ServicioQueLanza(original), () => TimeSpan.Zero, TimeSpan.FromSeconds(100)).Aplicar(PlanUnClienteConAutorizacion("15/09/2024")));
+            Assert.Same(original, ex.InnerException);
+        }
+
+        [Fact]
+        public void La_excepcion_con_causa_conserva_fila_motivo_y_mensaje_y_la_de_siempre_no_trae_causa()
+        {
+            var causa = new InvalidOperationException("x");
+            var conCausa = new EscrituraDeCatalogoFallidaException(7, "duplicado", causa);
+            Assert.Equal((7, "duplicado", "Fila 7: duplicado"), (conCausa.Fila, conCausa.Motivo, conCausa.Message));
+            Assert.Same(causa, conCausa.InnerException);
+
+            var sinCausa = new EscrituraDeCatalogoFallidaException(7, "duplicado");
+            Assert.Equal("Fila 7: duplicado", sinCausa.Message);
+            Assert.Null(sinCausa.InnerException);
+        }
+
+        [Theory]
+        [InlineData(99, 1)]
+        [InlineData(0, 1)]
+        [InlineData(1, 99)]
+        [InlineData(2, 0)]
+        public void Un_tipo_o_una_accion_fuera_del_enum_falla_antes_de_escribir_nada(int tipo, int accion)
+        {
+            var validos = new CambioDeEstadoACrear(TipoDeCatalogo.Cliente, Guid.NewGuid(), AccionDeEstado.Desactivar, 2);
+            var roto = new CambioDeEstadoACrear((TipoDeCatalogo)tipo, Guid.NewGuid(), (AccionDeEstado)accion, 3);
+            // El roto va DESPUÉS de uno válido: si se validara sobre la marcha, el primero ya estaría escrito.
+            var plan = new PlanDeCambioDeEstado(new List<ResultadoDeFilaDeCambio>(), false, new List<CambioDeEstadoACrear> { validos, roto }, 0);
+            var svc = new OrganizationServiceEnMemoria();
+            Assert.ThrowsAny<ArgumentOutOfRangeException>(() => new EscritorDeCatalogos(svc, () => TimeSpan.Zero, TimeSpan.FromSeconds(100)).Aplicar(plan));
+            Assert.Empty(svc.Llamadas);
         }
 
         // ------------------------------------------------------------------------------------------ dobles
