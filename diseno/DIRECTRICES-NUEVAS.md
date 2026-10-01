@@ -594,6 +594,23 @@ privilegio de la Custom API.
 
 El indicador es modal: mientras está abierto no se puede volver a hacer clic.
 
+### Contrato del JS (`recursos/js/comandos.js`, fijado el 2026-10-01 para la pieza 5)
+
+Funciones públicas nuevas de `Sanic.Mppp.Comandos`, todas reciben el control de la grilla (`SelectedControl`):
+
+| Función | Qué hace |
+|---|---|
+| `esAdministradorDePlanes(control)` | Regla de visibilidad del ancla y de las opciones. `true` solo si `Xrm.Utility.getGlobalContext().userSettings.roles` trae un rol llamado exactamente `SR - MPPP - Administrador de planes`. **Ante la duda (error al leer los roles), `false`**: a diferencia de las reglas de estado de Fila (que muestran ante la duda porque el plugin igual valida), acá ocultar no le quita nada a nadie que deba verlo — el privilegio de la Custom API es la puerta real |
+| `cargarCatalogos(control)` / `cambiarEstadoCatalogos(control)` | Abren el selector de archivo **sincrónicamente dentro del clic** (un `input type="file"` con `accept=".xlsx"`; fuera del gesto del usuario el navegador lo bloquea). Cancelar no hace nada. Un archivo que no termina en `.xlsx` → aviso, sin llamar a la API. Después: indicador "Leyendo el archivo…" (FileReader → base64 sin el prefijo `data:`), "Validando y cargando el archivo… puede tardar hasta 2 minutos" (la Custom API como Action, `archivo`), "Preparando el resultado…" (descarga de `resultado` como `<nombre original sin extensión>-resultado.xlsx` con `Xrm.Navigation.openFile`, `openMode: 2`). Cierra el indicador, muestra el resumen y refresca la grilla. Un error de la API (los MPPP-CAR) se muestra con `error.message` **tal cual** |
+| `plantillaCarga(control)` / `plantillaCambioEstado(control)` | Indicador "Generando la plantilla…", la Custom API con `plantilla: true`, descarga `CargaCatalogos.xlsx` / `ActivarDesactivar.xlsx` |
+
+Textos del resumen (en `TEXTOS`, en 3082 y 1033 como los demás):
+- Carga grabada: "Carga terminada: {clientes} clientes, {planes} planes, {correos} correos y {autorizaciones} autorizaciones creados." / "Load finished: {clientes} clients, {planes} plans, {correos} emails and {autorizaciones} authorizations created."
+- Cambio grabado: "Cambio de estado terminado: {activados} activados, {desactivados} desactivados y {sincambios} sin cambios." / "Status change finished: {activados} activated, {desactivados} deactivated and {sincambios} unchanged."
+- Si `advertencias` > 0, se agrega: " {advertencias} filas con advertencias: revisá el archivo de resultado." / " {advertencias} rows with warnings: check the result file."
+- No grabado: "No se grabó nada: {errores} filas con errores. Revisá la columna Resultado del archivo que se descargó, corregí y volvé a subirlo." / "Nothing was saved: {errores} rows with errors. Check the Result column of the downloaded file, fix it and upload it again."
+
+
 ## Parámetro nuevo
 
 `carga.filas.maximo` · Número · **300**. Lo usan las dos Custom API. Hay que medirlo contra Dev
