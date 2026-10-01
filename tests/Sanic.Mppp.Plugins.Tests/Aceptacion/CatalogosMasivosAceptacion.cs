@@ -409,6 +409,39 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(1, svc.Llamadas);
         }
 
+        // ================================================================================================ revisión 2026-10-01: fallar cerrado
+        [Fact]
+        public void Un_usuario_sin_isdisabled_en_la_respuesta_no_cuenta_como_habilitado()
+        {
+            var sistema = new OrganizationServiceEnMemoria();
+            var rol = sistema.Sembrar(new Entity("role") { ["name"] = "SR - MPPP - Ejecutivo" });
+            sistema.Sembrar(new Entity("systemuser", Ana) { ["internalemailaddress"] = "ana@banco.com" });
+            sistema.Sembrar(new Entity("systemuserroles") { ["systemuserid"] = Ana, ["roleid"] = rol });
+            var foto = new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), sistema)
+                .ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "ana@banco.com")) }));
+            Assert.False(Assert.Single(foto.Usuarios).Habilitado);
+        }
+
+        [Fact]
+        public void Si_el_rol_de_ejecutivo_no_existe_en_el_entorno_es_un_error_de_configuracion_que_lo_nombra()
+        {
+            var sistema = new OrganizationServiceEnMemoria();
+            sistema.Sembrar(new Entity("systemuser", Ana) { ["internalemailaddress"] = "ana@banco.com", ["isdisabled"] = false });
+            var ex = Assert.Throws<InvalidOperationException>(() => new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), sistema)
+                .ParaCarga(ClavesDeCarga.Extraer(new[] { Fila(2, ("D", "ana@banco.com")) })));
+            Assert.Contains("SR - MPPP - Ejecutivo", ex.Message);
+        }
+
+        [Fact]
+        public void La_falla_de_Dataverse_viaja_como_InnerException()
+        {
+            var plan = PlanDeCargaValido(out _, out _);
+            var svc = new ServicioQueFallaEn(new OrganizationServiceEnMemoria(), 1, "Entity Key violated");
+            var ex = Assert.Throws<EscrituraDeCatalogoFallidaException>(() =>
+                new EscritorDeCatalogos(svc, () => TimeSpan.Zero, TimeSpan.FromSeconds(100)).Aplicar(plan));
+            Assert.IsType<FaultException<OrganizationServiceFault>>(ex.InnerException);
+        }
+
         // ================================================================================================ dobles de esta prueba
         /// <summary>Decorador: la escritura número N (Create o Update) falla como Dataverse; cuenta TODAS las llamadas.</summary>
         private sealed class ServicioQueFallaEn : IOrganizationService

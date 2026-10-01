@@ -889,6 +889,28 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.True(reloj.Elapsed < TimeSpan.FromSeconds(2), $"tardó {reloj.Elapsed}");
         }
 
+        // ================================================================================================ lo grabado vacío (revisión 4a)
+        [Fact]
+        public void Un_correo_grabado_sin_nombre_de_contacto_lo_dice_y_no_cita_comillas_vacias()
+        {
+            // 6 de los 9 correos de Dev no tienen nombre (son anteriores a la columna, 2026-09-24). La carga no lo completa.
+            var foto = new EstadoDeCatalogos(
+                new[] { new ClienteExistente(G(1), "000000123", "ABC123456001", "Ferretería Sol", Ana, true) },
+                new PlanExistente[0],
+                new[] { new AutorizadoExistente(G(30), "viejo@empresa.com", null, true) },
+                new[] { new AutorizacionClienteExistente(G(40), G(30), G(1), null, null, true) },
+                new UsuarioCandidato[0]);
+            var fila = Assert.Single(PlanificadorDeCarga.Planificar(new[] { F(2, A("123"), H("viejo@empresa.com"), I("Viejo"), K("algo")) }, foto, Hoy).Filas);
+            var nombre = Assert.Single(fila.Errores, e => e.StartsWith("Nombre contacto: ", StringComparison.Ordinal));
+            Assert.Contains("sin nombre de contacto", nombre);
+            var comentario = Assert.Single(fila.Errores, e => e.StartsWith("Comentarios: ", StringComparison.Ordinal));
+            Assert.Contains("sin comentario", comentario);
+            Assert.DoesNotContain("\"\"", nombre + comentario);
+
+            // Sin I ni K, ese mismo correo se usa sin problema.
+            Assert.False(PlanificadorDeCarga.Planificar(new[] { F(2, A("123"), H("viejo@empresa.com")) }, foto, Hoy).TieneErrores);
+        }
+
         // ================================================================================================ claves para la foto
         [Fact]
         public void Las_claves_salen_normalizadas_sin_repetidos_y_sin_las_invalidas()
