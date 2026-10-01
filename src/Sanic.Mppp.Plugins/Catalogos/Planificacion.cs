@@ -163,7 +163,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
             if (f.CorreoEjecutivo.Usable && !EsElDueno(f.CorreoEjecutivo.Valor, c.DuenoId))
             {
-                f.Error(Encabezados.CorreoEjecutivo + ": " + f.CorreoEjecutivo.Valor + " no es el ejecutivo actual del cliente " + c.CifBac
+                f.Error(Encabezados.CorreoEjecutivo + ": " + MotivosDeCarga.Mostrar(f.CorreoEjecutivo.Valor) + " no es el ejecutivo actual del cliente " + c.CifBac
                         + ". La carga no modifica clientes que ya existen: usá el correo del ejecutivo actual, dejá la celda vacía o reasignalo desde el formulario del cliente.");
             }
         }
@@ -272,24 +272,25 @@ namespace Sanic.Mppp.Plugins.Catalogos
         private string MotivoDelEjecutivo(string correo, out Guid duenoId)
         {
             duenoId = Guid.Empty;
+            var citado = MotivosDeCarga.Mostrar(correo); // el correo ya está acotado a 320, pero un motivo no cita nunca un valor entero.
             List<UsuarioCandidato> usuarios;
             _usuariosPorCorreo.TryGetValue(correo, out usuarios);
 
             if (usuarios == null || usuarios.Count == 0)
-                return Encabezados.CorreoEjecutivo + ": no hay ningún usuario con el correo " + correo + ". Revisá que esté bien escrito o usá el correo de un usuario que exista.";
+                return Encabezados.CorreoEjecutivo + ": no hay ningún usuario con el correo " + citado + ". Revisá que esté bien escrito o usá el correo de un usuario que exista.";
 
             if (usuarios.Count > 1)
             {
-                return Encabezados.CorreoEjecutivo + ": hay " + usuarios.Count.ToString(CultureInfo.InvariantCulture) + " usuarios con el correo " + correo
+                return Encabezados.CorreoEjecutivo + ": hay " + usuarios.Count.ToString(CultureInfo.InvariantCulture) + " usuarios con el correo " + citado
                        + " y no se sabe cuál es el ejecutivo. Pedí que quede uno solo o usá otro correo.";
             }
 
             var usuario = usuarios[0];
             if (!usuario.Habilitado)
-                return Encabezados.CorreoEjecutivo + ": el usuario " + correo + " está deshabilitado. Pedí que lo habiliten o usá otro correo.";
+                return Encabezados.CorreoEjecutivo + ": el usuario " + citado + " está deshabilitado. Pedí que lo habiliten o usá otro correo.";
 
             if (!usuario.EsEjecutivo)
-                return Encabezados.CorreoEjecutivo + ": " + correo + " no tiene el rol Ejecutivo (SR - MPPP - Ejecutivo). Pedí que se lo asignen o usá otro correo.";
+                return Encabezados.CorreoEjecutivo + ": " + citado + " no tiene el rol Ejecutivo (SR - MPPP - Ejecutivo). Pedí que se lo asignen o usá otro correo.";
 
             duenoId = usuario.Id;
             return null;
@@ -415,22 +416,22 @@ namespace Sanic.Mppp.Plugins.Catalogos
         {
             if (f.Nombre.Usable && !Iguales(f.Nombre.Valor, a.NombreContacto))
             {
-                f.Error(Encabezados.NombreContacto + ": el correo " + f.Correo.Valor + " ya existe con el nombre \"" + MotivosDeCarga.Mostrar(a.NombreContacto) + "\", no \"" + MotivosDeCarga.Mostrar(f.Nombre.Valor)
+                f.Error(Encabezados.NombreContacto + ": el correo " + MotivosDeCarga.Mostrar(f.Correo.Valor) + " ya existe con el nombre \"" + MotivosDeCarga.Mostrar(a.NombreContacto) + "\", no \"" + MotivosDeCarga.Mostrar(f.Nombre.Valor)
                         + "\". La carga no modifica correos que ya existen: usá el mismo nombre o dejá la celda vacía.");
             }
 
             if (!a.Activo)
-                f.Advertencia(Encabezados.Correo + ": el correo " + f.Correo.Valor + " está inactivo. Lo que se autorice con él no va a estar vigente hasta que se lo active.");
+                f.Advertencia(Encabezados.Correo + ": el correo " + MotivosDeCarga.Mostrar(f.Correo.Valor) + " está inactivo. Lo que se autorice con él no va a estar vigente hasta que se lo active.");
         }
 
         private void ValidarCorreoNuevo(GrupoDeCorreo g)
         {
             var conflicto = Contradicciones(g.Filas, f => f.Nombre.Usable ? f.Nombre.Valor : null, StringComparer.OrdinalIgnoreCase,
-                otras => Encabezados.NombreContacto + ": el correo " + g.Correo + " aparece con otro nombre de contacto en " + MotivosDeCarga.Filas(otras) + ". Usá el mismo en todas.");
+                otras => Encabezados.NombreContacto + ": el correo " + MotivosDeCarga.Mostrar(g.Correo) + " aparece con otro nombre de contacto en " + MotivosDeCarga.Filas(otras) + ". Usá el mismo en todas.");
 
             // Regla 11: para crear el correo hace falta el nombre, en alguna de sus filas.
             if (!conflicto && !g.Filas.Any(f => f.Nombre.Presente))
-                ErrorEnTodas(g, Encabezados.NombreContacto + ": hace falta para crear el correo " + g.Correo + ". Completalo en alguna de las filas de ese correo.");
+                ErrorEnTodas(g, Encabezados.NombreContacto + ": hace falta para crear el correo " + MotivosDeCarga.Mostrar(g.Correo) + ". Completalo en alguna de las filas de ese correo.");
         }
 
         // ================================================================================================ autorización (reglas 12 a 14)
@@ -463,7 +464,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
         private void ChequearAutorizacionExistente(FilaDeTrabajo f, AutorizacionClienteExistente au)
         {
-            var sobre = f.Correo.Valor + " sobre el cliente " + f.ClienteExistente.CifBac;
+            var sobre = MotivosDeCarga.Mostrar(f.Correo.Valor) + " sobre el cliente " + f.ClienteExistente.CifBac;
 
             // Regla 13: una autorización inactiva no se reactiva desde la carga.
             if (!au.Activo)
@@ -488,7 +489,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
         private void ValidarAutorizacionNueva(GrupoDeAutorizacion g)
         {
-            var sobre = g.Correo + " sobre " + DescribirCliente(g.Filas[0]);
+            var sobre = MotivosDeCarga.Mostrar(g.Correo) + " sobre " + DescribirCliente(g.Filas[0]);
 
             Contradicciones(g.Filas, f => f.Fecha.Usable ? f.Fecha.Valor.ToString("yyyyMMdd", CultureInfo.InvariantCulture) : null, StringComparer.Ordinal,
                 otras => Encabezados.FechaDocumento + ": la autorización de " + sobre + " aparece con otra fecha en " + MotivosDeCarga.Filas(otras) + ". Usá la misma en todas.");

@@ -16,6 +16,31 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
         }
 
         [Fact]
+        public void El_motivo_con_el_formato_literal_de_NET_Framework_sale_limpio()
+        {
+            // Es el formato que produce el sandbox de Dataverse (net462): el Message es "<motivo>" + CRLF + "Parameter name: <nombre>".
+            // En .NET moderno el Message lo arma distinto, así que la prueba lo reproduce a mano con una excepción que lo devuelve tal cual.
+            var motivo = MotivosDeCarga.DeArgumento(new ExcepcionConMensaje("El CIF BAC solo admite dígitos.\r\nParameter name: valor", "valor"));
+            Assert.Equal("El CIF BAC solo admite dígitos.", motivo);
+        }
+
+        [Fact]
+        public void El_motivo_con_el_formato_de_NET_Framework_sin_retorno_de_carro_sale_limpio()
+        {
+            var motivo = MotivosDeCarga.DeArgumento(new ExcepcionConMensaje("Solo dígitos.\nParameter name: valor", "valor"));
+            Assert.Equal("Solo dígitos.", motivo);
+        }
+
+        private sealed class ExcepcionConMensaje : ArgumentException
+        {
+            private readonly string _mensaje;
+
+            public ExcepcionConMensaje(string mensaje, string parametro) : base(mensaje, parametro) { _mensaje = mensaje; }
+
+            public override string Message => _mensaje;
+        }
+
+        [Fact]
         public void El_motivo_de_un_ArgumentException_sin_parametro_queda_igual()
         {
             Assert.Equal("Texto del motivo.", MotivosDeCarga.DeArgumento(new ArgumentException("Texto del motivo.")));

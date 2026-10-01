@@ -171,6 +171,12 @@ namespace Sanic.Mppp.Plugins.Catalogos
     /// <summary>
     /// Lo que existe hoy, para las claves que trae el archivo. Copia las colecciones al construirse: quien la armó no
     /// puede cambiarla después. Ninguna colección puede ser nula ni traer elementos nulos (<see cref="ArgumentException"/>).
+    /// <para>
+    /// PRECONDICIÓN de quien arma la foto: los CIF BAC, CIF COM, códigos de plan y correos de autorizado llegan YA normalizados como
+    /// los guarda el step (<c>Steps.Normalizacion</c>: CIF BAC de 9 dígitos, CIF COM de 12 en mayúscula, código de 4 en mayúscula,
+    /// correo en minúscula y sin espacios). Cliente y plan se buscan por igualdad exacta: un valor sin normalizar nunca se encuentra,
+    /// y el archivo daría "no existe" para algo que sí existe. Los correos de usuario sí se comparan sin distinguir mayúsculas.
+    /// </para>
     /// </summary>
     public sealed class EstadoDeCatalogos
     {

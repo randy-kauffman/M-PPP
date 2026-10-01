@@ -262,5 +262,66 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
                 F(4, ("A", "444"), ("B", "NUE000000444"), ("C", "Cuatro"), ("D", "ana@banco.com")));
             Assert.Equal(new[] { 4, 9 }, plan.Clientes.Select(c => c.FilaOrigen).ToArray());
         }
+
+        // ------------------------------------------------------------------------------------------ segunda vuelta (revisión)
+        [Fact]
+        public void El_correo_del_ejecutivo_de_mas_de_320_dice_el_largo_y_no_se_cita_entero()
+        {
+            var enorme = new string('a', 400) + "@banco.com";
+            var plan = Planificar(Foto(), F(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Nueva"), ("D", enorme)));
+            var error = Assert.Single(plan.Filas[0].Errores);
+            Assert.StartsWith("Correo ejecutivo: tiene 410 caracteres y el máximo es 320.", error);
+        }
+
+        [Fact]
+        public void Un_correo_de_ejecutivo_de_exactamente_320_es_valido()
+        {
+            var de320 = new string('a', 320 - "@banco.com".Length) + "@banco.com";
+            var foto = Foto(true, new UsuarioCandidato(G(77), de320, true, true));
+            var plan = Planificar(foto, F(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Nueva"), ("D", de320)));
+            Assert.False(plan.TieneErrores);
+            Assert.Equal(G(77), Assert.Single(plan.Clientes).DuenoId);
+        }
+
+        [Fact]
+        public void Ningun_motivo_cita_un_correo_de_320_caracteres_entero()
+        {
+            var largo = new string('a', 320 - "@banco.com".Length) + "@banco.com";
+            var foto = new EstadoDeCatalogos(
+                new[] { new ClienteExistente(Sol, "000000123", "ABC123456001", "Ferretería Sol", Ana, false) },
+                new PlanExistente[0],
+                new[] { new AutorizadoExistente(G(30), largo, "Nombre grabado", false) },
+                new[] { new AutorizacionClienteExistente(G(40), G(30), Sol, null, "grabado", true) },
+                new[] { new UsuarioCandidato(Ana, "ana@banco.com", true, true) });
+
+            var plan = Planificar(foto,
+                F(2, ("A", "123"), ("D", largo)),                                                   // ejecutivo que no es el dueño, cliente inactivo
+                F(3, ("A", "123"), ("H", largo), ("I", "Otro nombre"), ("K", "otro")),              // correo y autorización existentes, datos distintos
+                F(4, ("A", "999"), ("B", "NUE000000999"), ("C", "N"), ("D", largo), ("H", "x" + largo.Substring(1))),
+                F(5, ("A", "999"), ("D", "x" + largo.Substring(1))));                               // ejecutivo contradictorio entre filas, correo nuevo sin nombre
+            var mensajes = plan.Filas.SelectMany(f => f.Errores.Concat(f.Advertencias)).ToList();
+            Assert.NotEmpty(mensajes);
+            Assert.All(mensajes, m => Assert.True(m.Length < 400, $"motivo de {m.Length} caracteres: {m.Substring(0, 80)}"));
+        }
+
+        [Theory]
+        [InlineData("31/12/1899", 1899)]
+        [InlineData("01/01/0001", 1)]
+        public void La_fecha_anterior_a_1900_dice_cual_es_y_desde_cuando_vale(string valor, int anio)
+        {
+            Assert.True(anio < 1900);
+            var plan = Planificar(Foto(), F(2, ("A", "123"), ("H", "n@empresa.com"), ("I", "X"), ("J", valor)));
+            var error = Assert.Single(plan.Filas[0].Errores);
+            Assert.StartsWith("Fecha documento: ", error);
+            Assert.Contains(valor, error);
+            Assert.Contains("01/01/1900", error);
+        }
+
+        [Fact]
+        public void El_serial_1_es_31_12_1899_y_es_error_pero_el_serial_2_es_el_1_de_enero_de_1900_y_vale()
+        {
+            Assert.Single(Planificar(Foto(), F(2, ("A", "123"), ("H", "n@empresa.com"), ("I", "X"), ("J", "1"))).Filas[0].Errores);
+            Assert.False(Planificar(Foto(), F(2, ("A", "123"), ("H", "n@empresa.com"), ("I", "X"), ("J", "2"))).TieneErrores);
+        }
     }
 }

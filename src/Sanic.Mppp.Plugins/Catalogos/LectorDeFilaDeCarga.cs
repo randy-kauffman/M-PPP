@@ -38,6 +38,8 @@ namespace Sanic.Mppp.Plugins.Catalogos
         private const int MaximoNombreContacto = 100;
         private const int MaximoComentarios = 50;
 
+        private static readonly DateTime PrimeraFechaValida = new DateTime(1900, 1, 1);
+
         internal static FilaDeTrabajo Leer(FilaPlantilla fila, int posicion, DateTime hoy)
         {
             var f = new FilaDeTrabajo(posicion, fila.NumeroFilaExcel);
@@ -53,7 +55,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
             var razon = Celda(valores, ColumnasDeCarga.RazonSocial);
             f.Razon = Texto(f, Encabezados.RazonSocial, razon, MaximoRazonSocial);
-            f.CorreoEjecutivo = Normalizar(f, Encabezados.CorreoEjecutivo, Celda(valores, ColumnasDeCarga.CorreoEjecutivo), Normalizacion.CorreoAutorizado);
+            f.CorreoEjecutivo = LeerCorreo(f, Encabezados.CorreoEjecutivo, Celda(valores, ColumnasDeCarga.CorreoEjecutivo));
 
             // Plan (regla 5): tipo de formato y moneda son datos de un plan, y sin código no hay plan.
             var codigo = Celda(valores, ColumnasDeCarga.CodigoPlan);
@@ -76,7 +78,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
             var nombre = Celda(valores, ColumnasDeCarga.NombreContacto);
             var fecha = Celda(valores, ColumnasDeCarga.FechaDocumento);
             var comentarios = Celda(valores, ColumnasDeCarga.Comentarios);
-            f.Correo = LeerCorreo(f, correo);
+            f.Correo = LeerCorreo(f, Encabezados.Correo, correo);
             if (correo == null)
             {
                 f.Nombre = SinCorreo(f, Encabezados.NombreContacto, nombre, new Campo<string>());
@@ -126,13 +128,14 @@ namespace Sanic.Mppp.Plugins.Catalogos
             return campo;
         }
 
-        private static Campo<string> LeerCorreo(FilaDeTrabajo f, string crudo)
+        // Los dos correos del archivo (D, el del ejecutivo, y H, el autorizado) caben en una columna de correo T(320) (diseno/02 §2.3).
+        private static Campo<string> LeerCorreo(FilaDeTrabajo f, string encabezado, string crudo)
         {
-            var campo = Normalizar(f, Encabezados.Correo, crudo, Normalizacion.CorreoAutorizado);
+            var campo = Normalizar(f, encabezado, crudo, Normalizacion.CorreoAutorizado);
             if (campo.Usable && campo.Valor.Length > MaximoCorreo)
             {
                 campo.Valido = false;
-                f.Error(LargoExcedido(Encabezados.Correo, campo.Valor.Length, MaximoCorreo));
+                f.Error(LargoExcedido(encabezado, campo.Valor.Length, MaximoCorreo));
             }
 
             return campo;
@@ -208,6 +211,14 @@ namespace Sanic.Mppp.Plugins.Catalogos
             {
                 f.Error(Encabezados.FechaDocumento + ": \"" + MotivosDeCarga.Mostrar(crudo)
                         + "\" no es una fecha válida. Usá una celda de fecha de Excel o el formato d/m/aaaa (por ejemplo, 15/09/2024). Corregila.");
+                return campo;
+            }
+
+            // Dataverse no admite fechas anteriores a 1753, y una que pase acá reventaría la pasada 2 entera sin decir qué fila: un
+            // documento firmado anterior a 1900 no existe en este negocio (DN-04, "Lectura del archivo", Fechas).
+            if (fecha < PrimeraFechaValida)
+            {
+                f.Error(Encabezados.FechaDocumento + ": " + Dia(fecha) + " es anterior al " + Dia(PrimeraFechaValida) + ", que es la primera fecha que se acepta. Corregila.");
                 return campo;
             }
 
