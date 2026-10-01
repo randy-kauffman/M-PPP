@@ -330,6 +330,143 @@ class RibbonGenerado(unittest.TestCase):
         self.assertNotIn('description="Marcar "ya""', x)
 
 
+def _boton_menu(**cambios):
+    """Un botón con menú desplegable (DN-04, M-PPP, 2026-10-01): sin `funcion`, con `menu`."""
+    b = {"id": "cargamasiva", "icono": "sanic_mppp_wr_svg_cmdcargamasiva",
+         "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+         "etiqueta": {"1033": "Bulk load", "3082": "Carga masiva"},
+         "tooltip": {"1033": "Loads or downloads the bulk Excel.", "3082": "Carga o descarga el Excel masivo."},
+         "ubicaciones": ["HomepageGrid"], "secuencia": 80,
+         "menu": [
+             {"id": "cargar", "funcion": "Sanic.Mppp.Comandos.cargarCatalogos", "secuencia": 10,
+              "etiqueta": {"1033": "Upload file", "3082": "Cargar archivo"},
+              "tooltip": {"1033": "Uploads the Excel.", "3082": "Sube el Excel."}},
+             {"id": "plantilla", "funcion": "Sanic.Mppp.Comandos.plantillaCarga", "secuencia": 20,
+              "etiqueta": {"1033": "Download template", "3082": "Descargar plantilla"},
+              "tooltip": {"1033": "Downloads the empty template.", "3082": "Descarga la plantilla vacía."}},
+         ]}
+    b.update(cambios)
+    return b
+
+
+class RibbonConMenu(unittest.TestCase):
+    """Menú desplegable (`FlyoutAnchor`): el patrón es el de la plataforma, sacado del ribbon REAL de Dev el 2026-10-01
+    (`Mscrm.HomepageGrid.<tabla>.Flows.RefreshCommandBar.Flows`): ancla con Command SIN acciones (solo reglas),
+    Menu > MenuSection (DisplayMode Menu16) > Controls > un Button por opción, cada uno con su propio Command."""
+
+    def xml(self, boton=None, extra=()):
+        cambio = dict(CAMBIO_RIBBON, botones=[boton or _boton_menu(), *extra])
+        return imp.ribbondiffxml(IDENT, cambio, COMPONENTE["idiomas"], [])
+
+    def test_el_ancla_es_un_FlyoutAnchor_con_menu_y_un_boton_por_opcion(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        self.assertIn(f'<FlyoutAnchor Id="{base}.HomepageGrid.FlyoutAnchor"', x)
+        self.assertIn(f'Command="{base}.Command"', x)
+        self.assertIn(f'<Menu Id="{base}.HomepageGrid.Menu">', x)
+        self.assertIn(f'<MenuSection Id="{base}.HomepageGrid.MenuSection" Sequence="10" DisplayMode="Menu16">', x)
+        self.assertIn(f'<Controls Id="{base}.HomepageGrid.Controls">', x)
+        self.assertIn(f'<Button Command="{base}.cargar.Command" Id="{base}.HomepageGrid.cargar.Button"', x)
+        self.assertIn(f'<Button Command="{base}.plantilla.Command" Id="{base}.HomepageGrid.plantilla.Button"', x)
+        self.assertIn('ModernImage="$webresource:sanic_mppp_wr_svg_cmdcargamasiva"', x)
+        self.assertLess(x.index(".cargar.Button"), x.index(".plantilla.Button"))
+
+    def test_el_comando_del_ancla_no_tiene_acciones_y_lleva_la_regla_de_visibilidad(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        i = x.index(f'<CommandDefinition Id="{base}.Command">')
+        ancla = x[i:x.index("</CommandDefinition>", i)]
+        self.assertIn("<Actions />", ancla)
+        self.assertIn(f'<EnableRule Id="{base}.EnableRule" />', ancla)
+
+    def test_ni_el_ancla_ni_las_opciones_exigen_filas_seleccionadas(self):
+        # Cargar un archivo no depende de la selección; con SelectionCountAtLeastOne el menú quedaría oculto en UCI.
+        x = self.xml()
+        self.assertNotIn("Mscrm.SelectionCountAtLeastOne", x)
+
+    def test_cada_opcion_llama_a_su_funcion_con_el_control_para_refrescar(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        for opcion, funcion in (("cargar", "Sanic.Mppp.Comandos.cargarCatalogos"), ("plantilla", "Sanic.Mppp.Comandos.plantillaCarga")):
+            i = x.index(f'<CommandDefinition Id="{base}.{opcion}.Command">')
+            cuerpo = x[i:x.index("</CommandDefinition>", i)]
+            self.assertIn(f'FunctionName="{funcion}"', cuerpo)
+            self.assertIn('<CrmParameter Value="SelectedControl" />', cuerpo)
+            self.assertIn(f'<EnableRule Id="{base}.EnableRule" />', cuerpo)
+
+    def test_ancla_y_opciones_llevan_etiqueta_y_tooltip_en_cada_idioma(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        for loc in (f"{base}.Button.LabelText", f"{base}.cargar.Button.LabelText", f"{base}.plantilla.Button.ToolTipDescription"):
+            i = x.index(f'<LocLabel Id="{loc}">')
+            bloque = x[i:x.index("</LocLabel>", i)]
+            self.assertIn('languagecode="1033"', bloque)
+            self.assertIn('languagecode="3082"', bloque)
+        self.assertIn('description="Descargar plantilla"', x)
+
+    def test_un_menu_en_dos_ubicaciones_comparte_los_comandos(self):
+        x = self.xml(_boton_menu(ubicaciones=["HomepageGrid", "SubGrid"]))
+        self.assertEqual(2, x.count("<FlyoutAnchor "))
+        self.assertEqual(3, x.count("<CommandDefinition "))   # ancla + 2 opciones, una sola vez
+
+    def test_un_boton_comun_al_lado_del_menu_no_cambia(self):
+        x = self.xml(extra=[BOTON])
+        self.assertIn("Mscrm.SelectionCountAtLeastOne", x)   # el botón común sigue exigiendo selección
+        self.assertIn('FunctionName="Sanic.Mppp.Comandos.digitada"', x)
+
+    def test_generar_dos_veces_da_el_mismo_texto(self):
+        self.assertEqual(self.xml(), self.xml())
+
+
+class ValidacionDelMenu(Base):
+    """Misma vía que `ValidacionOffline`: el playbook se valida entero sin red; un error no llama al entorno."""
+
+    def componente(self, boton):
+        return dict(copy.deepcopy(COMPONENTE), cambios=[dict(CAMBIO_RIBBON, botones=[boton])])
+
+    def rechaza(self, boton, fragmento):
+        centinela = FabricaCentinela()
+        estado, _, detalle = imp.construir(self.escribir(self.componente(boton)), False, centinela)
+        self.assertEqual("error", estado, detalle)
+        self.assertIn(fragmento, detalle)
+        self.assertFalse(centinela.llamada)
+
+    def test_un_menu_bien_armado_se_acepta(self):
+        datos = json.loads(json.dumps(self.componente(_boton_menu())))
+        imp.validar_playbook(datos, IDENT)   # no lanza
+
+    def test_funcion_y_menu_juntos_se_rechaza(self):
+        self.rechaza(_boton_menu(funcion="Sanic.Mppp.Comandos.x"), "funcion")
+
+    def test_un_menu_vacio_se_rechaza(self):
+        self.rechaza(_boton_menu(menu=[]), "menu")
+
+    def test_una_opcion_sin_funcion_se_rechaza(self):
+        b = _boton_menu()
+        del b["menu"][0]["funcion"]
+        self.rechaza(b, "funcion")
+
+    def test_una_opcion_con_una_clave_de_mas_se_rechaza(self):
+        b = _boton_menu()
+        b["menu"][0]["ubicaciones"] = ["HomepageGrid"]
+        self.rechaza(b, "ubicaciones")
+
+    def test_ids_de_opcion_repetidos_se_rechazan(self):
+        b = _boton_menu()
+        b["menu"][1]["id"] = "cargar"
+        self.rechaza(b, "cargar")
+
+    def test_una_opcion_sin_texto_en_un_idioma_se_rechaza(self):
+        b = _boton_menu()
+        del b["menu"][0]["etiqueta"]["3082"]
+        self.rechaza(b, "3082")
+
+    def test_un_boton_sin_funcion_ni_menu_se_rechaza(self):
+        b = _boton_menu()
+        del b["menu"]
+        self.rechaza(b, "funcion")
+
+
 class ValidacionOffline(Base):
     def rechaza(self, componente, fragmento):
         centinela = FabricaCentinela()

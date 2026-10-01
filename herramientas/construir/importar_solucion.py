@@ -91,7 +91,11 @@ CLAVES_POR_CLASE = {
     "app_componentes": ["app", "clase", "sitemap", "tablas"],
     "ribbon": ["biblioteca", "botones", "clase", "ocultar", "tabla"],
 }
-CLAVES_BOTON = ["etiqueta", "funcion", "icono", "id", "tooltip", "ubicaciones", "secuencia"]
+CLAVES_BOTON = ["etiqueta", "icono", "id", "tooltip", "ubicaciones", "secuencia"]
+# Un botón lleva EXACTAMENTE una de las dos: `funcion` (botón común) o `menu` (menú desplegable, `FlyoutAnchor`;
+# agregado el 2026-10-01 para DN-04 de M-PPP). Ver `ribbondiffxml`.
+ACCIONES_BOTON = ["funcion", "menu"]
+CLAVES_OPCION_MENU = ["etiqueta", "funcion", "id", "secuencia", "tooltip"]
 # `regla` es OPCIONAL: la función JS que decide si el botón corresponde para lo
 # seleccionado. Sin ella el botón se muestra siempre, que es como nacieron los ocho.
 CLAVES_BOTON_OPCIONALES = ["regla"]
@@ -201,17 +205,26 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
         aqui = f"{donde}.boton[{j}]"
         exigir_forma(boton, dict, aqui, "boton")
         faltan_b = sorted(set(CLAVES_BOTON) - set(boton))
-        sobran_b = sorted(set(boton) - set(CLAVES_BOTON) - set(CLAVES_BOTON_OPCIONALES))
+        sobran_b = sorted(set(boton) - set(CLAVES_BOTON) - set(ACCIONES_BOTON) - set(CLAVES_BOTON_OPCIONALES))
         if faltan_b or sobran_b:
             raise ErrorPlaybook(
-                f"{aqui}: un botón exige {{{', '.join(CLAVES_BOTON)}}} y admite además "
+                f"{aqui}: un botón exige {{{', '.join(CLAVES_BOTON)}}}, una de {{funcion, menu}}, y admite además "
                 f"{{{', '.join(CLAVES_BOTON_OPCIONALES)}}}"
                 + (f"; faltan {faltan_b}" if faltan_b else "")
                 + (f"; sobran {sobran_b}" if sobran_b else ""))
+        acciones_b = [a for a in ACCIONES_BOTON if a in boton]
+        if len(acciones_b) != 1:
+            raise ErrorPlaybook(
+                f"{aqui}: un botón lleva exactamente una de {{funcion, menu}} (funcion: botón común; menu: menú "
+                f"desplegable); trae {acciones_b or 'ninguna'}")
         if "regla" in boton:
             exigir_forma(boton["regla"], str, aqui, "regla", no_vacio=True)
-        for campo in ("id", "funcion", "icono"):
+        for campo in ("id", "icono"):
             exigir_forma(boton[campo], str, aqui, campo, no_vacio=True)
+        if "funcion" in boton:
+            exigir_forma(boton["funcion"], str, aqui, "funcion", no_vacio=True)
+        else:
+            _validar_menu(boton["menu"], f"{aqui}.menu", idiomas)
         exigir_forma(boton["secuencia"], int, aqui, "secuencia")
         if boton["id"] in vistos:
             raise ErrorPlaybook(f"{aqui}: el id '{boton['id']}' está repetido en esta tabla")
@@ -222,6 +235,28 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
             raise ErrorPlaybook(f"{aqui}: ubicaciones {malas} no válidas; las válidas son {list(UBICACIONES)}")
         for campo in ("etiqueta", "tooltip"):
             _validar_textos(boton[campo], idiomas, f"{aqui}.{campo}")
+
+
+def _validar_menu(menu, donde, idiomas):
+    """Las opciones de un menú desplegable: al menos una, cada una con exactamente sus claves, ids sin repetir."""
+    opciones = exigir_forma(menu, [dict], donde, "menu", no_vacio=True)
+    vistos = set()
+    for k, opcion in enumerate(opciones):
+        aqui = f"{donde}[{k}]"
+        faltan = sorted(set(CLAVES_OPCION_MENU) - set(opcion))
+        sobran = sorted(set(opcion) - set(CLAVES_OPCION_MENU))
+        if faltan or sobran:
+            raise ErrorPlaybook(
+                f"{aqui}: una opción de menú exige exactamente {{{', '.join(CLAVES_OPCION_MENU)}}}"
+                + (f"; faltan {faltan}" if faltan else "") + (f"; sobran {sobran}" if sobran else ""))
+        for campo in ("id", "funcion"):
+            exigir_forma(opcion[campo], str, aqui, campo, no_vacio=True)
+        exigir_forma(opcion["secuencia"], int, aqui, "secuencia")
+        if opcion["id"] in vistos:
+            raise ErrorPlaybook(f"{aqui}: el id de opción '{opcion['id']}' está repetido en este menú")
+        vistos.add(opcion["id"])
+        for campo in ("etiqueta", "tooltip"):
+            _validar_textos(opcion[campo], idiomas, f"{aqui}.{campo}")
 
 
 def _validar_textos(textos, idiomas, donde):
@@ -272,6 +307,7 @@ def _base_id(identidad, cambio, boton):
 
 
 def _loclabels(base, boton, idiomas):
+    """Etiqueta, título y descripción de un botón (o de una opción de menú: `base` es entonces `<base>.<opcion>`)."""
     filas = []
     for sufijo, textos in (("LabelText", boton["etiqueta"]),
                            ("ToolTipTitle", boton["etiqueta"]),
@@ -286,6 +322,65 @@ def _atributo(texto):
     """Escapa lo que no puede ir crudo dentro de un atributo XML."""
     return (texto.replace("&", "&amp;").replace("<", "&lt;")
             .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _regla_propia(base, boton, cambio, reglas):
+    """La regla de habilitación propia del botón (`regla` del playbook), registrada una vez; devuelve su referencia."""
+    if not boton.get("regla"):
+        return ""
+    reglas.append(
+        f'<EnableRule Id="{base}.EnableRule">'
+        f'<CustomRule FunctionName="{boton["regla"]}" '
+        f'Library="$webresource:{cambio["biblioteca"]}" Default="false">'
+        '<CrmParameter Value="SelectedControl" />'
+        "</CustomRule></EnableRule>")
+    return f'<EnableRule Id="{base}.EnableRule" />'
+
+
+def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiquetas, reglas):
+    """Un botón con `menu` (agregado 2026-10-01, DN-04 de M-PPP). Patrón copiado del ribbon REAL de la plataforma
+    (`Mscrm.HomepageGrid.<tabla>.Flows.RefreshCommandBar.Flows`, `RetrieveEntityRibbon` en Dev): el ancla es un
+    `FlyoutAnchor` con un Command SIN acciones (solo decide si se ve) y `Menu > MenuSection (Menu16) > Controls` con un
+    `Button` por opción, cada uno con su Command. A diferencia del botón común, NI el ancla NI las opciones llevan
+    `Mscrm.SelectionCountAtLeastOne`: un menú que no actúa sobre filas seleccionadas quedaría deshabilitado, y en
+    Unified Interface un comando deshabilitado no se ve. Learn (troubleshoot "Button in command bar doesn't appear
+    after grid item selection"): los flyouts se muestran haya o no selección."""
+    propia = _regla_propia(base, boton, cambio, reglas)
+    biblioteca = cambio["biblioteca"]
+    opciones = sorted(boton["menu"], key=lambda o: o["secuencia"])
+    for ubicacion in boton["ubicaciones"]:
+        lugar = f"Mscrm.{ubicacion}.{cambio['tabla']}.{GRUPO[ubicacion]}.Controls._children"
+        botones = "".join(
+            f'<Button Command="{base}.{o["id"]}.Command" Id="{base}.{ubicacion}.{o["id"]}.Button" '
+            f'LabelText="$LocLabels:{base}.{o["id"]}.Button.LabelText" Sequence="{o["secuencia"]}" '
+            f'ToolTipTitle="$LocLabels:{base}.{o["id"]}.Button.ToolTipTitle" '
+            f'ToolTipDescription="$LocLabels:{base}.{o["id"]}.Button.ToolTipDescription" />'
+            for o in opciones)
+        acciones.append(
+            f'<CustomAction Id="{base}.{ubicacion}.CustomAction" Location="{lugar}" '
+            f'Sequence="{boton["secuencia"]}"><CommandUIDefinition>'
+            f'<FlyoutAnchor Id="{base}.{ubicacion}.FlyoutAnchor" Command="{base}.Command" '
+            f'Sequence="{boton["secuencia"]}" TemplateAlias="o1" '
+            f'LabelText="$LocLabels:{base}.Button.LabelText" '
+            f'ToolTipTitle="$LocLabels:{base}.Button.ToolTipTitle" '
+            f'ToolTipDescription="$LocLabels:{base}.Button.ToolTipDescription" '
+            f'Image16by16="$webresource:{boton["icono"]}" Image32by32="$webresource:{boton["icono"]}" '
+            f'ModernImage="$webresource:{boton["icono"]}">'
+            f'<Menu Id="{base}.{ubicacion}.Menu">'
+            f'<MenuSection Id="{base}.{ubicacion}.MenuSection" Sequence="10" DisplayMode="Menu16">'
+            f'<Controls Id="{base}.{ubicacion}.Controls">{botones}</Controls>'
+            "</MenuSection></Menu></FlyoutAnchor>"
+            "</CommandUIDefinition></CustomAction>")
+    reglas_ancla = f"<EnableRules>{propia}</EnableRules>" if propia else "<EnableRules />"
+    comandos.append(f'<CommandDefinition Id="{base}.Command">{reglas_ancla}<DisplayRules /><Actions /></CommandDefinition>')
+    etiquetas.extend(_loclabels(base, boton, idiomas))
+    for o in opciones:
+        comandos.append(
+            f'<CommandDefinition Id="{base}.{o["id"]}.Command">{reglas_ancla}<DisplayRules />'
+            f'<Actions><JavaScriptFunction FunctionName="{o["funcion"]}" Library="$webresource:{biblioteca}">'
+            '<CrmParameter Value="SelectedControl" />'
+            "</JavaScriptFunction></Actions></CommandDefinition>")
+        etiquetas.extend(_loclabels(f"{base}.{o['id']}", o, idiomas))
 
 
 def ribbondiffxml(identidad, cambio, idiomas, botones_presentes):
@@ -305,6 +400,9 @@ def ribbondiffxml(identidad, cambio, idiomas, botones_presentes):
 
     for boton in cambio["botones"]:
         base = _base_id(identidad, cambio, boton)
+        if "menu" in boton:
+            _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiquetas, reglas)
+            continue
         for ubicacion in boton["ubicaciones"]:
             lugar = f"Mscrm.{ubicacion}.{tabla}.{GRUPO[ubicacion]}.Controls._children"
             acciones.append(
