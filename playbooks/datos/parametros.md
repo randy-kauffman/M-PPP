@@ -135,11 +135,17 @@ arriba.
 **`carga.filas.maximo` se agregó el 2026-10-01 (DN-04, `diseno/DIRECTRICES-NUEVAS.md`)** con
 `parametro.py`, versión 1, valor **300**: decisión del aprobador ("arranquemos con 300 en un parámetro; lo vamos a
 medir para ajustarlo"). Lo leen las dos Custom API de catálogos masivos, con SYSTEM. Un archivo con más filas se
-rechaza entero (MPPP-CAR-006), nunca se corta. Si falta, no es entero o es menor que 1, el código usa 300. **Pendiente:
-medirlo en Dev** (pieza 6 de DN-04) y versionarlo con `parametro.py` si cambia.
+rechaza entero (MPPP-CAR-006), nunca se corta. Si falta, no es entero o es menor que 1, el código usa 300.
+
+**`carga.filas.maximo` `sanic_version=2`, valor 100 (2026-10-01, D-75, decisión del aprobador).** Medido en Dev con la sesión
+real del Administrador de planes, en el peor caso (cada fila crea cliente, plan, correo y autorización): 100 filas en 25,5 s,
+150 en 39,0 s; 200 y 300 fallan siempre a los ~40 s con el error 10928 de Azure SQL (la base corta la transacción). El tope
+por defecto del código también pasa a 100 (ensamblado 1.0.22.0), y el presupuesto de escritura a 30 s. Versionado con
+`parametro.py`.
 
 Valores con fuente:
-- `carga.filas.maximo`: `DIRECTRICES-NUEVAS.md` DN-04, decisión 8 del aprobador (2026-10-01); `02-diccionario-datos.md` §2.5.
+- `carga.filas.maximo` `sanic_version=1`: `DIRECTRICES-NUEVAS.md` DN-04, decisión 8 del aprobador (2026-10-01); `02-diccionario-datos.md` §2.5.
+- `carga.filas.maximo` `sanic_version=2`: medición D-75 (`PENDIENTES.md`) y decisión del aprobador del 2026-10-01; `DIRECTRICES-NUEVAS.md` DN-04 §Parámetro nuevo.
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
 - `correo.prefijos.reenvio`, `clasificacion.dias.vencimiento`, `rpa.puedeaprobar`: `02-diccionario-datos.md` §134-136.
 - `lectura.limites`: `03-contratos-custom-api.md` §249 (2 MB / 20 MB); los nombres de las claves salen de `Plantilla/LimitesLectura.cs`.
@@ -401,6 +407,16 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "300",
       "sanic_descripcion": "Maximo de filas no vacias por archivo en la carga y la activacion masiva de catalogos (DN-04). Inicial 300, a medir en Dev y ajustar (decision del aprobador, 2026-10-01). Un archivo con mas filas se rechaza entero (MPPP-CAR-006), nunca se corta."
+    },
+    {
+      "sanic_nombre": "carga.filas.maximo",
+      "sanic_version": 2,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Numero"
+      },
+      "sanic_valor": "100",
+      "sanic_descripcion": "Maximo de filas no vacias por archivo en la carga y la activacion masiva de catalogos (DN-04). Medido en Dev el 2026-10-01 (D-75): 100 filas de peor caso en 25,5 s; desde 200 la base corta a los ~40 s (error 10928). Un archivo con mas filas se rechaza entero (MPPP-CAR-006), nunca se corta."
     }
   ]
 }
