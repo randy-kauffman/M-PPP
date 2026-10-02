@@ -226,8 +226,8 @@ En la grilla principal de Filas, en la subgrilla de Filas de la Solicitud y en e
 | **Devolver** | Supervisor | Digitada | nota interna (diálogo) | Estado → Validada + `sanic_notainterna`. **La nota NO sale en el correo al cliente** (2026-09-24) |
 | **Atendido** · **Descartar** | Ejecutivo | Solicitud No reconocida o No es correo nuevo | confirmación | Estado → Cerrada · Descartada. Lo que nadie clasifica en 30 días pasa solo a Vencida (`07` DF-09) |
 | **Revisado** | Ejecutivo, Supervisor | Solicitud con `requiererevision` | confirmación | Apaga `requiererevision`. El step `RevisionAtendidaStep` deja el **motivo que había escrito la máquina** en la Bitácora, con quién y cuándo, y limpia `sanic_motivorevision` |
-| **Carga masiva** (DN-04, 2026-10-01, sin construir) | Administrador de planes | grilla principal de Cliente, Plan, Autorizado y AutorizacionCliente (no opera sobre la selección) | un `.xlsx`, hoja `CargaCatalogos` | `sanic_mppp_capi_cargarcatalogos`: crea Clientes, Planes, Correos y Autorizaciones por cliente, todo o nada; descarga el Excel de resultado y muestra el resumen |
-| **Activar/Desactivar masivo** (DN-04, 2026-10-01, sin construir) | Administrador de planes | ídem | un `.xlsx`, hoja `ActivarDesactivar` | `sanic_mppp_capi_cambiarestadocatalogos`: activa o desactiva registro por registro, todo o nada; ídem |
+| **Carga masiva** (DN-04, construido y verificado en Dev el 2026-10-01) | Administrador de planes | grilla principal de Cliente, Plan, Autorizado y AutorizacionCliente (no opera sobre la selección) | un `.xlsx`, hoja `CargaCatalogos` | `sanic_mppp_capi_cargarcatalogos`: crea Clientes, Planes, Correos y Autorizaciones por cliente, todo o nada; descarga el Excel de resultado y muestra el resumen |
+| **Activar/Desactivar masivo** (DN-04, construido y verificado en Dev el 2026-10-01) | Administrador de planes | ídem | un `.xlsx`, hoja `ActivarDesactivar` | `sanic_mppp_capi_cambiarestadocatalogos`: activa o desactiva registro por registro, todo o nada; ídem |
 
 > **DN-04: los dos comandos de catálogos no siguen el patrón de confirmación de los de arriba.** Cada uno es un **menú desplegable** con *Cargar archivo* y *Descargar plantilla* (decisión del aprobador, 2026-10-01). Piden un archivo, no actúan sobre filas seleccionadas, y mientras trabajan muestran el indicador nativo `Xrm.Utility.showProgressIndicator` con un mensaje por etapa. El flujo exacto del JS y los textos del resumen están en `DIRECTRICES-NUEVAS.md` DN-04 §Interfaz.
 
@@ -251,7 +251,7 @@ Una acción masiva puede fallar en algunas filas y en otras no (por ejemplo, el 
 | App y sitemap | 1 + 1 | |
 | Vistas | 20 | Lista cerrada en `05` §3 (`06` §12.2): 5 de Fila, 3 de Solicitud, activos + búsqueda de cada catálogo, y las 4 de AutorizacionPlan/AutorizacionCliente para subgrillas y "sin evidencia" |
 | Formularios | 9 | Uno por tabla con interfaz (ResultadoRegla y Bitácora solo se ven en subgrilla); incluye `AutorizacionCliente`, agregado el 2026-09-27 |
-| Comandos | 8 | Los de §5. **Hoy son 10 construidos** (fase 2 sumó *Atendida* y *Descargar para digitar*, `06` §12.5), **+2 diseñados el 2026-10-01** (DN-04: *Carga masiva* y *Activar/Desactivar masivo*, en 4 grillas cada uno) |
+| Comandos | 8 | Los de §5. **Hoy son 10 construidos** (fase 2 sumó *Atendida* y *Descargar para digitar*, `06` §12.5), **+2 construidos el 2026-10-01** (DN-04: *Carga masiva* y *Activar/Desactivar masivo*, en 4 grillas cada uno): **12** en total |
 | Tabla técnica + su creación rápida | 1 + 1 | `sanic_mppp_tbl_motivoaccion`: el diálogo de motivo (DA-03 corregida) |
 | Web resources | ~10 | Íconos SVG del sitemap y de los botones |
 | Ocultamiento de comandos genéricos | 11 tablas | DA-06 (11 desde el 2026-09-28, D-69: `AutorizacionCliente` había quedado afuera) |
