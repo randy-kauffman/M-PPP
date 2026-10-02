@@ -73,7 +73,7 @@ namespace Sanic.Mppp.Plugins.Api
             Codigo = codigo;
         }
 
-        /// <summary>"MPPP-CAR-001" a "MPPP-CAR-010".</summary>
+        /// <summary>"MPPP-CAR-001" a "MPPP-CAR-011".</summary>
         public string Codigo { get; }
     }
 
@@ -88,8 +88,9 @@ namespace Sanic.Mppp.Plugins.Api
     ///    FilaDeMas → 006; ninguna fila de datos → 007. Siempre como <see cref="CargaMasivaRechazadaException"/>, nada escrito.
     ///  - Con errores de fila: archivo de resultado y Grabado = false, NINGUNA escritura.
     ///  - Sin errores: escribe con el presupuesto (<see cref="PresupuestoSegundos"/>, medido con <c>transcurrido</c> desde el
-    ///    inicio de la llamada); presupuesto agotado → 008; una escritura que falla → 009 con su fila ("No se grabó nada").
-    ///    Las dos dejan que la excepción suba: la transacción de la Custom API deshace lo escrito (D-72).
+    ///    inicio de la llamada); presupuesto agotado → 008; una escritura que falla → 009 con su fila ("No se grabó nada"),
+    ///    salvo que su <c>ErrorCode</c> sea de plataforma (sobrecarga, límites, tiempo agotado) → 011 sin culpar a la fila (D-75).
+    ///    Las tres dejan que la excepción suba: la transacción de la Custom API deshace lo escrito (D-72).
     /// </summary>
     public sealed class CatalogosMasivos
     {
@@ -297,7 +298,7 @@ namespace Sanic.Mppp.Plugins.Api
             }
         }
 
-        // ============================================================================================ escritura (MPPP-CAR-008 y 009)
+        // ============================================================================================ escritura (MPPP-CAR-008, 009 y 011)
 
         /// <summary>
         /// Cuenta con el presupuesto ANTES de escribir (no solo dentro del escritor): si la pasada 1 ya se comió los 100 s no se
@@ -320,6 +321,12 @@ namespace Sanic.Mppp.Plugins.Api
             }
             catch (EscrituraDeCatalogoFallidaException ex)
             {
+                // Una falla de PLATAFORMA (sobrecarga, límites) no es culpa de la fila: se clasifica por ErrorCode, nunca por el texto (D-75).
+                if (FallasDePlataforma.EsDePlataforma(ex.CodigoDeError))
+                    throw new CargaMasivaRechazadaException("MPPP-CAR-011",
+                        "Dataverse estaba sobrecargado y no pudo terminar de grabar. No se grabó nada. "
+                        + "Esperá unos minutos y volvé a subir el mismo archivo; si vuelve a pasar, partilo en archivos más chicos.", ex);
+
                 var motivo = Recortar((ex.Motivo ?? string.Empty).Trim());
                 throw new CargaMasivaRechazadaException("MPPP-CAR-009",
                     "No se pudo grabar la fila " + ex.Fila.ToString(CultureInfo.InvariantCulture) + ": " + motivo + (motivo.EndsWith("\u2026", StringComparison.Ordinal) ? " " : ". ")

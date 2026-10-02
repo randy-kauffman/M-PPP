@@ -495,7 +495,7 @@ namespace Sanic.Mppp.Plugins.Datos
             catch (FaultException<OrganizationServiceFault> falla)
             {
                 var motivo = falla.Detail != null && !string.IsNullOrWhiteSpace(falla.Detail.Message) ? falla.Detail.Message : falla.Message;
-                throw new EscrituraDeCatalogoFallidaException(fila, motivo, falla);
+                throw new EscrituraDeCatalogoFallidaException(fila, motivo, falla, falla.Detail?.ErrorCode);
             }
 
             avance.Escritas++;
@@ -524,13 +524,23 @@ namespace Sanic.Mppp.Plugins.Datos
         }
 
         /// <summary>
-        /// Como la anterior, con el código de Dataverse. Mensaje: "Fila N (código 0xXXXXXXXX): motivo" si hay código, y "Fila N: motivo"
-        /// si es null. El mensaje va a la traza, nunca al usuario (D-75). FIRMA DEL ARQUITECTO (2026-10-01): la implementa el constructor.
+        /// Como la anterior, con el código de Dataverse. Mensaje: "Fila N (código 0xXXXXXXXX): motivo" si hay código (8 dígitos
+        /// hexadecimales en mayúsculas), y "Fila N: motivo" si es null. El mensaje va a la traza, nunca al usuario (D-75).
         /// </summary>
         public EscrituraDeCatalogoFallidaException(int fila, string motivo, Exception interna, int? codigoDeError)
-            : base("FIRMA SIN IMPLEMENTAR", interna)
+            : base(Mensaje(fila, motivo, codigoDeError), interna)
         {
-            throw new System.NotImplementedException();
+            Fila = fila;
+            Motivo = motivo;
+            CodigoDeError = codigoDeError;
+        }
+
+        private static string Mensaje(int fila, string motivo, int? codigoDeError)
+        {
+            var encabezado = "Fila " + fila.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (codigoDeError.HasValue)
+                encabezado += " (código 0x" + codigoDeError.Value.ToString("X8", System.Globalization.CultureInfo.InvariantCulture) + ")";
+            return encabezado + ": " + motivo;
         }
 
         /// <summary>La fila de Excel de origen de lo que no se pudo escribir.</summary>
@@ -542,9 +552,34 @@ namespace Sanic.Mppp.Plugins.Datos
         /// <summary>
         /// El <c>ErrorCode</c> del <c>OrganizationServiceFault</c>, o null si la falla no traía detalle. Con él la Custom API distingue
         /// una falla de plataforma (MPPP-CAR-011) de un error de dato (009), y va a la traza en hexadecimal (D-75).
-        /// FIRMA DEL ARQUITECTO (2026-10-01): la implementa el constructor.
         /// </summary>
-        public int? CodigoDeError => throw new System.NotImplementedException();
+        public int? CodigoDeError { get; }
+    }
+
+    /// <summary>
+    /// Los <c>ErrorCode</c> de Dataverse que son una falla de PLATAFORMA (sobrecarga, límites, tiempo agotado) y no un error del dato
+    /// que se intentó grabar (D-75). Se clasifica SIEMPRE por código, nunca por el texto del mensaje. Fuente: Learn, "Web service
+    /// error codes" y "Troubleshoot Dataverse plug-ins". Un código que no está acá es un error de dato (MPPP-CAR-009).
+    /// </summary>
+    internal static class FallasDePlataforma
+    {
+        private static readonly HashSet<int> Codigos = new HashSet<int>
+        {
+            unchecked((int)0x80072324), // AzureSqlMaxConcurrentWorkersLimitExceededError (candidato para el 10928 de Azure SQL; PENDIENTE de verificar en Dev, D-75)
+            unchecked((int)0x80072323), // AzureSqlDatabaseResourceLimitExceededError
+            unchecked((int)0x80072326), // ThrottlingConcurrencyLimitExceededError
+            unchecked((int)0x80072321), // ThrottlingTimeExceededError
+            unchecked((int)0x80072322), // ThrottlingBurstRequestLimitExceededError
+            unchecked((int)0x8005F103), // Throttling
+            unchecked((int)0x80072330), // CacheLoadConcurrencyError
+            -2147204783,                // "Sql error: Execution Timeout Expired" (Troubleshoot Dataverse plug-ins)
+        };
+
+        /// <summary>True si el código es de plataforma; null (la falla no traía detalle) nunca lo es.</summary>
+        public static bool EsDePlataforma(int? codigoDeError)
+        {
+            return codigoDeError.HasValue && Codigos.Contains(codigoDeError.Value);
+        }
     }
 
     /// <summary>Se alcanzó el presupuesto de tiempo antes de terminar (MPPP-CAR-008).</summary>
