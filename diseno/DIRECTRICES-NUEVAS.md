@@ -653,7 +653,7 @@ filas. **Decisión del aprobador (2026-10-01):** tope de 100 filas: el peor caso
 presupuesto de 30 s. Si la base está más lenta, puede cortar nuestro MPPP-CAR-008, con su mensaje claro, y ese es el
 propósito del presupuesto. Y el presupuesto de
 escritura baja de 100 s a **30 s**, para que corte nuestro MPPP-CAR-008, con su mensaje claro, antes que la base. El tope de
-la base de Producción no está medido.
+la base de Producción no se mide (descartado por el aprobador el 2026-10-02, D-75).
 
 ## Abierto
 
