@@ -9231,7 +9231,7 @@ Evidencia citada en la tabla:
 | L-01 los dos menús en las cuatro grillas (Administrador de planes) | EJECUTADO — OK | [GUI]: las cuatro pruebas `<grilla>: los dos menús están...`, 3 corridas seguidas en verde |
 | L-02 el Ejecutivo no ve los menús | EJECUTADO — OK | [GUI]: las cuatro pruebas `un Ejecutivo no ve los menús...`, 1 corrida en verde |
 | L-03 Supervisor y Administrador técnico no los ven | EJECUTADO — OK | [GUI 2026-10-02]: Supervisor, sin menús en las 4 grillas. Administrador técnico: las 4 saltadas porque su sitemap no tiene el área Catalogos (coincide con la matriz de `04`) |
-| L-04 los menús siguen el idioma de la interfaz | PENDIENTE | Reescrito el 2026-10-02 al cerrar D-74 (las cuatro tablas pasan a etiquetas localizadas): se corre después de importar el ribbon y regenerar la metadata. La mitad en 3082 es N-A: Dev solo tiene 1033 instalado |
+| L-04 los menús siguen el idioma de la interfaz | EJECUTADO — OK (1033); 3082 N-A | [correr.py 2026-10-02, segunda corrida, 57 OK]: con las cuatro tablas en etiquetas localizadas y la metadata regenerada, en una interfaz en inglés (el botón nativo dice "New") ancla y opciones dicen EXACTAMENTE "Bulk load", "Bulk activate/deactivate", "Upload file" y "Download template". La mitad en 3082 es N-A: Dev solo tiene 1033 instalado |
 | L-05 plantilla `CargaCatalogos.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 12 encabezados con Resultado en L, sin filas |
 | L-06 plantilla `ActivarDesactivar.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 7 encabezados con Resultado en G, sin filas |
 | L-07 plantilla = resultado = archivo corregido | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `ExcelDeCatalogosAceptacion.cs`. No se re-subió un resultado corregido en Dev |
@@ -9290,7 +9290,7 @@ Evidencia citada en la tabla:
 
 | Grupo | Casos | EJECUTADO — OK | CUBIERTO POR PRUEBAS AUTOMÁTICAS | PENDIENTE |
 |---|---|---|---|---|
-| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 7 | 1 | 1 |
+| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 8 | 1 | 0 |
 | 2 — Códigos de archivo `MPPP-CAR-001` a `011` (L-10 a L-21) | 12 | 4 | 8 | 0 |
 | 3 — Excel 1: reglas por fila (L-22 a L-34) | 13 | 0 | 13 | 0 |
 | 4 — Excel 2: reglas por fila (L-35 a L-42) | 8 | 2 | 6 | 0 |
@@ -9299,4 +9299,4 @@ Evidencia citada en la tabla:
 | 7 — Dueño y permisos (L-49 a L-51) | 3 | 3 | 0 | 0 |
 | 8 — Comentarios (L-52 a L-56) | 5 | 3 | 2 | 0 |
 | 9 — Parámetro (L-57) | 1 | 0 | 1 | 0 |
-| **Total** | **57** | **23** | **33** | **1** |
+| **Total** | **57** | **24** | **33** | **0** |
