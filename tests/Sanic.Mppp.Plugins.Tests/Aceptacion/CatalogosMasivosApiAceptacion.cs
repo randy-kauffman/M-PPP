@@ -135,6 +135,18 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void Encabezados_en_otro_orden_son_MPPP_CAR_005_y_el_mensaje_nombra_los_que_no_coinciden()
+        {
+            // DN-04 §Lectura: "si falta, sobra o está fuera de orden cualquiera, se rechaza y el mensaje nombra cuáles". Hueco
+            // que encontró el redactor del set 12 (2026-10-01): había prueba de encabezado distinto y de columna de más, no de orden.
+            var cambiados = EncabezadosCarga().Select(t => t == "Tipo formato" ? "Moneda" : t == "Moneda" ? "Tipo formato" : t);
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(Catalogos(out _), Sistema()).Cargar(ArchivoCrudo("CargaCatalogos", cambiados)));
+            Assert.Equal("MPPP-CAR-005", ex.Codigo);
+            Assert.Contains("Tipo formato", ex.Message);
+            Assert.Contains("Moneda", ex.Message);
+        }
+
+        [Fact]
         public void Un_archivo_que_supera_lectura_limites_es_MPPP_CAR_003()
         {
             var n = Nucleo(Catalogos(out _), Sistema(limites: @"{""maximoBytesComprimido"":10,""maximoBytesDescomprimido"":20000000}"));

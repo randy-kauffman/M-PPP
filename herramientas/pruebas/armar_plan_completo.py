@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Arma `pruebas/PLAN-COMPLETO.md` concatenando `pruebas/README.md` + los 12
-archivos numerados de `pruebas/` (`00-preparacion.md` a `11-exportacion-excel.md`),
+"""Arma `pruebas/PLAN-COMPLETO.md` concatenando `pruebas/README.md` + los 13
+archivos numerados de `pruebas/` (`00-preparacion.md` a `12-catalogos-masivos.md`),
 para leerlos de corrido sin abrir uno por uno.
 
     python3 herramientas/pruebas/armar_plan_completo.py
@@ -18,7 +18,7 @@ de verdad del orden y de qué entra.
   (título) y se lo reemplaza por el encabezado fijo `## Índice y cómo
   usarlo`; el resto de sus encabezados (`## Cómo está organizado`, etc.) NO
   se tocan — quedan como secciones hermanas de "Índice y cómo usarlo".
-- Cada uno de los 12 archivos numerados entra con TODOS sus encabezados
+- Cada uno de los 13 archivos numerados entra con TODOS sus encabezados
   corridos un nivel (`#` → `##`, `##` → `###`, `###` → `####`, ...), así su
   título (`# 00 — Preparación`) pasa a ser la sección (`## 00 — ...`) y sus
   casos (`## P-01 · ...`) pasan a ser subsecciones (`### P-01 · ...`).
@@ -39,7 +39,8 @@ README = os.path.join(PRUEBAS, "README.md")
 SALIDA = os.path.join(PRUEBAS, "PLAN-COMPLETO.md")
 
 # Orden canónico de los archivos de casos (`CONVENCIONES.md` §4): el mismo
-# que usa `herramientas/pruebas/sets/__init__.py` para C/S/R/M/A/G/V/I/B/U/E,
+# que usa `herramientas/pruebas/sets/__init__.py` para C/S/R/M/A/G/V/I/B/U/E (el set L,
+# `12-catalogos-masivos.md`, todavía no tiene arnés propio),
 # pero acá por nombre de archivo, no por letra (00-preparacion.md no tiene
 # letra: el set P desapareció, pero el archivo sigue siendo parte del plan).
 #
@@ -61,6 +62,7 @@ ARCHIVOS = [
     "09-rpa-fase2.md",
     "10-autorizacion-cliente.md",
     "11-exportacion-excel.md",
+    "12-catalogos-masivos.md",
 ]
 
 _ENCABEZADO = re.compile(r"^(#{1,6})(\s.*)?$")
@@ -108,7 +110,7 @@ def armar():
         f"Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · "
         f"generado el {hoy} por `herramientas/pruebas/armar_plan_completo.py`",
         "",
-        "Este documento junta `README.md` y los 12 archivos de `pruebas/` en uno solo, para",
+        "Este documento junta `README.md` y los 13 archivos de `pruebas/` en uno solo, para",
         "leerlo de corrido. Los archivos separados (y los Excel) están en el repositorio, en",
         "`pruebas/`. **No lo edites a mano**: si editás algo, editalo en el archivo separado y",
         "volvé a correr `python3 herramientas/pruebas/armar_plan_completo.py`.",

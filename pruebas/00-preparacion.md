@@ -211,7 +211,8 @@ conteo total: total envejece con cada parámetro nuevo de fases posteriores):
 > y no son de fase 1 son `autorizacion.modo` (DN-01, 2026-09-26), `exportacion.columnas` (DN-02,
 > 2026-09-26), `rpa.codigos`, `rpa.horas.tolerancia`, `rpa.lote.maximo` y `rpa.minutos.claimmaximo`
 > (fase 2, 2026-09-25/26). El criterio correcto para este caso es "al menos estos 13 activos", no
-> un total exacto.
+> un total exacto. **Después se agregó `carga.filas.maximo`** (DN-04, 2026-10-01): la versión 2 vale
+> **100** (medido en Dev, D-75) y es la que tienen que encontrar los casos del set L (`12-catalogos-masivos.md`).
 
 Los que más van a importar:
 

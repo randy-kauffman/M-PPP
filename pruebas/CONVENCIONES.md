@@ -120,6 +120,7 @@ reagrupamiento de sets (13 → 11; la tabla de equivalencias completa, viejo →
 | `B` | `09-rpa-fase2.md` (Bot) |
 | `U` | `10-autorizacion-cliente.md` (aUtorización) |
 | `E` | `11-exportacion-excel.md` |
+| `L` | `12-catalogos-masivos.md` (**L**ote: carga y cambio de estado de catálogos en lote, DN-04; agregada el 2026-10-01. `O` y `H` no se reusan: eran de los sets retirados el 2026-09-28) |
 
 Un archivo nuevo elige una letra libre y **la agrega a esta tabla en el mismo commit**. Un ID
 asignado no se reusa ni se renumera: se referencia desde otros documentos y desde los módulos de `herramientas/pruebas/sets/`.
@@ -348,8 +349,9 @@ Estos parámetros **cambian el comportamiento de todo el entorno**:
 | `rpa.horas.tolerancia` | Ventana de fecha aceptable | `24` |
 | `rpa.minutos.claimmaximo` | Duración de un claim | `60` |
 | `exportacion.columnas` | Orden de columnas del Excel (DN-02) | el sembrado por `parametros.md` |
+| `carga.filas.maximo` | Tope de filas por archivo de la carga y la activación masiva (DN-04) | `100` (versión 2) |
 
-Valores verificados contra Dev el 2026-09-27.
+Valores verificados contra Dev el 2026-09-27; `carga.filas.maximo`, el 2026-10-01 (D-75).
 
 La regla es: **al terminar, el set deja cada parámetro global en su valor canónico.** No restaura el
 valor que encontró: lo lleva al canon.

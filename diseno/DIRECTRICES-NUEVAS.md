@@ -366,7 +366,7 @@ su correo y no valida todo el archivo antes de grabar. Confirmado por el aprobad
 | 5 | **Todo o nada.** Se valida el archivo entero sin grabar; con un solo error no se graba nada | confirmado |
 | 6 | **Comentarios solo en `AutorizacionCliente`**, no en `AutorizacionPlan` | confirmado |
 | 7 | **Dos Custom API** (carga y cambio de estado), **dos botones**, cada botón **en las cuatro grillas**: Clientes, Planes, Correos autorizados, Autorizaciones por cliente | confirmado |
-| 8 | **Tope de 300 filas por archivo, en un parámetro**, a medir contra Dev y ajustar | confirmado |
+| 8 | **Tope de 300 filas por archivo, en un parámetro**, a medir contra Dev y ajustar | confirmado; **medido y bajado a 100 el 2026-10-01** (D-75, §Parámetro nuevo) |
 | 9 | Motivos de error **claros y con el número de fila** | confirmado |
 | 10 | **Indicador de progreso nativo con un mensaje por etapa**, no barra de porcentaje. Un porcentaje real exige partir la carga en varias llamadas, y eso rompe el todo o nada (si falla la tercera tanda, las dos primeras ya quedaron grabadas) | confirmado |
 | 11 | **Sin mockup HTML** (excepción a la regla del proyecto): no hay pantallas nuevas, solo botones sobre grillas existentes. Lo único de interfaz nuevo, el resumen en pantalla, queda especificado abajo para que nadie lo invente | confirmado |
@@ -458,7 +458,8 @@ de la fila. Por la desnormalización, el mismo cliente y el mismo correo se repi
 15. **La misma clave tiene que tener los mismos datos en todas sus filas.** *Precisado el 2026-10-01 (revisión del código):* esto rige para lo que el archivo **crea**. Sobre lo que **ya existe**, cada fila se compara contra lo grabado (reglas 3, 6, 10 y 12), así que solo lleva error la fila que lo contradice; la que coincide está bien. Es más preciso que marcar todas: le dice al usuario cuál de las dos corregir. Para cliente, plan, correo y autorización, comparando entre las filas solo las celdas que vienen llenas (las vacías no contradicen). Ejemplo: `000123456` con dos razones sociales distintas → error **en todas las filas involucradas**, nombrándolas ("filas 3 y 9").
 16. Un mismo CIF BAC con dos CIF COM distintos en el archivo (o al revés) → error en esas filas.
 
-**Lo que NO es error.** Una fila donde todo ya existía queda "Sin cambios: todo ya existía". El
+**Lo que NO es error.** Una fila donde todo ya existía queda "Sin cambios: todo ya existía o lo crea una fila anterior" (texto
+del código desde la pieza 2: la segunda fila de un cliente que el mismo archivo crea tampoco crea nada por sí misma). El
 archivo se puede volver a subir sin efectos (carga idempotente); si una carga se cortó, se repite
 entera.
 
@@ -592,7 +593,8 @@ final, **Resultado**, y la fila 1 de encabezados igual.
 "Carga masiva" y "Activar/Desactivar masivo", **cada uno es un menú desplegable** (`FlyoutAnchor`, el primero
 del proyecto) con dos opciones: *Cargar archivo* (el flujo de abajo) y *Descargar plantilla* (llama a la
 Custom API con `plantilla = true` y descarga `CargaCatalogos.xlsx` o `ActivarDesactivar.xlsx`, con el
-indicador "Generando la plantilla…"). Los textos de las opciones también van en 1033 y 3082. con texto embebido **en 1033 y 3082** (`01` §0) e ícono
+indicador "Generando la plantilla…"). El playbook guarda los textos en 1033 y 3082, pero el menú muestra el texto fijo en
+español (ver el párrafo de abajo, D-74), y lleva ícono
 propio (`recursos/svg/`). Van en la **grilla principal** de las cuatro tablas. Los ve **solo el
 Administrador de planes**: Ejecutivo y Supervisor solo leen catálogos. La regla real igual es el
 privilegio de la Custom API.
@@ -646,7 +648,9 @@ falta, se usa un valor quemado de **100** (mismo criterio que `rpa.horas.toleran
 **Medición (D-75, peor caso: cada fila crea cliente, plan, correo y autorización, con la sesión real del Administrador de
 planes):** 50 filas en 14,0 s, 100 en 25,5 s y 150 en 39,0 s, todas grabadas. 200 y 300 fallaron siempre a los ~40 s con el
 error 10928 de Azure SQL (tope de workers de la base). En Dev el techo es de **tiempo de transacción abierta (~40 s)**, no de
-filas. **Decisión del aprobador (2026-10-01):** tope de 100 filas (36% de margen en el peor caso), y el presupuesto de
+filas. **Decisión del aprobador (2026-10-01):** tope de 100 filas: el peor caso tardó 25,5 s, con 36% de margen frente al corte de la base (~40 s) y unos 15% frente al
+presupuesto de 30 s. Si la base está más lenta, puede cortar nuestro MPPP-CAR-008, con su mensaje claro, y ese es el
+propósito del presupuesto. Y el presupuesto de
 escritura baja de 100 s a **30 s**, para que corte nuestro MPPP-CAR-008, con su mensaje claro, antes que la base. El tope de
 la base de Producción no está medido.
 

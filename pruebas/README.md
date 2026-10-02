@@ -27,11 +27,19 @@ archivo, prepara por su cuenta todo lo que necesita) con su letra, corrido por
 | B | [`09-rpa-fase2.md`](09-rpa-fase2.md) | El bot RPA: Custom API, claim, orden FIFO, catálogo de errores | 20 |
 | U | [`10-autorizacion-cliente.md`](10-autorizacion-cliente.md) | DN-01: autorización por cliente, con interruptor a plan | 11 |
 | E | [`11-exportacion-excel.md`](11-exportacion-excel.md) | DN-02: descargar a Excel lo que hay que digitar | 10 |
+| L | [`12-catalogos-masivos.md`](12-catalogos-masivos.md) | DN-04: carga masiva y activación masiva de catálogos por Excel (menús, plantillas, `MPPP-CAR-001` a `011`, reglas por fila, todo o nada, dueño del cliente nuevo) y Comentarios en la autorización por cliente | 57 |
 
-**149 casos** (contados de los encabezados de caso de cada archivo el 2026-09-28, no de un número
-viejo — el reagrupamiento de sets solo movió casos, no agregó ni sacó ninguno: el total es el mismo
-que el 2026-09-27, cuando todavía eran 13 archivos). Cada uno trae: qué prueba, cómo hacerlo, **qué
-tiene que pasar** y cómo verificarlo.
+**206 casos** (contados de los encabezados de caso de cada archivo el 2026-10-01: los 149 de los
+sets C a E, contados el 2026-09-28 después del reagrupamiento de sets, más los 57 del set L). Cada uno
+trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
+
+> **Set L, nota al 2026-10-01.** El set L **todavía no tiene `herramientas/pruebas/sets/set_l.py`**:
+> `correr.py` no lo conoce y `--listar` no lo muestra. Su archivo trae el estado de cada caso en su
+> tabla `## Resultados`, con tres estados que **no se mezclan**: *EJECUTADO — OK* (con evidencia
+> citada: el arnés de Playwright `pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs` y las
+> mediciones de Dev de D-73/D-75), *CUBIERTO POR PRUEBAS AUTOMÁTICAS* (solo la suite de C#, sin
+> correr en Dev: no es un OK) y *PENDIENTE*. Al 2026-10-01: 13 ejecutados, 34 cubiertos por pruebas
+> automáticas y 10 pendientes.
 
 > **Set G, nota al 2026-09-28.** El archivo documenta 20 casos (`G-06` quedó fusionada en `G-00`/
 > `G-00b`, así que no cuenta como caso aparte). De esos 20, tres siguen siendo GUI sin arnés todavía
