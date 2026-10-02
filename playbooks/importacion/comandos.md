@@ -644,7 +644,100 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
       "clase": "ribbon",
       "tabla": "sanic_mppp_tbl_plan",
       "biblioteca": "sanic_mppp_wr_js_comandos",
-      "botones": [],
+      "botones": [
+        {
+          "id": "cargamasiva",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdcargamasiva",
+          "etiqueta": {
+            "1033": "Bulk load",
+            "3082": "Carga masiva"
+          },
+          "tooltip": {
+            "1033": "Bulk load of clients, plans, emails and client authorizations from Excel.",
+            "3082": "Carga masiva de clientes, planes, correos y autorizaciones por cliente desde Excel."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 80,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cargarCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCarga",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        },
+        {
+          "id": "activardesactivar",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdactivardesactivar",
+          "etiqueta": {
+            "1033": "Bulk activate/deactivate",
+            "3082": "Activar/Desactivar masivo"
+          },
+          "tooltip": {
+            "1033": "Activates or deactivates clients, plans, emails and client authorizations from Excel.",
+            "3082": "Activa o desactiva desde Excel clientes, planes, correos y autorizaciones por cliente."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 90,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cambiarEstadoCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCambioEstado",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        }
+      ],
       "ocultar": [
         ".Abandon",
         ".AddAppointment",
@@ -728,7 +821,100 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
       "clase": "ribbon",
       "tabla": "sanic_mppp_tbl_autorizado",
       "biblioteca": "sanic_mppp_wr_js_comandos",
-      "botones": [],
+      "botones": [
+        {
+          "id": "cargamasiva",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdcargamasiva",
+          "etiqueta": {
+            "1033": "Bulk load",
+            "3082": "Carga masiva"
+          },
+          "tooltip": {
+            "1033": "Bulk load of clients, plans, emails and client authorizations from Excel.",
+            "3082": "Carga masiva de clientes, planes, correos y autorizaciones por cliente desde Excel."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 80,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cargarCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCarga",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        },
+        {
+          "id": "activardesactivar",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdactivardesactivar",
+          "etiqueta": {
+            "1033": "Bulk activate/deactivate",
+            "3082": "Activar/Desactivar masivo"
+          },
+          "tooltip": {
+            "1033": "Activates or deactivates clients, plans, emails and client authorizations from Excel.",
+            "3082": "Activa o desactiva desde Excel clientes, planes, correos y autorizaciones por cliente."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 90,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cambiarEstadoCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCambioEstado",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        }
+      ],
       "ocultar": [
         ".Abandon",
         ".AddAppointment",
@@ -896,7 +1082,100 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
       "clase": "ribbon",
       "tabla": "sanic_mppp_tbl_autorizacioncliente",
       "biblioteca": "sanic_mppp_wr_js_comandos",
-      "botones": [],
+      "botones": [
+        {
+          "id": "cargamasiva",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdcargamasiva",
+          "etiqueta": {
+            "1033": "Bulk load",
+            "3082": "Carga masiva"
+          },
+          "tooltip": {
+            "1033": "Bulk load of clients, plans, emails and client authorizations from Excel.",
+            "3082": "Carga masiva de clientes, planes, correos y autorizaciones por cliente desde Excel."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 80,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cargarCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCarga",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        },
+        {
+          "id": "activardesactivar",
+          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
+          "icono": "sanic_mppp_wr_svg_cmdactivardesactivar",
+          "etiqueta": {
+            "1033": "Bulk activate/deactivate",
+            "3082": "Activar/Desactivar masivo"
+          },
+          "tooltip": {
+            "1033": "Activates or deactivates clients, plans, emails and client authorizations from Excel.",
+            "3082": "Activa o desactiva desde Excel clientes, planes, correos y autorizaciones por cliente."
+          },
+          "ubicaciones": [
+            "HomepageGrid"
+          ],
+          "secuencia": 90,
+          "idioma_del_texto": 3082,
+          "menu": [
+            {
+              "id": "cargar",
+              "funcion": "Sanic.Mppp.Comandos.cambiarEstadoCatalogos",
+              "secuencia": 10,
+              "etiqueta": {
+                "1033": "Upload file",
+                "3082": "Cargar archivo"
+              },
+              "tooltip": {
+                "1033": "Uploads the filled-in Excel template and processes it: all or nothing.",
+                "3082": "Sube la plantilla de Excel completada y la procesa: todo o nada."
+              }
+            },
+            {
+              "id": "plantilla",
+              "funcion": "Sanic.Mppp.Comandos.plantillaCambioEstado",
+              "secuencia": 20,
+              "etiqueta": {
+                "1033": "Download template",
+                "3082": "Descargar plantilla"
+              },
+              "tooltip": {
+                "1033": "Downloads the empty Excel template with the expected columns.",
+                "3082": "Descarga la plantilla de Excel vacía con las columnas esperadas."
+              }
+            }
+          ]
+        }
+      ],
       "ocultar": [
         ".Abandon",
         ".AddAppointment",

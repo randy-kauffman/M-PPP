@@ -31,12 +31,15 @@ const ENCABEZADOS_CARGA = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecuti
   "Moneda", "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"];
 const ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"];
 
+// Mismo nombre de área que usa A-02 (casos/a-02-comandos-genericos-ocultos.spec.mjs).
+const AREA_CATALOGOS = "Catalogos"; // sin tilde, como la expone la plataforma (selectores.mjs, TABLAS_A02)
+
 const usuario = usuarioActivo();
 test.use({ storageState: verificarSesionExiste(usuario) });
 
 async function abrirClientes(page) {
   await abrirApp(page);
-  await irASitemap(page, SITEMAP.clientes);
+  await irASitemap(page, SITEMAP.clientes, AREA_CATALOGOS); // "Clientes" vive en el área Catálogos; la app abre en Trabajo
   await esperarGrilla(page, { permitirVacia: true });
 }
 
