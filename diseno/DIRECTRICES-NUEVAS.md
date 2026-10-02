@@ -594,6 +594,15 @@ privilegio de la Custom API.
 
 El indicador es modal: mientras está abierto no se puede volver a hacer clic.
 
+**Los menús llevan texto fijo en español, no etiquetas localizadas** (decisión del aprobador, 2026-10-01; excepción
+declarada a la regla de multiidioma, `01` §0). Comprobado en Dev: Unified Interface **no resuelve `$LocLabels` dentro de
+un `FlyoutAnchor`**. Las etiquetas quedaban guardadas (`ribbondiff`, tipo 3) pero `GetClientMetadata` no las mandaba, y
+el menú y sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto directo en `LabelText`
+lo admite el ribbon (Learn, "Use localized labels with ribbons") y **no depende de los idiomas instalados**: se ve igual
+en cualquier entorno, también para un usuario con la interfaz en inglés. El playbook conserva los textos en 1033 y 3082
+y declara `idioma_del_texto: 3082`. Si se necesitara multiidioma acá, la alternativa probada son botones simples
+(LocLabels sí funciona en un `Button`, como en Fila).
+
 ### Contrato del JS (`recursos/js/comandos.js`, fijado el 2026-10-01 para la pieza 5)
 
 Funciones públicas nuevas de `Sanic.Mppp.Comandos`, todas reciben el control de la grilla (`SelectedControl`):
