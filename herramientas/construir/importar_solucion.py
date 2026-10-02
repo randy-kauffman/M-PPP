@@ -240,17 +240,16 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
             _validar_menu(boton["menu"], f"{aqui}.menu", idiomas)
             # Un menú declara SIEMPRE cómo lleva su texto, y una sola forma: nunca vuelve a $LocLabels por omisión.
             if "idioma_del_texto" in boton and "etiquetas_localizadas" in boton:
-                raise ErrorPlaybook(f"{aqui}: un menú lleva 'idioma_del_texto' (texto fijo) o 'etiquetas_localizadas' "
-                                    "($LocLabels, experimento D-74 de M-PPP), no los dos")
+                raise ErrorPlaybook(f"{aqui}: un menú lleva 'etiquetas_localizadas' ($LocLabels, lo recomendado) o "
+                                    "'idioma_del_texto' (texto fijo en un idioma), no los dos")
             if "etiquetas_localizadas" in boton:
                 if boton["etiquetas_localizadas"] is not True:
                     raise ErrorPlaybook(f"{aqui}: 'etiquetas_localizadas' solo admite true; para texto fijo se usa "
                                         "'idioma_del_texto'")
             elif "idioma_del_texto" not in boton:
                 raise ErrorPlaybook(
-                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}) o 'etiquetas_localizadas': "
-                    "en Dev, Unified Interface no mostró $LocLabels dentro de un FlyoutAnchor (D-74 de M-PPP), así que el "
-                    "menú lleva texto fijo salvo que se declare el experimento")
+                    f"{aqui}: un botón con 'menu' declara cómo lleva su texto: 'etiquetas_localizadas': true ($LocLabels, "
+                    f"un texto por idioma, lo recomendado) o 'idioma_del_texto' (texto fijo, uno de {idiomas})")
             else:
                 exigir_forma(boton["idioma_del_texto"], int, aqui, "idioma_del_texto")
                 if boton["idioma_del_texto"] not in idiomas:
@@ -376,14 +375,13 @@ def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiqueta
     Unified Interface un comando deshabilitado no se ve. Learn (troubleshoot "Button in command bar doesn't appear
     after grid item selection"): los flyouts se muestran haya o no selección.
 
-    TEXTO FIJO, NO `$LocLabels` (observado en Dev el 2026-10-01; no demostrado imposible, D-74 de M-PPP): Unified
-    Interface no mostró LocLabels dentro de un FlyoutAnchor. Las etiquetas quedaban guardadas en `ribbondiff` pero `GetClientMetadata` no las mandaba, y el menú y
-    sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto va en el idioma que declara
-    `idioma_del_texto` (decisión del aprobador: español). Learn ("Use localized labels with ribbons"): el ribbon admite
-    texto directo, que no depende de los idiomas instalados en el entorno.
-
-    Con `etiquetas_localizadas` (D-74, 2026-10-02: el experimento controlado), el ancla y cada opción apuntan a sus
-    `$LocLabels` (ids `<base>.Button.*` y `<base>.<opcion>.Button.*`), con un texto por idioma, como un botón común."""
+    TEXTO: con `etiquetas_localizadas` (lo recomendado) el ancla y cada opción apuntan a sus `$LocLabels` (ids
+    `<base>.Button.*` y `<base>.<opcion>.Button.*`), con un texto por idioma, como un botón común. Funciona dentro de un
+    FlyoutAnchor: lo probó el experimento controlado D-74 de M-PPP (2026-10-02), con la metadata regenerada DESPUÉS de
+    importar (un menú localizado mostró "Bulk load" en una interfaz en inglés; el de control, con texto fijo, siguió en
+    español). El "LabelText" del 2026-10-01 que había hecho creer lo contrario fue metadata vieja. Con `idioma_del_texto`
+    el texto va fijo en ese idioma (Learn, "Use localized labels with ribbons": el ribbon admite texto directo); queda
+    para un caso que lo pida, no como regla."""
     propia = _regla_propia(base, boton, cambio, reglas)
     biblioteca = cambio["biblioteca"]
     opciones = sorted(boton["menu"], key=lambda o: o["secuencia"])

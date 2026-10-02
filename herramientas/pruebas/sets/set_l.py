@@ -573,7 +573,7 @@ def l03(ctx):
 def l04(ctx):
     c = _caso("L-04")
     _chequear_gui(c, ctx, "admin_planes", [
-        f"{D_ADMIN} › L-04: con la interfaz en inglés, los menús llevan texto fijo en español y un botón nativo sale en inglés"])
+        f"{D_ADMIN} › L-04: con la interfaz en inglés, los menús salen en inglés (siguen el idioma) y un botón nativo también"])
     # La mitad en 3082 no se puede correr: Dev solo tiene 1033 instalado (instalar un idioma no lo hace un set).
     est, r, _ = ctx.dv.call("GET", "RetrieveProvisionedLanguages()")
     idiomas = (r or {}).get("RetrieveProvisionedLanguages") or []
@@ -1002,7 +1002,7 @@ TITULOS = {
     'L-01': 'El Administrador de planes ve los dos menús, con sus dos opciones, en las cuatro grillas',
     'L-02': 'El Ejecutivo no ve ninguno de los dos menús, en ninguna de las cuatro grillas',
     'L-03': 'El Supervisor y el Administrador técnico tampoco ven los menús',
-    'L-04': 'Los menús llevan texto fijo en español, también con la interfaz en inglés',
+    'L-04': 'Los menús siguen el idioma de la interfaz',
     'L-05': '"Descargar plantilla" de Carga masiva baja `CargaCatalogos.xlsx` vacía, con sus encabezados',
     'L-06': '"Descargar plantilla" de Activar/Desactivar baja `ActivarDesactivar.xlsx` vacía, con sus encabezados',
     'L-07': 'Plantilla, archivo de resultado y archivo corregido tienen la misma forma: se baja, se corrige y se vuelve a subir tal cual',

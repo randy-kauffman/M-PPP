@@ -395,10 +395,9 @@ class RibbonConMenu(unittest.TestCase):
             self.assertIn(f'<EnableRule Id="{base}.EnableRule" />', cuerpo)
 
     def test_ancla_y_opciones_llevan_texto_fijo_en_el_idioma_declarado_y_ningun_LocLabel(self):
-        # Unified Interface NO resuelve $LocLabels dentro de un FlyoutAnchor (comprobado en Dev el 2026-10-01: el
-        # servidor guarda las etiquetas en ribbondiff, pero GetClientMetadata no las manda y el menú dice "LabelText").
-        # Decisión del aprobador: texto fijo, en español. Learn: el ribbon admite texto directo ("direct entry of text"),
-        # que no depende de los idiomas instalados.
+        # El modo de texto fijo (`idioma_del_texto`). Learn: el ribbon admite texto directo ("direct entry of text"), que
+        # no depende de los idiomas instalados. Ya no es la regla de los menús: D-74 (2026-10-02) probó que $LocLabels
+        # funciona dentro de un FlyoutAnchor con la metadata regenerada después de importar.
         x = self.xml()
         self.assertNotIn("$LocLabels:", x)
         self.assertNotIn("<LocLabel ", x)
@@ -428,7 +427,7 @@ class RibbonConMenu(unittest.TestCase):
 
 
 def _boton_menu_localizado():
-    """D-74 (2026-10-02): el experimento controlado. El mismo menú, con `etiquetas_localizadas` en vez de texto fijo."""
+    """El mismo menú, con `etiquetas_localizadas` (la forma recomendada desde D-74, 2026-10-02) en vez de texto fijo."""
     b = _boton_menu()
     del b["idioma_del_texto"]
     b["etiquetas_localizadas"] = True
@@ -436,8 +435,9 @@ def _boton_menu_localizado():
 
 
 class RibbonConMenuLocalizado(unittest.TestCase):
-    """D-74: un menú con `$LocLabels`, para comprobar en Dev, con la metadata regenerada DESPUÉS de importar, si Unified
-    Interface las resuelve dentro de un `FlyoutAnchor`. La evidencia del 2026-10-01 quedó mezclada con metadata vieja."""
+    """Un menú con `$LocLabels`. D-74 (2026-10-02) probó en Dev que Unified Interface las resuelve dentro de un
+    `FlyoutAnchor` cuando la metadata se regenera DESPUÉS de importar ("Bulk load" en una interfaz en inglés); el
+    "LabelText" del 2026-10-01 fue metadata vieja."""
 
     def xml(self):
         cambio = dict(CAMBIO_RIBBON, botones=[_boton_menu_localizado()])

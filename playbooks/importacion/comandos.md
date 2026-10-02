@@ -15,12 +15,12 @@ plataforma son GLOBALES (`Mscrm.DeleteSelectedRecord`, `Mscrm.AssignSelectedReco
 ese boton en TODAS las tablas del entorno, incluidas las de los otros proyectos del estudio.
 El id del boton si lleva la tabla. Verificado con `RetrieveEntityRibbon` el 2026-09-22.
 
-**Experimento D-74 (2026-10-02, orden del aprobador): los dos menús de `sanic_mppp_tbl_autorizacioncliente` llevan
-`"etiquetas_localizadas": true`** en vez del texto fijo de las otras tres tablas, que quedan como control. Pregunta:
-con la metadata del ribbon regenerada DESPUÉS de importar, ¿Unified Interface resuelve `$LocLabels` dentro de un
-`FlyoutAnchor`? (La evidencia del 2026-10-01 quedó mezclada con metadata vieja.) Con la interfaz en inglés, el menú
-tiene que decir "Bulk load". Según el resultado, o las cuatro tablas pasan a etiquetas localizadas, o esta vuelve a
-`"idioma_del_texto": 3082` y D-74 se cierra como límite de la plataforma (`diseno/PENDIENTES.md`).
+**Menús desplegables con etiquetas localizadas (D-74, cerrada el 2026-10-02).** Los dos menús de las cuatro tablas
+de catálogos llevan `"etiquetas_localizadas": true`: `$LocLabels` con un texto por idioma, como cualquier botón. El
+experimento controlado lo probó: con la metadata del ribbon regenerada DESPUÉS de importar, una tabla con
+`$LocLabels` mostró "Bulk load" en una interfaz en inglés, mientras la tabla de control con texto fijo seguía
+diciendo "Carga masiva". El "LabelText" del 2026-10-01 fue metadata vieja (la regeneración se hizo antes de la última
+importación), no un límite de la plataforma. Después de importar este playbook, SIEMPRE: Regenerate ribbon metadata.
 
 Los sufijos declarados en `ocultar` son candidatos: la herramienta oculta solo los que existen
 de verdad en el ribbon de cada tabla, y nunca los de la pestaña de graficos.
@@ -491,7 +491,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 80,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",
@@ -537,7 +537,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 90,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",
@@ -668,7 +668,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 80,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",
@@ -714,7 +714,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 90,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",
@@ -845,7 +845,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 80,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",
@@ -891,7 +891,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 90,
-          "idioma_del_texto": 3082,
+          "etiquetas_localizadas": true,
           "menu": [
             {
               "id": "cargar",

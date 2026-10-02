@@ -593,8 +593,8 @@ final, **Resultado**, y la fila 1 de encabezados igual.
 "Carga masiva" y "Activar/Desactivar masivo", **cada uno es un menú desplegable** (`FlyoutAnchor`, el primero
 del proyecto) con dos opciones: *Cargar archivo* (el flujo de abajo) y *Descargar plantilla* (llama a la
 Custom API con `plantilla = true` y descarga `CargaCatalogos.xlsx` o `ActivarDesactivar.xlsx`, con el
-indicador "Generando la plantilla…"). El playbook guarda los textos en 1033 y 3082, pero el menú muestra el texto fijo en
-español (ver el párrafo de abajo, D-74), y lleva ícono
+indicador "Generando la plantilla…"). Los textos van en 1033 y 3082, como etiquetas localizadas (ver el párrafo de
+abajo, D-74), y lleva ícono
 propio (`recursos/svg/`). Van en la **grilla principal** de las cuatro tablas. Los ve **solo el
 Administrador de planes**: Ejecutivo y Supervisor solo leen catálogos. La regla real igual es el
 privilegio de la Custom API.
@@ -613,15 +613,16 @@ privilegio de la Custom API.
 
 El indicador es modal: mientras está abierto no se puede volver a hacer clic.
 
-**Los menús llevan texto fijo en español, no etiquetas localizadas** (decisión del aprobador, 2026-10-01; excepción
-declarada a la regla de multiidioma, `01` §0, **solo para menús desplegables**: los botones simples siguen con
-`$LocLabels`). Observado en Dev: Unified Interface **no mostró las `$LocLabels` dentro de un `FlyoutAnchor`**; no está
-demostrado que sea imposible y el experimento controlado es D-74 (`PENDIENTES.md`). Las etiquetas quedaban guardadas (`ribbondiff`, tipo 3) pero `GetClientMetadata` no las mandaba, y
-el menú y sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto directo en `LabelText`
-lo admite el ribbon (Learn, "Use localized labels with ribbons") y **no depende de los idiomas instalados**: se ve igual
-en cualquier entorno, también para un usuario con la interfaz en inglés. El playbook conserva los textos en 1033 y 3082
-y declara `idioma_del_texto: 3082`. Si se necesitara multiidioma acá, la alternativa probada son botones simples
-(LocLabels sí funciona en un `Button`, como en Fila).
+**Los menús llevan etiquetas localizadas, como cualquier botón** (`01` §0: multiidioma desde que nace; D-74 cerrada el
+2026-10-02). *Historia, para que no se repita:* el 2026-10-01 un menú con `$LocLabels` mostró "LabelText" y se
+concluyó que Unified Interface no las resolvía dentro de un `FlyoutAnchor`; el aprobador aceptó texto fijo en español
+como excepción, pero dudó de la conclusión ("no creo que no se pueda tener multilinguaje en agrupaciones de botones").
+Tenía razón. El experimento controlado del 2026-10-02 pasó UNA tabla a `$LocLabels` y dejó las otras tres con texto
+fijo como control: con la metadata sin regenerar, la tabla del experimento seguía mostrando el texto viejo; con la
+metadata regenerada DESPUÉS de importar, mostró "Bulk load", "Upload file" y "Download template" en una interfaz en
+inglés (en `GetClientMetadata` llegan resueltas, en una tabla aparte de etiquetas), y la de control siguió en español.
+La causa del 2026-10-01 fue metadata vieja: la regeneración se había hecho antes de la última importación. El playbook
+declara `"etiquetas_localizadas": true` en los menús de las cuatro tablas.
 
 ### Contrato del JS (`recursos/js/comandos.js`, fijado el 2026-10-01 para la pieza 5)
 

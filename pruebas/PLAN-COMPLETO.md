@@ -7554,37 +7554,33 @@ verde.
 
 ---
 
-#### L-04 — Los menús llevan texto fijo en español, también con la interfaz en inglés
+#### L-04 — Los menús siguen el idioma de la interfaz
 
-**Qué prueba.** DN-04, "Los menús llevan texto fijo en español" (decisión del aprobador,
-2026-10-01; excepción declarada a la regla de multiidioma solo para menús desplegables; D-74 sigue
-abierta para ver si `$LocLabels` funciona en un `FlyoutAnchor`). El texto está en `LabelText`, no
-depende de los idiomas instalados.
+**Qué prueba.** Que los dos menús desplegables (`FlyoutAnchor`) y sus opciones llevan **etiquetas localizadas**
+(`$LocLabels`, un texto por idioma), como cualquier botón del proyecto (`01` §0, multiidioma desde que nace).
+*Reescrito el 2026-10-02 (D-74 cerrada):* hasta ese día este caso exigía texto fijo en español, porque el 2026-10-01
+un menú con `$LocLabels` mostró "LabelText". El experimento controlado probó que eso fue metadata del ribbon sin
+regenerar: con la metadata regenerada después de importar, un menú localizado mostró "Bulk load" en una interfaz en
+inglés, y el menú de control con texto fijo siguió en español.
 
-**Necesita.** `local/sesion-admin_planes.json` con el idioma de la interfaz del usuario en inglés (1033)
-y una segunda corrida en español (3082). Cambiar el idioma de `# User 3` es tocar la configuración
-de un usuario de prueba: el set lo lleva a español al terminar (canon, no restauración).
+**Necesita.** `local/sesion-admin_planes.json`, con la interfaz del usuario en inglés (1033, el único idioma instalado en
+Dev). La metadata del ribbon regenerada DESPUÉS de la última importación del ribbon.
 
-**Cómo.**
-1. Con la interfaz en español, abrir la grilla Clientes y leer el texto del ancla de cada menú y de
-   sus dos opciones.
-2. Repetir con la interfaz en inglés.
+**Cómo.** Abrir la grilla Clientes y leer el texto del ancla de cada menú y de sus dos opciones; en la misma barra, el
+de un botón nativo de la plataforma ("New"), como control de que la interfaz está en inglés.
 
-**Qué tiene que pasar.** En los dos idiomas el texto es exactamente "Carga masiva",
-"Activar/Desactivar masivo", "Cargar archivo" y "Descargar plantilla". **Los botones simples de la
-barra, en cambio, sí cambian de idioma** (siguen con `$LocLabels`, `A-13`).
+**Qué tiene que pasar.** Con la interfaz en inglés, el texto es exactamente "Bulk load", "Bulk activate/deactivate",
+"Upload file" y "Download template" (los 1033 de `playbooks/importacion/comandos.md`), y el botón nativo dice "New".
+Con la interfaz en español, "Carga masiva", "Activar/Desactivar masivo", "Cargar archivo" y "Descargar plantilla".
 
-**Cómo se verifica.** El texto de los elementos del menú en el DOM, en cada idioma. El spec de hoy
-(`dn-04-catalogos-masivos.spec.mjs`) acepta **las dos** formas ("Carga masiva" o "Bulk load"): no
-sirve para este caso, porque un menú localizado también lo pasaría. Hay que fijar el texto en español.
+**Cómo se verifica.** El texto de los elementos del menú en el DOM, comparado EXACTO (no con el patrón de dos idiomas
+del resto del spec, que no distinguiría un menú localizado de uno con texto fijo).
 
-**Cómo se sabe que falló.** El menú dice "LabelText": las etiquetas localizadas volvieron al
-`FlyoutAnchor` y la metadata no las manda (el síntoma original de D-74). Dice "Bulk load" en inglés:
-alguien volvió a `$LocLabels` sin cerrar D-74, y este caso tiene que actualizarse junto con la
-decisión, no ignorarse.
+**Cómo se sabe que falló.** El menú dice el español con la interfaz en inglés: volvió el texto fijo. Dice "LabelText" o
+una referencia `$LocLabels` cruda: la metadata del ribbon no se regeneró después de la última importación.
 
-**Automatizable.** GUI — sesión `admin_planes`, en dos idiomas. Falta un caso del arnés que fije el
-texto en español (el spec actual tolera inglés).
+**Automatizable.** GUI — sesión `admin_planes`. La mitad en español (3082) es N/A: Dev tiene solo 1033 instalado, e
+instalar un idioma cambia el entorno (no lo hace un set de pruebas).
 
 ---
 
@@ -9235,7 +9231,7 @@ Evidencia citada en la tabla:
 | L-01 los dos menús en las cuatro grillas (Administrador de planes) | EJECUTADO — OK | [GUI]: las cuatro pruebas `<grilla>: los dos menús están...`, 3 corridas seguidas en verde |
 | L-02 el Ejecutivo no ve los menús | EJECUTADO — OK | [GUI]: las cuatro pruebas `un Ejecutivo no ve los menús...`, 1 corrida en verde |
 | L-03 Supervisor y Administrador técnico no los ven | EJECUTADO — OK | [GUI 2026-10-02]: Supervisor, sin menús en las 4 grillas. Administrador técnico: las 4 saltadas porque su sitemap no tiene el área Catalogos (coincide con la matriz de `04`) |
-| L-04 texto fijo en español, también con la interfaz en inglés | EJECUTADO — OK (1033); 3082 N-A | [GUI 2026-10-02]: con la interfaz en inglés (el botón nativo dice "New"), ancla y opciones dicen EXACTAMENTE "Carga masiva", "Activar/Desactivar masivo", "Cargar archivo" y "Descargar plantilla". La mitad en 3082 es N-A: Dev solo tiene 1033 instalado (`RetrieveProvisionedLanguages`, 2026-10-02) |
+| L-04 los menús siguen el idioma de la interfaz | PENDIENTE | Reescrito el 2026-10-02 al cerrar D-74 (las cuatro tablas pasan a etiquetas localizadas): se corre después de importar el ribbon y regenerar la metadata. La mitad en 3082 es N-A: Dev solo tiene 1033 instalado |
 | L-05 plantilla `CargaCatalogos.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 12 encabezados con Resultado en L, sin filas |
 | L-06 plantilla `ActivarDesactivar.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 7 encabezados con Resultado en G, sin filas |
 | L-07 plantilla = resultado = archivo corregido | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `ExcelDeCatalogosAceptacion.cs`. No se re-subió un resultado corregido en Dev |
@@ -9294,7 +9290,7 @@ Evidencia citada en la tabla:
 
 | Grupo | Casos | EJECUTADO — OK | CUBIERTO POR PRUEBAS AUTOMÁTICAS | PENDIENTE |
 |---|---|---|---|---|
-| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 8 | 1 | 0 |
+| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 7 | 1 | 1 |
 | 2 — Códigos de archivo `MPPP-CAR-001` a `011` (L-10 a L-21) | 12 | 4 | 8 | 0 |
 | 3 — Excel 1: reglas por fila (L-22 a L-34) | 13 | 0 | 13 | 0 |
 | 4 — Excel 2: reglas por fila (L-35 a L-42) | 8 | 2 | 6 | 0 |
@@ -9303,4 +9299,4 @@ Evidencia citada en la tabla:
 | 7 — Dueño y permisos (L-49 a L-51) | 3 | 3 | 0 | 0 |
 | 8 — Comentarios (L-52 a L-56) | 5 | 3 | 2 | 0 |
 | 9 — Parámetro (L-57) | 1 | 0 | 1 | 0 |
-| **Total** | **57** | **24** | **33** | **0** |
+| **Total** | **57** | **23** | **33** | **1** |

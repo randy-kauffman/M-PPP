@@ -4,7 +4,7 @@
 // L-09 (carga y cambio de estado que GRABAN) y L-55 (Comentarios por el formulario) escriben, y por eso traen datos
 // propios y limpieza propia (`datos_dn04_l09.py`, `beforeAll --sembrar` / `afterAll --limpiar`).
 //
-//   MPPP_USUARIO=admin_planes   npx playwright test dn-04   → L-01 a L-09 y L-55 (formulario): menús, texto fijo, plantillas,
+//   MPPP_USUARIO=admin_planes   npx playwright test dn-04   → L-01 a L-09 y L-55 (formulario): menús en el idioma de la interfaz, plantillas,
 //                                                              cancelar, rechazo, error y carga grabada
 //   MPPP_USUARIO=ejecutivo      npx playwright test dn-04   → L-02: los menús NO aparecen en ninguna (esAdministradorDePlanes)
 //   MPPP_USUARIO=supervisor     npx playwright test dn-04   → L-03: ídem
@@ -41,13 +41,15 @@ const ENCABEZADOS_CARGA = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecuti
   "Moneda", "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"];
 const ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"];
 
-// L-04: el texto FIJO de los menús (decisión del aprobador, DN-04: van en `LabelText`, no en `$LocLabels`). A diferencia
-// de las constantes de arriba, estas NO son un patrón de dos idiomas: son la única forma correcta, en cualquier idioma.
-const TEXTO_FIJO = {
-  menuCarga: "Carga masiva",
-  menuEstado: "Activar/Desactivar masivo",
-  opcionCargar: "Cargar archivo",
-  opcionPlantilla: "Descargar plantilla",
+// L-04: los menús siguen el idioma de la interfaz (`$LocLabels`, D-74 cerrada el 2026-10-02). Con la interfaz en inglés
+// (1033, el único idioma instalado en Dev) los textos son EXACTAMENTE estos, sacados del playbook
+// `playbooks/importacion/comandos.md`. A diferencia de las constantes de arriba, NO son un patrón de dos idiomas: si el
+// menú dijera el español, es que volvió a texto fijo; si dijera "LabelText", que la metadata del ribbon no se regeneró.
+const TEXTO_1033 = {
+  menuCarga: "Bulk load",
+  menuEstado: "Bulk activate/deactivate",
+  opcionCargar: "Upload file",
+  opcionPlantilla: "Download template",
 };
 
 // Los textos del JS que estos casos comparan, COPIADOS de `TEXTOS` en recursos/js/comandos.js (1033 y 3082). El caso no
@@ -371,15 +373,17 @@ test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => 
     expect(huboDescarga).toBe(false);
   });
 
-  // L-04 — texto FIJO en español con la interfaz en inglés. El arnés de arriba localiza los menús con las etiquetas de
-  // los dos idiomas (no puede suponer el idioma de la sesión), y por eso NO sirve para este caso: un menú localizado
-  // ("Bulk load") también lo pasaría. Acá la comparación es exacta contra el texto español, y el localizador solo
-  // busca el español: si el menú dice otra cosa, el item "no aparece" y el mensaje lista lo que la barra sí trae.
+  // L-04 — los menús siguen el idioma de la interfaz. El arnés de arriba localiza los menús con las etiquetas de los dos
+  // idiomas (no puede suponer el idioma de la sesión), y por eso NO sirve para este caso: un menú que no siguiera el
+  // idioma también lo pasaría. Acá la comparación es exacta contra el texto en inglés, y el localizador solo busca el
+  // inglés: si el menú dice otra cosa, el item "no aparece" y el mensaje lista lo que la barra sí trae.
+  //
+  // Historia: hasta el 2026-10-02 este caso exigía texto fijo en español, porque el 2026-10-01 un menú con $LocLabels
+  // mostró "LabelText". El experimento controlado D-74 probó que eso fue metadata del ribbon sin regenerar, no un límite.
   //
   // Solo la mitad en inglés (1033). La mitad en español (3082) es N/A: Dev tiene SOLO el idioma 1033 instalado, así que
-  // la interfaz de `# User 3` no se puede llevar a 3082 sin cambiar la configuración del entorno (no autorizado). Cuando
-  // 3082 esté instalado, esta misma comparación exacta vale tal cual con la interfaz en español.
-  test("L-04: con la interfaz en inglés, los menús llevan texto fijo en español y un botón nativo sale en inglés", async ({ page }) => {
+  // la interfaz de `# User 3` no se puede llevar a 3082 sin cambiar la configuración del entorno (no autorizado).
+  test("L-04: con la interfaz en inglés, los menús salen en inglés (siguen el idioma) y un botón nativo también", async ({ page }) => {
     await abrirClientes(page);
     const { lcid } = await idiomaDeLaSesion(page);
     expect(lcid, "Este caso es la mitad en inglés: la sesión tiene que estar en 1033.").toBe(1033);
@@ -403,14 +407,14 @@ test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => 
     };
     const itemsAbiertos = async () => (await page.getByRole("menuitem").allTextContents()).map((t) => t.trim());
 
-    for (const textoAncla of [TEXTO_FIJO.menuCarga, TEXTO_FIJO.menuEstado]) {
+    for (const textoAncla of [TEXTO_1033.menuCarga, TEXTO_1033.menuEstado]) {
       const ancla = await textoDelItem(barra, textoAncla, itemsDeLaBarra);
       expect(ancla.texto, `El ancla del menú '${textoAncla}'`).toBe(textoAncla);
       await ancla.item.click();
-      const cargar = await textoDelItem(page, TEXTO_FIJO.opcionCargar, itemsAbiertos);
-      expect(cargar.texto, `La opción de '${textoAncla}'`).toBe(TEXTO_FIJO.opcionCargar);
-      const plantilla = await textoDelItem(page, TEXTO_FIJO.opcionPlantilla, itemsAbiertos);
-      expect(plantilla.texto, `La opción de '${textoAncla}'`).toBe(TEXTO_FIJO.opcionPlantilla);
+      const cargar = await textoDelItem(page, TEXTO_1033.opcionCargar, itemsAbiertos);
+      expect(cargar.texto, `La opción de '${textoAncla}'`).toBe(TEXTO_1033.opcionCargar);
+      const plantilla = await textoDelItem(page, TEXTO_1033.opcionPlantilla, itemsAbiertos);
+      expect(plantilla.texto, `La opción de '${textoAncla}'`).toBe(TEXTO_1033.opcionPlantilla);
       await cerrarMenu(page, ancla.item, cargar.item);
     }
   });
