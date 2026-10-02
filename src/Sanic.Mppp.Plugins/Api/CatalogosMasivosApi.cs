@@ -97,9 +97,18 @@ namespace Sanic.Mppp.Plugins.Api
     public sealed class CatalogosMasivos
     {
         public const string ParametroFilasMaximo = "carga.filas.maximo";
-        public const int FilasMaximoPorDefecto = 300;
-        /// <summary>120 s del límite síncrono menos 20 de margen, como exportarparadigitar (diseno/03 §1b).</summary>
-        public const int PresupuestoSegundos = 100;
+        /// <summary>
+        /// Tope de filas por archivo si el parámetro <see cref="ParametroFilasMaximo"/> falta o no sirve. D-75 (medición en Dev,
+        /// 2026-10-01): 100 filas en el peor caso se graban en 25,5 s, dentro del presupuesto; 300 no cabían (la base cortó la transacción).
+        /// </summary>
+        public const int FilasMaximoPorDefecto = 100;
+
+        /// <summary>
+        /// Segundos que se le dan a la carga para escribir antes de rendirse con MPPP-CAR-008. D-75 (medición en Dev, 2026-10-01): la base
+        /// corta una transacción a los ~40 s con el error 10928 de Azure SQL; con 30 s corta primero nuestro 008, con su mensaje claro,
+        /// y no el 011 de la plataforma. Ya no es "120 s del límite síncrono menos 20 de margen" como exportarparadigitar.
+        /// </summary>
+        public const int PresupuestoSegundos = 30;
 
         /// <summary>Código de una falla de PLATAFORMA (sobrecarga, límites, tiempo agotado), al leer o al escribir (D-75).</summary>
         internal const string CodigoDeFallaDePlataforma = "MPPP-CAR-011";
@@ -310,7 +319,7 @@ namespace Sanic.Mppp.Plugins.Api
         // ============================================================================================ escritura (MPPP-CAR-008, 009 y 011)
 
         /// <summary>
-        /// Cuenta con el presupuesto ANTES de escribir (no solo dentro del escritor): si la pasada 1 ya se comió los 100 s no se
+        /// Cuenta con el presupuesto ANTES de escribir (no solo dentro del escritor): si la pasada 1 ya se comió los 30 s del presupuesto no se
         /// empieza. Las dos excepciones dejan subir la falla para que la transacción de la Custom API deshaga lo escrito (D-72), y
         /// después de atraparlas no se hace NINGUNA llamada más al servicio.
         /// </summary>
@@ -385,7 +394,7 @@ namespace Sanic.Mppp.Plugins.Api
 
         /// <summary>
         /// Seam SOLO para pruebas (requiere <c>InternalsVisibleTo</c>): si no es null, se usa como reloj en vez del cronómetro real,
-        /// para probar el presupuesto sin esperar 100 s. Producción NUNCA la toca: queda en null.
+        /// para probar el presupuesto sin esperar el presupuesto entero (30 s). Producción NUNCA la toca: queda en null.
         /// </summary>
         internal static Func<TimeSpan> RelojParaPruebas;
 

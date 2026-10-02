@@ -242,11 +242,11 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Api
         }
 
         [Fact]
-        public void El_006_sin_parametro_nombra_el_300_por_defecto()
+        public void El_006_sin_parametro_nombra_el_100_por_defecto()
         {
-            var filas = Enumerable.Range(2, 301).Select(n => Fila(n, ("A", "123"))).ToArray();
+            var filas = Enumerable.Range(2, 101).Select(n => Fila(n, ("A", "123"))).ToArray();
             var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(Catalogos(), Sistema()).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, filas)));
-            Assert.Contains("300 filas", ex.Message);
+            Assert.Contains("100 filas", ex.Message);
         }
 
         [Fact]
