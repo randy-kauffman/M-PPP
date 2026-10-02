@@ -397,7 +397,7 @@ Botón (grilla) → JS: elegir .xlsx → base64 → Custom API (Action, plugin C
 | **Orden de escritura** | Clientes → Planes → Correos → Autorizaciones, sin importar el orden de las filas del archivo. Cada entidad se crea **una sola vez** aunque aparezca en varias filas |
 | **Normalizar antes de buscar** | El step `NormalizarYValidarStep` normaliza al grabar, pero la búsqueda ocurre antes. Si no se normaliza, `123` no encuentra al cliente `000000123`. **Se reutilizan las mismas funciones de normalización y validación de formato que usa el step** (`Steps/ReglasDeSteps.cs`): dos implementaciones de "qué es un CIF COM válido" terminan diciendo cosas distintas |
 | **Búsquedas por lote, no fila por fila** | Una consulta por tabla con todas las claves del archivo (condición `In`), no una por fila. 300 filas × 4 búsquedas serían 1.200 viajes |
-| **Presupuesto de 2 minutos** | Mismo criterio que `exportarparadigitar` (DN-02): umbral de 100 s. Si se alcanza, se corta con excepción (que deshace lo grabado) y un mensaje que pide partir el archivo. El tope de filas se calibra midiendo, no estimando |
+| **Presupuesto de escritura** | Se diseñó como `exportarparadigitar` (DN-02), con un umbral de 100 s. **Bajado a 30 s el 2026-10-01 (D-75)**: la medición mostró que en Dev la base corta una transacción a los ~40 s. Si se alcanza, se corta con excepción (que deshace lo grabado) y un mensaje que pide partir el archivo. El tope de filas se calibró midiendo, no estimando (§Parámetro nuevo) |
 | **El archivo se lee con las reglas LP-01 a LP-07** (`03` §7) | Frontera de confianza única, tope de bytes comprimidos y descomprimidos (`lectura.limites`), orden exigido, nada se pierde en silencio. **Excepción a LP-08**: la hoja y los encabezados están **fijos en el código**, no en un parámetro. En la plantilla del cliente la estructura es configuración del negocio; acá cada columna tiene un significado que solo el código entiende, así que una columna nueva exige código nuevo igual. Ponerla en un parámetro sería configurable solo en apariencia |
 | **Las filas de más se rechazan, no se cortan** | En la plantilla del cliente, una fila más allá de la ventana corta la lectura (D-12). **Acá no**: con más filas no vacías que `carga.filas.maximo`, se rechaza el archivo entero. El usuario creería que cargó todo |
 
@@ -543,6 +543,19 @@ no hay filas confiables a las que asignarle un motivo.
 | `MPPP-CAR-008` | Se agotó el presupuesto de tiempo; **no se grabó nada** (pide partir el archivo) |
 | `MPPP-CAR-009` | Falló una escritura en la pasada 2; **no se grabó nada** (nombra la fila y el motivo de Dataverse) |
 | `MPPP-CAR-010` | `plantilla = true` y además vino `archivo`: no se adivina cuál de las dos cosas se quiso |
+| `MPPP-CAR-011` | Falló una escritura de la pasada 2 por **sobrecarga de la plataforma**, no por un dato; **no se grabó nada** (pide reintentar en unos minutos o partir el archivo, y no nombra ninguna fila: la fila no tiene nada malo) |
+
+**Falla de plataforma (MPPP-CAR-011) contra error de dato (MPPP-CAR-009)** (decisión del aprobador, 2026-10-01, D-75). En la
+medición, una carga de 300 filas falló con el error 10928 de Azure SQL y el 009 le decía al usuario "Corregí esa fila", cuando
+la fila no tenía nada malo. Se clasifica por el `ErrorCode` del `OrganizationServiceFault`, **nunca por el texto**. Cuentan como
+falla de plataforma estos códigos de Learn ("Web service error codes"; el de timeout, de "Troubleshoot Dataverse plug-ins"):
+`0x80072324` AzureSqlMaxConcurrentWorkersLimitExceededError · `0x80072323` AzureSqlDatabaseResourceLimitExceededError ·
+`0x80072326` ThrottlingConcurrencyLimitExceededError · `0x80072321` ThrottlingTimeExceededError ·
+`0x80072322` ThrottlingBurstRequestLimitExceededError · `0x8005F103` Throttling · `0x80072330` CacheLoadConcurrencyError ·
+`-2147204783` "Sql error: Execution Timeout Expired". Cualquier otro código, o un fault sin detalle, sigue siendo 009. El código
+de Dataverse (en hexadecimal) va SIEMPRE a la traza, sea 009 u 011: el 10928 de la medición no dejó su código en la traza, y
+sin él no se puede confirmar que la lista lo cubre. **Pendiente de verificar en Dev**: que el 10928 real llega con uno de esos
+códigos (se reproduce con 200 filas mientras el presupuesto sigue en 100 s).
 
 **Excel de resultado.** Las mismas columnas, con los valores tal como se leyeron, más una columna al
 final, **Resultado**, y la fila 1 de encabezados igual.
@@ -623,9 +636,16 @@ Textos del resumen (en `TEXTOS`, en 3082 y 1033 como los demás):
 
 ## Parámetro nuevo
 
-`carga.filas.maximo` · Número · **300**. Lo usan las dos Custom API. Hay que medirlo contra Dev
-(como DN-02) y ajustarlo. Si falta, se usa un valor quemado de 300 (mismo criterio que
-`rpa.horas.tolerancia`). El peso del archivo reutiliza `lectura.limites`.
+`carga.filas.maximo` · Número · **100** (era 300; medido en Dev el 2026-10-01, D-75). Lo usan las dos Custom API. Si
+falta, se usa un valor quemado de **100** (mismo criterio que `rpa.horas.tolerancia`). El peso del archivo reutiliza
+`lectura.limites`.
+
+**Medición (D-75, peor caso: cada fila crea cliente, plan, correo y autorización, con la sesión real del Administrador de
+planes):** 50 filas en 14,0 s, 100 en 25,5 s y 150 en 39,0 s, todas grabadas. 200 y 300 fallaron siempre a los ~40 s con el
+error 10928 de Azure SQL (tope de workers de la base). En Dev el techo es de **tiempo de transacción abierta (~40 s)**, no de
+filas. **Decisión del aprobador (2026-10-01):** tope de 100 filas (36% de margen en el peor caso), y el presupuesto de
+escritura baja de 100 s a **30 s**, para que corte nuestro MPPP-CAR-008, con su mensaje claro, antes que la base. El tope de
+la base de Producción no está medido.
 
 ## Abierto
 

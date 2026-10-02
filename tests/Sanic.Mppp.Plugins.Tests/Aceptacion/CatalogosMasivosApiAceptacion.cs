@@ -398,6 +398,113 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Contains("SR - MPPP - Ejecutivo", f2.Traza.Todo);
         }
 
+        // ================================================================================================ D-75: falla de plataforma (MPPP-CAR-011)
+        // Medición en Dev (2026-10-01): una carga de 300 filas falló con el error 10928 de Azure SQL ("The request limit for the
+        // database is 400") y el 009 decía "Corregí esa fila", cuando la fila no tenía nada malo. Decisión del aprobador: un mensaje
+        // propio para la falla de plataforma, clasificada por ErrorCode (Learn, "Web service error codes"), nunca por el texto.
+        private const string TextoDelDiezNueveVeintiOcho = "Too many concurrent requests. Please consider reducing the number of API calls, request batch size or try again after some time. "
+            + "SqlException: Resource ID : 1. The request limit for the database is 400 and has been reached.";
+
+        private static string ArchivoQueCreaEnLaFila(int fila) => Archivo(EstructuraDeExcelDeCatalogo.Carga,
+            Fila(fila, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "ana@banco.com")));
+
+        [Theory]
+        [InlineData(unchecked((int)0x80072324))]   // AzureSqlMaxConcurrentWorkersLimitExceededError
+        [InlineData(unchecked((int)0x80072323))]   // AzureSqlDatabaseResourceLimitExceededError
+        [InlineData(unchecked((int)0x80072326))]   // ThrottlingConcurrencyLimitExceededError
+        [InlineData(unchecked((int)0x80072321))]   // ThrottlingTimeExceededError
+        [InlineData(unchecked((int)0x80072322))]   // ThrottlingBurstRequestLimitExceededError
+        [InlineData(unchecked((int)0x8005F103))]   // Throttling
+        [InlineData(unchecked((int)0x80072330))]   // CacheLoadConcurrencyError
+        [InlineData(-2147204783)]                  // Sql error: Execution Timeout Expired (Troubleshoot Dataverse plug-ins)
+        public void Una_falla_de_plataforma_es_MPPP_CAR_011_y_no_culpa_a_la_fila(int codigo)
+        {
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), TextoDelDiezNueveVeintiOcho, codigo);
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(falla, Sistema()).Cargar(ArchivoQueCreaEnLaFila(7)));
+
+            Assert.Equal("MPPP-CAR-011", ex.Codigo);
+            Assert.StartsWith("MPPP-CAR-011: ", ex.Message);
+            Assert.Contains("No se grabó nada", ex.Message);
+            Assert.Contains("unos minutos", ex.Message);          // qué hacer: reintentar más tarde…
+            Assert.Contains("partilo", ex.Message);               // …o partir el archivo
+            Assert.DoesNotContain("Corregí", ex.Message);         // la fila no tiene nada malo
+            Assert.DoesNotContain("fila 7", ex.Message);          // ni se la nombra: el usuario iría a buscar un error que no está
+            Assert.DoesNotContain("SqlException", ex.Message);    // la jerga de la plataforma va a la traza, no al usuario
+            Assert.DoesNotContain("Too many", ex.Message);
+
+            // La excepción interna conserva la fila y el código para la traza; sube igual, para que la transacción deshaga todo.
+            var interna = Assert.IsType<EscrituraDeCatalogoFallidaException>(ex.InnerException);
+            Assert.Equal(7, interna.Fila);
+            Assert.Equal(codigo, interna.CodigoDeError);
+        }
+
+        [Fact]
+        public void Un_error_de_dato_sigue_siendo_MPPP_CAR_009_y_pide_corregir_su_fila()
+        {
+            // 0x80040237 DuplicateRecord: un dato del archivo choca con lo grabado. Eso SÍ lo corrige el usuario.
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), "A record with matching key values already exists.", unchecked((int)0x80040237));
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(falla, Sistema()).Cargar(ArchivoQueCreaEnLaFila(7)));
+            Assert.Equal("MPPP-CAR-009", ex.Codigo);
+            Assert.Contains("fila 7", ex.Message);
+            Assert.Contains("Corregí esa fila", ex.Message);
+            Assert.Equal(unchecked((int)0x80040237), Assert.IsType<EscrituraDeCatalogoFallidaException>(ex.InnerException).CodigoDeError);
+        }
+
+        [Fact]
+        public void Un_fault_sin_codigo_conocido_ni_detalle_sigue_siendo_MPPP_CAR_009()
+        {
+            // ErrorCode 0 (el doble de siempre) no es de la lista: nunca se adivina que fue la plataforma.
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() =>
+                Nucleo(new ServicioQueFallaAlEscribir(Catalogos(out _), TextoDelDiezNueveVeintiOcho), Sistema()).Cargar(ArchivoQueCreaEnLaFila(7)));
+            Assert.Equal("MPPP-CAR-009", ex.Codigo);   // aunque el TEXTO diga "Too many concurrent requests": se clasifica por código
+        }
+
+        [Fact]
+        public void El_mensaje_de_la_excepcion_interna_lleva_el_codigo_solo_si_lo_hay()
+        {
+            Assert.Equal("Fila 7 (código 0x80072324): Too many", new EscrituraDeCatalogoFallidaException(7, "Too many", null, unchecked((int)0x80072324)).Message);
+            Assert.Equal("Fila 7: Too many", new EscrituraDeCatalogoFallidaException(7, "Too many", null, null).Message);
+            Assert.Equal("Fila 7: Too many", new EscrituraDeCatalogoFallidaException(7, "Too many").Message);   // el constructor de siempre no cambia
+            Assert.Null(new EscrituraDeCatalogoFallidaException(7, "Too many").CodigoDeError);
+        }
+
+        [Fact]
+        public void El_cambio_de_estado_tambien_distingue_la_falla_de_plataforma()
+        {
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), TextoDelDiezNueveVeintiOcho, unchecked((int)0x80072324));
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(falla, Sistema()).CambiarEstado(
+                Archivo(EstructuraDeExcelDeCatalogo.CambioDeEstado, Fila(2, ("A", "CLIENTE"), ("B", "DESACTIVAR"), ("C", "123")))));
+            Assert.Equal("MPPP-CAR-011", ex.Codigo);
+        }
+
+        [Fact]
+        public void El_codigo_de_Dataverse_queda_en_la_traza_en_hexadecimal_y_el_usuario_recibe_el_011()
+        {
+            // Sin esto no se puede confirmar en Dev qué código trae el 10928 real (la traza de la medición solo tenía el texto).
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), TextoDelDiezNueveVeintiOcho, unchecked((int)0x8005F103));
+            var contexto = new ContextoDeEjecucionSimulado { UserId = UsuarioQueLlama, InitiatingUserId = UsuarioQueLlama, OperationCreatedOn = DateTime.UtcNow };
+            contexto.InputParameters["archivo"] = ArchivoQueCreaEnLaFila(7);
+            var fabrica = new FabricaPorUsuario(contexto, falla, Sistema());
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica));
+            Assert.StartsWith("MPPP-CAR-011: ", ex.Message);
+            // Formato propio y exacto: en el doble, el ToString del fault ya trae el código por su cuenta, y en Dev NO lo trajo.
+            // Exigir el formato de la excepción nuestra es lo que prueba que lo pone el código del proyecto.
+            Assert.Contains("Fila 7 (código 0x8005F103): ", fabrica.Traza.Todo);
+        }
+
+        [Fact]
+        public void El_codigo_tambien_queda_en_la_traza_de_un_009()
+        {
+            var falla = new ServicioQueFallaAlEscribir(Catalogos(out _), "A record with matching key values already exists.", unchecked((int)0x80040237));
+            var contexto = new ContextoDeEjecucionSimulado { UserId = UsuarioQueLlama, InitiatingUserId = UsuarioQueLlama, OperationCreatedOn = DateTime.UtcNow };
+            contexto.InputParameters["archivo"] = ArchivoQueCreaEnLaFila(7);
+            var fabrica = new FabricaPorUsuario(contexto, falla, Sistema());
+
+            Assert.StartsWith("MPPP-CAR-009: ", Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica)).Message);
+            Assert.Contains("Fila 7 (código 0x80040237): ", fabrica.Traza.Todo);
+        }
+
         // ================================================================================================ dobles de esta prueba
         /// <summary>Fábrica que da un servicio por usuario: null → SYSTEM; cualquier id → el del usuario. Registra lo pedido.</summary>
         private sealed class FabricaPorUsuario : IServiceProvider, IOrganizationServiceFactory
@@ -430,15 +537,17 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             }
         }
 
-        /// <summary>Decorador: la primera escritura falla como Dataverse.</summary>
+        /// <summary>Decorador: la primera escritura falla como Dataverse, con el <c>ErrorCode</c> que se pida (D-75).</summary>
         private sealed class ServicioQueFallaAlEscribir : IOrganizationService
         {
             private readonly IOrganizationService _real;
             private readonly string _mensaje;
+            private readonly int _codigo;
 
-            public ServicioQueFallaAlEscribir(IOrganizationService real, string mensaje) { _real = real; _mensaje = mensaje; }
+            public ServicioQueFallaAlEscribir(IOrganizationService real, string mensaje, int codigo = 0) { _real = real; _mensaje = mensaje; _codigo = codigo; }
 
-            private FaultException<OrganizationServiceFault> Falla() => new FaultException<OrganizationServiceFault>(new OrganizationServiceFault { Message = _mensaje }, new FaultReason(_mensaje));
+            private FaultException<OrganizationServiceFault> Falla() => new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { Message = _mensaje, ErrorCode = _codigo }, new FaultReason(_mensaje));
 
             public Guid Create(Entity entity) => throw Falla();
             public void Update(Entity entity) => throw Falla();

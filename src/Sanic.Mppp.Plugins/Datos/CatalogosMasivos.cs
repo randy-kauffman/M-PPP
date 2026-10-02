@@ -523,11 +523,28 @@ namespace Sanic.Mppp.Plugins.Datos
             Motivo = motivo;
         }
 
+        /// <summary>
+        /// Como la anterior, con el código de Dataverse. Mensaje: "Fila N (código 0xXXXXXXXX): motivo" si hay código, y "Fila N: motivo"
+        /// si es null. El mensaje va a la traza, nunca al usuario (D-75). FIRMA DEL ARQUITECTO (2026-10-01): la implementa el constructor.
+        /// </summary>
+        public EscrituraDeCatalogoFallidaException(int fila, string motivo, Exception interna, int? codigoDeError)
+            : base("FIRMA SIN IMPLEMENTAR", interna)
+        {
+            throw new System.NotImplementedException();
+        }
+
         /// <summary>La fila de Excel de origen de lo que no se pudo escribir.</summary>
         public int Fila { get; }
 
         /// <summary>Lo que dijo Dataverse.</summary>
         public string Motivo { get; }
+
+        /// <summary>
+        /// El <c>ErrorCode</c> del <c>OrganizationServiceFault</c>, o null si la falla no traía detalle. Con él la Custom API distingue
+        /// una falla de plataforma (MPPP-CAR-011) de un error de dato (009), y va a la traza en hexadecimal (D-75).
+        /// FIRMA DEL ARQUITECTO (2026-10-01): la implementa el constructor.
+        /// </summary>
+        public int? CodigoDeError => throw new System.NotImplementedException();
     }
 
     /// <summary>Se alcanzó el presupuesto de tiempo antes de terminar (MPPP-CAR-008).</summary>
