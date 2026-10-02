@@ -325,9 +325,13 @@ abre: se perdió el gesto del usuario (la apertura dejó de ser sincrónica con 
 ### L-09 — El indicador por etapas, el resumen de una carga grabada y el refresco de la grilla
 
 **Qué prueba.** DN-04, "Flujo del JS": tres mensajes de progreso ("Leyendo el archivo…", "Validando y
-cargando el archivo… puede tardar hasta 2 minutos", "Preparando el resultado…"), la descarga de
+cargando el archivo… puede tardar hasta un minuto", "Preparando el resultado…"), la descarga de
 `<nombre original sin extensión>-resultado.xlsx`, el diálogo de resumen y el refresco de la grilla.
 El indicador es modal: mientras está abierto no se puede volver a hacer clic.
+
+> **Evidencia parcial (2026-10-01).** El mensaje del medio ya lo comprueba el caso de Playwright de la carga con error de
+> fila (`pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs`, dos corridas en verde): el indicador muestra "puede tardar
+> hasta un minuto" (antes decía "hasta 2 minutos"; se corrigió por D-75). El resto del caso sigue pendiente.
 
 **Necesita.** `local/sesion-admin_planes.json`; un archivo de carga **sin errores** que cree un cliente
 (con su ejecutivo `# User 1`), un plan, un correo y su autorización, con una advertencia buscada (un

@@ -602,7 +602,8 @@ privilegio de la Custom API.
 **Flujo del JS** (mismo para los dos):
 1. Abre el selector de archivo (solo `.xlsx`). Si el usuario cancela, no pasa nada.
 2. `Xrm.Utility.showProgressIndicator("Leyendo el archivo…")` → lo pasa a base64.
-3. `"Validando y cargando el archivo… puede tardar hasta 2 minutos"` → llama a la Custom API.
+3. `"Validando y cargando el archivo… puede tardar hasta un minuto"` → llama a la Custom API. *(Era "hasta 2 minutos"; corregido el
+   2026-10-01 por D-75: la escritura se corta a los 30 s, y el minuto cubre la lectura y la descarga con margen. Decisión del aprobador.)*
 4. `"Preparando el resultado…"` → si vino `resultado`, lo descarga como `<nombre original>-resultado.xlsx`.
 5. Cierra el indicador y muestra un diálogo de resumen:
    - **Grabado**: `"Carga terminada: 12 clientes, 30 planes, 8 correos y 45 autorizaciones creados. 3 filas con advertencias: revisá el archivo de resultado."`
@@ -629,7 +630,7 @@ Funciones públicas nuevas de `Sanic.Mppp.Comandos`, todas reciben el control de
 | Función | Qué hace |
 |---|---|
 | `esAdministradorDePlanes(control)` | Regla de visibilidad del ancla y de las opciones. `true` solo si `Xrm.Utility.getGlobalContext().userSettings.roles` trae un rol llamado exactamente `SR - MPPP - Administrador de planes`. **Ante la duda (error al leer los roles), `false`**: a diferencia de las reglas de estado de Fila (que muestran ante la duda porque el plugin igual valida), acá ocultar no le quita nada a nadie que deba verlo — el privilegio de la Custom API es la puerta real |
-| `cargarCatalogos(control)` / `cambiarEstadoCatalogos(control)` | Abren el selector de archivo **sincrónicamente dentro del clic** (un `input type="file"` con `accept=".xlsx"`; fuera del gesto del usuario el navegador lo bloquea). Cancelar no hace nada. Un archivo que no termina en `.xlsx` → aviso, sin llamar a la API. Después: indicador "Leyendo el archivo…" (FileReader → base64 sin el prefijo `data:`), "Validando y cargando el archivo… puede tardar hasta 2 minutos" (la Custom API como Action, `archivo`), "Preparando el resultado…" (descarga de `resultado` como `<nombre original sin extensión>-resultado.xlsx` con `Xrm.Navigation.openFile`, `openMode: 2`). Cierra el indicador, muestra el resumen y refresca la grilla. Un error de la API (los MPPP-CAR) se muestra con `error.message` **tal cual** |
+| `cargarCatalogos(control)` / `cambiarEstadoCatalogos(control)` | Abren el selector de archivo **sincrónicamente dentro del clic** (un `input type="file"` con `accept=".xlsx"`; fuera del gesto del usuario el navegador lo bloquea). Cancelar no hace nada. Un archivo que no termina en `.xlsx` → aviso, sin llamar a la API. Después: indicador "Leyendo el archivo…" (FileReader → base64 sin el prefijo `data:`), "Validando y cargando el archivo… puede tardar hasta un minuto" (la Custom API como Action, `archivo`), "Preparando el resultado…" (descarga de `resultado` como `<nombre original sin extensión>-resultado.xlsx` con `Xrm.Navigation.openFile`, `openMode: 2`). Cierra el indicador, muestra el resumen y refresca la grilla. Un error de la API (los MPPP-CAR) se muestra con `error.message` **tal cual** |
 | `plantillaCarga(control)` / `plantillaCambioEstado(control)` | Indicador "Generando la plantilla…", la Custom API con `plantilla: true`, descarga `CargaCatalogos.xlsx` / `ActivarDesactivar.xlsx` |
 
 Textos del resumen (en `TEXTOS`, en 3082 y 1033 como los demás):

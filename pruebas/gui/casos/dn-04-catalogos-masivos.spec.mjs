@@ -125,8 +125,11 @@ test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => 
     await abrirClientes(page);
     const cargar = await opcionDelMenu(page, MENU_CARGA, OPCION_CARGAR);
     const [selector] = await Promise.all([page.waitForEvent("filechooser", { timeout: 15_000 }), cargar.click()]);
+    // D-75 (2026-10-01): el indicador anuncia "hasta un minuto" (era "hasta 2 minutos"; la escritura se corta a los 30 s).
+    const indicador = page.getByText(/puede tardar hasta un minuto|it may take up to a minute/).first();
     const [descarga] = await Promise.all([
       page.waitForEvent("download", { timeout: 150_000 }),
+      indicador.waitFor({ state: "visible", timeout: 60_000 }),
       selector.setFiles(path.join(DATOS, "dn04-carga-con-error.xlsx")),
     ]);
     expect(descarga.suggestedFilename()).toBe("dn04-carga-con-error-resultado.xlsx");

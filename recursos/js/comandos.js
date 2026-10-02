@@ -112,7 +112,7 @@ Sanic.Mppp.Comandos = (function () {
             // DN-04: carga y cambio de estado masivos de catalogos. Los textos del
             // resumen son los que fija el contrato (DIRECTRICES-NUEVAS, DN-04).
             leyendo: "Reading the file\u2026",
-            validando: "Validating and loading the file\u2026 it may take up to 2 minutes",
+            validando: "Validating and loading the file\u2026 it may take up to a minute",
             preparando: "Preparing the result\u2026",
             generandoPlantilla: "Generating the template\u2026",
             extensionInvalida: "The file must be an Excel workbook (.xlsx). Nothing was sent.",
@@ -136,7 +136,7 @@ Sanic.Mppp.Comandos = (function () {
             descargando: "Preparando el archivo de Excel\u2026",
             errorDescarga: "No se pudo preparar el archivo:",
             leyendo: "Leyendo el archivo\u2026",
-            validando: "Validando y cargando el archivo\u2026 puede tardar hasta 2 minutos",
+            validando: "Validando y cargando el archivo\u2026 puede tardar hasta un minuto",
             preparando: "Preparando el resultado\u2026",
             generandoPlantilla: "Generando la plantilla\u2026",
             extensionInvalida: "El archivo tiene que ser un libro de Excel (.xlsx). No se envi\u00f3 nada.",
