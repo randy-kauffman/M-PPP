@@ -563,6 +563,16 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void Un_fault_de_lectura_sin_detalle_sale_con_el_generico_y_sin_codigo()
+        {
+            // Revisión de la segunda vuelta (2026-10-01): sin Detail no hay código que clasificar ni que trazar; nunca se adivina.
+            var sinDetalle = new ServicioQueFallaAlLeer(Catalogos(out _), "x", 0) { SinDetalle = true };
+            var (fabrica, _) = EnvoltorioCon(sinDetalle, Sistema(), ArchivoQueCreaEnLaFila(7));
+            Assert.Equal(CargarCatalogosApi.MensajeDeErrorGenerico, Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica)).Message);
+            Assert.DoesNotContain("(código ", fabrica.Traza.Todo);
+        }
+
+        [Fact]
         public void El_texto_del_011_es_el_mismo_al_leer_y_al_escribir()
         {
             var (fLectura, _) = EnvoltorioCon(new ServicioQueFallaAlLeer(Catalogos(out _), "x", unchecked((int)0x80072324)), Sistema(), ArchivoQueCreaEnLaFila(7));
@@ -613,8 +623,11 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             public ServicioQueFallaAlLeer(IOrganizationService real, string mensaje, int codigo) { _real = real; _mensaje = mensaje; _codigo = codigo; }
 
+            /// <summary>true: el fault viaja sin <c>Detail</c> (null), como puede llegar uno que no armó Dataverse.</summary>
+            public bool SinDetalle { get; set; }
+
             private FaultException<OrganizationServiceFault> Falla() => new FaultException<OrganizationServiceFault>(
-                new OrganizationServiceFault { Message = _mensaje, ErrorCode = _codigo }, new FaultReason(_mensaje));
+                SinDetalle ? null : new OrganizationServiceFault { Message = _mensaje, ErrorCode = _codigo }, new FaultReason(_mensaje));
 
             public EntityCollection RetrieveMultiple(QueryBase query) => throw Falla();
             public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => throw Falla();
