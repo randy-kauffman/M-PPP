@@ -38,8 +38,9 @@ trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
 > tabla `## Resultados`, con tres estados que **no se mezclan**: *EJECUTADO — OK* (con evidencia
 > citada: el arnés de Playwright `pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs` y las
 > mediciones de Dev de D-73/D-75), *CUBIERTO POR PRUEBAS AUTOMÁTICAS* (solo la suite de C#, sin
-> correr en Dev: no es un OK) y *PENDIENTE*. Al 2026-10-01: 13 ejecutados, 34 cubiertos por pruebas
-> automáticas y 10 pendientes.
+> correr en Dev: no es un OK) y *PENDIENTE*. Al 2026-10-02: 23 ejecutados, 34 cubiertos por pruebas
+> automáticas y 0 pendientes (los 10 que faltaban se corrieron ese día, con las sesiones reales de los
+> cuatro roles y el spec de Playwright extendido).
 
 > **Set G, nota al 2026-09-28.** El archivo documenta 20 casos (`G-06` quedó fusionada en `G-00`/
 > `G-00b`, así que no cuenta como caso aparte). De esos 20, tres siguen siendo GUI sin arnés todavía

@@ -147,9 +147,11 @@ solo cubre al Ejecutivo.
 
 **Necesita.** `local/sesion-supervisor.json` (`# User 2`, `SR - MPPP - Supervisor`) y
 `local/sesion-admin_tecnico.json` (`# User 4`, `SR - MPPP - Administrador tecnico`), vivas y con su
-rol. El Administrador técnico **no ve Clientes ni Autorizados** (`diseno/04` §2: "no ve clientes,
-autorizados..."): en esas grillas el caso se resuelve por la ausencia de la grilla misma, y se
-anota cuáles no se pudieron abrir en vez de darlas por verdes.
+rol. El Administrador técnico **no tiene ningún privilegio sobre las cinco tablas de catálogo** (`diseno/04`,
+matriz: "—" en Cliente, Plan, Autorizado, AutorizacionPlan y AutorizacionCliente) y su sitemap no tiene
+el área Catalogos: el caso se resuelve por la ausencia de las grillas, y se anota cuáles no se pudieron
+abrir en vez de darlas por verdes. *(Corregido el 2026-10-02: decía solo "no ve Clientes ni
+Autorizados"; la corrida mostró que no ve ninguna, y es lo que dice la matriz.)*
 
 **Cómo.** Con cada sesión, abrir cada grilla de catálogo que el rol pueda abrir y buscar los dos menús
 (mismos selectores que `dn-04-catalogos-masivos.spec.mjs`, que hoy filtra por `MPPP_USUARIO`).
@@ -345,12 +347,17 @@ estado); la grilla Clientes abierta **antes** de cargar.
 3. Cerrar el diálogo y mirar la grilla.
 4. Repetir con un archivo de Activar/Desactivar sin errores.
 
-**Qué tiene que pasar.** Los tres mensajes aparecen en ese orden y el indicador bloquea la pantalla; se
+**Qué tiene que pasar.** El JS **pide** los tres mensajes en ese orden (espía sobre
+`Xrm.Utility.showProgressIndicator`) y el de la llamada a la API ("Validando…") **llega a verse**. *(Corregido
+el 2026-10-02: decía "los tres aparecen". La plataforma pinta el indicador ~400 ms después de pedirlo, así que
+"Leyendo" y "Preparando", que duran milisegundos, se cierran antes de verse: exigirlos en pantalla era pedir
+algo no observable. El defecto era del caso, no del producto.)* El indicador bloquea la pantalla; se
 descarga `<nombre>-resultado.xlsx`; el diálogo dice "Carga terminada: 1 clientes, 1 planes, 1 correos
 y 1 autorizaciones creados." (en 3082; en 1033 "Load finished: ... created."), más
 " N filas con advertencias: revisá el archivo de resultado." si `advertencias` > 0; el cliente nuevo
 aparece en la grilla sin recargar a mano. Con Activar/Desactivar: "Cambio de estado terminado: N
-activados, N desactivados y N sin cambios.".
+activados, N desactivados y N sin cambios.", más el mismo sufijo de advertencias si las hay (desactivar un
+cliente con autorizaciones activas siempre advierte, regla 6).
 
 **Cómo se verifica.** La captura del diálogo y de la descarga con Playwright, y `GET
 sanic_mppp_tbl_clientes?$filter=sanic_cifbac eq '<CIF del archivo>'` para el cliente creado.
@@ -1652,7 +1659,7 @@ rechazo con `MPPP-CAR-0xx` quiere decir que la llamada pasó la puerta y el rech
 ### L-52 — La columna Comentarios existe, en el formulario y en las dos vistas
 
 **Qué prueba.** DN-04, "Columna nueva": `sanic_mppp_tbl_autorizacioncliente.sanic_comentarios` es `T(50)`,
-opcional, con nombre visible "Comentarios" en 1033 (y su etiqueta en 3082 desde que nace, `01` §0).
+opcional, con nombre visible "Comentarios" en 1033 (`01` §0: las etiquetas de metadatos van en 1033 y la plataforma las usa si al destino le falta su idioma; *corregido el 2026-10-02*, decía "y en 3082").
 Va al formulario **Autorizacion por cliente**, en la sección de la evidencia, **después de la fecha del
 documento**, y a las vistas "Autorizaciones por cliente activas" y "Correos autorizados sobre este
 cliente".
@@ -1665,8 +1672,7 @@ cliente".
 2. Abrir el formulario de la autorización y ubicar el campo.
 3. Abrir las dos vistas y buscar la columna.
 
-**Qué tiene que pasar.** `MaxLength = 50`, `RequiredLevel = None`, etiqueta "Comentarios" en 1033 y en
-3082; el campo está en la sección de la evidencia, debajo de la fecha del documento; la columna aparece
+**Qué tiene que pasar.** `MaxLength = 50`, `RequiredLevel = None`, etiqueta "Comentarios" en 1033; el campo está en la sección de la evidencia, debajo de la fecha del documento; la columna aparece
 en las dos vistas.
 
 **Cómo se verifica.** La consulta de metadata del paso 1 y la inspección del formulario y de las vistas
@@ -1811,7 +1817,7 @@ pruebas automáticas C#
 
 ## Resultados
 
-Estado al **2026-10-01**. Los tres estados y lo que significa cada uno están en "Cómo leer el estado de
+Estado al **2026-10-02** (los 10 pendientes se corrieron ese día). Los tres estados y lo que significa cada uno están en "Cómo leer el estado de
 cada caso", arriba. **Nada de esta tabla es una corrida de `correr.py`**: el set `L` todavía no tiene
 `set_l.py`. Ni un solo caso está marcado como EJECUTADO sin evidencia citada.
 
@@ -1822,6 +1828,14 @@ Evidencia citada en la tabla:
   (`MPPP_USUARIO=ejecutivo`).
 - **[Dev 1.0.22.0]** = pruebas con la sesión real del Administrador de planes (`# User 3`) contra la
   Custom API en Dev, 2026-10-01, ensamblado 1.0.22.0 (`diseno/PENDIENTES.md`, D-73 y D-75).
+- **[GUI 2026-10-02]** = el mismo spec, extendido con L-03, L-04, L-08, L-09 y el formulario de L-55: dos
+  corridas seguidas en verde como Administrador de planes (14 de 14), una como Supervisor (4 de 4), una
+  como Ejecutivo (4 de 4) y una como Administrador técnico (4 saltados por motivo verificado: su
+  sitemap no tiene el área Catalogos). Datos propios (`pruebas/gui/datos_dn04_l09.py`, `--sembrar` y
+  `--limpiar`), limpios al terminar.
+- **[Dev API 2026-10-02]** = llamadas con las sesiones reales de los cuatro usuarios (verificados con
+  `WhoAmI` y su rol en `systemuserroles`) y consultas de metadatos con el service principal, ensamblado
+  1.0.22.0. Datos `ZZP-` sembrados con la propia carga masiva y borrados al terminar.
 - **[Dev 1.0.21.0]** = la misma sesión, ensamblado 1.0.21.0, con el presupuesto todavía en 100 s
   (D-75).
 - **[C#]** = suite de pruebas automáticas de C# en `tests/Sanic.Mppp.Plugins.Tests` (1580 en verde al
@@ -1831,13 +1845,13 @@ Evidencia citada en la tabla:
 |---|---|---|
 | L-01 los dos menús en las cuatro grillas (Administrador de planes) | EJECUTADO — OK | [GUI]: las cuatro pruebas `<grilla>: los dos menús están...`, 3 corridas seguidas en verde |
 | L-02 el Ejecutivo no ve los menús | EJECUTADO — OK | [GUI]: las cuatro pruebas `un Ejecutivo no ve los menús...`, 1 corrida en verde |
-| L-03 Supervisor y Administrador técnico no los ven | PENDIENTE | El spec solo cubre `admin_planes` y `ejecutivo`; hay que extenderlo a `supervisor` y `admin_tecnico` |
-| L-04 texto fijo en español, también con la interfaz en inglés | PENDIENTE | El spec acepta las dos formas ("Carga masiva" / "Bulk load"), así que no demuestra el texto fijo; D-74 abierta |
+| L-03 Supervisor y Administrador técnico no los ven | EJECUTADO — OK | [GUI 2026-10-02]: Supervisor, sin menús en las 4 grillas. Administrador técnico: las 4 saltadas porque su sitemap no tiene el área Catalogos (coincide con la matriz de `04`) |
+| L-04 texto fijo en español, también con la interfaz en inglés | EJECUTADO — OK (1033); 3082 N-A | [GUI 2026-10-02]: con la interfaz en inglés (el botón nativo dice "New"), ancla y opciones dicen EXACTAMENTE "Carga masiva", "Activar/Desactivar masivo", "Cargar archivo" y "Descargar plantilla". La mitad en 3082 es N-A: Dev solo tiene 1033 instalado (`RetrieveProvisionedLanguages`, 2026-10-02) |
 | L-05 plantilla `CargaCatalogos.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 12 encabezados con Resultado en L, sin filas |
 | L-06 plantilla `ActivarDesactivar.xlsx` | EJECUTADO — OK | [GUI]: nombre del archivo, 7 encabezados con Resultado en G, sin filas |
 | L-07 plantilla = resultado = archivo corregido | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `ExcelDeCatalogosAceptacion.cs`. No se re-subió un resultado corregido en Dev |
-| L-08 cancelar el selector y extensión distinta de `.xlsx` | PENDIENTE | Sin arnés |
-| L-09 indicador por etapas, resumen de carga grabada y refresco de la grilla | PENDIENTE | El spec cubre los dos desenlaces de error (L-13, L-43), no el desenlace grabado en la interfaz |
+| L-08 cancelar el selector y extensión distinta de `.xlsx` | EJECUTADO — OK | [GUI 2026-10-02]: el selector se abre con el clic; sin archivo (`setFiles([])`, que dispara `change` y no `cancel`) no hay indicador, diálogo ni llamada; con un `.txt`, el aviso exacto del JS y cero llamadas a las dos Custom API |
+| L-09 indicador por etapas, resumen de carga grabada y refresco de la grilla | EJECUTADO — OK | [GUI 2026-10-02]: los tres `show` en orden (espía) y "Validando…" visible; descarga del resultado; "Load finished: 1 clients, 1 plans, 1 emails and 1 authorizations created. 1 rows with warnings: check the result file."; el cliente nuevo aparece en la grilla sin recargar; cambio de estado: "Status change finished: 0 activated, 1 deactivated and 1 unchanged. 1 rows with warnings: check the result file." |
 | L-10 `MPPP-CAR-001` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` |
 | L-11 `MPPP-CAR-002` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` |
 | L-12 `MPPP-CAR-003` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` |
@@ -1869,8 +1883,8 @@ Evidencia citada en la tabla:
 | L-38 Excel 2, regla 4 (sin cambios) | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CambioDeEstadoAceptacion.cs` |
 | L-39 Excel 2, regla 5 (opuestas y repetidas) | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CambioDeEstadoAceptacion.cs` |
 | L-40 Excel 2, regla 6 (advertencias de efecto) | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CambioDeEstadoAceptacion.cs` |
-| L-41 Excel 2, regla 7 y sin cascada | PENDIENTE | [C#] cubre el cambio nativo, pero la **ausencia de cascada y la auditoría de quién desactivó no tienen prueba automática ni de Dev** |
-| L-42 el ejemplo del aprobador de punta a punta | PENDIENTE | La Custom API de cambio de estado no se corrió en Dev |
+| L-41 Excel 2, regla 7 y sin cascada | EJECUTADO — OK | [Dev API 2026-10-02]: desactivar `ZZP-Cliente 1` lo dejó inactivo y su plan y sus dos autorizaciones siguieron activos, con la advertencia "deja sin efecto 2 autorizaciones"; `modifiedby` y la auditoría (un `Update` de `# User 3`, no de SYSTEM) registran al usuario real. Ojo: la auditoría apareció con unos minutos de demora (Learn: los logs viven en el almacenamiento de logs) |
+| L-42 el ejemplo del aprobador de punta a punta | EJECUTADO — OK | [Dev API 2026-10-02]: las seis filas sobre 3 clientes, 1 plan y 2 correos con autorizaciones cruzadas: 2 activados, 4 desactivados, 0 sin cambios; el plan solo, el correo de Juan inactivo con sus dos autorizaciones intactas ("deja sin efecto 2"), solo maria@1 desactivada (María sigue sobre el Cliente 2), juan@3 activada con la advertencia de correo inactivo. El texto del resumen en la interfaz lo cubre L-09 |
 | L-43 error de fila: no se graba, se descarga el resultado, "No se grabó nada" | EJECUTADO — OK | [GUI]: `'Cargar archivo' con un error de fila descarga el resultado y avisa que no se grabó nada`. Límite: el spec no cuenta registros en Dataverse |
 | L-44 filas sanas: "Sin errores — no se grabó" | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CargaDeCatalogosAceptacion.cs`, `CambioDeEstadoAceptacion.cs`. El archivo del GUI tiene una sola fila: no ejercita este texto |
 | L-45 rollback: cero registros tras una falla de la pasada 2 | EJECUTADO — OK | D-72 (`spikes/d72-transaccion-capi/CONCLUSIONES.md`: `IsInTransaction = true` y una excepción deja cero registros) y la medición de D-75 ("El todo o nada funcionó en las cuatro (cero registros)", 200 y 300 filas) |
@@ -1879,11 +1893,11 @@ Evidencia citada en la tabla:
 | L-48 100 filas peor caso dentro del presupuesto | EJECUTADO — OK | [Dev 1.0.22.0]: 100 filas que crean cliente, plan, correo y autorización, grabadas en 25,1 s. Margen contra los 30 s: unos 5 s |
 | L-49 dueño = el ejecutivo; creador = el Administrador de planes | EJECUTADO — OK | [Dev 1.0.22.0]: 100 de 100 clientes con dueño "# User 1" (Ejecutiva) y creador "# User 3" (Administrador de planes) (D-73) |
 | L-50 el Ejecutivo dueño ve cliente y autorizaciones | EJECUTADO — OK | [Dev 1.0.22.0]: la Ejecutiva los ve, a ellos y a sus autorizaciones (D-73) |
-| L-51 la puerta de las dos Custom API | PENDIENTE | No se llamó la API con Ejecutivo, Supervisor ni Administrador técnico |
-| L-52 la columna Comentarios en formulario y vistas | PENDIENTE | La columna se verificó estructuralmente el 2026-10-01 (`diseno/06`, 3.13: muestra exportada OK); no se miró el formulario ni las vistas |
-| L-53 solo en `AutorizacionCliente`, auditada | PENDIENTE | Sin consulta de metadata |
+| L-51 la puerta de las dos Custom API | EJECUTADO — OK | [Dev API 2026-10-02]: 12 de 12 llamadas (3 usuarios × 2 API × plantilla y archivo) rechazadas con 403 `0x80040220` de la plataforma, sin `MPPP-CAR`; el privilegio que falta es exactamente `prvCreatesanic_mppp_tbl_cliente` (carga) y `prvWritesanic_mppp_tbl_cliente` (cambio de estado). Los archivos traían un error de fila: aunque la puerta fallara, no podían escribir |
+| L-52 la columna Comentarios en formulario y vistas | EJECUTADO — OK | [Dev API 2026-10-02]: `MaxLength` 50, `RequiredLevel` None, "Comentarios" en 1033; en el `formxml` de "Autorizacion por cliente", sección "Evidencia de la autorizacion", justo después de `sanic_fechadocumento`; en el `layoutxml` de las dos vistas |
+| L-53 solo en `AutorizacionCliente`, auditada | EJECUTADO — OK | [Dev API 2026-10-02]: `AutorizacionPlan` no tiene la columna; en `AutorizacionCliente` es auditada, con la auditoría encendida en la tabla y en la organización |
 | L-54 Comentarios: 50 por Excel | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CargaDeCatalogosAceptacion.cs` |
-| L-55 Comentarios: 51 rechazado por formulario y Web API | PENDIENTE | Sin corrida |
+| L-55 Comentarios: 51 rechazado por formulario y Web API | EJECUTADO — OK | [Dev API 2026-10-02]: PATCH con 51 → 400 `0x80044331` ("exceeded the maximum allowed length of '50'"); con 50 → 204 y se guardan 50. [GUI 2026-10-02]: en el formulario, tipear 51 deja 50 en el campo y Ctrl+S guarda 50 |
 | L-56 los comentarios de la carga se guardan y no se pisan | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CargaDeCatalogosAceptacion.cs`, `PlanificadorDeCargaTests.cs`, `CatalogosMasivosTests.cs` |
 | L-57 `carga.filas.maximo` = 100 y valor por defecto 100 | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` (valor por defecto). El valor 100 en Dev es la base de L-15 y L-48, que sí están ejecutados |
 
@@ -1891,13 +1905,13 @@ Evidencia citada en la tabla:
 
 | Grupo | Casos | EJECUTADO — OK | CUBIERTO POR PRUEBAS AUTOMÁTICAS | PENDIENTE |
 |---|---|---|---|---|
-| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 4 | 1 | 4 |
+| 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 8 | 1 | 0 |
 | 2 — Códigos de archivo `MPPP-CAR-001` a `011` (L-10 a L-21) | 12 | 3 | 9 | 0 |
 | 3 — Excel 1: reglas por fila (L-22 a L-34) | 13 | 0 | 13 | 0 |
-| 4 — Excel 2: reglas por fila (L-35 a L-42) | 8 | 0 | 6 | 2 |
+| 4 — Excel 2: reglas por fila (L-35 a L-42) | 8 | 2 | 6 | 0 |
 | 5 — Todo o nada (L-43 a L-45) | 3 | 2 | 1 | 0 |
 | 6 — Idempotencia, volumen y orden (L-46 a L-48) | 3 | 2 | 1 | 0 |
-| 7 — Dueño y permisos (L-49 a L-51) | 3 | 2 | 0 | 1 |
-| 8 — Comentarios (L-52 a L-56) | 5 | 0 | 2 | 3 |
+| 7 — Dueño y permisos (L-49 a L-51) | 3 | 3 | 0 | 0 |
+| 8 — Comentarios (L-52 a L-56) | 5 | 3 | 2 | 0 |
 | 9 — Parámetro (L-57) | 1 | 0 | 1 | 0 |
-| **Total** | **57** | **13** | **34** | **10** |
+| **Total** | **57** | **23** | **34** | **0** |

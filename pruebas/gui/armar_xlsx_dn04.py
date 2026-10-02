@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Arma los .xlsx que sube el caso `casos/dn-04-catalogos-masivos.spec.mjs` (DN-04). Ninguno escribe en Dataverse:
-uno trae la hoja equivocada (MPPP-CAR-004) y otro un cliente nuevo incompleto (error de fila → "No se grabó nada").
+"""Arma los .xlsx que sube el caso `casos/dn-04-catalogos-masivos.spec.mjs` (DN-04). Dos NO escriben en Dataverse: uno
+trae la hoja equivocada (MPPP-CAR-004) y otro un cliente nuevo incompleto (error de fila → "No se grabó nada"). Los otros
+dos (L-09) SÍ escriben: `dn04-carga-ok.xlsx` crea un cliente, un plan, un correo y una autorización, y
+`dn04-estado-ok.xlsx` cambia el estado de lo que creó el anterior; los datos que necesitan los siembra y limpia
+`pruebas/gui/datos_dn04_l09.py` (CIF y correos del rango reservado 99998000x / zz-l-*).
 Se regeneran con `python3 pruebas/gui/armar_xlsx_dn04.py`; el resultado se commitea junto al caso."""
 import io, os, zipfile
 
@@ -8,6 +11,10 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 DESTINO = os.path.join(AQUI, "datos", "dn04")
 ENCABEZADOS = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecutivo", "Codigo plan", "Tipo formato", "Moneda",
                "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"]
+ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"]
+# Correo de "# User 1" (el ejecutivo dueño del cliente nuevo). Se verificó contra `systemusers` de Dev el 2026-10-02; si
+# el usuario cambia de correo, la fila 2 de `dn04-carga-ok.xlsx` falla con la regla 4 (ejecutivo no habilitado).
+CORREO_EJECUTIVO = "User1@55xljh.onmicrosoft.com"
 
 
 def xlsx(hoja, filas):
@@ -34,10 +41,22 @@ def xlsx(hoja, filas):
 def main():
     os.makedirs(DESTINO, exist_ok=True)
     encabezado = (1, [(f"{chr(65 + i)}1", t) for i, t in enumerate(ENCABEZADOS)])
+    encabezado_estado = (1, [(f"{chr(65 + i)}1", t) for i, t in enumerate(ENCABEZADOS_ESTADO)])
     archivos = {
         "dn04-carga-hoja-equivocada.xlsx": xlsx("OtraHoja", [encabezado]),
         # Cliente nuevo (CIF que no existe) sin razón social ni ejecutivo: error de fila, nada se graba.
         "dn04-carga-con-error.xlsx": xlsx("CargaCatalogos", [encabezado, (2, [("A2", "999999901"), ("B2", "ZZH000000901")])]),
+        # L-09, carga que GRABA. Fila 2: cliente NUEVO (999980004) con su plan PZ04 (formato 10, USD) y el correo nuevo
+        # zz-l-ana@... con su autorización. Fila 3: el cliente 999980005 solo, que `datos_dn04_l09.py --sembrar` deja
+        # INACTIVO: no crea nada y provoca la advertencia de cliente inactivo.
+        "dn04-carga-ok.xlsx": xlsx("CargaCatalogos", [encabezado,
+            (2, [("A2", "999980004"), ("B2", "ZZPCA0004001"), ("C2", "ZZP-Cliente 4"), ("D2", CORREO_EJECUTIVO),
+                 ("E2", "PZ04"), ("F2", "10"), ("G2", "USD"), ("H2", "zz-l-ana@pruebas.mppp.local"), ("I2", "Ana ZZP")]),
+            (3, [("A3", "999980005"), ("B3", "ZZPCA0005001")])]),
+        # L-09 paso 4: desactiva el cliente que creó la carga anterior y "activa" el correo que ya está activo (sin cambios).
+        "dn04-estado-ok.xlsx": xlsx("ActivarDesactivar", [encabezado_estado,
+            (2, [("A2", "CLIENTE"), ("B2", "DESACTIVAR"), ("C2", "999980004")]),
+            (3, [("A3", "CORREO"), ("B3", "ACTIVAR"), ("F3", "zz-l-ana@pruebas.mppp.local")])]),
     }
     for nombre, contenido in archivos.items():
         with open(os.path.join(DESTINO, nombre), "wb") as f:
