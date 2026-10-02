@@ -155,6 +155,9 @@ CANON_SIMPLE = {
     "rpa.lote.maximo": "100",
     "rpa.horas.tolerancia": "24",
     "rpa.minutos.claimmaximo": "60",
+    # DN-04 (D-75, 2026-10-01): el tope de la carga masiva. Si el set L muriera con su versión de prueba (200)
+    # todavía activa, esto la lleva a 100 igual: la versión activa más alta es la que lee el plugin.
+    "carga.filas.maximo": "100",
 }
 
 PARAMETROS_NO_SIMPLES = ("plantilla.obligatoriedad", "exportacion.columnas")

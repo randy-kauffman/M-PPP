@@ -23,10 +23,12 @@ tabla `## Resultados` del final, con la evidencia citada. Hay tres estados, y **
 | **CUBIERTO POR PRUEBAS AUTOMÁTICAS** | Lo ejercita la suite de C# (`tests/Sanic.Mppp.Plugins.Tests`, 1580 en verde al 2026-10-01), con el archivo de aceptación citado. **No se corrió en Dev** | **No es un OK.** `CONVENCIONES.md` §3 solo define OK / FALLA / N-A para una corrida real; este estado dice "hay una prueba que lo cubre", no "se vio funcionar en el entorno". Un doble de pruebas no reproduce la plataforma (D-73 lo dejó escrito) |
 | **PENDIENTE** | Nadie lo corrió. Se corre en Dev | — |
 
-**Todavía no existe `herramientas/pruebas/sets/set_l.py`**: `correr.py` no conoce el set `L`. Los casos
-de abajo están escritos para que el set se pueda escribir sin adivinar; hasta entonces, lo que está
-EJECUTADO salió del arnés de Playwright (`pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs`) y de
-las mediciones con sesión real de D-73/D-75, y todo lo demás es manual o está pendiente.
+**El set corre con `python3 herramientas/pruebas/correr.py L`** (`herramientas/pruebas/sets/set_l.py`, desde el
+2026-10-02). Junta tres fuentes de evidencia, cada una corrida una sola vez por set: la suite de C# (resultado por
+prueba, con TRX), el spec de Playwright `pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs` (una corrida por rol; un
+test saltado nunca cuenta como aprobado) y la Web API con las sesiones reales de los cuatro roles. En la salida de
+`correr.py`, un caso "cubierto por pruebas automáticas" da OK cuando TODAS las pruebas de C# que cita existen y pasan;
+la tabla de `## Resultados` sigue distinguiendo ese estado de un OK con evidencia de Dev.
 
 ## Preparativos comunes a este archivo
 
@@ -590,8 +592,10 @@ el archivo; cero registros nuevos.
 de `008`: la base cortó antes que el presupuesto propio, que es justo lo que D-75 quiso evitar bajando
 a 30 s.
 
-**Automatizable.** API en `set_l.py`, **siempre N-A sin bandera de alto riesgo** (mismo criterio que
-`E-07`/`E-08`); la cobertura confiable y repetible es la automática C#
+**Automatizable.** API en `set_l.py`, **siempre** (corregido el 2026-10-02: no hace falta bandera de alto riesgo).
+El set siembra una versión temporal de `carga.filas.maximo` en 200, sube 200 filas que crean todo y espera el 008
+cerca de los 30 s; la transacción dura lo mismo que la de L-48, lejos del corte de la base (~40 s). La versión se
+desactiva en el mismo caso y se borra en `cerrar()`. Además, la cobertura automática C#
 (`CatalogosMasivosApiAceptacion.cs`: `Presupuesto_agotado_es_MPPP_CAR_008`;
 `CatalogosMasivosAceptacion.cs`: `Con_el_presupuesto_agotado_no_escribe_mas_y_dice_cuantas_alcanzo`,
 `CatalogosMasivosApiAceptacion.cs`: `Si_no_hay_nada_que_escribir_el_presupuesto_no_tira_el_resultado`).
@@ -1818,8 +1822,11 @@ pruebas automáticas C#
 ## Resultados
 
 Estado al **2026-10-02** (los 10 pendientes se corrieron ese día). Los tres estados y lo que significa cada uno están en "Cómo leer el estado de
-cada caso", arriba. **Nada de esta tabla es una corrida de `correr.py`**: el set `L` todavía no tiene
-`set_l.py`. Ni un solo caso está marcado como EJECUTADO sin evidencia citada.
+cada caso", arriba. Ni un solo caso está marcado como EJECUTADO sin evidencia citada.
+
+- **[correr.py 2026-10-02]** = `python3 herramientas/pruebas/correr.py L`, primera corrida del arnés: **57 OK · 0 FALLA
+  · 0 N-A** en 20 minutos, Dev limpio al terminar. La auditoría del parámetro confirma L-17: versión temporal creada a
+  las 15:37:34 UTC, desactivada 31 s después (el corte del 008) y borrada en `cerrar()`.
 
 Evidencia citada en la tabla:
 
@@ -1859,7 +1866,7 @@ Evidencia citada en la tabla:
 | L-14 `MPPP-CAR-005` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] solo (a) encabezado distinto y (b) columna de más; **(c) columnas intercambiadas y (d) mayúsculas/espacios no tienen prueba de aceptación propia**: se corren en Dev |
 | L-15 `MPPP-CAR-006`, 101 filas | EJECUTADO — OK | [Dev 1.0.22.0]: 101 filas → `MPPP-CAR-006` sin escribir (D-75) |
 | L-16 `MPPP-CAR-007` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` |
-| L-17 `MPPP-CAR-008` por presupuesto de 30 s | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` y `CatalogosMasivosAceptacion.cs`. En Dev nunca se disparó: el peor caso de 100 filas tarda 25,1 s |
+| L-17 `MPPP-CAR-008` por presupuesto de 30 s | EJECUTADO — OK | [correr.py 2026-10-02]: con una versión temporal del tope en 200, 200 filas que crean todo cortaron con `MPPP-CAR-008` a los ~31 s, con "(30 segundos)" en el mensaje; la versión volvió a 100. Además [C#] `CatalogosMasivosApiAceptacion.cs` y `CatalogosMasivosAceptacion.cs` |
 | L-18 `MPPP-CAR-009` por error de dato al grabar | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs`. No se provocó en Dev |
 | L-19 `MPPP-CAR-010` | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CatalogosMasivosApiAceptacion.cs` |
 | L-20 `MPPP-CAR-011` por falla de plataforma, sin nombrar fila | EJECUTADO — OK | [Dev 1.0.21.0]: 200 filas fallaron a los 42 s, el usuario recibió `MPPP-CAR-011` y la traza dijo `Fila 66 (código 0x80072324)`; además [C#]. No se repitió con 1.0.22.0: con el tope en 100 ya no se alcanza por volumen |
@@ -1887,7 +1894,7 @@ Evidencia citada en la tabla:
 | L-42 el ejemplo del aprobador de punta a punta | EJECUTADO — OK | [Dev API 2026-10-02]: las seis filas sobre 3 clientes, 1 plan y 2 correos con autorizaciones cruzadas: 2 activados, 4 desactivados, 0 sin cambios; el plan solo, el correo de Juan inactivo con sus dos autorizaciones intactas ("deja sin efecto 2"), solo maria@1 desactivada (María sigue sobre el Cliente 2), juan@3 activada con la advertencia de correo inactivo. El texto del resumen en la interfaz lo cubre L-09 |
 | L-43 error de fila: no se graba, se descarga el resultado, "No se grabó nada" | EJECUTADO — OK | [GUI]: `'Cargar archivo' con un error de fila descarga el resultado y avisa que no se grabó nada`. Límite: el spec no cuenta registros en Dataverse |
 | L-44 filas sanas: "Sin errores — no se grabó" | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CargaDeCatalogosAceptacion.cs`, `CambioDeEstadoAceptacion.cs`. El archivo del GUI tiene una sola fila: no ejercita este texto |
-| L-45 rollback: cero registros tras una falla de la pasada 2 | EJECUTADO — OK | D-72 (`spikes/d72-transaccion-capi/CONCLUSIONES.md`: `IsInTransaction = true` y una excepción deja cero registros) y la medición de D-75 ("El todo o nada funcionó en las cuatro (cero registros)", 200 y 300 filas) |
+| L-45 rollback: cero registros tras una falla de la pasada 2 | EJECUTADO — OK | [correr.py 2026-10-02]: la carga cortada de L-17 dejó cero clientes, planes y correos. Antes: D-72 (`spikes/d72-transaccion-capi/CONCLUSIONES.md`: `IsInTransaction = true` y una excepción deja cero registros) y la medición de D-75 ("El todo o nada funcionó en las cuatro (cero registros)", 200 y 300 filas) |
 | L-46 re-subir el mismo archivo: "Sin cambios" | EJECUTADO — OK | [Dev 1.0.22.0]: re-subir las 100 filas → 0 creados en 0,6 s. El texto por fila ("Sin cambios: todo ya existía...") lo cubre [C#] `CargaDeCatalogosAceptacion.cs`; no se capturó la columna Resultado de esa corrida |
 | L-47 desnormalizado: una sola vez, en orden de dependencias | CUBIERTO POR PRUEBAS AUTOMÁTICAS | [C#] `CargaDeCatalogosAceptacion.cs`, `CatalogosMasivosAceptacion.cs`. La corrida de Dev de 100 filas no era desnormalizada (cada fila creaba todo) |
 | L-48 100 filas peor caso dentro del presupuesto | EJECUTADO — OK | [Dev 1.0.22.0]: 100 filas que crean cliente, plan, correo y autorización, grabadas en 25,1 s. Margen contra los 30 s: unos 5 s |
@@ -1906,7 +1913,7 @@ Evidencia citada en la tabla:
 | Grupo | Casos | EJECUTADO — OK | CUBIERTO POR PRUEBAS AUTOMÁTICAS | PENDIENTE |
 |---|---|---|---|---|
 | 1 — Menús, plantillas y flujo del navegador (L-01 a L-09) | 9 | 8 | 1 | 0 |
-| 2 — Códigos de archivo `MPPP-CAR-001` a `011` (L-10 a L-21) | 12 | 3 | 9 | 0 |
+| 2 — Códigos de archivo `MPPP-CAR-001` a `011` (L-10 a L-21) | 12 | 4 | 8 | 0 |
 | 3 — Excel 1: reglas por fila (L-22 a L-34) | 13 | 0 | 13 | 0 |
 | 4 — Excel 2: reglas por fila (L-35 a L-42) | 8 | 2 | 6 | 0 |
 | 5 — Todo o nada (L-43 a L-45) | 3 | 2 | 1 | 0 |
@@ -1914,4 +1921,4 @@ Evidencia citada en la tabla:
 | 7 — Dueño y permisos (L-49 a L-51) | 3 | 3 | 0 | 0 |
 | 8 — Comentarios (L-52 a L-56) | 5 | 3 | 2 | 0 |
 | 9 — Parámetro (L-57) | 1 | 0 | 1 | 0 |
-| **Total** | **57** | **23** | **34** | **0** |
+| **Total** | **57** | **24** | **33** | **0** |

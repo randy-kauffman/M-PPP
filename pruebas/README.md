@@ -33,12 +33,12 @@ archivo, prepara por su cuenta todo lo que necesita) con su letra, corrido por
 sets C a E, contados el 2026-09-28 después del reagrupamiento de sets, más los 57 del set L). Cada uno
 trae: qué prueba, cómo hacerlo, **qué tiene que pasar** y cómo verificarlo.
 
-> **Set L, nota al 2026-10-01.** El set L **todavía no tiene `herramientas/pruebas/sets/set_l.py`**:
-> `correr.py` no lo conoce y `--listar` no lo muestra. Su archivo trae el estado de cada caso en su
+> **Set L, nota al 2026-10-02.** El set L corre con `correr.py L` (`herramientas/pruebas/sets/set_l.py`; primera
+> corrida: 57 OK · 0 FALLA · 0 N-A). Su archivo trae además el estado de cada caso en su
 > tabla `## Resultados`, con tres estados que **no se mezclan**: *EJECUTADO — OK* (con evidencia
 > citada: el arnés de Playwright `pruebas/gui/casos/dn-04-catalogos-masivos.spec.mjs` y las
 > mediciones de Dev de D-73/D-75), *CUBIERTO POR PRUEBAS AUTOMÁTICAS* (solo la suite de C#, sin
-> correr en Dev: no es un OK) y *PENDIENTE*. Al 2026-10-02: 23 ejecutados, 34 cubiertos por pruebas
+> correr en Dev: no es un OK) y *PENDIENTE*. Al 2026-10-02: 24 ejecutados, 33 cubiertos por pruebas
 > automáticas y 0 pendientes (los 10 que faltaban se corrieron ese día, con las sesiones reales de los
 > cuatro roles y el spec de Playwright extendido).
 

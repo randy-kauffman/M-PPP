@@ -32,7 +32,7 @@ _AQUI = os.path.dirname(os.path.abspath(__file__))
 # (R-19..R-28) y H se repartió entre A (A-15) y G (G-14..G-19). Tampoco va a
 # haber un `set_o.py` ni un `set_h.py` de nuevo — las letras quedan libres
 # para un archivo nuevo, no reservadas.
-ORDEN_CANONICO = ["C", "S", "R", "M", "A", "G", "V", "I", "B", "U", "E"]
+ORDEN_CANONICO = ["C", "S", "R", "M", "A", "G", "V", "I", "B", "U", "E", "L"]
 
 CAMPOS_OBLIGATORIOS = ("LETRA", "NOMBRE", "preparar", "CASOS", "cerrar")
 

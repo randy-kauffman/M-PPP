@@ -39,8 +39,7 @@ README = os.path.join(PRUEBAS, "README.md")
 SALIDA = os.path.join(PRUEBAS, "PLAN-COMPLETO.md")
 
 # Orden canónico de los archivos de casos (`CONVENCIONES.md` §4): el mismo
-# que usa `herramientas/pruebas/sets/__init__.py` para C/S/R/M/A/G/V/I/B/U/E (el set L,
-# `12-catalogos-masivos.md`, todavía no tiene arnés propio),
+# que usa `herramientas/pruebas/sets/__init__.py` para C/S/R/M/A/G/V/I/B/U/E/L,
 # pero acá por nombre de archivo, no por letra (00-preparacion.md no tiene
 # letra: el set P desapareció, pero el archivo sigue siendo parte del plan).
 #
