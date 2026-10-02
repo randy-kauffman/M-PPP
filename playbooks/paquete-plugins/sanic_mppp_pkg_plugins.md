@@ -14,6 +14,10 @@ a los que apuntan las Custom API y los steps.
 sandbox no siga ejecutando el binario viejo. Se actualiza con `--actualizar-contenido` (la `version` del PAQUETE,
 1.0.0, es inmutable y no cambia).
 
+**1.0.21.0 (2026-10-01, D-75)**: MPPP-CAR-011 para fallas de plataforma al leer y al escribir, y el código de Dataverse
+en la traza. Mismos tipos, sin steps nuevos. Se sube con el presupuesto TODAVÍA en 100 s a propósito: hay que reproducir el
+10928 de Azure SQL con 200 filas para confirmar qué `ErrorCode` trae (`DIRECTRICES-NUEVAS.md` DN-04, párrafo del 011).
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
