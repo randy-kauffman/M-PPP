@@ -98,7 +98,7 @@ ACCIONES_BOTON = ["funcion", "menu"]
 CLAVES_OPCION_MENU = ["etiqueta", "funcion", "id", "secuencia", "tooltip"]
 # `regla` es OPCIONAL: la función JS que decide si el botón corresponde para lo
 # seleccionado. Sin ella el botón se muestra siempre, que es como nacieron los ocho.
-CLAVES_BOTON_OPCIONALES = ["regla"]
+CLAVES_BOTON_OPCIONALES = ["regla", "idioma_del_texto"]
 UBICACIONES = ("HomepageGrid", "SubGrid", "Form")
 
 C_APP = "la consulta de la app (GET appmodules)"
@@ -223,8 +223,17 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
             exigir_forma(boton[campo], str, aqui, campo, no_vacio=True)
         if "funcion" in boton:
             exigir_forma(boton["funcion"], str, aqui, "funcion", no_vacio=True)
+            if "idioma_del_texto" in boton:
+                raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' es solo para un botón con 'menu'; un botón común usa LocLabels")
         else:
             _validar_menu(boton["menu"], f"{aqui}.menu", idiomas)
+            if "idioma_del_texto" not in boton:
+                raise ErrorPlaybook(
+                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}): Unified Interface no resuelve "
+                    "$LocLabels dentro de un FlyoutAnchor, así que el menú lleva texto fijo en ese idioma")
+            exigir_forma(boton["idioma_del_texto"], int, aqui, "idioma_del_texto")
+            if boton["idioma_del_texto"] not in idiomas:
+                raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' = {boton['idioma_del_texto']} no es uno de {idiomas}")
         exigir_forma(boton["secuencia"], int, aqui, "secuencia")
         if boton["id"] in vistos:
             raise ErrorPlaybook(f"{aqui}: el id '{boton['id']}' está repetido en esta tabla")
@@ -344,26 +353,34 @@ def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiqueta
     `Button` por opción, cada uno con su Command. A diferencia del botón común, NI el ancla NI las opciones llevan
     `Mscrm.SelectionCountAtLeastOne`: un menú que no actúa sobre filas seleccionadas quedaría deshabilitado, y en
     Unified Interface un comando deshabilitado no se ve. Learn (troubleshoot "Button in command bar doesn't appear
-    after grid item selection"): los flyouts se muestran haya o no selección."""
+    after grid item selection"): los flyouts se muestran haya o no selección.
+
+    TEXTO FIJO, NO `$LocLabels` (comprobado en Dev el 2026-10-01): Unified Interface no resuelve LocLabels dentro de un
+    FlyoutAnchor. Las etiquetas quedaban guardadas en `ribbondiff` pero `GetClientMetadata` no las mandaba, y el menú y
+    sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto va en el idioma que declara
+    `idioma_del_texto` (decisión del aprobador: español). Learn ("Use localized labels with ribbons"): el ribbon admite
+    texto directo, que no depende de los idiomas instalados en el entorno."""
     propia = _regla_propia(base, boton, cambio, reglas)
     biblioteca = cambio["biblioteca"]
+    lcid = str(boton["idioma_del_texto"])
     opciones = sorted(boton["menu"], key=lambda o: o["secuencia"])
+
+    def textos(objeto):
+        etiqueta = _atributo(objeto["etiqueta"][lcid])
+        return (f'LabelText="{etiqueta}" Alt="{etiqueta}" ToolTipTitle="{etiqueta}" '
+                f'ToolTipDescription="{_atributo(objeto["tooltip"][lcid])}"')
+
     for ubicacion in boton["ubicaciones"]:
         lugar = f"Mscrm.{ubicacion}.{cambio['tabla']}.{GRUPO[ubicacion]}.Controls._children"
         botones = "".join(
             f'<Button Command="{base}.{o["id"]}.Command" Id="{base}.{ubicacion}.{o["id"]}.Button" '
-            f'LabelText="$LocLabels:{base}.{o["id"]}.Button.LabelText" Sequence="{o["secuencia"]}" '
-            f'ToolTipTitle="$LocLabels:{base}.{o["id"]}.Button.ToolTipTitle" '
-            f'ToolTipDescription="$LocLabels:{base}.{o["id"]}.Button.ToolTipDescription" />'
+            f'Sequence="{o["secuencia"]}" TemplateAlias="o1" {textos(o)} />'
             for o in opciones)
         acciones.append(
             f'<CustomAction Id="{base}.{ubicacion}.CustomAction" Location="{lugar}" '
             f'Sequence="{boton["secuencia"]}"><CommandUIDefinition>'
             f'<FlyoutAnchor Id="{base}.{ubicacion}.FlyoutAnchor" Command="{base}.Command" '
-            f'Sequence="{boton["secuencia"]}" TemplateAlias="o1" '
-            f'LabelText="$LocLabels:{base}.Button.LabelText" '
-            f'ToolTipTitle="$LocLabels:{base}.Button.ToolTipTitle" '
-            f'ToolTipDescription="$LocLabels:{base}.Button.ToolTipDescription" '
+            f'Sequence="{boton["secuencia"]}" TemplateAlias="o1" {textos(boton)} '
             f'Image16by16="$webresource:{boton["icono"]}" Image32by32="$webresource:{boton["icono"]}" '
             f'ModernImage="$webresource:{boton["icono"]}">'
             f'<Menu Id="{base}.{ubicacion}.Menu">'
@@ -373,14 +390,12 @@ def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiqueta
             "</CommandUIDefinition></CustomAction>")
     reglas_ancla = f"<EnableRules>{propia}</EnableRules>" if propia else "<EnableRules />"
     comandos.append(f'<CommandDefinition Id="{base}.Command">{reglas_ancla}<DisplayRules /><Actions /></CommandDefinition>')
-    etiquetas.extend(_loclabels(base, boton, idiomas))
     for o in opciones:
         comandos.append(
             f'<CommandDefinition Id="{base}.{o["id"]}.Command">{reglas_ancla}<DisplayRules />'
             f'<Actions><JavaScriptFunction FunctionName="{o["funcion"]}" Library="$webresource:{biblioteca}">'
             '<CrmParameter Value="SelectedControl" />'
             "</JavaScriptFunction></Actions></CommandDefinition>")
-        etiquetas.extend(_loclabels(f"{base}.{o['id']}", o, idiomas))
 
 
 def ribbondiffxml(identidad, cambio, idiomas, botones_presentes):
@@ -680,6 +695,13 @@ def _verificar_ribbon(dv, cambio, identidad):
                         faltan.append(f"al menú '{boton['id']}' le falta la opción '{opcion['id']}' en {ubicacion}")
             elif f"{base}.{ubicacion}.Button" not in presentes:
                 faltan.append(f"falta el botón '{boton['id']}' en {ubicacion}")
+        if "menu" in boton:
+            # El texto fijo también se verifica: con los mismos ids, un menú con el texto viejo pasaría por bueno.
+            lcid = str(boton["idioma_del_texto"])
+            for objeto in [boton, *boton["menu"]]:
+                texto = _atributo(objeto["etiqueta"][lcid])
+                if f'LabelText="{texto}"' not in ribbon:
+                    faltan.append(f"al menú '{boton['id']}' le falta el texto fijo '{objeto['etiqueta'][lcid]}'")
         for opcion in boton.get("menu", []):
             if f'FunctionName="{opcion["funcion"]}"' not in ribbon:
                 faltan.append(f"la opción '{opcion['id']}' del menú '{boton['id']}' no llama a '{opcion['funcion']}'")

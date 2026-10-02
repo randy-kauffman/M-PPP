@@ -336,7 +336,7 @@ def _boton_menu(**cambios):
          "regla": "Sanic.Mppp.Comandos.esAdministradorDePlanes",
          "etiqueta": {"1033": "Bulk load", "3082": "Carga masiva"},
          "tooltip": {"1033": "Loads or downloads the bulk Excel.", "3082": "Carga o descarga el Excel masivo."},
-         "ubicaciones": ["HomepageGrid"], "secuencia": 80,
+         "ubicaciones": ["HomepageGrid"], "secuencia": 80, "idioma_del_texto": 3082,
          "menu": [
              {"id": "cargar", "funcion": "Sanic.Mppp.Comandos.cargarCatalogos", "secuencia": 10,
               "etiqueta": {"1033": "Upload file", "3082": "Cargar archivo"},
@@ -394,15 +394,24 @@ class RibbonConMenu(unittest.TestCase):
             self.assertIn('<CrmParameter Value="SelectedControl" />', cuerpo)
             self.assertIn(f'<EnableRule Id="{base}.EnableRule" />', cuerpo)
 
-    def test_ancla_y_opciones_llevan_etiqueta_y_tooltip_en_cada_idioma(self):
+    def test_ancla_y_opciones_llevan_texto_fijo_en_el_idioma_declarado_y_ningun_LocLabel(self):
+        # Unified Interface NO resuelve $LocLabels dentro de un FlyoutAnchor (comprobado en Dev el 2026-10-01: el
+        # servidor guarda las etiquetas en ribbondiff, pero GetClientMetadata no las manda y el menú dice "LabelText").
+        # Decisión del aprobador: texto fijo, en español. Learn: el ribbon admite texto directo ("direct entry of text"),
+        # que no depende de los idiomas instalados.
         x = self.xml()
-        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
-        for loc in (f"{base}.Button.LabelText", f"{base}.cargar.Button.LabelText", f"{base}.plantilla.Button.ToolTipDescription"):
-            i = x.index(f'<LocLabel Id="{loc}">')
-            bloque = x[i:x.index("</LocLabel>", i)]
-            self.assertIn('languagecode="1033"', bloque)
-            self.assertIn('languagecode="3082"', bloque)
-        self.assertIn('description="Descargar plantilla"', x)
+        self.assertNotIn("$LocLabels:", x)
+        self.assertNotIn("<LocLabel ", x)
+        self.assertIn('LabelText="Carga masiva"', x)
+        self.assertIn('LabelText="Cargar archivo"', x)
+        self.assertIn('LabelText="Descargar plantilla"', x)
+        self.assertIn('ToolTipDescription="Descarga la plantilla vacía."', x)
+        self.assertIn('Alt="Carga masiva"', x)
+
+    def test_el_texto_fijo_se_escapa(self):
+        b = _boton_menu()
+        b["etiqueta"]["3082"] = 'Carga "masiva" & más'
+        self.assertIn('LabelText="Carga &quot;masiva&quot; &amp; más"', self.xml(b))
 
     def test_un_menu_en_dos_ubicaciones_comparte_los_comandos(self):
         x = self.xml(_boton_menu(ubicaciones=["HomepageGrid", "SubGrid"]))
@@ -448,6 +457,13 @@ class VerificacionDelMenu(unittest.TestCase):
         real = self.ribbon_generado().replace(f'Id="{base}.HomepageGrid.plantilla.Button"', 'Id="otra.cosa"')
         faltan = self.verificar(real)
         self.assertTrue(any("plantilla" in f for f in faltan), faltan)
+
+    def test_un_menu_con_el_texto_viejo_no_se_da_por_bueno(self):
+        # Un menú desplegado con $LocLabels (la primera versión) tiene los mismos ids: sin mirar el texto, la herramienta
+        # diría ya_existia y nunca importaría el texto fijo.
+        real = self.ribbon_generado().replace('LabelText="Carga masiva"', 'LabelText="$LocLabels:x.Button.LabelText"')
+        faltan = self.verificar(real)
+        self.assertTrue(any("Carga masiva" in f for f in faltan), faltan)
 
     def test_una_opcion_que_no_llama_a_su_funcion(self):
         real = self.ribbon_generado().replace('FunctionName="Sanic.Mppp.Comandos.plantillaCarga"', 'FunctionName="Otra.Cosa"')
@@ -497,6 +513,18 @@ class ValidacionDelMenu(Base):
         b = _boton_menu()
         del b["menu"][0]["etiqueta"]["3082"]
         self.rechaza(b, "3082")
+
+    def test_un_menu_sin_idioma_del_texto_se_rechaza(self):
+        b = _boton_menu()
+        del b["idioma_del_texto"]
+        self.rechaza(b, "idioma_del_texto")
+
+    def test_un_idioma_del_texto_fuera_de_los_idiomas_se_rechaza(self):
+        self.rechaza(_boton_menu(idioma_del_texto=1031), "idioma_del_texto")
+
+    def test_idioma_del_texto_en_un_boton_comun_se_rechaza(self):
+        b = dict(BOTON, idioma_del_texto=3082)
+        self.rechaza(b, "idioma_del_texto")
 
     def test_un_boton_sin_funcion_ni_menu_se_rechaza(self):
         b = _boton_menu()

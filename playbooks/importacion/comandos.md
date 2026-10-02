@@ -484,6 +484,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 80,
+          "idioma_del_texto": 3082,
           "menu": [
             {
               "id": "cargar",
@@ -529,6 +530,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
             "HomepageGrid"
           ],
           "secuencia": 90,
+          "idioma_del_texto": 3082,
           "menu": [
             {
               "id": "cargar",
