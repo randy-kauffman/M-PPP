@@ -71,15 +71,22 @@ export async function cambiarArea(page, nombreArea) {
  * (ver `quitarAcentos`).
  */
 export async function irASitemap(page, etiqueta, area) {
-  if (area) {
-    await cambiarArea(page, area);
-  }
   const patron = patronSinAcentos(etiqueta);
-
   const porRol = page.getByRole("treeitem", { name: patron });
-  if ((await porRol.count()) > 0) {
-    await porRol.first().click();
-    return;
+
+  // CARRERA OBSERVADA (2026-10-01, DN-04): la app abre en "Por digitar"; para un usuario sin permiso sobre Fila esa
+  // página pinta un error MIENTRAS se cambia de área, y el clic en el área se perdía (la captura quedaba en
+  // "Trabajo"). `count()` no espera, así que la entrada se buscaba antes de que el área cambiara. Ahora se ESPERA la
+  // entrada, y si no aparece se vuelve a cambiar de área una vez.
+  for (let intento = 1; intento <= (area ? 2 : 1); intento++) {
+    if (area) await cambiarArea(page, area);
+    try {
+      await porRol.first().waitFor({ state: "visible", timeout: 15_000 });
+      await porRol.first().click();
+      return;
+    } catch {
+      // sin treeitem visible: otro intento de área, o los respaldos de abajo
+    }
   }
 
   const porLink = page.getByRole("link", { name: patron });

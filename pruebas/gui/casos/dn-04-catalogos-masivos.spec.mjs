@@ -3,8 +3,10 @@
 // casos ESCRIBE en Dataverse: suben un archivo que se rechaza o que no se graba (todo o nada). La carga con escrituras
 // reales es D-73 (diseno/PENDIENTES.md).
 //
-//   MPPP_USUARIO=admin_planes npx playwright test dn-04   → menús presentes, plantillas, rechazo y error de fila
-//   MPPP_USUARIO=ejecutivo    npx playwright test dn-04   → los menús NO aparecen (regla esAdministradorDePlanes)
+//   MPPP_USUARIO=admin_planes npx playwright test dn-04   → menús presentes en las 4 grillas, plantillas, rechazo y error
+//   MPPP_USUARIO=ejecutivo    npx playwright test dn-04   → los menús NO aparecen en ninguna (esAdministradorDePlanes)
+//
+// Las cargas de archivo corren solo en Clientes: las cuatro grillas llaman al mismo JS y a la misma Custom API.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,20 +39,48 @@ const AREA_CATALOGOS = "Catalogos"; // sin tilde, como la expone la plataforma (
 const usuario = usuarioActivo();
 test.use({ storageState: verificarSesionExiste(usuario) });
 
-async function abrirClientes(page) {
+// Las cuatro grillas con menús (playbooks/importacion/comandos.md, DN-04).
+const GRILLAS = [SITEMAP.clientes, SITEMAP.planes, SITEMAP.autorizados, SITEMAP.autorizacionesClientes];
+
+async function abrirGrilla(page, entrada) {
   await abrirApp(page);
-  await irASitemap(page, SITEMAP.clientes, AREA_CATALOGOS); // "Clientes" vive en el área Catálogos; la app abre en Trabajo
+  await irASitemap(page, entrada, AREA_CATALOGOS); // los catálogos viven en el área Catálogos; la app abre en Trabajo
   await esperarGrilla(page, { permitirVacia: true });
 }
 
+const abrirClientes = (page) => abrirGrilla(page, SITEMAP.clientes);
+
 /** Abre un menú desplegable y devuelve el locator de una de sus opciones (ya visible). */
-async function opcionDelMenu(page, menu, opcion) {
+async function opcionDelMenu(page, menu, opcion, grilla = SITEMAP.clientes) {
+  return (await abrirMenu(page, menu, opcion, grilla)).item;
+}
+
+/** Como `opcionDelMenu`, pero devuelve también el ancla (para poder cerrar el menú). */
+async function abrirMenu(page, menu, opcion, grilla) {
   const ancla = await localizarBoton(page, menu, { raiz: page.getByRole("main") });
-  expect(ancla, `El menú '${menu[0]}' está AUSENTE de la barra de Clientes.`).not.toBeNull();
+  expect(ancla, `El menú '${menu[0]}' está AUSENTE de la barra de ${grilla}.`).not.toBeNull();
   await ancla.locator.click();
   const item = await localizarBoton(page, opcion);
-  expect(item, `El menú '${menu[0]}' se abrió pero no trae la opción '${opcion[0]}'.`).not.toBeNull();
-  return item.locator;
+  expect(item, `En ${grilla}, el menú '${menu[0]}' se abrió pero no trae la opción '${opcion[0]}'.`).not.toBeNull();
+  return { ancla: ancla.locator, item: item.locator };
+}
+
+/** Cierra el desplegable y ESPERA a que se cierre: mientras está abierto, su capa tapa la barra y el siguiente menú
+ *  "no aparece" (falso AUSENTE observado 2026-10-01). `Escape` solo no alcanza: en una de tres corridas idénticas el
+ *  menú siguió abierto tras tres `Escape` (el menú solo atiende `Escape` si el foco está adentro). Se escala: Escape,
+ *  Escape con el foco en una opción, clic en el ancla (alterna el menú; con tope, por si la capa lo tapa). */
+async function cerrarMenu(page, ancla, opcionVisible) {
+  const cerrado = () => opcionVisible.waitFor({ state: "hidden", timeout: 3_000 }).then(() => true).catch(() => false);
+  const formas = [
+    ["Escape", () => page.keyboard.press("Escape")],
+    ["Escape con foco en el menú", async () => { await opcionVisible.focus({ timeout: 3_000 }).catch(() => {}); await page.keyboard.press("Escape"); }],
+    ["clic en el ancla", () => ancla.click({ timeout: 5_000 }).catch(() => {})],
+  ];
+  for (const [, cerrar] of formas) {
+    await cerrar();
+    if (await cerrado()) return;
+  }
+  throw new Error(`El menú desplegable no se cerró (probado: ${formas.map(([n]) => n).join(", ")}).`);
 }
 
 async function textoDelDialogo(page) {
@@ -61,6 +91,18 @@ async function textoDelDialogo(page) {
 test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => {
   test.skip(usuario !== "admin_planes", "solo con la sesión del Administrador de planes");
   test.beforeEach(() => mkdirSync(CARPETA_DESCARGAS, { recursive: true }));
+
+  for (const grilla of GRILLAS) {
+    test(`${grilla}: los dos menús están y cada uno trae sus dos opciones`, async ({ page }) => {
+      await abrirGrilla(page, grilla);
+      for (const menu of [MENU_CARGA, MENU_ESTADO]) {
+        const { ancla, item: cargar } = await abrirMenu(page, menu, OPCION_CARGAR, grilla); // abre el menú
+        const plantilla = await localizarBoton(page, OPCION_PLANTILLA);         // mismo menú, ya abierto
+        expect(plantilla, `En ${grilla}, el menú '${menu[0]}' no trae la opción '${OPCION_PLANTILLA[0]}'.`).not.toBeNull();
+        await cerrarMenu(page, ancla, cargar);
+      }
+    });
+  }
 
   for (const [menu, archivo, encabezados] of [
     [MENU_CARGA, "CargaCatalogos.xlsx", ENCABEZADOS_CARGA],
@@ -114,9 +156,11 @@ test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => 
 test.describe("DN-04 — menús de catálogos (Ejecutivo)", () => {
   test.skip(usuario !== "ejecutivo", "solo con la sesión del Ejecutivo");
 
-  test("un Ejecutivo no ve los menús de carga ni de activación masiva", async ({ page }) => {
-    await abrirClientes(page);
-    expect(await localizarBoton(page, MENU_CARGA, { raiz: page.getByRole("main") })).toBeNull();
-    expect(await localizarBoton(page, MENU_ESTADO, { raiz: page.getByRole("main") })).toBeNull();
-  });
+  for (const grilla of GRILLAS) {
+    test(`${grilla}: un Ejecutivo no ve los menús de carga ni de activación masiva`, async ({ page }) => {
+      await abrirGrilla(page, grilla);
+      expect(await localizarBoton(page, MENU_CARGA, { raiz: page.getByRole("main") })).toBeNull();
+      expect(await localizarBoton(page, MENU_ESTADO, { raiz: page.getByRole("main") })).toBeNull();
+    });
+  }
 });
