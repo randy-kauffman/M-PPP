@@ -539,7 +539,7 @@ namespace Sanic.Mppp.Plugins.Datos
         {
             var encabezado = "Fila " + fila.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (codigoDeError.HasValue)
-                encabezado += " (código 0x" + codigoDeError.Value.ToString("X8", System.Globalization.CultureInfo.InvariantCulture) + ")";
+                encabezado += " (código " + FallasDePlataforma.EnHexadecimal(codigoDeError.Value) + ")";
             return encabezado + ": " + motivo;
         }
 
@@ -574,6 +574,12 @@ namespace Sanic.Mppp.Plugins.Datos
             unchecked((int)0x80072330), // CacheLoadConcurrencyError
             -2147204783,                // "Sql error: Execution Timeout Expired" (Troubleshoot Dataverse plug-ins)
         };
+
+        /// <summary>El código como se muestra en la traza: "0x" y 8 dígitos hexadecimales en mayúsculas (0x80072324).</summary>
+        public static string EnHexadecimal(int codigoDeError)
+        {
+            return "0x" + codigoDeError.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         /// <summary>True si el código es de plataforma; null (la falla no traía detalle) nunca lo es.</summary>
         public static bool EsDePlataforma(int? codigoDeError)

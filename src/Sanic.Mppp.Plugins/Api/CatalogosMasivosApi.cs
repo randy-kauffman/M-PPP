@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
 using Sanic.Mppp.Plugins.Catalogos;
 using Sanic.Mppp.Plugins.Datos;
@@ -90,6 +91,7 @@ namespace Sanic.Mppp.Plugins.Api
     ///  - Sin errores: escribe con el presupuesto (<see cref="PresupuestoSegundos"/>, medido con <c>transcurrido</c> desde el
     ///    inicio de la llamada); presupuesto agotado → 008; una escritura que falla → 009 con su fila ("No se grabó nada"),
     ///    salvo que su <c>ErrorCode</c> sea de plataforma (sobrecarga, límites, tiempo agotado) → 011 sin culpar a la fila (D-75).
+    ///    El mismo 011 sale de una falla de plataforma al leer, desde el envoltorio (<see cref="EjecucionDeCatalogosMasivos"/>).
     ///    Las tres dejan que la excepción suba: la transacción de la Custom API deshace lo escrito (D-72).
     /// </summary>
     public sealed class CatalogosMasivos
@@ -98,6 +100,13 @@ namespace Sanic.Mppp.Plugins.Api
         public const int FilasMaximoPorDefecto = 300;
         /// <summary>120 s del límite síncrono menos 20 de margen, como exportarparadigitar (diseno/03 §1b).</summary>
         public const int PresupuestoSegundos = 100;
+
+        /// <summary>Código de una falla de PLATAFORMA (sobrecarga, límites, tiempo agotado), al leer o al escribir (D-75).</summary>
+        internal const string CodigoDeFallaDePlataforma = "MPPP-CAR-011";
+
+        /// <summary>El texto del 011: UNO solo, el mismo al leer (envoltorio) y al escribir (núcleo). No nombra filas ni jerga de la plataforma.</summary>
+        internal const string TextoDeFallaDePlataforma = "Dataverse estaba sobrecargado y no pudo procesar el archivo. No se grabó nada. "
+            + "Esperá unos minutos y volvé a subir el mismo archivo; si vuelve a pasar, partilo en archivos más chicos.";
 
         /// <summary>Máximo de filas de una hoja de Excel menos la del encabezado: un valor mayor en el parámetro no cabe en la hoja.</summary>
         private const int FilasMaximoQueCabenEnLaHoja = 1048575;
@@ -323,9 +332,7 @@ namespace Sanic.Mppp.Plugins.Api
             {
                 // Una falla de PLATAFORMA (sobrecarga, límites) no es culpa de la fila: se clasifica por ErrorCode, nunca por el texto (D-75).
                 if (FallasDePlataforma.EsDePlataforma(ex.CodigoDeError))
-                    throw new CargaMasivaRechazadaException("MPPP-CAR-011",
-                        "Dataverse estaba sobrecargado y no pudo terminar de grabar. No se grabó nada. "
-                        + "Esperá unos minutos y volvé a subir el mismo archivo; si vuelve a pasar, partilo en archivos más chicos.", ex);
+                    throw new CargaMasivaRechazadaException(CodigoDeFallaDePlataforma, TextoDeFallaDePlataforma, ex);
 
                 var motivo = Recortar((ex.Motivo ?? string.Empty).Trim());
                 throw new CargaMasivaRechazadaException("MPPP-CAR-009",
@@ -453,7 +460,9 @@ namespace Sanic.Mppp.Plugins.Api
     /// Lo común a los dos envoltorios: proveedor de servicios, reloj del presupuesto (arranca al entrar), "hoy" en Nicaragua, los
     /// dos servicios (el del usuario que llama para los catálogos y SYSTEM para parámetros, usuarios y roles), MPPP-CAR-010 y la
     /// traducción de excepciones. Un <see cref="CargaMasivaRechazadaException"/> sale con su mensaje tal cual y con su detalle técnico
-    /// en la traza; cualquier otra excepción va a la traza completa y sale con el mensaje genérico.
+    /// en la traza. Una falla de Dataverse al LEER (<c>FaultException&lt;OrganizationServiceFault&gt;</c>) deja su código en la traza en
+    /// hexadecimal y sale como MPPP-CAR-011 si el <c>ErrorCode</c> es de plataforma (D-75); si no, como el genérico. Cualquier otra
+    /// excepción va a la traza completa y sale con el mensaje genérico.
     /// </summary>
     internal static class EjecucionDeCatalogosMasivos
     {
@@ -510,6 +519,17 @@ namespace Sanic.Mppp.Plugins.Api
                 // El texto es para el usuario; el detalle técnico (qué dijo el lector o Dataverse) queda para la traza.
                 trace.Trace("{0}", nombre + ": rechazo " + ex.Codigo + (ex.InnerException == null ? "." : ". Detalle: " + ex.InnerException));
                 throw new InvalidPluginExecutionException(ex.Message);
+            }
+            catch (FaultException<OrganizationServiceFault> ex)
+            {
+                // Una lectura (pasada 1, parámetros, usuarios, roles) que falla en Dataverse: el código va a la traza en hexadecimal, porque
+                // el ToString del fault no siempre lo trae. Clasificada por ErrorCode, nunca por el texto. Sin ninguna llamada al servicio (D-72).
+                var codigo = ex.Detail?.ErrorCode;
+                trace.Trace("{0}", nombre + ": falla de Dataverse" + (codigo.HasValue ? " (código " + FallasDePlataforma.EnHexadecimal(codigo.Value) + ")" : string.Empty) + ". " + ex);
+
+                if (FallasDePlataforma.EsDePlataforma(codigo))
+                    throw new InvalidPluginExecutionException(CatalogosMasivos.CodigoDeFallaDePlataforma + ": " + CatalogosMasivos.TextoDeFallaDePlataforma);
+                throw new InvalidPluginExecutionException(CargarCatalogosApi.MensajeDeErrorGenerico);
             }
             catch (Exception ex)
             {
