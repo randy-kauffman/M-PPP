@@ -543,7 +543,7 @@ no hay filas confiables a las que asignarle un motivo.
 | `MPPP-CAR-008` | Se agotó el presupuesto de tiempo; **no se grabó nada** (pide partir el archivo) |
 | `MPPP-CAR-009` | Falló una escritura en la pasada 2; **no se grabó nada** (nombra la fila y el motivo de Dataverse) |
 | `MPPP-CAR-010` | `plantilla = true` y además vino `archivo`: no se adivina cuál de las dos cosas se quiso |
-| `MPPP-CAR-011` | Falló una escritura de la pasada 2 por **sobrecarga de la plataforma**, no por un dato; **no se grabó nada** (pide reintentar en unos minutos o partir el archivo, y no nombra ninguna fila: la fila no tiene nada malo) |
+| `MPPP-CAR-011` | Falló una lectura o una escritura por **sobrecarga de la plataforma**, no por un dato; **no se grabó nada** (pide reintentar en unos minutos o partir el archivo, y no nombra ninguna fila: la fila no tiene nada malo) |
 
 **Falla de plataforma (MPPP-CAR-011) contra error de dato (MPPP-CAR-009)** (decisión del aprobador, 2026-10-01, D-75). En la
 medición, una carga de 300 filas falló con el error 10928 de Azure SQL y el 009 le decía al usuario "Corregí esa fila", cuando
@@ -552,8 +552,10 @@ falla de plataforma estos códigos de Learn ("Web service error codes"; el de ti
 `0x80072324` AzureSqlMaxConcurrentWorkersLimitExceededError · `0x80072323` AzureSqlDatabaseResourceLimitExceededError ·
 `0x80072326` ThrottlingConcurrencyLimitExceededError · `0x80072321` ThrottlingTimeExceededError ·
 `0x80072322` ThrottlingBurstRequestLimitExceededError · `0x8005F103` Throttling · `0x80072330` CacheLoadConcurrencyError ·
-`-2147204783` "Sql error: Execution Timeout Expired". Cualquier otro código, o un fault sin detalle, sigue siendo 009. El código
-de Dataverse (en hexadecimal) va SIEMPRE a la traza, sea 009 u 011: el 10928 de la medición no dejó su código en la traza, y
+`-2147204783` "Sql error: Execution Timeout Expired". Cualquier otro código, o un fault sin detalle, sigue siendo 009 (en una escritura) o el mensaje genérico (en una lectura).
+*Ampliado el 2026-10-01 tras la revisión del código*: también una LECTURA con código de plataforma (pasada 1, parámetros,
+usuarios, roles) da 011, porque el 10928 puede caer en cualquier llamada. El código de Dataverse (en hexadecimal) va SIEMPRE a
+la traza, sea 009, 011 o genérico: el 10928 de la medición no dejó su código en la traza, y
 sin él no se puede confirmar que la lista lo cubre. **Pendiente de verificar en Dev**: que el 10928 real llega con uno de esos
 códigos (se reproduce con 200 filas mientras el presupuesto sigue en 100 s).
 

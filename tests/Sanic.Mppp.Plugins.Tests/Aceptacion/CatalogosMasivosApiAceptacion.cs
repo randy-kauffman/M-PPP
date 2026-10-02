@@ -425,6 +425,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal("MPPP-CAR-011", ex.Codigo);
             Assert.StartsWith("MPPP-CAR-011: ", ex.Message);
             Assert.Contains("No se grabó nada", ex.Message);
+            Assert.Contains("no pudo procesar el archivo", ex.Message);   // mismo texto para lectura y escritura (revisión, 2026-10-01)
             Assert.Contains("unos minutos", ex.Message);          // qué hacer: reintentar más tarde…
             Assert.Contains("partilo", ex.Message);               // …o partir el archivo
             Assert.DoesNotContain("Corregí", ex.Message);         // la fila no tiene nada malo
@@ -505,6 +506,72 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Contains("Fila 7 (código 0x80040237): ", fabrica.Traza.Todo);
         }
 
+        // ------------------------------------------------------------------------------------- D-75, segunda vuelta: LECTURAS
+        // Hallazgo de la revisión (2026-10-01): una falla de plataforma al LEER (pasada 1, parámetros, usuarios, roles) caía en el
+        // mensaje genérico y la traza quedaba sin código. El 10928 puede caer en cualquier llamada, no solo en una escritura.
+        private static (FabricaPorUsuario fabrica, ContextoDeEjecucionSimulado contexto) EnvoltorioCon(IOrganizationService usuario, IOrganizationService sistema, string archivo)
+        {
+            var contexto = new ContextoDeEjecucionSimulado { UserId = UsuarioQueLlama, InitiatingUserId = UsuarioQueLlama, OperationCreatedOn = DateTime.UtcNow };
+            contexto.InputParameters["archivo"] = archivo;
+            return (new FabricaPorUsuario(contexto, usuario, sistema), contexto);
+        }
+
+        [Fact]
+        public void Una_falla_de_plataforma_al_leer_los_catalogos_es_MPPP_CAR_011()
+        {
+            var cat = Catalogos(out _);
+            var lectura = new ServicioQueFallaAlLeer(cat, TextoDelDiezNueveVeintiOcho, unchecked((int)0x80072324));
+            var (fabrica, _) = EnvoltorioCon(lectura, Sistema(), ArchivoQueCreaEnLaFila(7));
+
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica));
+            Assert.StartsWith("MPPP-CAR-011: ", ex.Message);
+            Assert.Contains("no pudo procesar el archivo", ex.Message);
+            Assert.Contains("No se grabó nada", ex.Message);
+            Assert.DoesNotContain("SqlException", ex.Message);
+            Assert.Contains("(código 0x80072324)", fabrica.Traza.Todo);
+            Assert.Empty(Escrituras(cat));   // la falla es en la pasada 1: no se llegó a escribir nada
+        }
+
+        [Fact]
+        public void Una_falla_de_plataforma_al_leer_con_SYSTEM_tambien_es_MPPP_CAR_011()
+        {
+            // Los parámetros, usuarios y roles se leen con SYSTEM: la plataforma puede fallar ahí igual.
+            var sistema = new ServicioQueFallaAlLeer(Sistema(), TextoDelDiezNueveVeintiOcho, unchecked((int)0x8005F103));
+            var (fabrica, _) = EnvoltorioCon(Catalogos(out _), sistema, ArchivoQueCreaEnLaFila(7));
+            Assert.StartsWith("MPPP-CAR-011: ", Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica)).Message);
+            Assert.Contains("(código 0x8005F103)", fabrica.Traza.Todo);
+        }
+
+        [Fact]
+        public void El_cambio_de_estado_tambien_da_MPPP_CAR_011_si_la_plataforma_falla_al_leer()
+        {
+            var lectura = new ServicioQueFallaAlLeer(Catalogos(out _), TextoDelDiezNueveVeintiOcho, unchecked((int)0x80072324));
+            var (fabrica, _) = EnvoltorioCon(lectura, Sistema(),
+                Archivo(EstructuraDeExcelDeCatalogo.CambioDeEstado, Fila(2, ("A", "CLIENTE"), ("B", "DESACTIVAR"), ("C", "123"))));
+            Assert.StartsWith("MPPP-CAR-011: ", Assert.Throws<InvalidPluginExecutionException>(() => new CambiarEstadoCatalogosApi().Execute(fabrica)).Message);
+        }
+
+        [Fact]
+        public void Una_falla_de_lectura_que_no_es_de_plataforma_sale_con_el_generico_pero_deja_su_codigo_en_la_traza()
+        {
+            // 0x80040220 PrivilegeDenied: no es sobrecarga. El usuario recibe el genérico de siempre; soporte, el código.
+            var lectura = new ServicioQueFallaAlLeer(Catalogos(out _), "Principal user is missing prvReadsanic_mppp_tbl_cliente privilege.", unchecked((int)0x80040220));
+            var (fabrica, _) = EnvoltorioCon(lectura, Sistema(), ArchivoQueCreaEnLaFila(7));
+            var ex = Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fabrica));
+            Assert.Equal(CargarCatalogosApi.MensajeDeErrorGenerico, ex.Message);
+            Assert.Contains("(código 0x80040220)", fabrica.Traza.Todo);
+        }
+
+        [Fact]
+        public void El_texto_del_011_es_el_mismo_al_leer_y_al_escribir()
+        {
+            var (fLectura, _) = EnvoltorioCon(new ServicioQueFallaAlLeer(Catalogos(out _), "x", unchecked((int)0x80072324)), Sistema(), ArchivoQueCreaEnLaFila(7));
+            var (fEscritura, _) = EnvoltorioCon(new ServicioQueFallaAlEscribir(Catalogos(out _), "x", unchecked((int)0x80072324)), Sistema(), ArchivoQueCreaEnLaFila(7));
+            Assert.Equal(
+                Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fLectura)).Message,
+                Assert.Throws<InvalidPluginExecutionException>(() => new CargarCatalogosApi().Execute(fEscritura)).Message);
+        }
+
         // ================================================================================================ dobles de esta prueba
         /// <summary>Fábrica que da un servicio por usuario: null → SYSTEM; cualquier id → el del usuario. Registra lo pedido.</summary>
         private sealed class FabricaPorUsuario : IServiceProvider, IOrganizationServiceFactory
@@ -535,6 +602,28 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 Pedidos.Add(userId);
                 return userId == null ? _sistema : _usuario;
             }
+        }
+
+        /// <summary>Decorador: toda LECTURA falla como Dataverse, con el <c>ErrorCode</c> que se pida (D-75, segunda vuelta).</summary>
+        private sealed class ServicioQueFallaAlLeer : IOrganizationService
+        {
+            private readonly IOrganizationService _real;
+            private readonly string _mensaje;
+            private readonly int _codigo;
+
+            public ServicioQueFallaAlLeer(IOrganizationService real, string mensaje, int codigo) { _real = real; _mensaje = mensaje; _codigo = codigo; }
+
+            private FaultException<OrganizationServiceFault> Falla() => new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { Message = _mensaje, ErrorCode = _codigo }, new FaultReason(_mensaje));
+
+            public EntityCollection RetrieveMultiple(QueryBase query) => throw Falla();
+            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => throw Falla();
+            public Guid Create(Entity entity) => _real.Create(entity);
+            public void Update(Entity entity) => _real.Update(entity);
+            public void Delete(string entityName, Guid id) => _real.Delete(entityName, id);
+            public OrganizationResponse Execute(OrganizationRequest request) => _real.Execute(request);
+            public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Associate(entityName, entityId, relationship, relatedEntities);
+            public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Disassociate(entityName, entityId, relationship, relatedEntities);
         }
 
         /// <summary>Decorador: la primera escritura falla como Dataverse, con el <c>ErrorCode</c> que se pida (D-75).</summary>
