@@ -1,89 +1,74 @@
-# Notas de release — borrador para el aprobador
+Cierre de DN-04 del proyecto `2026-001-referencias-planes-pago`.
 
-**Este documento es un borrador de trabajo, no un release publicado.** Nadie
-hizo `git push`, ni tag, ni GitHub release: eso queda para quien apruebe.
+Solución `sanic_mppp_sol_mantenimientoppp` **1.2.0.0** — managed y unmanaged. Ensamblado de plugins **1.0.22.0**.
+La versión sube el *minor*: todo lo nuevo es **aditivo y retrocompatible** (dos Custom API nuevas, una columna opcional,
+un parámetro nuevo y dos menús que solo ve el Administrador de planes; ningún camino existente cambia).
 
-Preparado el 2026-09-28, rama `cierre/fase-1`, contra el release anterior
-**`v1.0.0`** (2026-09-24, "Fase 1 — solución unmanaged 1.0.0.0"). Esta versión
-del documento reemplaza al borrador anterior: el aprobador ya decidió la
-versión de la solución y el coordinador ya corrigió los datos de Dev; acá se
-reflejan los números finales.
+Se adjuntan además los **parámetros** y las **reglas** activos en un `.xlsx` cada uno. El valor de `servicio.cuenta` va
+enmascarado a propósito: es un UPN de cuenta de servicio y este repositorio es público.
 
 ---
 
-## 1. Qué cambió desde v1.0.0
+## 1. Qué cambió desde v1.1.0
 
-### Fase 2 completa: bot RPA
-Automatización de la digitación en AS400 vía dos Custom API nuevas:
+### DN-04 · Carga masiva y activación masiva de catálogos por Excel
+El Administrador de planes deja de cargar clientes, planes, correos y autorizaciones de a uno en formularios. Dos
+menús desplegables nuevos en la grilla de las cuatro tablas de catálogos (Clientes, Planes, Correos Autorizados,
+Autorizaciones - Clientes), cada uno con *Cargar archivo* y *Descargar plantilla*:
 
-- **`sanic_mppp_capi_obtenerfilaspendientes`** — el bot pide filas pendientes (FIFO
-  por fecha de validación + número de fila), con `claim` temporal para que dos
-  corridas no se pisen.
-- **`sanic_mppp_capi_registrarresultadorpa`** — el bot informa el resultado por
-  lote (digitada / rechazada), traducido con el catálogo `rpa.codigos`.
+- **Carga masiva** (`sanic_mppp_capi_cargarcatalogos`): un Excel desnormalizado (hoja `CargaCatalogos`) que crea lo
+  que falte —correo, cliente (con su ejecutivo como dueño), plan y autorización por cliente— en orden de dependencias,
+  y cada cosa una sola vez aunque se repita en varias filas.
+- **Activar/Desactivar masivo** (`sanic_mppp_capi_cambiarestadocatalogos`): un Excel (hoja `ActivarDesactivar`) que
+  activa o desactiva clientes, planes, correos y autorizaciones por cliente, registro por registro, sin cascada.
 
-Incluye rol dedicado `SR - MPPP - RPA` (0 privilegios sobre tablas MPPP — el bot
-entra solo por las dos Custom API), app user `# MPPP-RPA`, y el dominio de reglas
-del bot (`PuertaDelRpa`, `ReglasDelRpa`, `SeleccionParaElRpa`, `FilaParaElRpa`)
-construido con TDD.
+Las dos son **todo o nada**: la pasada 1 valida el archivo entero sin escribir; con un solo error de fila no se graba
+nada y se devuelve el Excel con una columna *Resultado* que dice qué corregir en cada fila. La pasada 2 corre dentro de
+la transacción de la Custom API (verificado en Dev, D-72): si algo falla, se deshace todo. Escriben **con el usuario
+que llama**, así la auditoría dice quién dio de alta o desactivó cada cosa. La plantilla la genera la misma API, con la
+misma definición de columnas que valida. Los errores de archivo tienen código propio, de `MPPP-CAR-001` a `011`.
 
-### DN-01 · Autorización por cliente
-La autorización de un correo remitente deja de ser solo "por plan" — ahora puede
-ser **"por cliente"** (autoriza sobre todos los planes de ese cliente, sin
-enumerarlos). El modo lo decide un parámetro (`autorizacion.modo`, sembrado en
-`plan` = comportamiento de hoy); `AutorizacionPlan` **se conserva** en modo
-cliente, no se migra ni se pierde. El mensaje al cliente no cambia en ningún
-modo.
+**Columna nueva**: `Comentarios` (texto de 50, opcional, auditada) en la autorización por cliente, en el formulario y en
+las dos vistas.
 
-### DN-02 · Exportar a Excel para digitar
-El ejecutivo puede bajar en un `.xlsx` las filas seleccionadas para digitarlas en
-lote fuera de la app, en el orden de columnas que define el parámetro
-`exportacion.columnas` (JSON, editable sin tocar código). Se arma en C# con Open
-XML SDK vía la Custom API `sanic_mppp_capi_exportarparadigitar` y un comando
-nuevo en el ribbon.
+**Parámetro nuevo**: `carga.filas.maximo` = **100**. Se diseñó con 300 y se **midió** en Dev (D-75): el peor caso (cada
+fila crea cliente, plan, correo y autorización) graba 100 filas en ~25 s; desde 200 filas la base de Dev corta la
+transacción a los ~40 s (error 10928 de Azure SQL). El presupuesto de escritura del plugin bajó de 100 s a **30 s**,
+para que corte nuestro mensaje (`MPPP-CAR-008`, "partí el archivo") antes que la base. Una falla de la plataforma —no
+de un dato— tiene su propio código, **`MPPP-CAR-011`**, clasificado por el `ErrorCode` de Dataverse y verificado en Dev
+contra el error real (`0x80072324`): ya no se le dice al usuario "corregí esa fila" cuando la fila no tiene nada malo.
 
-### DN-03 · Obligatoriedad por gestión
-`plantilla.obligatoriedad` agrega `porGestion`: un ajuste más simple que las
-`reglas` existentes, que aflojan o endurecen campos obligatorios solo por
-Gestión (Inclusión/Exclusión/Modificación), sin reemplazar el mecanismo
-anterior — conviven. Sembrado con `Exclusion` (cuenta, banco y moneda
-opcionales). Un parámetro sin `porGestion` se comporta exactamente como antes.
+**Menús en el idioma del usuario.** Los menús llevan etiquetas localizadas (1033 y 3082), como el resto del proyecto.
+Al construirlos, un menú con etiquetas localizadas mostró "LabelText" y se concluyó que la plataforma no las soportaba
+dentro de un menú desplegable; el aprobador lo dudó y un experimento controlado le dio la razón (D-74): era la metadata
+compilada del ribbon sin regenerar.
+
+### Herramientas
+- `importar_solucion.py` genera y verifica menús desplegables (`FlyoutAnchor`), con etiquetas localizadas o texto fijo,
+  y al importar un ribbon **avisa que hay que regenerar la metadata compilada** (Command Checker > Regenerate ribbon
+  metadata): publicar no alcanza, y la regeneración tiene que ir DESPUÉS de la última importación.
+- Las diez herramientas que escriben distinguen `actualizado` de `creado`.
+- El playbook del paquete de plugins borra `bin/` y `obj/` antes de empaquetar (`dotnet pack` dejaba el `.nupkg` viejo).
 
 ### Arnés de pruebas
-**149 casos en 11 sets**, varios con navegador real (Playwright) para lo que solo
-un clic de verdad puede probar (la "X" de cerrar un diálogo, el DOM del ribbon).
-Incluye el set B (automatización del bot RPA contra la plataforma) y el set V
-(vigilancia / recuperación de fallas de flujo).
+- **Set L** nuevo (`pruebas/12-catalogos-masivos.md`, 57 casos), con su arnés: `python3 herramientas/pruebas/correr.py L`
+  junta la suite de C#, el spec de Playwright en los cuatro roles y la Web API con las sesiones reales de cada usuario.
+  Un test saltado nunca cuenta como aprobado. **Resultado: 57 OK · 0 FALLA · 0 N-A**, en las dos corridas reales.
+- **206 casos en 12 sets** en total. Suite de C#: **1581** pruebas en verde.
+- Navegación del arnés GUI más robusta: espera la entrada del sitemap y reintenta el cambio de área (cerró D-70).
 
 ---
 
-## 2. Los nueve defectos reparados (`diseno/PENDIENTES.md`)
+## 2. Pendientes cerrados (`diseno/PENDIENTES.md`)
 
 | # | Qué era | Cómo quedó |
 |---|---|---|
-| D-59 | `Avisos.cs`: `InvalidCastException` (Guid→EntityReference) tumbaba SIEMPRE el aviso a ejecutivos cuando un correo no se podía procesar — justo el caso para el que existe el aviso. | Corregido con TDD; el doble de prueba propio (no FakeXrmEasy) repetía la misma equivocación en dos fixtures, también corregidas. Ensamblado `1.0.16.0`. |
-| D-60 | `StepsDeFila.cs`: una transición del RPA a `RechazadaEnAS400` (el camino MÁS común del bot) leía `sanic_digitadapor` como proxy de identidad; esa columna es NULL si la fila nunca pasó por Digitada, y el rechazo se caía SIEMPRE aunque el bot ya hubiera pasado la puerta de seguridad. Incluía además B-17 (un ítem bueno se perdía en un lote mixto). | `ResolverIdentidadDelActor` ya no inventa identidad; confía en el RPA solo para la combinación verificada. Ensamblado `1.0.18.0`. |
-| D-61 | Contrato de `obtenerfilaspendientes` pedía a la vez "`maximo` ausente → 100" y "`0` → error", imposible: en una Function ausente ES `0`. | Decisión del aprobador: `0` pasa a significar el defecto (100); un negativo sigue siendo error. Ensamblado `1.0.17.0`. |
-| D-62 | `mppp-vig.json`: la etapa de arranque (5 eslabones) solo encadenaba con `"Succeeded"` — si fallaba cualquiera, los 5 bloques de recuperación quedaban `Skipped` esa corrida entera. | Se agregó `"Failed"` a los 5 `runAfter`, más control de concurrencia (`runs=1`) en el trigger. |
-| D-63 | `sanic_requiereatencionmanual` faltaba en la lista blanca de escritura de Fila: el botón "Atendida" daba HTTP 400 y dejaba filas trabadas (el bot no las podía tomar, la persona no las podía liberar). | Agregada a `PermitidasEnFila`. Ensamblado `1.0.17.0`. |
-| D-64 | DA-08 define 5 avisos en la campana de la app; solo existía 1. | Se implementaron 2 más ("filas por digitar", "filas por aprobar"); los otros 3 se descartaron por decisión del aprobador — ya están cubiertos por vistas de menú agregadas el 2026-09-27, y un aviso que duplica una vista es ruido. Ensamblado `1.0.19.0` (el ensamblado actual). |
-| D-65 | Faltaba `prvReadappnotification` en los roles Ejecutivo/Supervisor: la campana no podía CREAR notificaciones aunque D-59 ya estuviera resuelto (error tapaba error). | Otorgado por playbook de rol, no a mano en el portal. |
-| D-66 | Re-ingesta de `MPPP-VIG` fallaba con 0% de éxito (los IDs de mensaje de Outlook dejaban de ser válidos entre leerlos y re-leerlos). | Corregido por el aprobador en el `MoveV2` del flujo; verificado por tasa de error (no por total acumulado — la primera medición se equivocó comparando dos acumulados tomados en momentos distintos). |
-| D-67 | Se creyó que el trigger de `MPPP-VIG` había dejado de dispararse (5.5 horas sin marca en Bitácora). | El aprobador corrigió el flujo; verificado con eventos reales de Bitácora. Nota de método: el silencio de VIG no prueba por sí solo que esté caído, solo que no tuvo nada que recuperar. |
-
-**I-07** (no listada arriba porque **no era un defecto**): se sospechaba que
-`ListaBlancaStep` no protegía escrituras directas por Web API. Era una
-identidad exenta por diseño (el propio service principal del arnés de pruebas
-cuenta como "código de servidor"); rehecho impersonando usuarios humanos reales,
-la lista blanca funciona como se diseñó.
-
-**Cerrado, confirmado por el aprobador**: el rango de defectos reparados es
-**D-59 a D-67 (nueve)**, con **I-07 aparte** porque no era defecto. El borrador
-anterior de este documento dejaba abierta la duda de si D-67 debía contarse
-(la consigna original decía "D-59 a D-66, más I-07"); `PENDIENTES.md` ya
-mostraba a D-67 cerrada el 2026-09-28 con el mismo patrón de evidencia que las
-otras ocho (commit, ensamblado, verificación independiente), y el aprobador
-confirmó que sí cuenta. Son nueve reparadas de punta a punta.
+| D-69 | `AutorizacionCliente` mostraba comandos genéricos aunque el ribbon estaba bien importado. | Era la metadata compilada sin regenerar. Regenerada; `A-02 — AutorizacionCliente` en verde en Dev. |
+| D-70 | El arnés GUI no encontraba "Correos Autorizados" en el sitemap. | Carrera en la navegación (`count()` sin esperar tras cambiar de área). Arreglado; `A-02 — Autorizado` en verde. |
+| D-72 | ¿Hay transacción en la Custom API? Prerrequisito del todo o nada. | Sí (`IsInTransaction = true`, etapa 30); una excepción deshace todo, con el servicio del usuario y con SYSTEM. |
+| D-73 | Prueba con escrituras reales y la sesión del Administrador de planes. | El cliente nuevo queda con el ejecutivo como dueño y el ejecutivo lo ve; el creador es el Administrador de planes. |
+| D-74 | ¿Etiquetas multiidioma en menús desplegables? | **Sí funcionan.** Experimento con una tabla de prueba y tres de control; las cuatro tablas pasaron a etiquetas localizadas y desapareció la excepción al multiidioma. |
+| D-75 | El tope de 300 filas no se sostenía en Dev. | Tope 100, presupuesto 30 s y `MPPP-CAR-011`, medido y verificado en Dev. El tope de la base de Producción no se mide, por decisión del aprobador. |
 
 ---
 
@@ -91,64 +76,34 @@ confirmó que sí cuenta. Son nueve reparadas de punta a punta.
 
 | # | Qué | Estado |
 |---|---|---|
-| D-68 | La RED 2 de V-02 (detectar al arrancar que un flujo quedó apagado por una corrida que murió de golpe) nunca se ejercitó: el sistema de permisos bloqueó el PATCH manual necesario para probarla. | **Riesgo residual ACEPTADO por el aprobador** el 2026-09-28. La RED 1 (restaurar en el `finally`) sí se probó y funcionó. |
-| D-69 | `AutorizacionCliente` — comandos genéricos ("Nuevo", etc.) siguen visibles en el ribbon aunque el bloque de ocultos ya está bien importado y verificado por Web API (`RetrieveEntityRibbon`). | **Reparado en código, abierto a la espera de UN CLIC MANUAL**: un administrador de plataforma tiene que entrar con `&ribbondebug=true` y usar "Regenerate ribbon metadata" — es de plataforma, ninguna herramienta de este repo lo puede hacer. El caso A-02 queda en rojo hasta ese clic. |
-| D-70 | El arnés de navegador (`pruebas/gui`) no encuentra la entrada "Correos Autorizados" del sitemap. | **Abierto, menor.** Sin confirmar si es el nombre viejo del sitemap o el selector. |
-| D-71 | Los 4 flujos vivos (REC, COM, ING, VIG) **no tienen desplegado** el control de concurrencia (`runtimeConfiguration.concurrency.runs`) que `recursos/flujos/*.json` sí declara. | **Abierto.** Contradice una verificación previa (D-62) que se dio por buena sin repetirse; causa sin confirmar (¿un ajuste manual sobre VIG lo reescribió? ¿`flujo.py --completar` no lo aplica aunque reporte éxito?). Sin control de concurrencia, dos corridas del mismo flujo pueden solaparse — ya hubo evidencia de eso en `MPPP-VIG` antes de D-62. |
+| D-68 | La RED 2 de V-02 (detectar al arrancar un flujo que quedó apagado por una corrida que murió de golpe) nunca se ejercitó. | **Riesgo residual ACEPTADO** por el aprobador (2026-09-28). La RED 1 sí se probó. |
+| D-71 | Los 4 flujos vivos (REC, COM, ING, VIG) **no tienen desplegado** el control de concurrencia que declaran sus `recursos/flujos/*.json`. | **Abierto.** Sin él, dos corridas del mismo flujo pueden solaparse. No lo toca este release. |
 
-**Un release que solo cuenta lo bueno es propaganda, no un release.** Estos
-cuatro puntos, sobre todo D-69 (un caso de prueba en rojo) y D-71 (un riesgo de
-concurrencia real, sin mitigar, en los cuatro flujos vivos), son candidatos a
-condición de aceptación antes de publicar, no solo a nota al pie.
+Además, dos límites conocidos de este release, sin número de pendiente:
 
-**Resumen de estado del release**: **9 defectos cerrados** (D-59 a D-67) +
-**4 abiertos** (D-68 a D-71). El release cuenta las dos cosas.
+- **El tope de la base de Producción no está medido** (descartado por el aprobador). Si Producción corta antes que Dev,
+  el usuario recibe `MPPP-CAR-008` o `011`, los dos con mensaje claro y sin grabar nada.
+- **La mitad en español de L-04 es N/A**: Dev solo tiene el idioma 1033 instalado. Los menús se probaron en inglés
+  (muestran "Bulk load"); en un entorno con 3082 muestran "Carga masiva".
+
+**Resumen de estado**: **6 pendientes cerrados** (D-69, D-70, D-72 a D-75) y **2 abiertos** (D-68 aceptado, D-71).
 
 ---
 
-## 4. Versión de la solución: `1.1.0.0`
+## 4. Versión de la solución: `1.2.0.0`
 
-**Hallazgo que originó esta decisión**: el campo `version` de la solución en
-Dataverse **seguía en `1.0.0.0`** — nunca se había incrementado desde `v1.0.0`,
-a pesar de toda la fase 2. Es distinto del *ensamblado* de plugins
-(`Sanic.Mppp.Plugins.dll`), que sí avanzó release a release y hoy está en
-**`1.0.19.0`** (`AssemblyVersion`/`FileVersion` del `.csproj`). Son dos números
-independientes: uno versiona el paquete de la solución completa, el otro solo
-el binario de plugins.
+Decisión del aprobador (2026-10-01): **1.2.0.0**. Todo lo nuevo es aditivo: dos Custom API nuevas, una columna opcional,
+un parámetro nuevo y dos menús visibles solo para el Administrador de planes. Ningún consumidor existente se rompe.
 
-**Decisión del aprobador: `1.1.0.0`** (la alternativa conservadora sobre
-`2.0.0.0` que se había propuesto). Justificación: **todo lo nuevo de esta fase
-es aditivo y retrocompatible**, así que corresponde un incremento de *minor*,
-no uno de *major*, según semver estricto:
+El *ensamblado* de plugins es otro número: pasó de `1.0.19.0` (v1.1.0) a **`1.0.22.0`**. La 1.0.20.0 trajo las dos Custom
+API, la 1.0.21.0 el `MPPP-CAR-011` (desplegada a propósito con el presupuesto todavía en 100 s, para reproducir el
+error real de la base y confirmar su código) y la 1.0.22.0 el presupuesto de 30 s y el tope de 100.
 
-- DN-01 nace con el parámetro `autorizacion.modo` sembrado en `plan`
-  (comportamiento de hoy); nadie que no toque el parámetro nota diferencia.
-- DN-03 sin `porGestion` se comporta exactamente igual que antes; el ajuste es
-  opt-in por parámetro.
-- El bot RPA es una capacidad enteramente nueva y aditiva (dos Custom API y un
-  rol propio): no reemplaza ni modifica un camino existente.
-- Ningún consumidor existente de la solución se rompe con este release.
-
-El campo `version` de la solución en Dev ya fue actualizado a `1.1.0.0` por el
-coordinador (verificado: `solutions?$select=version` devuelve `1.1.0.0`), y
-los dos `.zip` de este release se re-exportaron después de esa actualización y
-después de publicar las personalizaciones — ya no llevan `1.0.0.0` adentro.
-
-### Hallazgos de esta corrida que quedaron resueltos en este release
-
-1. **La versión de la solución nunca se había incrementado desde fase 1.**
-   Quedaba en `1.0.0.0` pese a que la fase 2 agregó tres directivas de negocio
-   y un bot RPA completo. Corregido a `1.1.0.0` (ver arriba).
-2. **`plantilla.obligatoriedad` y `rpa.lote.maximo` tenían dos versiones
-   activas simultáneas** (v1 y v2 de cada uno), violando DD-02
-   ("cambiar de versión desactiva la anterior; la vigente nunca se edita").
-   El coordinador desactivó las versiones v1 duplicadas. Verificado en esta
-   corrida: **19 parámetros activos, 19 nombres distintos, cero duplicados**
-   (antes eran 21 filas activas para 19 nombres).
-
-Ninguno de los dos hallazgos tiene ticket propio en `diseno/PENDIENTES.md`
-(no son parte de D-68 a D-71): son correcciones de datos de release, no
-defectos de código, y ya están resueltas al día de esta corrida.
+### Corrección de datos de este release
+`carga.filas.maximo` tenía **dos versiones activas** (v1 = 300 y v2 = 100), contra DD-02 ("cambiar de versión desactiva
+la anterior"): la herramienta que versiona el parámetro agregó la v2 sin desactivar la v1. Se desactivó la v1. Quedan
+**20 parámetros activos, 20 nombres distintos, cero duplicados**. (El plugin ya leía la v2, la versión activa más alta,
+así que el comportamiento no cambió.)
 
 ---
 
@@ -156,31 +111,17 @@ defectos de código, y ya están resueltas al día de esta corrida.
 
 | Archivo | Qué es | Verificado |
 |---|---|---|
-| `sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip` | Export unmanaged, `ExportSolution` (`Managed: false`), publicado ANTES de exportar (`PublishAllXml`, body `{}`). | `solution.xml`: `UniqueName=sanic_mppp_sol_mantenimientoppp`, `Version=1.1.0.0`, `Managed=0`. El `.nupkg` de plugins trae el DLL con la cadena `1.0.19.0` (no `1.0.0.0`; único valor `1.0.x.0` encontrado en el binario). |
-| `sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Version=1.1.0.0`, `Managed=1`, mismo `UniqueName`. Mismo DLL `1.0.19.0` dentro del `.nupkg`. |
-| `sanic_mppp_tbl_parametros_activos_2026-09-28.xlsx` | **19 filas activas** de `sanic_mppp_tbl_parametro` (19 nombres distintos, cero duplicados — ya no hay 21 filas para 19 nombres). Columnas: Nombre, Version, Tipo, Valor, Descripcion. | Releído después de guardado; el valor de `servicio.cuenta` sale enmascarado; el resto de los 19 valores se revisó de nuevo, uno por uno, contra la corrida anterior. |
-| `sanic_mppp_tbl_reglas_activas_2026-09-28.xlsx` | 15 filas activas de `sanic_mppp_tbl_regla` (sin cambios respecto a la corrida anterior — la corrección de datos fue solo sobre parámetros). Columnas: Codigo, Nivel, Orden, Efecto, Dependencias, Estado. | Releído después de guardado; ningún valor sensible; contenido idéntico fila por fila a la exportación previa. |
+| `sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_unmanaged.zip` | Export unmanaged (`ExportSolution`, `Managed: false`), publicado antes de exportar (`PublishAllXml`). | `solution.xml`: `Version=1.2.0.0`, `Managed=0`. El DLL de plugins dentro del `.nupkg` trae `1.0.22.0` y ninguna otra versión del proyecto. |
+| `sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Version=1.2.0.0`, `Managed=1`. Mismo DLL `1.0.22.0`. |
+| `sanic_mppp_tbl_parametros_activos_2026-10-02.xlsx` | Los **20** parámetros activos. Columnas: Nombre, Version, Tipo, Valor, Descripcion. | Contra el de 2026-09-28: la única diferencia es la fila nueva `carga.filas.maximo` (v2, Numero, 100). `servicio.cuenta` enmascarado; ningún otro valor ni descripción trae cuenta, dominio, tenant id ni URL. |
+| `sanic_mppp_tbl_reglas_activas_2026-10-02.xlsx` | Las **15** reglas activas. Columnas: Codigo, Nivel, Orden, Efecto, Dependencias, Estado. | Idénticas fila por fila a las de 2026-09-28 (DN-04 no tocó reglas). |
 
-Se borraron los cuatro artefactos de la corrida anterior con `1_0_0_0` /
-21 filas en el nombre o el contenido (creados en el commit `d358b11`): los
-dos `.zip` con `1.0.0.0` adentro, y los dos `.xlsx` quedaron regenerados en el
-mismo nombre de archivo (no versionan por número de release, así que
-"borrarlos" fue sobrescribirlos con el contenido corregido).
+El `.nupkg` también lleva `Sanic.Mppp.Plugins.Paquete.dll` (versión 1.0.0.0): es el ensamblado vacío que genera el
+proyecto del paquete, ya presente en v1.1.0; no tiene código.
 
-### Enmascarado en los Excel — qué se tapó y qué se revisó
-
-- **`servicio.cuenta`** (pedido explícito): el valor real es el UPN de una
-  cuenta de administrador del tenant. Enmascarado a
-  `<enmascarado: UPN de la cuenta de servicio>`. Se dejó la fila con nombre,
-  tipo (Texto) y descripción completos.
-- **Revisión del resto** (los 19 nombres, valor por valor, no solo el
-  nombre): ningún otro parámetro activo expone cuenta, dominio interno,
-  tenant id ni URL de entorno. `rpa.codigos`, `plantilla.listas` y
-  `exportacion.columnas` traen JSON de configuración de negocio (catálogos de
-  banco, mensajes al cliente, mapeo de columnas) sin identificadores del
-  tenant. Nada más se enmascaró. `plantilla.obligatoriedad` (ahora solo v2) y
-  `rpa.lote.maximo` (ahora solo v2) se revisaron también: mismo contenido que
-  la versión vigente de la corrida anterior, sin datos sensibles.
+### Después de importar esta solución en otro entorno
+Regenerar la metadata del ribbon (`&ribbondebug=true` > Command Checker > Regenerate ribbon metadata), DESPUÉS de la
+importación. Sin eso, los menús nuevos no aparecen o aparecen con "LabelText".
 
 ---
 
@@ -188,26 +129,20 @@ mismo nombre de archivo (no versionan por número de release, así que
 
 ```
 python3 - <<'PY'
-import zipfile, re
-for n in ["sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip",
-          "sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_managed.zip"]:
-    z = zipfile.ZipFile(f"solution/{n}")
-    sol = z.read("solution.xml").decode()
-    print(n, re.search(r"<Version>([^<]+)</Version>", sol).group(1),
-          re.search(r"<Managed>([^<]+)</Managed>", sol).group(1))
-PY
-```
-
-Para el DLL de plugins dentro del `.nupkg` (confirma `1.0.19.0`, no la
-fecha del archivo):
-
-```
-python3 - <<'PY'
 import zipfile, io, re
-z = zipfile.ZipFile("solution/sanic_mppp_sol_mantenimientoppp_1_1_0_0_fase2cierre_20260928_unmanaged.zip")
-nupkg = z.read("pluginpackages/sanic_mppp_pkg_plugins/package/sanic_mppp_pkg_plugins.nupkg")
-nz = zipfile.ZipFile(io.BytesIO(nupkg))
-dll = nz.read("lib/net462/Sanic.Mppp.Plugins.dll").decode("latin1")
-print(sorted(set(re.findall(r"\b1\.0\.\d{1,2}\.0\b", dll))))
+for n in ["unmanaged", "managed"]:
+    z = zipfile.ZipFile(f"solution/sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_{n}.zip")
+    sol = z.read("solution.xml").decode()
+    nupkg = [x for x in z.namelist() if x.endswith(".nupkg")][0]
+    dll = zipfile.ZipFile(io.BytesIO(z.read(nupkg))).read("lib/net462/Sanic.Mppp.Plugins.dll")
+    print(n, re.search(r"<Version>([^<]+)</Version>", sol).group(1),
+          re.search(r"<Managed>([^<]+)</Managed>", sol).group(1),
+          sorted(set(re.findall(r"1\.0\.\d{1,2}\.0", dll.decode("utf-16-le", "ignore")))))
 PY
+```
+
+Y el set de este release contra Dev:
+
+```
+python3 herramientas/pruebas/correr.py L
 ```
