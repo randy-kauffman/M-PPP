@@ -679,6 +679,23 @@ class ContraElEntorno(Base):
         self.assertTrue(any(f"<entity>{TABLA}</entity>" in p for p in publicaciones), publicaciones)
         self.assertIn("Sanic.Mppp.Comandos.digitada", self.cust_enviado())
 
+    def test_un_ribbon_importado_avisa_que_hay_que_regenerar_la_metadata(self):
+        # DN-04 (2026-10-01): RetrieveEntityRibbon ya traía los menús nuevos y la herramienta dijo "creado", pero
+        # la app siguió mostrando la barra vieja hasta "Regenerate ribbon metadata" (Command Checker). Publicar NO
+        # regenera la metadata compilada que lee la app (GetClientMetadata), y la herramienta no puede hacerlo: el
+        # éxito tiene que decir el paso manual que falta.
+        cliente = self.armar_ribbon(ClienteSimulado())
+        estado, _, detalle = imp.construir(self.escribir(comp(cambios=[CAMBIO_RIBBON])), False, lambda: cliente)
+        self.assertEqual("creado", estado, detalle)
+        self.assertIn("Regenerate ribbon metadata", detalle)
+        self.assertIn("ribbondebug=true", detalle)
+
+    def test_sin_ribbon_importado_no_hay_aviso_de_regenerar(self):
+        cliente = self.armar(ClienteSimulado(), puestas_antes=[])
+        estado, _, detalle = imp.construir(self.escribir(), False, lambda: cliente)
+        self.assertEqual("creado", estado, detalle)
+        self.assertNotIn("Regenerate ribbon metadata", detalle)
+
     def test_si_el_generico_sigue_a_la_vista_despues_de_importar_no_se_informa_exito(self):
         cliente = self.armar_ribbon(ClienteSimulado(), despues_ok=False)
         estado, _, detalle = imp.construir(self.escribir(comp(cambios=[CAMBIO_RIBBON])), False, lambda: cliente)

@@ -105,6 +105,16 @@ C_APP = "la consulta de la app (GET appmodules)"
 C_COMPONENTES = "la consulta de los componentes de la app (GET RetrieveAppComponents)"
 C_TRABAJO = "la consulta del trabajo de importación (GET importjobs)"
 C_RIBBON = "la consulta del ribbon de una tabla (GET RetrieveEntityRibbon)"
+
+# DN-04 (2026-10-01): `RetrieveEntityRibbon` ya traía los menús nuevos y la app seguía mostrando la barra vieja. La app
+# lee la metadata COMPILADA (`GetClientMetadata`), que ni importar ni publicar regeneran, y esta herramienta no puede
+# regenerarla (no hay API documentada). Por eso la verificación de arriba no alcanza y el éxito dice el paso que falta.
+# Receta: power-platform-construir, app-model-driven/patrones.md §2.4.
+AVISO_REGENERAR = (
+    " | PASO MANUAL: la app no muestra el ribbon nuevo hasta regenerar la metadata compilada. Abrí la app con "
+    "'&ribbondebug=true' en la URL, Command Checker > Regenerate ribbon metadata (rol System Administrator o "
+    "System Customizer). Hacelo DESPUÉS de la última importación de ribbon: la regeneración compila lo que hay en ese "
+    "momento")
 C_STEPS = "la consulta de los steps de la solución (GET sdkmessageprocessingsteps)"
 
 MENSAJE_FALLO_CLIENTE = (
@@ -229,8 +239,8 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
             _validar_menu(boton["menu"], f"{aqui}.menu", idiomas)
             if "idioma_del_texto" not in boton:
                 raise ErrorPlaybook(
-                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}): Unified Interface no resuelve "
-                    "$LocLabels dentro de un FlyoutAnchor, así que el menú lleva texto fijo en ese idioma")
+                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}): en Dev, Unified Interface no mostró "
+                    "$LocLabels dentro de un FlyoutAnchor (D-74 de M-PPP), así que el menú lleva texto fijo en ese idioma")
             exigir_forma(boton["idioma_del_texto"], int, aqui, "idioma_del_texto")
             if boton["idioma_del_texto"] not in idiomas:
                 raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' = {boton['idioma_del_texto']} no es uno de {idiomas}")
@@ -355,8 +365,8 @@ def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiqueta
     Unified Interface un comando deshabilitado no se ve. Learn (troubleshoot "Button in command bar doesn't appear
     after grid item selection"): los flyouts se muestran haya o no selección.
 
-    TEXTO FIJO, NO `$LocLabels` (comprobado en Dev el 2026-10-01): Unified Interface no resuelve LocLabels dentro de un
-    FlyoutAnchor. Las etiquetas quedaban guardadas en `ribbondiff` pero `GetClientMetadata` no las mandaba, y el menú y
+    TEXTO FIJO, NO `$LocLabels` (observado en Dev el 2026-10-01; no demostrado imposible, D-74 de M-PPP): Unified
+    Interface no mostró LocLabels dentro de un FlyoutAnchor. Las etiquetas quedaban guardadas en `ribbondiff` pero `GetClientMetadata` no las mandaba, y el menú y
     sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto va en el idioma que declara
     `idioma_del_texto` (decisión del aprobador: español). Learn ("Use localized labels with ribbons"): el ribbon admite
     texto directo, que no depende de los idiomas instalados en el entorno."""
@@ -945,7 +955,8 @@ def _contra_entorno_nucleo(dv, datos, identidad, solo_verificar, componente, for
         f"importada la solución '{solucion}' (importjob {id_trabajo}); "
         f"{len(tocadas)} app(s) con {total} tablas, {len(ribbons)} ribbon con {botones} botones propios; "
         "todo verificado contra el entorno"
-        + ("; " + "; ".join(reparados) if reparados else ""))
+        + ("; " + "; ".join(reparados) if reparados else "")
+        + (AVISO_REGENERAR if ribbons else ""))
 
 
 def construir(ruta_playbook, solo_verificar, fabrica_cliente, dormir=None, forzar=False):
