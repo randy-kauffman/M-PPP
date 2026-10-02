@@ -565,7 +565,7 @@ namespace Sanic.Mppp.Plugins.Datos
     {
         private static readonly HashSet<int> Codigos = new HashSet<int>
         {
-            unchecked((int)0x80072324), // AzureSqlMaxConcurrentWorkersLimitExceededError (candidato para el 10928 de Azure SQL; PENDIENTE de verificar en Dev, D-75)
+            unchecked((int)0x80072324), // AzureSqlMaxConcurrentWorkersLimitExceededError: es el 10928 de Azure SQL (verificado en Dev el 2026-10-01, D-75)
             unchecked((int)0x80072323), // AzureSqlDatabaseResourceLimitExceededError
             unchecked((int)0x80072326), // ThrottlingConcurrencyLimitExceededError
             unchecked((int)0x80072321), // ThrottlingTimeExceededError

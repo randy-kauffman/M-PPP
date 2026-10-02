@@ -556,8 +556,9 @@ falla de plataforma estos códigos de Learn ("Web service error codes"; el de ti
 *Ampliado el 2026-10-01 tras la revisión del código*: también una LECTURA con código de plataforma (pasada 1, parámetros,
 usuarios, roles) da 011, porque el 10928 puede caer en cualquier llamada. El código de Dataverse (en hexadecimal) va SIEMPRE a
 la traza, sea 009, 011 o genérico: el 10928 de la medición no dejó su código en la traza, y
-sin él no se puede confirmar que la lista lo cubre. **Pendiente de verificar en Dev**: que el 10928 real llega con uno de esos
-códigos (se reproduce con 200 filas mientras el presupuesto sigue en 100 s).
+sin él no se puede confirmar que la lista lo cubre. **Verificado en Dev el 2026-10-01** (ensamblado 1.0.21.0, presupuesto todavía
+en 100 s): una carga de 200 filas falló a los 42 s, el usuario recibió el 011 y la traza dijo `Fila 66 (código 0x80072324)`. El
+10928 llega como `AzureSqlMaxConcurrentWorkersLimitExceededError`, en el `ErrorCode` de arriba del fault (no en el `InnerFault`).
 
 **Excel de resultado.** Las mismas columnas, con los valores tal como se leyeron, más una columna al
 final, **Resultado**, y la fila 1 de encabezados igual.

@@ -155,13 +155,17 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(null)]       // ausente
         [InlineData("abc")]      // no es entero
         [InlineData("0")]        // menor que 1
-        public void Sin_un_carga_filas_maximo_usable_el_tope_es_300(string valor)
+        public void Sin_un_carga_filas_maximo_usable_el_tope_es_100(string valor)
         {
-            var filas300 = Enumerable.Range(2, 300).Select(n => Fila(n, ("A", "123"))).ToArray();
-            var filas301 = Enumerable.Range(2, 301).Select(n => Fila(n, ("A", "123"))).ToArray();
+            // D-75 (2026-10-01): medido en Dev, 100 filas de peor caso en 25,5 s; desde 200 la base corta a los ~40 s. Era 300.
+            var filas100 = Enumerable.Range(2, 100).Select(n => Fila(n, ("A", "123"))).ToArray();
+            var filas101 = Enumerable.Range(2, 101).Select(n => Fila(n, ("A", "123"))).ToArray();
             var cat = Catalogos(out _);
-            Assert.True(Nucleo(cat, Sistema(filasMaximo: valor)).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, filas300)).Grabado);
-            Assert.Equal("MPPP-CAR-006", Codigo(() => Nucleo(cat, Sistema(filasMaximo: valor)).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, filas301))));
+            Assert.True(Nucleo(cat, Sistema(filasMaximo: valor)).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, filas100)).Grabado);
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(cat, Sistema(filasMaximo: valor)).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga, filas101)));
+            Assert.Equal("MPPP-CAR-006", ex.Codigo);
+            Assert.Contains("más de 100 filas", ex.Message);
+            Assert.Equal(100, CatalogosMasivos.FilasMaximoPorDefecto);
         }
 
         [Fact]
@@ -220,12 +224,18 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Presupuesto_agotado_es_MPPP_CAR_008()
         {
             var cat = Catalogos(out _);
-            var n = Nucleo(cat, Sistema(), reloj: () => TimeSpan.FromSeconds(CatalogosMasivos.PresupuestoSegundos));
-            Assert.Equal(100, CatalogosMasivos.PresupuestoSegundos);
-            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => n.Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga,
-                Fila(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "ana@banco.com")))));
+            // D-75 (2026-10-01): en Dev la base corta una transacción a los ~40 s (error 10928). El presupuesto baja de 100 a 30 s
+            // para que corte NUESTRO 008, con su mensaje claro, antes que la base. Literal medido, no la constante contra sí misma.
+            Assert.Equal(30, CatalogosMasivos.PresupuestoSegundos);
+            var archivo = Archivo(EstructuraDeExcelDeCatalogo.Carga, Fila(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "ana@banco.com")));
+
+            var ex = Assert.Throws<CargaMasivaRechazadaException>(() => Nucleo(cat, Sistema(), reloj: () => TimeSpan.FromSeconds(30)).Cargar(archivo));
             Assert.Equal("MPPP-CAR-008", ex.Codigo);
             Assert.Contains("No se grabó nada", ex.Message);
+            Assert.Contains("30 segundos", ex.Message);
+
+            // Un instante antes de los 30 s todavía se escribe.
+            Assert.True(Nucleo(Catalogos(out _), Sistema(), reloj: () => TimeSpan.FromSeconds(29.9)).Cargar(archivo).Grabado);
         }
 
         [Fact]
