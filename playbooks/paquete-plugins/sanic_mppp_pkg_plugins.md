@@ -17,6 +17,9 @@ sandbox no siga ejecutando el binario viejo. Se actualiza con `--actualizar-cont
 **1.0.21.0 (2026-10-01, D-75)**: MPPP-CAR-011 para fallas de plataforma al leer y al escribir, y el código de Dataverse
 en la traza. Mismos tipos, sin steps nuevos. Se sube con el presupuesto TODAVÍA en 100 s a propósito: hay que reproducir el
 10928 de Azure SQL con 200 filas para confirmar qué `ErrorCode` trae (`DIRECTRICES-NUEVAS.md` DN-04, párrafo del 011).
+Verificado ese mismo día: llegó como `0x80072324` y salió como MPPP-CAR-011.
+
+**1.0.22.0 (2026-10-01, D-75)**: presupuesto de escritura de 30 s y tope por defecto de 100 filas. Mismos tipos.
 
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
@@ -83,7 +86,7 @@ Comprobación antes de subir: el .nupkg tiene la fecha de hoy y su `Sanic.Mppp.P
 ## 3. Precondiciones
 
 - La solución `sanic_mppp_sol_mantenimientoppp` existe, es unmanaged y su publisher es `Sistemas_Abiertos_Nicaragua` (lo comprueba la herramienta).
-- El .nupkg está armado y pesa menos de 12 MB. Solo puede llevar `Sanic.Mppp.Plugins.dll` y los dos de `DocumentFormat.OpenXml`: el SDK de Dataverse ya vive en el sandbox y no viaja (`ExcludeAssets="runtime"` en el csproj del paquete).
+- El .nupkg está armado y pesa menos de 12 MB. Lleva `Sanic.Mppp.Plugins.dll`, los dos de `DocumentFormat.OpenXml` y `Sanic.Mppp.Plugins.Paquete.dll`, el ensamblado vacío (~4,6 KB) que genera el propio proyecto del paquete (observado al desplegar 1.0.21.0, 2026-10-01; el csproj del paquete no cambió desde que se creó). Nada más: el SDK de Dataverse ya vive en el sandbox y no viaja (`ExcludeAssets="runtime"` en el csproj del paquete).
 - Ningún step registrado todavía. Si hubiera steps apuntando a estos tipos, un cambio de `major`/`minor` del ensamblado NO los re-apunta solo (Learn, "Assembly versioning").
 
 ## 4. Qué NO hace esta herramienta
