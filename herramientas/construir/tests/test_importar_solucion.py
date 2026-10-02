@@ -427,6 +427,51 @@ class RibbonConMenu(unittest.TestCase):
         self.assertEqual(self.xml(), self.xml())
 
 
+def _boton_menu_localizado():
+    """D-74 (2026-10-02): el experimento controlado. El mismo menú, con `etiquetas_localizadas` en vez de texto fijo."""
+    b = _boton_menu()
+    del b["idioma_del_texto"]
+    b["etiquetas_localizadas"] = True
+    return b
+
+
+class RibbonConMenuLocalizado(unittest.TestCase):
+    """D-74: un menú con `$LocLabels`, para comprobar en Dev, con la metadata regenerada DESPUÉS de importar, si Unified
+    Interface las resuelve dentro de un `FlyoutAnchor`. La evidencia del 2026-10-01 quedó mezclada con metadata vieja."""
+
+    def xml(self):
+        cambio = dict(CAMBIO_RIBBON, botones=[_boton_menu_localizado()])
+        return imp.ribbondiffxml(IDENT, cambio, COMPONENTE["idiomas"], [])
+
+    def test_ancla_y_opciones_apuntan_a_su_loclabel_y_no_llevan_texto_fijo(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        self.assertIn(f'LabelText="$LocLabels:{base}.Button.LabelText"', x)
+        self.assertIn(f'ToolTipDescription="$LocLabels:{base}.Button.ToolTipDescription"', x)
+        self.assertIn(f'LabelText="$LocLabels:{base}.cargar.Button.LabelText"', x)
+        self.assertIn(f'LabelText="$LocLabels:{base}.plantilla.Button.LabelText"', x)
+        self.assertNotIn('LabelText="Carga masiva"', x)
+        self.assertNotIn('LabelText="Cargar archivo"', x)
+
+    def test_cada_loclabel_lleva_un_texto_por_idioma(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        for id_, ingles, espanol in ((f"{base}.Button.LabelText", "Bulk load", "Carga masiva"),
+                                     (f"{base}.cargar.Button.LabelText", "Upload file", "Cargar archivo"),
+                                     (f"{base}.plantilla.Button.LabelText", "Download template", "Descargar plantilla")):
+            i = x.index(f'<LocLabel Id="{id_}">')
+            etiqueta = x[i:x.index("</LocLabel>", i)]
+            self.assertIn(f'<Title description="{ingles}" languagecode="1033" />', etiqueta)
+            self.assertIn(f'<Title description="{espanol}" languagecode="3082" />', etiqueta)
+
+    def test_la_estructura_del_menu_no_cambia(self):
+        x = self.xml()
+        base = "sanic.mppp." + TABLA.split("_")[-1] + ".cargamasiva"
+        self.assertIn(f'<FlyoutAnchor Id="{base}.HomepageGrid.FlyoutAnchor"', x)
+        self.assertIn(f'<Button Command="{base}.cargar.Command" Id="{base}.HomepageGrid.cargar.Button"', x)
+        self.assertNotIn("Mscrm.SelectionCountAtLeastOne", x)
+
+
 class VerificacionDelMenu(unittest.TestCase):
     """La verificación tiene que acompañar a lo que se genera (2026-10-01: la primera versión de los menús generaba un
     FlyoutAnchor y la verificación seguía buscando un Button; el ribbon quedó bien en Dev y la herramienta dijo error)."""
@@ -464,6 +509,17 @@ class VerificacionDelMenu(unittest.TestCase):
         real = self.ribbon_generado().replace('LabelText="Carga masiva"', 'LabelText="$LocLabels:x.Button.LabelText"')
         faltan = self.verificar(real)
         self.assertTrue(any("Carga masiva" in f for f in faltan), faltan)
+
+    def test_un_menu_localizado_bien_desplegado_no_falta_nada(self):
+        # RetrieveEntityRibbon devuelve la referencia SIN resolver (`LabelText="$LocLabels:..."`), verificado en Dev el
+        # 2026-10-02 con los botones de Fila.
+        b = _boton_menu_localizado()
+        self.assertEqual([], self.verificar(self.ribbon_generado(b), b))
+
+    def test_un_menu_localizado_que_sigue_con_texto_fijo_no_se_da_por_bueno(self):
+        # El estado de Dev antes del experimento: sin esto, la herramienta diría ya_existia y nunca importaría el cambio.
+        faltan = self.verificar(self.ribbon_generado(), _boton_menu_localizado())
+        self.assertTrue(any("$LocLabels" in f for f in faltan), faltan)
 
     def test_una_opcion_que_no_llama_a_su_funcion(self):
         real = self.ribbon_generado().replace('FunctionName="Sanic.Mppp.Comandos.plantillaCarga"', 'FunctionName="Otra.Cosa"')
@@ -518,6 +574,20 @@ class ValidacionDelMenu(Base):
         b = _boton_menu()
         del b["idioma_del_texto"]
         self.rechaza(b, "idioma_del_texto")
+
+    def test_un_menu_localizado_se_acepta(self):
+        imp.validar_playbook(json.loads(json.dumps(self.componente(_boton_menu_localizado()))), IDENT)   # no lanza
+
+    def test_idioma_del_texto_y_etiquetas_localizadas_juntos_se_rechaza(self):
+        self.rechaza(dict(_boton_menu_localizado(), idioma_del_texto=3082), "etiquetas_localizadas")
+
+    def test_etiquetas_localizadas_en_false_se_rechaza(self):
+        b = _boton_menu_localizado()
+        b["etiquetas_localizadas"] = False
+        self.rechaza(b, "etiquetas_localizadas")
+
+    def test_etiquetas_localizadas_en_un_boton_comun_se_rechaza(self):
+        self.rechaza(dict(BOTON, etiquetas_localizadas=True), "etiquetas_localizadas")
 
     def test_un_idioma_del_texto_fuera_de_los_idiomas_se_rechaza(self):
         self.rechaza(_boton_menu(idioma_del_texto=1031), "idioma_del_texto")

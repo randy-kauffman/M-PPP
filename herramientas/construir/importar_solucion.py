@@ -98,7 +98,7 @@ ACCIONES_BOTON = ["funcion", "menu"]
 CLAVES_OPCION_MENU = ["etiqueta", "funcion", "id", "secuencia", "tooltip"]
 # `regla` es OPCIONAL: la función JS que decide si el botón corresponde para lo
 # seleccionado. Sin ella el botón se muestra siempre, que es como nacieron los ocho.
-CLAVES_BOTON_OPCIONALES = ["regla", "idioma_del_texto"]
+CLAVES_BOTON_OPCIONALES = ["regla", "idioma_del_texto", "etiquetas_localizadas"]
 UBICACIONES = ("HomepageGrid", "SubGrid", "Form")
 
 C_APP = "la consulta de la app (GET appmodules)"
@@ -233,17 +233,28 @@ def _validar_ribbon(cambio, donde, identidad, idiomas, tablas_ribbon):
             exigir_forma(boton[campo], str, aqui, campo, no_vacio=True)
         if "funcion" in boton:
             exigir_forma(boton["funcion"], str, aqui, "funcion", no_vacio=True)
-            if "idioma_del_texto" in boton:
-                raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' es solo para un botón con 'menu'; un botón común usa LocLabels")
+            for clave in ("idioma_del_texto", "etiquetas_localizadas"):
+                if clave in boton:
+                    raise ErrorPlaybook(f"{aqui}: '{clave}' es solo para un botón con 'menu'; un botón común usa LocLabels")
         else:
             _validar_menu(boton["menu"], f"{aqui}.menu", idiomas)
-            if "idioma_del_texto" not in boton:
+            # Un menú declara SIEMPRE cómo lleva su texto, y una sola forma: nunca vuelve a $LocLabels por omisión.
+            if "idioma_del_texto" in boton and "etiquetas_localizadas" in boton:
+                raise ErrorPlaybook(f"{aqui}: un menú lleva 'idioma_del_texto' (texto fijo) o 'etiquetas_localizadas' "
+                                    "($LocLabels, experimento D-74 de M-PPP), no los dos")
+            if "etiquetas_localizadas" in boton:
+                if boton["etiquetas_localizadas"] is not True:
+                    raise ErrorPlaybook(f"{aqui}: 'etiquetas_localizadas' solo admite true; para texto fijo se usa "
+                                        "'idioma_del_texto'")
+            elif "idioma_del_texto" not in boton:
                 raise ErrorPlaybook(
-                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}): en Dev, Unified Interface no mostró "
-                    "$LocLabels dentro de un FlyoutAnchor (D-74 de M-PPP), así que el menú lleva texto fijo en ese idioma")
-            exigir_forma(boton["idioma_del_texto"], int, aqui, "idioma_del_texto")
-            if boton["idioma_del_texto"] not in idiomas:
-                raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' = {boton['idioma_del_texto']} no es uno de {idiomas}")
+                    f"{aqui}: un botón con 'menu' exige 'idioma_del_texto' (uno de {idiomas}) o 'etiquetas_localizadas': "
+                    "en Dev, Unified Interface no mostró $LocLabels dentro de un FlyoutAnchor (D-74 de M-PPP), así que el "
+                    "menú lleva texto fijo salvo que se declare el experimento")
+            else:
+                exigir_forma(boton["idioma_del_texto"], int, aqui, "idioma_del_texto")
+                if boton["idioma_del_texto"] not in idiomas:
+                    raise ErrorPlaybook(f"{aqui}: 'idioma_del_texto' = {boton['idioma_del_texto']} no es uno de {idiomas}")
         exigir_forma(boton["secuencia"], int, aqui, "secuencia")
         if boton["id"] in vistos:
             raise ErrorPlaybook(f"{aqui}: el id '{boton['id']}' está repetido en esta tabla")
@@ -369,16 +380,31 @@ def _menu_desplegable(base, boton, cambio, idiomas, acciones, comandos, etiqueta
     Interface no mostró LocLabels dentro de un FlyoutAnchor. Las etiquetas quedaban guardadas en `ribbondiff` pero `GetClientMetadata` no las mandaba, y el menú y
     sus opciones decían "LabelText", aun después de "Regenerate ribbon metadata". El texto va en el idioma que declara
     `idioma_del_texto` (decisión del aprobador: español). Learn ("Use localized labels with ribbons"): el ribbon admite
-    texto directo, que no depende de los idiomas instalados en el entorno."""
+    texto directo, que no depende de los idiomas instalados en el entorno.
+
+    Con `etiquetas_localizadas` (D-74, 2026-10-02: el experimento controlado), el ancla y cada opción apuntan a sus
+    `$LocLabels` (ids `<base>.Button.*` y `<base>.<opcion>.Button.*`), con un texto por idioma, como un botón común."""
     propia = _regla_propia(base, boton, cambio, reglas)
     biblioteca = cambio["biblioteca"]
-    lcid = str(boton["idioma_del_texto"])
     opciones = sorted(boton["menu"], key=lambda o: o["secuencia"])
 
-    def textos(objeto):
-        etiqueta = _atributo(objeto["etiqueta"][lcid])
-        return (f'LabelText="{etiqueta}" Alt="{etiqueta}" ToolTipTitle="{etiqueta}" '
-                f'ToolTipDescription="{_atributo(objeto["tooltip"][lcid])}"')
+    if boton.get("etiquetas_localizadas"):
+        etiquetas += _loclabels(base, boton, idiomas)
+        for o in opciones:
+            etiquetas += _loclabels(f"{base}.{o['id']}", o, idiomas)
+
+        def textos(objeto):
+            b = base if objeto is boton else f"{base}.{objeto['id']}"
+            return (f'LabelText="$LocLabels:{b}.Button.LabelText" Alt="$LocLabels:{b}.Button.LabelText" '
+                    f'ToolTipTitle="$LocLabels:{b}.Button.ToolTipTitle" '
+                    f'ToolTipDescription="$LocLabels:{b}.Button.ToolTipDescription"')
+    else:
+        lcid = str(boton["idioma_del_texto"])
+
+        def textos(objeto):
+            etiqueta = _atributo(objeto["etiqueta"][lcid])
+            return (f'LabelText="{etiqueta}" Alt="{etiqueta}" ToolTipTitle="{etiqueta}" '
+                    f'ToolTipDescription="{_atributo(objeto["tooltip"][lcid])}"')
 
     for ubicacion in boton["ubicaciones"]:
         lugar = f"Mscrm.{ubicacion}.{cambio['tabla']}.{GRUPO[ubicacion]}.Controls._children"
@@ -705,7 +731,13 @@ def _verificar_ribbon(dv, cambio, identidad):
                         faltan.append(f"al menú '{boton['id']}' le falta la opción '{opcion['id']}' en {ubicacion}")
             elif f"{base}.{ubicacion}.Button" not in presentes:
                 faltan.append(f"falta el botón '{boton['id']}' en {ubicacion}")
-        if "menu" in boton:
+        if "menu" in boton and boton.get("etiquetas_localizadas"):
+            # RetrieveEntityRibbon devuelve la referencia sin resolver (verificado en Dev el 2026-10-02, botones de Fila).
+            for objeto in [boton, *boton["menu"]]:
+                b = base if objeto is boton else f"{base}.{objeto['id']}"
+                if f'LabelText="$LocLabels:{b}.Button.LabelText"' not in ribbon:
+                    faltan.append(f"al menú '{boton['id']}' le falta la etiqueta localizada $LocLabels:{b}.Button.LabelText")
+        elif "menu" in boton:
             # El texto fijo también se verifica: con los mismos ids, un menú con el texto viejo pasaría por bueno.
             lcid = str(boton["idioma_del_texto"])
             for objeto in [boton, *boton["menu"]]:
