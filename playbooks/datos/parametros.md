@@ -143,7 +143,21 @@ real del Administrador de planes, en el peor caso (cada fila crea cliente, plan,
 por defecto del código también pasa a 100 (ensamblado 1.0.22.0), y el presupuesto de escritura a 30 s. Versionado con
 `parametro.py`.
 
+**DN-05 (2026-10-06, `diseno/DIRECTRICES-NUEVAS.md`): cuatro parámetros sembrados con `parametro.py`, ANTES del
+ensamblado 1.0.23.0** (que exige los dos primeros; el 1.0.22.0 no los lee y lee bien los otros dos, comprobado con
+pruebas contra el código de `8cddb79`). Salen de los escenarios de prueba de Mercadeo BAC y de las decisiones del
+aprobador de ese día:
+- `plan.formatos` v1: qué clasificaciones, gestiones y bancos admite cada formato de plan (06 solo BAC; 10 BAC o CK con
+  cuenta BAC; 11 solo ACH y sin Modificación). Lo leen `CLASIFICACION_DEL_FORMATO`, `GESTION_DEL_FORMATO` y
+  `BANCO_DEL_FORMATO`, y completa Clasificación o Banco vacíos cuando el formato admite uno solo.
+- `cuenta.largos` v1: largo de la cuenta por banco (escenario 20), lo lee `CUENTA_DEL_BANCO`.
+- `plantilla.estructura` v2: `caracteres` por campo (escenario 21, regla `CARACTERES_PERMITIDOS`) y la cuenta a 17.
+- `plantilla.obligatoriedad` v3: la matriz de obligatoriedad del negocio. **Reemplaza el criterio de exclusión de la
+  v2** (que el aprobador había confirmado el 2026-09-28): la exclusión pasa a exigir cuenta y referencia, y la
+  identificación queda opcional.
+
 Valores con fuente:
+- `plan.formatos` v1, `cuenta.largos` v1, `plantilla.estructura` v2 y `plantilla.obligatoriedad` v3: `DIRECTRICES-NUEVAS.md` DN-05, decisiones del aprobador del 2026-10-06.
 - `carga.filas.maximo` `sanic_version=1`: `DIRECTRICES-NUEVAS.md` DN-04, decisión 8 del aprobador (2026-10-01); `02-diccionario-datos.md` §2.5.
 - `carga.filas.maximo` `sanic_version=2`: medición D-75 (`PENDIENTES.md`) y decisión del aprobador del 2026-10-01; `DIRECTRICES-NUEVAS.md` DN-04 §Parámetro nuevo.
 - `autorizacion.modo`: `DIRECTRICES-NUEVAS.md` DN-01 "Diseño resuelto", documentado en `02-diccionario-datos.md` §2.5 (agregado el 2026-09-26).
