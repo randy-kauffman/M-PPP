@@ -158,6 +158,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             svc.Sembrar(Activo(Tablas.Parametro, ("sanic_nombre", ValidarSolicitud.ParametroListas), ("sanic_version", 1), ("sanic_valor", ParametrosDePlantillaAceptacion.ListasValidas)));
             svc.Sembrar(Activo(Tablas.Parametro, ("sanic_nombre", ValidarSolicitud.ParametroObligatoriedad), ("sanic_version", 1), ("sanic_valor", ParametrosDePlantillaAceptacion.ObligatoriedadInicial)));
             svc.Sembrar(Activo(Tablas.Parametro, ("sanic_nombre", ValidarSolicitud.ParametroLimites), ("sanic_version", 1), ("sanic_valor", @"{""maximoBytesComprimido"":2097152,""maximoBytesDescomprimido"":20971520}")));
+            svc.Sembrar(Activo(Tablas.Parametro, ("sanic_nombre", ValidarSolicitud.ParametroFormatos), ("sanic_version", 1), ("sanic_valor", Dn05Aceptacion.FormatosDn05)));
+            svc.Sembrar(Activo(Tablas.Parametro, ("sanic_nombre", ValidarSolicitud.ParametroLargosDeCuenta), ("sanic_version", 1), ("sanic_valor", Dn05Aceptacion.LargosDn05)));
 
             var solicitudId = svc.Sembrar(new Entity(TablasHistorico.Solicitud)
             {

@@ -675,3 +675,164 @@ la base de Producción no se mide (descartado por el aprobador el 2026-10-02, D-
 6. Los dos comandos en las cuatro grillas, el JS y los íconos.
 7. Medición de volumen contra Dev, y ajuste del tope.
 8. Casos de prueba nuevos en `pruebas/` (set de catálogos).
+
+---
+
+# DN-05 · Escenarios de prueba del negocio y matriz de obligatoriedad
+
+Recibida el **2026-10-06**: Mercadeo BAC mandó `Escenario de Pruebas.xlsx`, con dos hojas. "Escenarios" trae los casos
+0 a 21, con el resultado esperado y comentarios del desarrollador. "Matriz de obligatoriedad" trae Gestión × formato del
+plan. La evaluación de cada escenario contra el código está en Engram (`negocio/escenarios-y-matriz-obligatoriedad`).
+Acá queda **solo lo que se decidió construir**.
+
+**Estado: diseño PROPUESTO, falta la revisión del aprobador. No se construye nada hasta su orden.**
+
+## Decisiones del aprobador (2026-10-06)
+
+| # | Decisión |
+|---|---|
+| 1 | En la matriz, "No" quiere decir **opcional**, no "tiene que venir vacío" |
+| 2 | La matriz **reemplaza** el criterio de exclusión de la v2 (DN-03, 28/09): en la exclusión, la **cuenta y la referencia son obligatorias** y la identificación es opcional. La aprueba el mismo aprobador |
+| 3 | Formato 11: la referencia se **arma** con banco + cuenta **solo en Inclusión**. En Exclusión se usa **la que manda el cliente** |
+| 4 | Formato 11 **no acepta Modificación**: regla nueva que rechaza la fila |
+| 5 | La clasificación **se completa sola** cuando el formato del plan admite una sola (06 → BAC, 11 → ACH). Si viene con valor, tiene que estar entre las permitidas para el formato (escenario 10) |
+| 6 | La cuenta lleva **solo dígitos**, en todas las clasificaciones, incluida CK (escenario 21) |
+| 7 | **Caracteres permitidos por campo**: regla nueva de fila, configurable por campo (escenario 21). Nombre: A-Z, a-z, espacio, guion, punto y coma ("S.A."). Referencia e identificación: solo letras A-Z/a-z y dígitos. **Sin Ñ ni tildes** en ninguno |
+| 8 | **Largo de la cuenta por banco**, con **rechazo** de la fila (escenario 20). BANPRO 6-16, BDF 10-16, LAFISE 9-16, FICOHSA 4-16, AVANZ 10-16, BAC 9-16; cualquier otro banco, 6-17. No depende de la moneda. Los ceros a la izquierda cuentan. El largo máximo real es **17** |
+| 9 | Escenarios **9** (canal de pago) y **12** (requiere preregistro): **pendientes**, esperan al área de operaciones. Escenario **13**: descartado |
+| 10 | Formatos 06 y 10: **solo cuentas BAC**, y Banco vacío se toma como BAC. CK también es cuenta BAC. Formato 11: el banco es obligatorio en la **inclusión**; en la **exclusión no hace falta** (corregido por el aprobador el mismo día, la matriz original ya lo decía) |
+
+## Matriz del negocio (Sí = obligatorio)
+
+| Gestión | Formato | Obligatorios | Clasificaciones permitidas |
+|---|---|---|---|
+| Inclusión | 06 | Gestión, Plan, Nombre, Identificación, Cuenta | BAC |
+| Inclusión | 10 | Gestión, Clasificación, Plan, Nombre, Tipo ID, Identificación, Cuenta | CK, BAC |
+| Inclusión | 11 | Gestión, Plan, Nombre, Tipo ID, Identificación, Cuenta, Banco | ACH |
+| Exclusión | 06, 10, 11 | Gestión, Plan, Referencia, Cuenta | (las del formato) |
+| Modificación | 06, 10 | Gestión, Plan, Referencia, Cuenta | (las del formato) |
+| Modificación | 11 | **No permitida** | — |
+
+## Diseño propuesto
+
+### A. `plantilla.obligatoriedad` versión 3 (solo parámetro)
+
+La matriz entra **completa** en las capas que el motor ya tiene: `reglas` afloja por Gestión × Clasificación × Formato y
+`porGestion` afloja y endurece. No hace falta código:
+
+```json
+{
+  "porDefecto": "obligatorio",
+  "opcionales": [{"campo":"referencia"}, {"campo":"moneda"}],
+  "reglas": [
+    {"gestion":"Inclusion","clasificacion":"*","formato":"06","opcionales":["clasificacion","tipoIdentificacion","banco"]},
+    {"gestion":"Inclusion","clasificacion":"*","formato":"10","opcionales":["banco"]},
+    {"gestion":"Inclusion","clasificacion":"*","formato":"11","opcionales":["clasificacion"]}
+  ],
+  "porGestion": {
+    "Exclusion":    {"opcionales":[{"campo":"clasificacion"},{"campo":"nombreBeneficiario"},{"campo":"tipoIdentificacion"},{"campo":"numeroIdentificacion"},{"campo":"banco"}],"obligatorios":[{"campo":"referencia"}]},
+    "Modificacion": {"opcionales":[{"campo":"clasificacion"},{"campo":"nombreBeneficiario"},{"campo":"tipoIdentificacion"},{"campo":"numeroIdentificacion"},{"campo":"banco"}],"obligatorios":[{"campo":"referencia"}]}
+  }
+}
+```
+
+Se verificó fila por fila contra la matriz. El Banco es opcional en toda Exclusión, incluido el 11 (decisión 10). En Modificación el 11 ya lo rechaza `GESTION_DEL_FORMATO`. **No se siembra sola**: si se carga antes que B, toda exclusión en un plan 11
+con la clasificación vacía se rechaza, porque `FORMATO_11_SOLO_ACH` la exige.
+
+### B. Lo que permite cada formato: `plan.formatos` (parámetro nuevo) y dos reglas que lo leen
+
+Un solo parámetro dice qué admite cada formato:
+
+```json
+{
+  "06": {"clasificaciones": ["BAC"],       "gestiones": ["Inclusion","Exclusion","Modificacion"], "bancos": ["BAC"]},
+  "10": {"clasificaciones": ["BAC","CK"],  "gestiones": ["Inclusion","Exclusion","Modificacion"], "bancos": ["BAC"]},
+  "11": {"clasificaciones": ["ACH"],       "gestiones": ["Inclusion","Exclusion"]}
+}
+```
+
+- **`CLASIFICACION_DEL_FORMATO`** **reemplaza** a `FORMATO_11_SOLO_ACH`, que es el caso particular del 11. Si la
+  clasificación viene vacía y el formato admite **una sola**, la Fila se guarda con esa clasificación. Si viene vacía y
+  admite varias, la regla no la completa (que sea obligatoria lo decide `OBLIGATORIEDAD`). Si viene con valor, tiene que
+  estar entre las permitidas. Mensaje: *"El plan {plan} solo admite la clasificación {permitidas}."* Depende de
+  `AUTORIZACION_CORREO_PLAN` y `LISTAS_VALIDAS`, igual que la regla que reemplaza, así que no filtra nada sobre planes
+  ajenos.
+- **`GESTION_DEL_FORMATO`** (regla nueva, decisión 4). Mensaje: *"El plan {plan} no admite la gestión {gestion}."*
+  Mismas dependencias.
+- **`BANCO_DEL_FORMATO`** (regla nueva, decisión 10). Funciona igual que la de clasificación: si el Banco viene vacío y
+  el formato admite uno solo, la Fila se guarda con ese banco; si viene con valor, tiene que estar entre los permitidos.
+  Sin `bancos` en el formato, sirve cualquier banco de `plantilla.listas`. Mensaje: *"El plan {plan} solo admite
+  cuentas de {bancos}."* Mismas dependencias.
+- **Si el escenario 9 termina en un campo "Canal de pago" en el plan**, solo cambia de dónde salen las clasificaciones
+  permitidas. La regla no se toca.
+- **Formato del plan que falta en el parámetro, o parámetro ausente**: error de configuración ruidoso, igual que
+  `plantilla.obligatoriedad`. Ante la duda, se falla cerrado.
+
+### C. `REFERENCIA_FORMATO_11` solo en Inclusión (código)
+
+En Exclusión, la referencia es la recibida (obligatoria por la versión 3). La dependencia `FORMATO_11_SOLO_ACH` pasa a
+`CLASIFICACION_DEL_FORMATO`.
+
+### D. `plantilla.estructura`, versión nueva (solo parámetro)
+
+`numeroCuenta`: `largoMaximo` pasa de 16 a **17** (decisión 8). El control de qué caracteres lleva cada campo se hace con
+E, y no con `formato` (que queda en `texto`), porque el escenario 21 pide que el mensaje diga qué caracteres fallaron y
+`LARGOS_Y_FORMATO` no lo dice (D-41). Así no hay dos reglas que se pisen.
+
+### E. `CARACTERES_PERMITIDOS` (regla nueva, configurable por campo)
+
+Cada campo de `plantilla.estructura` puede llevar `caracteres`. Un campo sin `caracteres` no se revisa, y así lo ya
+sembrado sigue igual:
+
+| Campo | `caracteres` |
+|---|---|
+| `nombreBeneficiario` | `{"letras": true, "espacio": true, "otros": "-.,"}` |
+| `referencia` | `{"letras": true, "digitos": true}` |
+| `numeroIdentificacion` | `{"letras": true, "digitos": true}` |
+| `numeroCuenta` | `{"digitos": true}` |
+
+- `letras`: A-Z y a-z, **solo ASCII** (sin Ñ ni tildes, decisión 7). `digitos`: 0-9. `espacio`: el espacio común.
+  `otros`: los caracteres exactos que se agregan. Una clave que falta vale `false`. Cualquier otro carácter, **incluidos
+  los invisibles y los de control**, es prohibido. Si el negocio quisiera permitir la Ñ algún día, va en `otros` y no hace
+  falta código.
+- Mensaje: *"La columna {campo} tiene caracteres no permitidos: {caracteres}."* Muestra **solo los caracteres
+  prohibidos**, sin repetir y con un tope, **nunca el valor** (D-41). Un invisible se muestra como "(carácter
+  invisible)". Así se cumple lo que pide el escenario 21 sin exponer la cuenta ni la identificación.
+- Nivel Registro, efecto Rechaza, sin dependencias. Se evalúa sobre lo recibido, igual que `LARGOS_Y_FORMATO`.
+
+### F. `CUENTA_DEL_BANCO` (regla nueva, rechazo) y parámetro `cuenta.largos`
+
+```json
+{
+  "porDefecto": {"minimo": 6, "maximo": 17},
+  "porBanco": {
+    "BANPRO":  {"minimo": 6,  "maximo": 16},
+    "BDF":     {"minimo": 10, "maximo": 16},
+    "LAFISE":  {"minimo": 9,  "maximo": 16},
+    "FICOHSA": {"minimo": 4,  "maximo": 16},
+    "AVANZ":   {"minimo": 10, "maximo": 16},
+    "BAC":     {"minimo": 9,  "maximo": 16}
+  }
+}
+```
+
+- Se compara contra el **banco efectivo**: el recibido, o el que completó `BANCO_DEL_FORMATO` (BAC en 06 y 10). Hoy los
+  bancos sin entrada propia son PRODUZCAMOS y ATLANTIDA, que usan `porDefecto`. **Banco vacío en el 11** (solo
+  puede pasar en una exclusión, decisión 10): no hay banco efectivo y se usa `porDefecto` (6-17).
+- El largo se mide sobre lo recibido sin espacios a los lados, **con los ceros a la izquierda**. Cuenta vacía: no se
+  revisa, porque eso es de `OBLIGATORIEDAD`. Que la cuenta sean solo dígitos lo controla E, no esta regla.
+- Un banco en `porBanco` que no existe en `plantilla.listas`, o un mínimo mayor que el máximo: error de configuración
+  ruidoso.
+- Mensaje: *"El largo de la cuenta no corresponde al banco {banco}."* Sin el largo ni el valor (D-41).
+- Depende de `BANCO_DEL_FORMATO`.
+
+## Orden de despliegue
+
+Primero el ensamblado con las reglas nuevas, mientras el catálogo sigue igual. Después, en una sola pasada:
+`plan.formatos`, `cuenta.largos`, las reglas nuevas en el catálogo, `REFERENCIA_FORMATO_11` apuntando a `CLASIFICACION_DEL_FORMATO` y
+`FORMATO_11_SOLO_ACH` inactiva. Una regla activa que depende de una inactiva es un error de configuración y tumba la
+validación (D-13). Al final, `plantilla.estructura` y `plantilla.obligatoriedad` en sus versiones nuevas.
+
+## Pendientes del negocio
+
+- **Escenarios 9 y 12**, la respuesta del área de operaciones.

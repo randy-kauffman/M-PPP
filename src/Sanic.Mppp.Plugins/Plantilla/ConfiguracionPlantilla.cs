@@ -330,5 +330,9 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
         /// <summary>`formato` (D-18b): lista CERRADA, sin expresiones regulares. Nulo = cualquier texto.</summary>
         public FormatoDeCampo? Formato { get; set; }
+
+        /// <summary>DN-05 (escenario 21): `caracteres`. Nulo = el campo no se revisa (así queda todo lo sembrado antes de
+        /// DN-05). Lo usa la regla CARACTERES_PERMITIDOS; el lector no lo mira. FIRMA DEL ARQUITECTO.</summary>
+        public CaracteresPermitidos Caracteres { get; set; }
     }
 }

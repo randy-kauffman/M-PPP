@@ -65,6 +65,11 @@ namespace Sanic.Mppp.Plugins.Api
         public const string ParametroObligatoriedad = "plantilla.obligatoriedad";
         public const string ParametroLimites = "lectura.limites";
 
+        /// <summary>DN-05: obligatorios como los de arriba (falta → error real que nombra el parámetro). Entran en
+        /// `sanic_versionparametros` como `;formatos={v};largos={v}`, después de los tres de hoy. FIRMA DEL ARQUITECTO.</summary>
+        public const string ParametroFormatos = FormatosDelPlan.NombreParametro;
+        public const string ParametroLargosDeCuenta = LargosDeCuenta.NombreParametro;
+
         /// <summary>`sanic_exceloriginal`, la columna de archivo de la que se lee la plantilla.</summary>
         public const string ColumnaExcel = "sanic_exceloriginal";
 

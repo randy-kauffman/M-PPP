@@ -69,9 +69,10 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             return b.Bytes();
         }
 
-        private static string[] Fila(string plan = "0042", string cuenta = "123456789", string nombre = "Juan Perez", string moneda = "USD", string gestion = "Inclusion")
+        private static string[] Fila(string plan = "0042", string cuenta = "123456789", string nombre = "Juan Perez", string moneda = "USD", string gestion = "Inclusion",
+            string clasificacion = "ACH")
         {
-            return new[] { gestion, "ACH", "CNA", moneda, "BAC", plan, nombre, "0011234567890", cuenta, string.Empty };
+            return new[] { gestion, clasificacion, "CNA", moneda, "BAC", plan, nombre, "0011234567890", cuenta, string.Empty };
         }
 
         private sealed class Mundo
@@ -112,6 +113,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                     Parametro(ValidarSolicitud.ParametroListas, ParametrosDePlantillaAceptacion.ListasValidas);
                     Parametro(ValidarSolicitud.ParametroObligatoriedad, obligatoriedad ?? ParametrosDePlantillaAceptacion.ObligatoriedadInicial);
                     Parametro(ValidarSolicitud.ParametroLimites, @"{""maximoBytesComprimido"":2097152,""maximoBytesDescomprimido"":20971520}");
+                    Parametro(ValidarSolicitud.ParametroFormatos, Dn05Aceptacion.FormatosDn05);
+                    Parametro(ValidarSolicitud.ParametroLargosDeCuenta, Dn05Aceptacion.LargosDn05);
                 }
 
                 var sobre = new[] { ReglasDelSobre.TraeAdjunto, ReglasDelSobre.AdjuntoEsExcel, ReglasDelSobre.UnSoloExcel, ReglasDelSobre.EstructuraPlantilla, ReglasDelSobre.TieneFilas };
@@ -121,15 +124,12 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                         ("sanic_dependede", i == 0 ? null : sobre[i - 1]), ("sanic_efecto", new OptionSetValue((int)EfectoDeLaRegla.Rechaza))));
                 }
 
-                var registro = new (string codigo, string dependeDe)[]
-                {
-                    (ReglasDeRegistro.ListasValidas, null), (ReglasDeRegistro.LargosYFormato, null), (ReglasDeRegistro.PlanExiste, null),
-                    (ReglasDeRegistro.Formato11SoloAch, ReglasDeRegistro.PlanExiste + "," + ReglasDeRegistro.ListasValidas),
-                    (ReglasDeRegistro.Obligatoriedad, ReglasDeRegistro.PlanExiste + "," + ReglasDeRegistro.ListasValidas),
-                    (ReglasDeRegistro.ReferenciaFormato11, ReglasDeRegistro.Formato11SoloAch + "," + ReglasDeRegistro.Obligatoriedad),
-                    (ReglasDeRegistro.MonedaDelPlan, ReglasDeRegistro.PlanExiste + "," + ReglasDeRegistro.ListasValidas),
-                    (ReglasDeRegistro.AutorizacionCorreoPlan, ReglasDeRegistro.PlanExiste),
-                };
+                // DN-05 (2026-10-06): el catálogo de registro DESTINO (FORMATO_11_SOLO_ACH inactiva, las cinco reglas nuevas
+                // activas). El catálogo de la transición, con FORMATO_11_SOLO_ACH todavía activa, lo cubre
+                // ModoDeAutorizacionWiringAceptacion.
+                var registro = Dn05Aceptacion.SemillaRegistro
+                    .Select(r => (r.codigo, dependeDe: r.dependeDe.Length == 0 ? null : string.Join(",", r.dependeDe)))
+                    .ToArray();
                 for (var i = 0; i < registro.Length; i++)
                 {
                     Svc.Sembrar(Activo(Tablas.Regla, ("sanic_codigo", registro[i].codigo), ("sanic_nivel", new OptionSetValue((int)NivelDeLaRegla.Registro)), ("sanic_orden", (i + 1) * 10),
@@ -261,7 +261,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var solicitud = m.Solicitud();
             Assert.Equal((4, 1, 3), (solicitud["sanic_filastotales"], solicitud["sanic_filasvalidas"], solicitud["sanic_filasrechazadas"]));
             Assert.Equal(Ahora, solicitud["sanic_fechavalidada"]);
-            Assert.Equal("estructura=1;listas=1;obligatoriedad=1", solicitud["sanic_versionparametros"]);
+            Assert.Equal("estructura=1;listas=1;obligatoriedad=1;formatos=1;largos=1", solicitud["sanic_versionparametros"]);
             var acuse = (string)solicitud["sanic_acusecontenido"];
             Assert.Contains("MPPP-00000123", acuse);
             Assert.Contains("<table", acuse);
@@ -414,14 +414,23 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(ValidarSolicitud.ParametroListas)]
         [InlineData(ValidarSolicitud.ParametroObligatoriedad)]
         [InlineData(ValidarSolicitud.ParametroLimites)]
+        [InlineData(ValidarSolicitud.ParametroFormatos)]
+        [InlineData(ValidarSolicitud.ParametroLargosDeCuenta)]
         public void Un_parametro_que_falta_es_un_error_real_y_nada_queda_a_medias(string cual)
         {
             var m = new Mundo(Excel(Fila()), conParametros: false);
-            foreach (var otro in new[] { ValidarSolicitud.ParametroEstructura, ValidarSolicitud.ParametroListas, ValidarSolicitud.ParametroObligatoriedad, ValidarSolicitud.ParametroLimites }.Where(p => p != cual))
+            var todos = new[]
+            {
+                ValidarSolicitud.ParametroEstructura, ValidarSolicitud.ParametroListas, ValidarSolicitud.ParametroObligatoriedad, ValidarSolicitud.ParametroLimites,
+                ValidarSolicitud.ParametroFormatos, ValidarSolicitud.ParametroLargosDeCuenta,
+            };
+            foreach (var otro in todos.Where(p => p != cual))
             {
                 m.Parametro(otro, otro == ValidarSolicitud.ParametroEstructura ? Estructura()
                     : otro == ValidarSolicitud.ParametroListas ? ParametrosDePlantillaAceptacion.ListasValidas
                     : otro == ValidarSolicitud.ParametroObligatoriedad ? ParametrosDePlantillaAceptacion.ObligatoriedadInicial
+                    : otro == ValidarSolicitud.ParametroFormatos ? Dn05Aceptacion.FormatosDn05
+                    : otro == ValidarSolicitud.ParametroLargosDeCuenta ? Dn05Aceptacion.LargosDn05
                     : @"{""maximoBytesComprimido"":2097152,""maximoBytesDescomprimido"":20971520}");
             }
 
@@ -450,10 +459,12 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var m = new Mundo(Excel(Fila()));
             m.Parametro(ValidarSolicitud.ParametroListas, ParametrosDePlantillaAceptacion.ListasValidas, version: 7);
             m.Parametro(ValidarSolicitud.ParametroEstructura, Estructura(), version: 3);
+            m.Parametro(ValidarSolicitud.ParametroFormatos, Dn05Aceptacion.FormatosDn05, version: 4);
+            m.Parametro(ValidarSolicitud.ParametroLargosDeCuenta, Dn05Aceptacion.LargosDn05, version: 2);
 
             m.Correr();
 
-            Assert.Equal("estructura=3;listas=7;obligatoriedad=1", m.Solicitud()["sanic_versionparametros"]);
+            Assert.Equal("estructura=3;listas=7;obligatoriedad=1;formatos=4;largos=2", m.Solicitud()["sanic_versionparametros"]);
         }
 
         [Fact]
@@ -601,5 +612,36 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
         }
-    }
+
+        // ------------------------------------------------------------------ DN-05: lo completado se GUARDA
+        [Fact]
+        public void Dn05_la_clasificacion_vacia_en_un_plan_de_una_sola_clasificacion_se_guarda_completada()
+        {
+            // 0042 es formato 11: solo ACH (plan.formatos). La celda vacía no es un error ni queda vacía en la Fila.
+            var m = new Mundo(Excel(Fila(clasificacion: string.Empty), Fila(clasificacion: "BAC")));
+
+            m.Correr();
+
+            var filas = m.Filas();
+            Assert.Equal((int)EstadoDeLaFila.Validada, filas[0].GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+            Assert.Equal((int)Clasificacion.ACH, filas[0].GetAttributeValue<OptionSetValue>("sanic_clasificacion").Value);
+
+            // Un valor recibido que el formato no admite NUNCA se reemplaza: se rechaza con el mensaje de la regla.
+            Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, filas[1].GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+            Assert.Equal((int)Clasificacion.BAC, filas[1].GetAttributeValue<OptionSetValue>("sanic_clasificacion").Value);
+            Assert.Contains("El plan 0042 solo admite la clasificación ACH.", filas[1].GetAttributeValue<string>("sanic_mensaje"));
+        }
+
+        [Fact]
+        public void Dn05_una_modificacion_en_un_plan_formato_11_se_rechaza()
+        {
+            var m = new Mundo(Excel(Fila(gestion: "Modificacion")));
+
+            m.Correr();
+
+            var fila = m.Filas().Single();
+            Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+            Assert.Contains("El plan 0042 no admite la gestión Modificacion.", fila.GetAttributeValue<string>("sanic_mensaje"));
+        }
+}
 }

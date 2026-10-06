@@ -120,8 +120,16 @@ namespace Sanic.Mppp.Plugins.Validacion
             IEnumerable<PlanDelCatalogo> planesActivos,
             IEnumerable<Guid> planesAutorizadosDelRemitente,
             ModoDeAutorizacion modo = ModoDeAutorizacion.Plan,
-            IEnumerable<Guid> clientesAutorizadosDelRemitente = null)
+            IEnumerable<Guid> clientesAutorizadosDelRemitente = null,
+            FormatosDelPlan formatos = null,
+            LargosDeCuenta largosDeCuenta = null)
         {
+            // DN-05: nulos admitidos para no romper a quien arma el catálogo sin ellos (pruebas, normalización de planes).
+            // Una regla ACTIVA que los necesita y no los encuentra lanza InvalidOperationException (error de configuración,
+            // falla cerrado): nunca se da por buena una fila que no se pudo comprobar.
+            Formatos = formatos;
+            LargosDeCuenta = largosDeCuenta;
+
             if (estructura == null)
             {
                 throw new ArgumentNullException(nameof(estructura));
@@ -225,6 +233,12 @@ namespace Sanic.Mppp.Plugins.Validacion
         public ListasPlantilla Listas { get; }
 
         public ObligatoriedadPlantilla Obligatoriedad { get; }
+
+        /// <summary>DN-05: `plan.formatos`. Puede ser nulo (ver el constructor). FIRMA DEL ARQUITECTO.</summary>
+        public FormatosDelPlan Formatos { get; }
+
+        /// <summary>DN-05: `cuenta.largos`. Puede ser nulo (ver el constructor). FIRMA DEL ARQUITECTO.</summary>
+        public LargosDeCuenta LargosDeCuenta { get; }
 
         /// <summary>El campo de la estructura con ese nombre de <see cref="CamposDeFila"/>: una COPIA NUEVA en cada llamada,
         /// así quien la reciba y la mute no afecta al catálogo ni a otro llamador (revisión de código, 2026-09-21). Otro
@@ -368,6 +382,22 @@ namespace Sanic.Mppp.Plugins.Validacion
 
         public Banco? Banco => ResolverEnumDeLista<Banco>(CamposDeFila.Banco);
 
+        /// <summary>
+        /// DN-05 (decisión 5): la clasificación que se GUARDA y la que mira OBLIGATORIEDAD. Si el cliente escribió algo, es
+        /// <see cref="Clasificacion"/> (nulo si no es válida: nunca se reemplaza un valor inválido). Si la celda vino vacía,
+        /// el plan existe, el catálogo trae <see cref="CatalogosDeValidacion.Formatos"/> y su formato admite UNA sola
+        /// clasificación, es esa. En cualquier otro caso, nulo. Nunca lanza. FIRMA DEL ARQUITECTO.
+        /// </summary>
+        public Clasificacion? ClasificacionEfectiva => throw new NotImplementedException();
+
+        /// <summary>
+        /// DN-05 (decisión 10): el banco que se GUARDA, el que mira OBLIGATORIEDAD y contra el que mide CUENTA_DEL_BANCO.
+        /// Misma lógica que <see cref="ClasificacionEfectiva"/> con <see cref="ReglasDelFormato.Bancos"/> (06 y 10: Banco
+        /// vacío = BAC). Si el formato no restringe bancos (lista nula), un Banco vacío queda nulo. Nunca lanza.
+        /// FIRMA DEL ARQUITECTO.
+        /// </summary>
+        public Banco? BancoEfectivo => throw new NotImplementedException();
+
         /// <summary>El código de 3 dígitos del banco de la fila (de `plantilla.listas`), o nulo si el banco vino vacío o no es válido.</summary>
         public string CodigoDeBanco => Catalogos.Listas.Resolver(CamposDeFila.Banco, Recibido(CamposDeFila.Banco))?.CodigoDeBanco;
 
@@ -497,6 +527,14 @@ namespace Sanic.Mppp.Plugins.Validacion
         public const string ReferenciaFormato11 = "REFERENCIA_FORMATO_11";
         public const string MonedaDelPlan = "MONEDA_DEL_PLAN";
         public const string AutorizacionCorreoPlan = "AUTORIZACION_CORREO_PLAN";
+
+        // DN-05 (aprobador, 2026-10-06). FIRMA DEL ARQUITECTO. FORMATO_11_SOLO_ACH queda en el código mientras el catálogo
+        // de Dev la tenga activa (orden de despliegue de DN-05): CLASIFICACION_DEL_FORMATO la reemplaza.
+        public const string ClasificacionDelFormato = "CLASIFICACION_DEL_FORMATO";
+        public const string GestionDelFormato = "GESTION_DEL_FORMATO";
+        public const string BancoDelFormato = "BANCO_DEL_FORMATO";
+        public const string CaracteresPermitidos = "CARACTERES_PERMITIDOS";
+        public const string CuentaDelBanco = "CUENTA_DEL_BANCO";
 
         /// <summary>Un evaluador por cada código de arriba, ni uno más. Instancias nuevas en cada llamada: no guardan estado.</summary>
         public static IList<IEvaluador<FilaEnValidacion>> Evaluadores()

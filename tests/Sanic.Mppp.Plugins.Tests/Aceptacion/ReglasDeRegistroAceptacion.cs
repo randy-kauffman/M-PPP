@@ -133,7 +133,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Hay_un_evaluador_por_cada_regla_semilla_de_registro_y_el_codigo_de_la_autorizacion_es_uno_solo()
         {
             var unos = ReglasDeRegistro.Evaluadores();
-            Assert.Equal(Semilla.Select(s => s.codigo).OrderBy(c => c, StringComparer.Ordinal), unos.Select(e => e.Codigo).OrderBy(c => c, StringComparer.Ordinal));
+            // DN-05 (2026-10-06): cinco evaluadores más. FORMATO_11_SOLO_ACH sigue mientras el catálogo de Dev la tenga activa.
+            var esperados = Semilla.Select(s => s.codigo).Concat(Dn05Aceptacion.CodigosNuevos);
+            Assert.Equal(esperados.OrderBy(c => c, StringComparer.Ordinal), unos.Select(e => e.Codigo).OrderBy(c => c, StringComparer.Ordinal));
             Assert.Empty(unos.Intersect(ReglasDeRegistro.Evaluadores()));
             Assert.Equal(EstadosPorReglas.CodigoAutorizacion, ReglasDeRegistro.AutorizacionCorreoPlan);
             Assert.All(unos, e => Assert.Throws<ArgumentNullException>(() => e.Evaluar(null)));
