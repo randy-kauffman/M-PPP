@@ -388,6 +388,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(@"{""letras"":""true""}")]
         [InlineData(@"{""letras"":true,""tildes"":true}")] // clave desconocida: no se ignora en silencio
         [InlineData(@"{""letras"":null}")]
+        [InlineData(@"{""letras"":true,""digitos"":null}")] // el nulo solo: no lo tapa un "todo en false"
         public void La_estructura_con_caracteres_mal_cargados_es_FormatException(string caracteres)
         {
             Assert.Throws<FormatException>(() => ConfiguracionPlantilla.DesdeJson(EstructuraJson(caracteres)));
@@ -842,6 +843,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData("\u2800")] // braille en blanco
         [InlineData("\uFE0F")] // selector de variación
         [InlineData("\u0301")] // marca combinante (Mn): la tilde de una "é" descompuesta
+        [InlineData("\U000E0100")] // selector de variación fuera del plano básico: un par sustituto válido que no se ve
         public void Los_caracteres_que_no_se_ven_se_nombran_como_invisibles(string invisible)
         {
             // Revisión DN-05, hallazgo 7: relleno, braille en blanco, selectores de variación y marcas combinantes (Mn, Me)
