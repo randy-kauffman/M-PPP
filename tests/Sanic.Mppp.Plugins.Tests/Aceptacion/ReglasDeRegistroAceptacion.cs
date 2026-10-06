@@ -84,7 +84,11 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 ListasPlantilla.DesdeJson(ParametrosDePlantillaAceptacion.ListasValidas),
                 ObligatoriedadPlantilla.DesdeJson(obligatoriedad),
                 Planes(),
-                new[] { Plan42, Plan06 });
+                new[] { Plan42, Plan06 },
+                // DN-05: con los dos parámetros nuevos, porque las pruebas que recorren TODOS los evaluadores incluyen los
+                // cinco nuevos, y sin parámetro esos lanzan (error de configuración, Dn05Aceptacion).
+                formatos: FormatosDelPlan.DesdeJson(Dn05Aceptacion.FormatosDn05),
+                largosDeCuenta: LargosDeCuenta.DesdeJson(Dn05Aceptacion.LargosDn05));
         }
 
         /// <summary>Una fila buena (Inclusion · ACH · plan 0042, formato 11, USD) con los cambios que pida cada prueba. Un valor nulo = la celda no vino.</summary>

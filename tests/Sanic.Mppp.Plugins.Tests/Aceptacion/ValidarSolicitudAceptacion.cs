@@ -296,14 +296,14 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [Fact]
         public void Los_catalogos_se_cargan_una_vez_por_ejecucion_nunca_una_consulta_por_fila()
         {
-            var filas = Enumerable.Range(0, 30).Select(i => Fila(cuenta: (100000 + i).ToString())).ToArray();
+            var filas = Enumerable.Range(0, 30).Select(i => Fila(cuenta: (100000000 + i).ToString()) /* 9 dígitos: el mínimo de BAC (DN-05) */).ToArray();
             var m = new Mundo(Excel(filas));
 
             var r = m.Correr();
 
             Assert.Equal(30, r.FilasValidas);
             var consultas = m.Svc.Llamadas.Count(l => l.Operacion == "RetrieveMultiple");
-            Assert.InRange(consultas, 1, 12); // 4 parámetros + 2 niveles de reglas + planes + autorizaciones (hasta 4)
+            Assert.InRange(consultas, 1, 14); // 6 parámetros (DN-05 sumó 2) + 2 niveles de reglas + planes + autorizaciones (hasta 4)
             Assert.Equal(30, m.Svc.Llamadas.Count(l => l.Operacion == "Create" && l.Entidad == TablasHistorico.Fila));
             Assert.All(m.Filas(), f => Assert.StartsWith("MPPP-00000123-F", (string)f["sanic_nombre"]));
         }
@@ -506,6 +506,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             m.Parametro(ValidarSolicitud.ParametroListas, ParametrosDePlantillaAceptacion.ListasValidas);
             m.Parametro(ValidarSolicitud.ParametroObligatoriedad, ParametrosDePlantillaAceptacion.ObligatoriedadInicial);
             m.Parametro(ValidarSolicitud.ParametroLimites, @"{""maximoBytesComprimido"":1048576,""maximoBytesDescomprimido"":3145728}");
+            m.Parametro(ValidarSolicitud.ParametroFormatos, Dn05Aceptacion.FormatosDn05);
+            m.Parametro(ValidarSolicitud.ParametroLargosDeCuenta, Dn05Aceptacion.LargosDn05);
 
             m.Correr();
 
