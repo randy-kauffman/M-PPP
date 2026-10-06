@@ -265,6 +265,8 @@ namespace Sanic.Mppp.Plugins.Validacion
                 LargoMinimo = campo.LargoMinimo,
                 LargoMaximo = campo.LargoMaximo,
                 Formato = campo.Formato,
+                // Inmutable (CaracteresPermitidos no tiene setters ni listas mutables): se comparte la instancia, no hace falta copiarla.
+                Caracteres = campo.Caracteres,
             };
         }
 
@@ -388,7 +390,19 @@ namespace Sanic.Mppp.Plugins.Validacion
         /// el plan existe, el catálogo trae <see cref="CatalogosDeValidacion.Formatos"/> y su formato admite UNA sola
         /// clasificación, es esa. En cualquier otro caso, nulo. Nunca lanza. FIRMA DEL ARQUITECTO.
         /// </summary>
-        public Clasificacion? ClasificacionEfectiva => throw new NotImplementedException();
+        public Clasificacion? ClasificacionEfectiva
+        {
+            get
+            {
+                if (Recibido(CamposDeFila.Clasificacion).Length > 0)
+                {
+                    return Clasificacion;
+                }
+
+                var admitidas = ReglasDeSuFormato()?.Clasificaciones;
+                return admitidas != null && admitidas.Count == 1 ? admitidas[0] : (Clasificacion?)null;
+            }
+        }
 
         /// <summary>
         /// DN-05 (decisión 10): el banco que se GUARDA, el que mira OBLIGATORIEDAD y contra el que mide CUENTA_DEL_BANCO.
@@ -396,7 +410,31 @@ namespace Sanic.Mppp.Plugins.Validacion
         /// vacío = BAC). Si el formato no restringe bancos (lista nula), un Banco vacío queda nulo. Nunca lanza.
         /// FIRMA DEL ARQUITECTO.
         /// </summary>
-        public Banco? BancoEfectivo => throw new NotImplementedException();
+        public Banco? BancoEfectivo
+        {
+            get
+            {
+                if (Recibido(CamposDeFila.Banco).Length > 0)
+                {
+                    return Banco;
+                }
+
+                var admitidos = ReglasDeSuFormato()?.Bancos;
+                return admitidos != null && admitidos.Count == 1 ? admitidos[0] : (Banco?)null;
+            }
+        }
+
+        /// <summary>DN-05: lo que admite el formato del plan de la fila, o nulo si no hay plan o el catálogo no trae `plan.formatos`.
+        /// Nunca lanza (el plan del catálogo siempre trae uno de los tres formatos que el parámetro exige completos).</summary>
+        private ReglasDelFormato ReglasDeSuFormato()
+        {
+            var plan = Plan;
+            return plan == null ? null : Catalogos.Formatos?.Para(plan.TipoFormato);
+        }
+
+        /// <summary>DN-05 (decisión 3): el plan es formato 11 Y la gestión es Inclusión, el único caso en que la referencia se
+        /// ARMA. Con la gestión vacía o inválida (nulo) no se arma nada: esa fila ya la rechazan LISTAS_VALIDAS u OBLIGATORIEDAD.</summary>
+        internal bool ArmaLaReferencia => Plan?.TipoFormato == TipoDeFormatoDelPlan._11 && Gestion == Dominio.Gestion.Inclusion;
 
         /// <summary>El código de 3 dígitos del banco de la fila (de `plantilla.listas`), o nulo si el banco vino vacío o no es válido.</summary>
         public string CodigoDeBanco => Catalogos.Listas.Resolver(CamposDeFila.Banco, Recibido(CamposDeFila.Banco))?.CodigoDeBanco;
@@ -447,15 +485,15 @@ namespace Sanic.Mppp.Plugins.Validacion
 
         /// <summary>
         /// La referencia de formato 11 (D-17): código de banco (3) + cuenta rellena con ceros A LA IZQUIERDA hasta 17 = 20
-        /// exactos. Nulo si el plan no es formato 11 (o no hay plan), si no hay código de banco, o si la cuenta viene vacía,
-        /// tiene más de 17 caracteres o trae algo que no sea 0-9 ASCII.
+        /// exactos. DN-05 (decisión 3): SOLO en una Inclusión. Nulo si el plan no es formato 11 (o no hay plan), si la gestión no es
+        /// Inclusión (Exclusión, Modificación, vacía o inválida), si no hay código de banco, o si la cuenta viene vacía, tiene más
+        /// de 17 caracteres o trae algo que no sea 0-9 ASCII.
         /// </summary>
         public string ReferenciaConstruida
         {
             get
             {
-                var plan = Plan;
-                if (plan == null || plan.TipoFormato != TipoDeFormatoDelPlan._11)
+                if (!ArmaLaReferencia)
                 {
                     return null;
                 }
@@ -485,8 +523,9 @@ namespace Sanic.Mppp.Plugins.Validacion
         }
 
         /// <summary>
-        /// `sanic_referencia`, la que rige. Formato 11: la construida, sin mirar la recibida (DD-10). Formatos 06 y 10: la
-        /// recibida sin espacios a los lados, aunque quede vacía (DD-15). Sin plan: nulo.
+        /// `sanic_referencia`, la que rige. DN-05: formato 11 en Inclusión, la construida, sin mirar la recibida (DD-10); en
+        /// cualquier otro caso (Exclusión, Modificación, formatos 06 y 10), la recibida sin espacios a los lados, aunque quede
+        /// vacía (DD-15). Sin plan: nulo.
         /// </summary>
         public string ReferenciaQueRige
         {
@@ -498,7 +537,7 @@ namespace Sanic.Mppp.Plugins.Validacion
                     return null;
                 }
 
-                return plan.TipoFormato == TipoDeFormatoDelPlan._11 ? ReferenciaConstruida : Recibido(CamposDeFila.Referencia);
+                return ArmaLaReferencia ? ReferenciaConstruida : Recibido(CamposDeFila.Referencia);
             }
         }
 
@@ -512,7 +551,7 @@ namespace Sanic.Mppp.Plugins.Validacion
     }
 
     /// <summary>
-    /// Los evaluadores de las ocho reglas semilla de nivel Registro (diseno/03 §1 paso 5; D-17, D-18 y D-19). Son lectores de
+    /// Los evaluadores de las ocho reglas semilla de nivel Registro (diseno/03 §1 paso 5; D-17, D-18 y D-19) y de las cinco de DN-05. Son lectores de
     /// <see cref="FilaEnValidacion"/>. El catálogo es editable: un evaluador al que le sacaron una dependencia no da por bueno
     /// lo que no puede comprobar. Ningún mensaje cita la cuenta ni la identificación (datos sensibles, DD-08); lo que se cita
     /// del cliente pasa por <see cref="MensajeAlCliente.Citar"/>; los campos se nombran por su encabezado en la plantilla.
@@ -549,6 +588,11 @@ namespace Sanic.Mppp.Plugins.Validacion
                 new EvaluadorReferenciaFormato11(),
                 new EvaluadorMonedaDelPlan(),
                 new EvaluadorAutorizacionCorreoPlan(),
+                new EvaluadorClasificacionDelFormato(),
+                new EvaluadorGestionDelFormato(),
+                new EvaluadorBancoDelFormato(),
+                new EvaluadorCaracteresPermitidos(),
+                new EvaluadorCuentaDelBanco(),
             };
         }
 
@@ -759,7 +803,8 @@ namespace Sanic.Mppp.Plugins.Validacion
                     throw new ArgumentNullException(nameof(fila));
                 }
 
-                var opcionales = fila.Catalogos.Obligatoriedad.CamposOpcionales(fila.Gestion, fila.Clasificacion, fila.Plan?.TipoFormato);
+                // DN-05: la clasificación EFECTIVA (la que se completó sola, si el formato admite una) y el banco efectivo.
+                var opcionales = fila.Catalogos.Obligatoriedad.CamposOpcionales(fila.Gestion, fila.ClasificacionEfectiva, fila.Plan?.TipoFormato);
                 var faltantes = new List<string>();
 
                 foreach (var campo in CamposDeFila.Todos())
@@ -793,13 +838,13 @@ namespace Sanic.Mppp.Plugins.Validacion
                     case CamposDeFila.Gestion:
                         return fila.Gestion == null;
                     case CamposDeFila.Clasificacion:
-                        return fila.Clasificacion == null;
+                        return fila.ClasificacionEfectiva == null;
                     case CamposDeFila.TipoIdentificacion:
                         return fila.TipoIdentificacion == null;
                     case CamposDeFila.Moneda:
                         return fila.Moneda == null;
                     case CamposDeFila.Banco:
-                        return fila.Banco == null;
+                        return fila.BancoEfectivo == null;
                     default:
                         // CamposDeLista solo trae los cinco de arriba (CamposDeFila.DeLista()): no hay otro caso posible.
                         throw new InvalidOperationException($"'{campo}' no es un campo de lista.");
@@ -807,8 +852,10 @@ namespace Sanic.Mppp.Plugins.Validacion
             }
         }
 
-        /// <summary>`REFERENCIA_FORMATO_11` (D-17): en planes formato 11, se cumple si <see cref="FilaEnValidacion.ReferenciaConstruida"/>
-        /// se pudo armar. En los otros formatos siempre se cumple (DD-15: no deriva nada). El mensaje nunca cita la cuenta.</summary>
+        /// <summary>`REFERENCIA_FORMATO_11` (D-17): en una INCLUSIÓN de formato 11 (DN-05, decisión 3), se cumple si
+        /// <see cref="FilaEnValidacion.ReferenciaConstruida"/> se pudo armar. En cualquier otro caso (Exclusión, Modificación,
+        /// gestión vacía o inválida, otros formatos) siempre se cumple: no deriva nada (DD-15), rige la referencia recibida. El
+        /// mensaje nunca cita la cuenta.</summary>
         private sealed class EvaluadorReferenciaFormato11 : IEvaluador<FilaEnValidacion>
         {
             public string Codigo => ReferenciaFormato11;
@@ -826,7 +873,7 @@ namespace Sanic.Mppp.Plugins.Validacion
                     return Veredicto.NoCumplida("No se puede armar la referencia porque el plan no existe.");
                 }
 
-                if (plan.TipoFormato != TipoDeFormatoDelPlan._11 || fila.ReferenciaConstruida != null)
+                if (!fila.ArmaLaReferencia || fila.ReferenciaConstruida != null)
                 {
                     return Veredicto.Cumplida();
                 }
@@ -904,6 +951,321 @@ namespace Sanic.Mppp.Plugins.Validacion
 
                 var marcadores = new Dictionary<string, string> { ["plan"] = plan.Codigo };
                 return Veredicto.NoCumplida($"Su correo no está autorizado sobre el plan {plan.Codigo}.", marcadores, null);
+            }
+        }
+
+        // ================================================================== DN-05 (aprobador, 2026-10-06)
+
+        /// <summary>El `plan.formatos` del catálogo, o error de configuración: una regla ACTIVA que lo necesita y no lo
+        /// encuentra no da por buena una fila que no pudo comprobar (falla cerrado, DN-05 §B).</summary>
+        private static FormatosDelPlan FormatosObligatorios(FilaEnValidacion fila)
+        {
+            return fila.Catalogos.Formatos ?? throw new InvalidOperationException(
+                $"Falta el parámetro '{FormatosDelPlan.NombreParametro}' en el catálogo de validación: no se puede comprobar lo que admite el formato del plan.");
+        }
+
+        /// <summary>Los valores de una lista, para nombrarlos al cliente: "BAC", "BAC o CK", "BAC, CK o ACH".</summary>
+        private static string Enumerar<T>(IReadOnlyList<T> valores)
+        {
+            var textos = valores.Select(v => v.ToString()).ToList();
+            return textos.Count == 1 ? textos[0] : string.Join(", ", textos.Take(textos.Count - 1)) + " o " + textos[textos.Count - 1];
+        }
+
+        /// <summary>
+        /// `CLASIFICACION_DEL_FORMATO` (DN-05, decisiones 5 y 10 del aprobador): REEMPLAZA a `FORMATO_11_SOLO_ACH`, que era su
+        /// caso particular. La clasificación recibida tiene que estar entre las que `plan.formatos` admite para el formato del
+        /// plan. Vacía cumple: que sea obligatoria lo decide OBLIGATORIEDAD, y que se complete sola lo hace
+        /// <see cref="FilaEnValidacion.ClasificacionEfectiva"/>. Con un valor que no es de la lista (nulo), no se da por buena.
+        /// </summary>
+        private sealed class EvaluadorClasificacionDelFormato : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => ClasificacionDelFormato;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var formatos = FormatosObligatorios(fila);
+                var plan = fila.Plan;
+                if (plan == null)
+                {
+                    return Veredicto.NoCumplida("No se puede comprobar el formato del plan porque el plan no existe.");
+                }
+
+                if (fila.Recibido(CamposDeFila.Clasificacion).Length == 0)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var admitidas = formatos.Para(plan.TipoFormato).Clasificaciones;
+                var clasificacion = fila.Clasificacion;
+                if (clasificacion.HasValue && admitidas.Contains(clasificacion.Value))
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var marcadores = new Dictionary<string, string> { ["plan"] = plan.Codigo };
+                return Veredicto.NoCumplida($"El plan {plan.Codigo} solo admite la clasificación {Enumerar(admitidas)}.", marcadores, null);
+            }
+        }
+
+        /// <summary>
+        /// `GESTION_DEL_FORMATO` (DN-05, decisión 4): la gestión tiene que estar entre las que `plan.formatos` admite para el
+        /// formato del plan (el 11 no admite Modificación). Vacía cumple (es de OBLIGATORIEDAD). Una gestión que no es de la
+        /// lista de gestiones (nulo) no se da por buena; la cita sale de <see cref="MensajeAlCliente.Citar"/> porque lo
+        /// escribió el cliente.
+        /// </summary>
+        private sealed class EvaluadorGestionDelFormato : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => GestionDelFormato;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var formatos = FormatosObligatorios(fila);
+                var plan = fila.Plan;
+                if (plan == null)
+                {
+                    return Veredicto.NoCumplida("No se puede comprobar el formato del plan porque el plan no existe.");
+                }
+
+                if (fila.Recibido(CamposDeFila.Gestion).Length == 0)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var gestion = fila.Gestion;
+                if (gestion.HasValue && formatos.Para(plan.TipoFormato).Gestiones.Contains(gestion.Value))
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var nombre = gestion.HasValue ? gestion.Value.ToString() : MensajeAlCliente.Citar(fila.Recibido(CamposDeFila.Gestion));
+                var marcadores = new Dictionary<string, string> { ["plan"] = plan.Codigo, ["gestion"] = nombre };
+                return Veredicto.NoCumplida($"El plan {plan.Codigo} no admite la gestión {nombre}.", marcadores, null);
+            }
+        }
+
+        /// <summary>
+        /// `BANCO_DEL_FORMATO` (DN-05, decisión 10): igual que la de clasificación, con los bancos. Vacío cumple (es de
+        /// OBLIGATORIEDAD; <see cref="FilaEnValidacion.BancoEfectivo"/> completa el único posible). Sin `bancos` en el formato,
+        /// sirve cualquier banco de `plantilla.listas`; uno que no está en esa lista (nulo) no se da por bueno.
+        /// </summary>
+        private sealed class EvaluadorBancoDelFormato : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => BancoDelFormato;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var formatos = FormatosObligatorios(fila);
+                var plan = fila.Plan;
+                if (plan == null)
+                {
+                    return Veredicto.NoCumplida("No se puede comprobar el formato del plan porque el plan no existe.");
+                }
+
+                if (fila.Recibido(CamposDeFila.Banco).Length == 0)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var admitidos = formatos.Para(plan.TipoFormato).Bancos;
+                var banco = fila.Banco;
+                if (banco.HasValue && (admitidos == null || admitidos.Contains(banco.Value)))
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var marcadores = new Dictionary<string, string> { ["plan"] = plan.Codigo };
+                var texto = admitidos == null
+                    ? $"El plan {plan.Codigo} no admite el banco indicado."
+                    : $"El plan {plan.Codigo} solo admite cuentas de {Enumerar(admitidos)}.";
+                return Veredicto.NoCumplida(texto, marcadores, null);
+            }
+        }
+
+        /// <summary>
+        /// `CARACTERES_PERMITIDOS` (DN-05, decisión 7, escenario 21): cada campo cuya estructura trae `caracteres` solo puede
+        /// llevar esos caracteres. Se mide sobre lo recibido (recortado); vacío o sin `caracteres` no se revisa. El mensaje nombra
+        /// los caracteres prohibidos de cada campo, en orden de primera aparición, sin repetir (se deduplica por el texto que se
+        /// MUESTRA), a lo sumo <see cref="MaximoDeCaracteresPorCampo"/> y después "…"; nunca el valor (D-41, DD-08). Un carácter
+        /// que no se puede mostrar se nombra, no se muestra. Una sola pasada por cada valor, que se corta al juntar uno más del
+        /// tope: el costo queda atado al largo del valor y nunca a lo que traiga.
+        /// </summary>
+        private sealed class EvaluadorCaracteresPermitidos : IEvaluador<FilaEnValidacion>
+        {
+            private const int MaximoDeCaracteresPorCampo = 10;
+            private const string Espacio = "(espacio)";
+            private const string Invisible = "(carácter invisible)";
+
+            public string Codigo => CaracteresPermitidos;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var encabezados = new List<string>();
+                var partes = new List<string>();
+
+                foreach (var campo in CamposDeFila.Todos())
+                {
+                    var permitidos = fila.Catalogos.Campo(campo).Caracteres;
+                    if (permitidos == null)
+                    {
+                        continue;
+                    }
+
+                    var recibido = fila.Recibido(campo);
+                    if (recibido.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    var prohibidos = Prohibidos(recibido, permitidos, out var hayMas);
+                    if (prohibidos.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var encabezado = fila.Encabezado(campo);
+                    encabezados.Add(encabezado);
+                    partes.Add($"{encabezado} ({string.Join(" ", prohibidos)}{(hayMas ? " …" : string.Empty)})");
+                }
+
+                if (partes.Count == 0)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var marcadores = new Dictionary<string, string> { ["campo"] = string.Join(", ", encabezados) };
+                return Veredicto.NoCumplida($"Caracteres no permitidos: {string.Join("; ", partes)}.", marcadores, null);
+            }
+
+            /// <summary>Cómo se muestran los caracteres prohibidos de un valor: hasta el tope, sin repetir. <paramref name="hayMas"/>
+            /// si había al menos uno más (distinto) que no entró.</summary>
+            private static List<string> Prohibidos(string valor, CaracteresPermitidos permitidos, out bool hayMas)
+            {
+                var mostrados = new List<string>();
+                var vistos = new HashSet<string>(StringComparer.Ordinal);
+                hayMas = false;
+
+                for (var i = 0; i < valor.Length; i++)
+                {
+                    var c = valor[i];
+                    string texto;
+                    if (char.IsHighSurrogate(c) && i + 1 < valor.Length && char.IsLowSurrogate(valor[i + 1]))
+                    {
+                        // Un par sustituto válido es UN carácter (un emoji): se revisa y se muestra entero, nunca por mitades.
+                        var baja = valor[i + 1];
+                        i++;
+                        if (permitidos.Permite(c) && permitidos.Permite(baja))
+                        {
+                            continue;
+                        }
+
+                        texto = new string(new[] { c, baja });
+                    }
+                    else
+                    {
+                        if (permitidos.Permite(c))
+                        {
+                            continue;
+                        }
+
+                        texto = Mostrar(c);
+                    }
+
+                    if (!vistos.Add(texto))
+                    {
+                        continue;
+                    }
+
+                    if (mostrados.Count == MaximoDeCaracteresPorCampo)
+                    {
+                        hayMas = true;
+                        break;
+                    }
+
+                    mostrados.Add(texto);
+                }
+
+                return mostrados;
+            }
+
+            /// <summary>El texto con el que se nombra un carácter prohibido (no sustituto válido): el espacio común, "(espacio)";
+            /// control, formato (Cf), cualquier otro espacio en blanco y sustituto suelto, "(carácter invisible)"; el resto, él mismo.</summary>
+            private static string Mostrar(char c)
+            {
+                if (c == ' ')
+                {
+                    return Espacio;
+                }
+
+                if (char.IsControl(c) || char.IsWhiteSpace(c) || char.IsSurrogate(c)
+                    || System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format)
+                {
+                    return Invisible;
+                }
+
+                return c.ToString();
+            }
+        }
+
+        /// <summary>
+        /// `CUENTA_DEL_BANCO` (DN-05, decisión 8, escenario 20): el largo de la cuenta (recibida, sin espacios a los lados,
+        /// CON los ceros a la izquierda) tiene que estar en el rango de `cuenta.largos` del banco efectivo
+        /// (<see cref="FilaEnValidacion.BancoEfectivo"/>); sin banco efectivo, el `porDefecto`. Cuenta vacía cumple (es de
+        /// OBLIGATORIEDAD); que sean solo dígitos es de CARACTERES_PERMITIDOS. El mensaje no cita el largo ni la cuenta (D-41).
+        /// </summary>
+        private sealed class EvaluadorCuentaDelBanco : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => CuentaDelBanco;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var largos = fila.Catalogos.LargosDeCuenta ?? throw new InvalidOperationException(
+                    $"Falta el parámetro '{LargosDeCuenta.NombreParametro}' en el catálogo de validación: no se puede comprobar el largo de la cuenta.");
+
+                var cuenta = fila.Recibido(CamposDeFila.NumeroCuenta);
+                if (cuenta.Length == 0)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var banco = fila.BancoEfectivo;
+                var rango = largos.Para(banco);
+                if (cuenta.Length >= rango.Minimo && cuenta.Length <= rango.Maximo)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                if (banco == null)
+                {
+                    return Veredicto.NoCumplida("El largo de la cuenta no es válido.");
+                }
+
+                var marcadores = new Dictionary<string, string> { ["banco"] = banco.Value.ToString() };
+                return Veredicto.NoCumplida($"El largo de la cuenta no corresponde al banco {banco.Value}.", marcadores, null);
             }
         }
     }

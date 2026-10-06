@@ -42,9 +42,9 @@ namespace Sanic.Mppp.Plugins.Api
     /// El plugin grande: abre la plantilla y valida la Solicitud entera (diseno/03 §1), sin el envoltorio `IPlugin` (que es
     /// <see cref="ValidarSolicitudApi"/>). Contrato (lo fijan las pruebas `ValidarSolicitudAceptacion`):
     ///  1. lee la Solicitud; si no está en Ingresada → `YaProcesada`, con los contadores y el estado ya guardados, sin tocar nada;
-    ///  2. carga UNA vez los parámetros `plantilla.estructura`, `plantilla.listas`, `plantilla.obligatoriedad` y `lectura.limites`
-    ///     (la versión activa más alta de cada uno); un parámetro que falta o está mal cargado es un error REAL, no una regla
-    ///     fallida: sin él no se puede validar nada. `sanic_versionparametros` queda como `estructura=2;listas=3;obligatoriedad=1`
+    ///  2. carga UNA vez los parámetros `plantilla.estructura`, `plantilla.listas`, `plantilla.obligatoriedad`, `lectura.limites` y,
+    ///     desde DN-05, `plan.formatos` y `cuenta.largos` (la versión activa más alta de cada uno); un parámetro que falta o está mal cargado es un error REAL, no una regla
+    ///     fallida: sin él no se puede validar nada. `sanic_versionparametros` queda como `estructura=2;listas=3;obligatoriedad=1;formatos=1;largos=1`
     ///     (en ese orden, con la versión de cada uno; `lectura.limites` no va: no cambia cómo se valida, solo cuánto se lee);
     ///  3. evalúa las reglas de nivel Solicitud con <see cref="ReglasDelSobre"/> y guarda un `ResultadoRegla` por cada una. El
     ///     Excel se abre UNA sola vez y solo si alguna regla lo necesita (el sobre corta antes si no hay adjunto);
@@ -116,22 +116,28 @@ namespace Sanic.Mppp.Plugins.Api
                     string.Format(CultureInfo.InvariantCulture, "Solicitud {0}: ya procesada (estado {1}).", solicitud.Numero, solicitud.Estado));
             }
 
-            // Paso 2 (diseno/03 §1 paso 3): los 4 parámetros, versión activa más alta. El que falta es un error REAL
+            // Paso 2 (diseno/03 §1 paso 3): los parámetros (4 de siempre y 2 de DN-05), versión activa más alta. El que falta es un error REAL
             // (no una regla fallida) cuyo mensaje nombra el parámetro.
             var pEstructura = ParametroObligatorio(ParametroEstructura);
             var pListas = ParametroObligatorio(ParametroListas);
             var pObligatoriedad = ParametroObligatorio(ParametroObligatoriedad);
             var pLimites = ParametroObligatorio(ParametroLimites);
+            // DN-05: `plan.formatos` y `cuenta.largos` son obligatorios igual que los de arriba. Si faltan, sin ellos no se
+            // puede validar nada (error real que nombra el parámetro, no una regla fallida).
+            var pFormatos = ParametroObligatorio(ParametroFormatos);
+            var pLargos = ParametroObligatorio(ParametroLargosDeCuenta);
 
             var estructura = ConfiguracionPlantilla.DesdeJson(pEstructura.Valor);
             var listas = ListasPlantilla.DesdeJson(pListas.Valor);
             var obligatoriedad = ObligatoriedadPlantilla.DesdeJson(pObligatoriedad.Valor);
             var limites = LimitesLectura.DesdeJson(pLimites.Valor);
+            var formatos = FormatosDelPlan.DesdeJson(pFormatos.Valor);
+            var largosDeCuenta = LargosDeCuenta.DesdeJson(pLargos.Valor);
 
             // `lectura.limites` no entra en sanic_versionparametros: no cambia cómo se valida, solo cuánto se lee (diseno/03 §1 paso 3).
             var versionParametros = string.Format(
-                CultureInfo.InvariantCulture, "estructura={0};listas={1};obligatoriedad={2}",
-                pEstructura.Version, pListas.Version, pObligatoriedad.Version);
+                CultureInfo.InvariantCulture, "estructura={0};listas={1};obligatoriedad={2};formatos={3};largos={4}",
+                pEstructura.Version, pListas.Version, pObligatoriedad.Version, pFormatos.Version, pLargos.Version);
 
             // Paso 3 (diseno/03 §1 pasos 2 y 4): el sobre, con la plantilla leída A DEMANDA y una sola vez.
             var lector = _lector(limites) ?? throw new InvalidOperationException("La fábrica de lector de plantilla devolvió nulo.");
@@ -155,7 +161,7 @@ namespace Sanic.Mppp.Plugins.Api
 
             if (sobreDejaSeguir)
             {
-                clienteConFilasPorDigitar = ProcesarFilas(sobre, estructura, listas, obligatoriedad, solicitud.Numero, solicitud.Remitente, ahoraUtc, filasParaGuardar, filasParaRespuesta, estadosDeFilas);
+                clienteConFilasPorDigitar = ProcesarFilas(sobre, estructura, listas, obligatoriedad, formatos, largosDeCuenta, solicitud.Numero, solicitud.Remitente, ahoraUtc, filasParaGuardar, filasParaRespuesta, estadosDeFilas);
             }
 
             var estadoFinal = EstadosPorReglas.DeLaSolicitud(resultadosSolicitud, estadosDeFilas);
@@ -245,7 +251,7 @@ namespace Sanic.Mppp.Plugins.Api
         /// </summary>
         private Guid? ProcesarFilas(
             SobreEnValidacion sobre, ConfiguracionPlantilla estructura, ListasPlantilla listas, ObligatoriedadPlantilla obligatoriedad,
-            string numeroDeSolicitud, string remitente, DateTime ahoraUtc,
+            FormatosDelPlan formatos, LargosDeCuenta largosDeCuenta, string numeroDeSolicitud, string remitente, DateTime ahoraUtc,
             List<FilaParaGuardar> filasParaGuardar, List<FilaParaRespuesta> filasParaRespuesta, List<EstadoDeLaFila> estadosDeFilas)
         {
             var filasDeLaVentana = sobre.Lectura.Filas;
@@ -265,7 +271,7 @@ namespace Sanic.Mppp.Plugins.Api
 
             var planesActivos = _catalogos.PlanesActivosPorCodigo(codigosDePlan);
             var planesAutorizados = _catalogos.PlanesAutorizadosDe(remitente);
-            var catalogos = new CatalogosDeValidacion(estructura, listas, obligatoriedad, planesActivos, planesAutorizados);
+            var catalogos = new CatalogosDeValidacion(estructura, listas, obligatoriedad, planesActivos, planesAutorizados, formatos: formatos, largosDeCuenta: largosDeCuenta);
 
             var reglasRegistro = _catalogos.ReglasActivasConId(NivelDeLaRegla.Registro);
             var definicionesRegistro = reglasRegistro.Select(r => r.Definicion).ToList();
@@ -298,10 +304,11 @@ namespace Sanic.Mppp.Plugins.Api
                     // Solicitud por cada fila del Create (03 §1 paso 6, "nunca una consulta por fila").
                     Nombre = NombreCalculado.DeFila(numeroDeSolicitud, fila.NumeroFila),
                     Gestion = fila.Gestion,
-                    Clasificacion = fila.Clasificacion,
+                    // DN-05: lo que se guarda es lo EFECTIVO (la clasificación y el banco que el formato del plan completó solos).
+                    Clasificacion = fila.ClasificacionEfectiva,
                     Moneda = fila.Moneda,
                     TipoIdentificacion = fila.TipoIdentificacion,
-                    Banco = fila.Banco,
+                    Banco = fila.BancoEfectivo,
                     NumeroPlan = numeroPlan,
                     PlanId = fila.Plan?.Id,
                     NombreBeneficiario = fila.Recibido(CamposDeFila.NombreBeneficiario),

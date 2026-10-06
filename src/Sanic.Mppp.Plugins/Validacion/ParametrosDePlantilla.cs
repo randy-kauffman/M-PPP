@@ -307,7 +307,7 @@ namespace Sanic.Mppp.Plugins.Validacion
     /// `reglas`. `DataContractJsonSerializer` no puede leer `porGestion` como `Dictionary&lt;string,T&gt;` (lo serializa como
     /// arreglo Key/Value, no como el objeto plano `{"Exclusion":{...}}` que pide esta forma): se lee con el mismo parser JSON
     /// manual, chico y a propósito, que <see cref="Dominio.CatalogoDeCodigosRpa"/> ya usa para `rpa.codigos` por el mismo
-    /// motivo (ver <see cref="AnalizadorJson"/> más abajo); el resto del parámetro sigue leyéndose con
+    /// motivo (ver <see cref="AnalizadorJson"/>, extraído a su propio archivo en DN-05); el resto del parámetro sigue leyéndose con
     /// `DataContractJsonSerializer`, sin tocarlo.</para>
     /// </summary>
     public sealed class ObligatoriedadPlantilla
@@ -403,7 +403,7 @@ namespace Sanic.Mppp.Plugins.Validacion
         }
 
         /// <summary>
-        /// DN-03: lee `porGestion` con el parser manual de <see cref="AnalizadorJson"/> (ver el comentario de la clase). Vacío
+        /// DN-03: lee `porGestion` con el parser manual de <see cref="AnalizadorJson"/> (ver el comentario de esa clase). Vacío
         /// (diccionario sin entradas) si `porGestion` falta o es JSON `null`: es la forma en la que se siembra el parámetro
         /// hasta que el negocio diga qué aflojar en cada gestión, y se comporta EXACTAMENTE como si no existiera.
         /// </summary>
@@ -414,7 +414,7 @@ namespace Sanic.Mppp.Plugins.Validacion
             // El documento ya es válido (DataContractJsonSerializer lo aceptó más arriba): este parser solo lo
             // recorre de nuevo para reconstruir 'porGestion'. Si igual revienta, es un problema real de este parser
             // (Falla() ya deja el motivo claro), no un documento mal cargado por segunda vez.
-            object documento = AnalizadorJson.Leer(json);
+            object documento = AnalizadorJson.Leer(json, "El parámetro de obligatoriedad de la plantilla trae 'porGestion' con un problema de JSON");
 
             if (!(documento is IDictionary<string, object> raiz) || !raiz.TryGetValue("porGestion", out object crudo) || crudo == null)
                 return resultado;
@@ -596,231 +596,6 @@ namespace Sanic.Mppp.Plugins.Validacion
             public ISet<string> Opcionales { get; }
 
             public ISet<string> Obligatorios { get; }
-        }
-
-        /// <summary>
-        /// Parser JSON manual, genérico (objetos, arreglos, cadenas y el literal `null`, anidados a cualquier profundidad) y
-        /// deliberadamente chico, del mismo espíritu que <see cref="Dominio.CatalogoDeCodigosRpa"/>: ese ya resolvió el mismo
-        /// problema para `rpa.codigos` (`DataContractJsonSerializer` serializa un `Dictionary&lt;string,T&gt;` como un
-        /// arreglo de pares clave/valor, no como el objeto plano `{"Exclusion":{...}}` que pide `porGestion`). Acá se repite
-        /// el mismo patrón en vez de inventar un tercero. No entiende números ni booleanos porque ninguna forma de
-        /// `plantilla.obligatoriedad` los usa; si aparecen donde se espera un objeto, un arreglo, una cadena o `null`, es
-        /// <see cref="FormatException"/>. No exige que el documento termine justo después del valor leído (a propósito: la
-        /// validez completa del documento ya la garantizó `DataContractJsonSerializer` más arriba en <see cref="DesdeJson"/>;
-        /// este parser solo necesita reconstruir la MISMA estructura para leer `porGestion`, no revalidar el documento entero).
-        /// </summary>
-        private static class AnalizadorJson
-        {
-            public static object Leer(string json)
-            {
-                var lector = new Lector(json);
-                lector.SaltarEspacios();
-                return lector.LeerValor();
-            }
-
-            private sealed class Lector
-            {
-                private readonly string _texto;
-                private int _pos;
-
-                public Lector(string texto)
-                {
-                    _texto = texto;
-                    _pos = 0;
-                }
-
-                public object LeerValor()
-                {
-                    SaltarEspacios();
-                    switch (MirarProximo())
-                    {
-                        case '{':
-                            return LeerObjeto();
-                        case '[':
-                            return LeerArreglo();
-                        case '"':
-                            return LeerCadena();
-                        case 'n':
-                            EsperarLiteral("null");
-                            return null;
-                        default:
-                            throw Falla("se esperaba un objeto, un arreglo, una cadena o 'null'");
-                    }
-                }
-
-                private IDictionary<string, object> LeerObjeto()
-                {
-                    Esperar('{');
-                    var resultado = new Dictionary<string, object>(StringComparer.Ordinal);
-                    SaltarEspacios();
-                    if (MirarProximo() == '}')
-                    {
-                        _pos++;
-                        return resultado;
-                    }
-
-                    while (true)
-                    {
-                        SaltarEspacios();
-                        var clave = LeerCadena();
-                        SaltarEspacios();
-                        Esperar(':');
-                        resultado[clave] = LeerValor();
-                        SaltarEspacios();
-                        var siguiente = LeerCaracter();
-                        if (siguiente == ',')
-                        {
-                            continue;
-                        }
-
-                        if (siguiente == '}')
-                        {
-                            break;
-                        }
-
-                        throw Falla("se esperaba ',' o '}' dentro de un objeto");
-                    }
-
-                    return resultado;
-                }
-
-                private IList<object> LeerArreglo()
-                {
-                    Esperar('[');
-                    var resultado = new List<object>();
-                    SaltarEspacios();
-                    if (MirarProximo() == ']')
-                    {
-                        _pos++;
-                        return resultado;
-                    }
-
-                    while (true)
-                    {
-                        resultado.Add(LeerValor());
-                        SaltarEspacios();
-                        var siguiente = LeerCaracter();
-                        if (siguiente == ',')
-                        {
-                            continue;
-                        }
-
-                        if (siguiente == ']')
-                        {
-                            break;
-                        }
-
-                        throw Falla("se esperaba ',' o ']' dentro de un arreglo");
-                    }
-
-                    return resultado;
-                }
-
-                private string LeerCadena()
-                {
-                    Esperar('"');
-                    var sb = new StringBuilder();
-                    while (true)
-                    {
-                        if (_pos >= _texto.Length)
-                        {
-                            throw Falla("cadena sin cerrar");
-                        }
-
-                        var c = _texto[_pos++];
-                        if (c == '"')
-                        {
-                            break;
-                        }
-
-                        if (c == '\\')
-                        {
-                            if (_pos >= _texto.Length)
-                            {
-                                throw Falla("escape incompleto");
-                            }
-
-                            var escape = _texto[_pos++];
-                            switch (escape)
-                            {
-                                case '"': sb.Append('"'); break;
-                                case '\\': sb.Append('\\'); break;
-                                case '/': sb.Append('/'); break;
-                                case 'b': sb.Append('\b'); break;
-                                case 'f': sb.Append('\f'); break;
-                                case 'n': sb.Append('\n'); break;
-                                case 'r': sb.Append('\r'); break;
-                                case 't': sb.Append('\t'); break;
-                                case 'u':
-                                    if (_pos + 4 > _texto.Length)
-                                    {
-                                        throw Falla("escape unicode incompleto");
-                                    }
-
-                                    var hex = _texto.Substring(_pos, 4);
-                                    _pos += 4;
-                                    sb.Append((char)int.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-                                    break;
-                                default:
-                                    throw Falla($"escape desconocido '\\{escape}'");
-                            }
-
-                            continue;
-                        }
-
-                        sb.Append(c);
-                    }
-
-                    return sb.ToString();
-                }
-
-                private void EsperarLiteral(string literal)
-                {
-                    foreach (char c in literal)
-                    {
-                        Esperar(c);
-                    }
-                }
-
-                private char MirarProximo()
-                {
-                    if (_pos >= _texto.Length)
-                    {
-                        throw Falla("fin de texto inesperado");
-                    }
-
-                    return _texto[_pos];
-                }
-
-                private char LeerCaracter()
-                {
-                    var c = MirarProximo();
-                    _pos++;
-                    return c;
-                }
-
-                private void Esperar(char esperado)
-                {
-                    var c = LeerCaracter();
-                    if (c != esperado)
-                    {
-                        throw Falla($"se esperaba '{esperado}' y vino '{c}'");
-                    }
-                }
-
-                public void SaltarEspacios()
-                {
-                    while (_pos < _texto.Length && char.IsWhiteSpace(_texto[_pos]))
-                    {
-                        _pos++;
-                    }
-                }
-
-                private FormatException Falla(string motivo)
-                {
-                    return new FormatException($"El parámetro de obligatoriedad de la plantilla trae 'porGestion' con un problema de JSON: {motivo}.");
-                }
-            }
         }
 
         [DataContract]

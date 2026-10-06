@@ -92,7 +92,8 @@ namespace Sanic.Mppp.Plugins.Plantilla
                         // por LectorOpenXml, donde el campo ya nace con un FormatoDeCampo? válido o nulo, nunca con un
                         // texto que interpretar). Un texto que no sea exactamente uno de los tres valores es
                         // FormatException (D-18b): una expresión mal escrita no puede tumbar ni aflojar la validación.
-                        Formato = ParsearFormato(campoDto.Nombre, campoDto.Formato)
+                        Formato = ParsearFormato(campoDto.Nombre, campoDto.Formato),
+                        Caracteres = ParsearCaracteres(campoDto.Nombre, campoDto.Caracteres)
                     });
                 }
             }
@@ -130,6 +131,33 @@ namespace Sanic.Mppp.Plugins.Plantilla
                     return FormatoDeCampo.Alfanumerico;
                 default:
                     throw new FormatException($"El parámetro de estructura de la plantilla trae un formato inválido ('{formato}') en el campo '{nombreDelCampo}': tiene que ser 'texto', 'digitos' o 'alfanumerico'.");
+            }
+        }
+
+        /// <summary>
+        /// DN-05 (escenario 21): convierte el `caracteres` del JSON a <see cref="CaracteresPermitidos"/>. Ausente o `null` →
+        /// nulo (el campo no se revisa, así queda todo lo sembrado antes de DN-05). Una clave que falta vale `false` (o vacío,
+        /// en `otros`). Un objeto que no permite nada es un parámetro mal cargado: <see cref="FormatException"/>, incluido el
+        /// <see cref="ArgumentException"/> del constructor. Un booleano que no lo es (`"letras":"si"`) ya lo rechazó el
+        /// deserializador más arriba; un `otros` que no es texto lo rechaza esta función.
+        /// </summary>
+        private static CaracteresPermitidos ParsearCaracteres(string nombreDelCampo, CaracteresDto caracteres)
+        {
+            if (caracteres == null)
+                return null;
+
+            // `otros` se lee como `object` y se exige texto: el deserializador convierte en silencio un número (`"otros":5`)
+            // en el texto "5", y un parámetro mal cargado no puede terminar permitiendo un carácter que nadie escribió.
+            if (caracteres.Otros != null && !(caracteres.Otros is string))
+                throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}': 'otros' tiene que ser un texto.");
+
+            try
+            {
+                return new CaracteresPermitidos(caracteres.Letras ?? false, caracteres.Digitos ?? false, caracteres.Espacio ?? false, (string)caracteres.Otros);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}': {ex.Message}", ex);
             }
         }
 
@@ -296,6 +324,25 @@ namespace Sanic.Mppp.Plugins.Plantilla
 
             [DataMember(Name = "formato")]
             public string Formato { get; set; }
+
+            [DataMember(Name = "caracteres")]
+            public CaracteresDto Caracteres { get; set; }
+        }
+
+        [DataContract]
+        private sealed class CaracteresDto
+        {
+            [DataMember(Name = "letras")]
+            public bool? Letras { get; set; }
+
+            [DataMember(Name = "digitos")]
+            public bool? Digitos { get; set; }
+
+            [DataMember(Name = "espacio")]
+            public bool? Espacio { get; set; }
+
+            [DataMember(Name = "otros")]
+            public object Otros { get; set; }
         }
     }
 
