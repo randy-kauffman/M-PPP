@@ -70,9 +70,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         private static string[] Fila(string plan = "0042", string cuenta = "123456789", string nombre = "Juan Perez", string moneda = "USD", string gestion = "Inclusion",
-            string clasificacion = "ACH")
+            string clasificacion = "ACH", string banco = "BAC")
         {
-            return new[] { gestion, clasificacion, "CNA", moneda, "BAC", plan, nombre, "0011234567890", cuenta, string.Empty };
+            return new[] { gestion, clasificacion, "CNA", moneda, banco, plan, nombre, "0011234567890", cuenta, string.Empty };
         }
 
         private sealed class Mundo
@@ -106,6 +106,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 PlanId = Svc.Sembrar(Activo(Tablas.Plan, ("sanic_codigo", "0042"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._11)), ("sanic_moneda", new OptionSetValue((int)Moneda.USD)), ("sanic_clienteid", new EntityReference(Tablas.Cliente, ClienteId))));
                 var autorizado = Svc.Sembrar(Activo(Tablas.Autorizado, ("sanic_nombre", "ana@acme.com"), ("sanic_clienteid", new EntityReference(Tablas.Cliente, ClienteId))));
                 Svc.Sembrar(Activo(Tablas.AutorizacionPlan, ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)), ("sanic_planid", new EntityReference(Tablas.Plan, PlanId))));
+                // DN-05: un plan formato 06 (solo BAC) del mismo cliente y autorizado, para lo que se completa al guardar.
+                var plan06 = Svc.Sembrar(Activo(Tablas.Plan, ("sanic_codigo", "0006"), ("sanic_tipoformato", new OptionSetValue((int)TipoDeFormatoDelPlan._06)), ("sanic_moneda", new OptionSetValue((int)Moneda.COR)), ("sanic_clienteid", new EntityReference(Tablas.Cliente, ClienteId))));
+                Svc.Sembrar(Activo(Tablas.AutorizacionPlan, ("sanic_autorizadoid", new EntityReference(Tablas.Autorizado, autorizado)), ("sanic_planid", new EntityReference(Tablas.Plan, plan06))));
 
                 if (conParametros)
                 {
@@ -632,6 +635,37 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, filas[1].GetAttributeValue<OptionSetValue>("sanic_estado").Value);
             Assert.Equal((int)Clasificacion.BAC, filas[1].GetAttributeValue<OptionSetValue>("sanic_clasificacion").Value);
             Assert.Contains("El plan 0042 solo admite la clasificación ACH.", filas[1].GetAttributeValue<string>("sanic_mensaje"));
+        }
+
+        [Fact]
+        public void Dn05_el_banco_y_la_clasificacion_vacios_en_un_plan_06_se_guardan_como_BAC()
+        {
+            // Revisión DN-05, hallazgo 3 (mutación M23 sobrevivía): lo que se GUARDA es el banco efectivo, no el recibido.
+            var m = new Mundo(Excel(Fila(plan: "0006", moneda: "COR", clasificacion: string.Empty, banco: string.Empty)));
+
+            m.Correr();
+
+            var fila = m.Filas().Single();
+            Assert.Equal((int)EstadoDeLaFila.Validada, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+            Assert.Equal((int)Banco.BAC, fila.GetAttributeValue<OptionSetValue>("sanic_banco").Value);
+            Assert.Equal((int)Clasificacion.BAC, fila.GetAttributeValue<OptionSetValue>("sanic_clasificacion").Value);
+        }
+
+        [Fact]
+        public void Dn05_plan_formatos_con_un_valor_que_plantilla_listas_no_acepta_es_un_error_real()
+        {
+            // Revisión DN-05, hallazgo 4: completar con un valor que la lista no acepta guardaría algo que ninguna fila podría
+            // escribir. Se cruza al cargar, antes de escribir nada. Los bancos de `cuenta.largos` NO se cruzan: uno sin
+            // entrada en la lista simplemente nunca se alcanza.
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroListas, ParametrosDePlantillaAceptacion.ListasValidas.Replace(@",{""valor"":""CK"",""variantes"":[""cheque""]}", string.Empty), version: 2);
+
+            var ex = Assert.Throws<InvalidOperationException>(() => m.Correr());
+
+            Assert.Contains(ValidarSolicitud.ParametroFormatos, ex.Message);
+            Assert.Contains("CK", ex.Message);
+            Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
+            Assert.Empty(m.Filas());
         }
 
         [Fact]

@@ -119,7 +119,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         /// <summary>El remitente: autorizado sobre 0006, 0010 y 0011; NO sobre 0099.</summary>
-        private static CatalogosDeValidacion Catalogos(bool conFormatos = true, bool conLargos = true, string obligatoriedad = ObligatoriedadV3)
+        private static CatalogosDeValidacion Catalogos(bool conFormatos = true, bool conLargos = true, string obligatoriedad = ObligatoriedadV3, string formatos = FormatosDn05)
         {
             return new CatalogosDeValidacion(
                 Estructura(),
@@ -133,7 +133,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                     new PlanDelCatalogo(PAjeno, "0099", TipoDeFormatoDelPlan._11, Moneda.USD),
                 },
                 new[] { P06, P10, P11 },
-                formatos: conFormatos ? FormatosDelPlan.DesdeJson(FormatosDn05) : null,
+                formatos: conFormatos ? FormatosDelPlan.DesdeJson(formatos) : null,
                 largosDeCuenta: conLargos ? LargosDeCuenta.DesdeJson(LargosDn05) : null);
         }
 
@@ -384,6 +384,10 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(@"{""letras"":""si""}")] // no es booleano
         [InlineData(@"{""otros"":5}")] // no es texto
         [InlineData(@"""letras""")] // no es objeto
+        [InlineData(@"{""letras"":1}")] // revisión DN-05, hallazgo 5: tipos exactos
+        [InlineData(@"{""letras"":""true""}")]
+        [InlineData(@"{""letras"":true,""tildes"":true}")] // clave desconocida: no se ignora en silencio
+        [InlineData(@"{""letras"":null}")]
         public void La_estructura_con_caracteres_mal_cargados_es_FormatException(string caracteres)
         {
             Assert.Throws<FormatException>(() => ConfiguracionPlantilla.DesdeJson(EstructuraJson(caracteres)));
@@ -786,5 +790,64 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             // REFERENCIA_FORMATO_11 depende de la clasificación: queda Omitida, no suma un segundo motivo.
             Assert.Equal(ResultadoDeLaRegla.Omitida, Resultado(diez, ReglasDeRegistro.ReferenciaFormato11));
         }
-    }
+
+        // ================================================================== revisión DN-05: lo que las mutaciones no detectaban
+        [Fact]
+        public void Obligatoriedad_mira_el_banco_y_la_clasificacion_efectivos()
+        {
+            // Con la obligatoriedad inicial (todo obligatorio salvo referencia), Banco y Clasificación vacíos en un plan 06 NO
+            // faltan: el formato los completa (M17, y M16 por la clasificación).
+            var catalogos = Catalogos(obligatoriedad: ParametrosDePlantillaAceptacion.ObligatoriedadInicial);
+            Assert.True(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, "6", ("banco", ""), ("clasificacion", ""), ("moneda", "COR"))).Cumple);
+            Assert.False(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, "11", ("banco", ""))).Cumple); // el 11 no completa banco
+        }
+
+        [Fact]
+        public void Una_regla_de_obligatoriedad_por_clasificacion_calza_con_la_clasificacion_efectiva()
+        {
+            // M16: plan 11 con la clasificación vacía es ACH efectiva, y la regla de ACH afloja el Tipo ID.
+            const string conReglaAch = @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""referencia""}],""reglas"":[
+                {""gestion"":""*"",""clasificacion"":""ACH"",""formato"":""11"",""opcionales"":[""tipoIdentificacion""]}]}";
+            var catalogos = Catalogos(obligatoriedad: conReglaAch);
+            Assert.True(Suelta(ReglasDeRegistro.Obligatoriedad, Fila(catalogos, "11", ("clasificacion", ""), ("tipoIdentificacion", ""))).Cumple);
+        }
+
+        [Fact]
+        public void Con_varios_bancos_o_clasificaciones_admitidos_nada_se_completa()
+        {
+            // M37: completar exige UNA sola opción, también en bancos.
+            const string varios = @"{
+                ""06"": {""clasificaciones"": [""BAC"",""CK""], ""gestiones"": [""Inclusion""], ""bancos"": [""BAC"",""LAFISE""]},
+                ""10"": {""clasificaciones"": [""BAC""], ""gestiones"": [""Inclusion""]},
+                ""11"": {""clasificaciones"": [""ACH""], ""gestiones"": [""Inclusion""]}
+            }";
+            var fila = Fila(Catalogos(formatos: varios), "6", ("banco", ""), ("clasificacion", ""));
+            Assert.Null(fila.BancoEfectivo);
+            Assert.Null(fila.ClasificacionEfectiva);
+        }
+
+        [Theory]
+        [InlineData("{\"06\": {\"clasificaciones\": [\"B\\u 41 C\"], \"gestiones\": [\"Inclusion\"]}, \"10\": {\"clasificaciones\": [\"BAC\"], \"gestiones\": [\"Inclusion\"]}, \"11\": {\"clasificaciones\": [\"ACH\"], \"gestiones\": [\"Inclusion\"]}}")]
+        public void El_json_estricto_exige_escapes_de_cuatro_hexadecimales(string json)
+        {
+            // Revisión DN-05, hallazgo 6: "\u 41 " (con espacios) no es un escape válido, aunque int.Parse lo acepte y dé "BAC".
+            // (El control crudo dentro de una cadena no se prueba acá: en estos dos parámetros todo texto se valida contra
+            // un enum, así que no es observable.)
+            Assert.Throws<FormatException>(() => FormatosDelPlan.DesdeJson(json));
+        }
+
+        [Theory]
+        [InlineData("\u3164")] // relleno Hangul
+        [InlineData("\u115F")] // relleno inicial Hangul
+        [InlineData("\u2800")] // braille en blanco
+        [InlineData("\uFE0F")] // selector de variación
+        [InlineData("\u0301")] // marca combinante (Mn): la tilde de una "é" descompuesta
+        public void Los_caracteres_que_no_se_ven_se_nombran_como_invisibles(string invisible)
+        {
+            // Revisión DN-05, hallazgo 7: relleno, braille en blanco, selectores de variación y marcas combinantes (Mn, Me)
+            // tampoco se muestran crudos.
+            var v = Suelta(ReglasDeRegistro.CaracteresPermitidos, Fila("6", ("nombreBeneficiario", "Jose" + invisible)));
+            Assert.Equal("Caracteres no permitidos: Nombre ((carácter invisible)).", v.Razon);
+        }
+}
 }

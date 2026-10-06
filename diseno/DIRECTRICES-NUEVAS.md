@@ -795,9 +795,12 @@ sembrado sigue igual:
   `otros`: los caracteres exactos que se agregan. Una clave que falta vale `false`. Cualquier otro carácter, **incluidos
   los invisibles y los de control**, es prohibido. Si el negocio quisiera permitir la Ñ algún día, va en `otros` y no hace
   falta código.
-- Mensaje: *"La columna {campo} tiene caracteres no permitidos: {caracteres}."* Muestra **solo los caracteres
-  prohibidos**, sin repetir y con un tope, **nunca el valor** (D-41). Un invisible se muestra como "(carácter
-  invisible)". Así se cumple lo que pide el escenario 21 sin exponer la cuenta ni la identificación.
+- Mensaje (fijado por las pruebas de aceptación): *"Caracteres no permitidos: {Encabezado} ({c1} {c2} …); {Encabezado}
+  (…)."* Campos en el orden de la fila; caracteres en el de su primera aparición, sin repetir y a lo sumo diez por campo.
+  Muestra **solo los caracteres prohibidos**, **nunca el valor** (D-41). El espacio se muestra como "(espacio)"; lo que
+  no se ve (controles, formato, espacios raros, rellenos, braille en blanco, selectores de variación, marcas
+  combinantes) como "(carácter invisible)". Único marcador: `campo` (los encabezados, separados por coma). Así se cumple
+  lo que pide el escenario 21 sin exponer la cuenta ni la identificación.
 - Nivel Registro, efecto Rechaza, sin dependencias. Se evalúa sobre lo recibido, igual que `LARGOS_Y_FORMATO`.
 
 ### F. `CUENTA_DEL_BANCO` (regla nueva, rechazo) y parámetro `cuenta.largos`
@@ -821,17 +824,33 @@ sembrado sigue igual:
   puede pasar en una exclusión, decisión 10): no hay banco efectivo y se usa `porDefecto` (6-17).
 - El largo se mide sobre lo recibido sin espacios a los lados, **con los ceros a la izquierda**. Cuenta vacía: no se
   revisa, porque eso es de `OBLIGATORIEDAD`. Que la cuenta sean solo dígitos lo controla E, no esta regla.
-- Un banco en `porBanco` que no existe en `plantilla.listas`, o un mínimo mayor que el máximo: error de configuración
-  ruidoso.
+- Un banco de `porBanco` que no es del choice, o un mínimo mayor que el máximo: error de configuración ruidoso. Un banco
+  de `porBanco` que el choice tiene y `plantilla.listas` no, **no** es error: nunca se alcanza (revisión de código).
+  Lo que sí se cruza contra `plantilla.listas` al cargar es `plan.formatos`: completar con un valor que la lista no
+  acepta guardaría algo que ningún cliente podría escribir.
 - Mensaje: *"El largo de la cuenta no corresponde al banco {banco}."* Sin el largo ni el valor (D-41).
 - Depende de `BANCO_DEL_FORMATO`.
 
 ## Orden de despliegue
 
-Primero el ensamblado con las reglas nuevas, mientras el catálogo sigue igual. Después, en una sola pasada:
-`plan.formatos`, `cuenta.largos`, las reglas nuevas en el catálogo, `REFERENCIA_FORMATO_11` apuntando a `CLASIFICACION_DEL_FORMATO` y
-`FORMATO_11_SOLO_ACH` inactiva. Una regla activa que depende de una inactiva es un error de configuración y tumba la
-validación (D-13). Al final, `plantilla.estructura` y `plantilla.obligatoriedad` en sus versiones nuevas.
+> **Corregido el 2026-10-06 (revisión de código, hallazgos 1 y 2).** El orden anterior ("primero el ensamblado") tumbaba
+> toda validación en Dev: el ensamblado nuevo exige `plan.formatos` y `cuenta.largos`. Y dejar la obligatoriedad v3
+> para el final abría una ventana en la que una Exclusión de formato 11 sin referencia quedaba Validada.
+
+Regla: **todo lo que el ensamblado nuevo exige se siembra antes que él, y nada de lo que se siembra antes puede aflojar
+al ensamblado viejo.**
+
+1. **Parámetros**, con el ensamblado VIEJO todavía arriba: `plan.formatos` y `cuenta.largos` (no los lee),
+   `plantilla.estructura` nueva (no conoce `caracteres` y lo ignora; la cuenta pasa a 17) y `plantilla.obligatoriedad`
+   v3. Con el ensamblado viejo la v3 solo **endurece** o es neutra: la Exclusión de formato 11 pasa a exigir referencia;
+   la clasificación vacía en el 11 la sigue rechazando `FORMATO_11_SOLO_ACH`; sin banco en una exclusión de formato 11,
+   la referencia vieja no se puede armar y la fila se rechaza. **Antes de este paso, comprobar con el ensamblado viejo
+   que lee la `plantilla.estructura` nueva** (validar un correo de prueba).
+2. **Ensamblado nuevo.** Con el catálogo viejo sigue funcionando: `FORMATO_11_SOLO_ACH` existe en el código, y la v3 ya
+   exige la referencia de la exclusión.
+3. **Catálogo de reglas**, en una sola pasada: las cinco reglas nuevas activas, `REFERENCIA_FORMATO_11` dependiendo de
+   `CLASIFICACION_DEL_FORMATO` y `FORMATO_11_SOLO_ACH` inactiva. Una regla activa que depende de una inactiva tumba la
+   validación (D-13), por eso va todo junto.
 
 ## Pendientes del negocio
 
