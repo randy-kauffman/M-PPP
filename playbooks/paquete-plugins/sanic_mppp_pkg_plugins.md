@@ -21,6 +21,12 @@ Verificado ese mismo día: llegó como `0x80072324` y salió como MPPP-CAR-011.
 
 **1.0.22.0 (2026-10-01, D-75)**: presupuesto de escritura de 30 s y tope por defecto de 100 filas. Mismos tipos.
 
+**1.0.23.0 (2026-10-06, DN-05)**: cinco reglas de registro nuevas (`CLASIFICACION_DEL_FORMATO`, `GESTION_DEL_FORMATO`,
+`BANCO_DEL_FORMATO`, `CARACTERES_PERMITIDOS`, `CUENTA_DEL_BANCO`), y `ValidarSolicitud` exige los parámetros
+`plan.formatos` y `cuenta.largos`. Mismos tipos, sin steps nuevos. **Se sube DESPUÉS de sembrar esos dos parámetros**
+(con el ensamblado viejo arriba, que no los lee): si sube antes, toda validación de correos falla con "Falta el
+parámetro". Y ANTES de `playbooks/datos/reglas.md` (el plugin de integridad rechaza una regla sin evaluador).
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
