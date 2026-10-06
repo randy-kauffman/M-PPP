@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.Serialization;
+using Sanic.Mppp.Plugins.Validacion;
 
 namespace Sanic.Mppp.Plugins.Plantilla
 {
@@ -68,8 +70,17 @@ namespace Sanic.Mppp.Plugins.Plantilla
             var campos = new List<CampoPlantilla>();
             if (dto.Campos != null)
             {
+                // Revisión DN-05, hallazgo 5: `caracteres` se lee estricto (tipos exactos, claves conocidas), y el
+                // deserializador no lo puede garantizar: convierte `1` y `"true"` en `true` e ignora las claves de más. Solo si
+                // algún campo lo trae se lee el documento una segunda vez con el parser estricto del proyecto (una pasada, O(N)).
+                IList<object> camposEnCrudo = null;
+                if (dto.Campos.Any(c => c != null && c.Caracteres != null))
+                    camposEnCrudo = CamposEnCrudo(json);
+
+                var indice = -1;
                 foreach (CampoPlantillaDto campoDto in dto.Campos)
                 {
+                    indice++;
                     if (campoDto == null)
                     {
                         campos.Add(null);
@@ -93,7 +104,7 @@ namespace Sanic.Mppp.Plugins.Plantilla
                         // texto que interpretar). Un texto que no sea exactamente uno de los tres valores es
                         // FormatException (D-18b): una expresión mal escrita no puede tumbar ni aflojar la validación.
                         Formato = ParsearFormato(campoDto.Nombre, campoDto.Formato),
-                        Caracteres = ParsearCaracteres(campoDto.Nombre, campoDto.Caracteres)
+                        Caracteres = ParsearCaracteres(campoDto.Nombre, campoDto.Caracteres == null ? null : CaracteresEnCrudo(camposEnCrudo, indice, campoDto.Nombre))
                     });
                 }
             }
@@ -134,31 +145,79 @@ namespace Sanic.Mppp.Plugins.Plantilla
             }
         }
 
+        private const string PrefijoDelError = "El parámetro de estructura de la plantilla";
+
+        /// <summary>Revisión DN-05, hallazgo 5: el arreglo `campos` del documento, leído con el parser estricto.</summary>
+        private static IList<object> CamposEnCrudo(string json)
+        {
+            var raiz = AnalizadorJson.LeerEstricto(json, PrefijoDelError) as IDictionary<string, object>;
+            if (raiz == null || !raiz.TryGetValue("campos", out var campos) || !(campos is IList<object> lista))
+                throw new FormatException($"{PrefijoDelError} no es un JSON válido: 'campos' tiene que ser un arreglo.");
+
+            return lista;
+        }
+
+        private static IDictionary<string, object> CaracteresEnCrudo(IList<object> camposEnCrudo, int indice, string nombreDelCampo)
+        {
+            if (camposEnCrudo == null || indice >= camposEnCrudo.Count || !(camposEnCrudo[indice] is IDictionary<string, object> campo)
+                || !campo.TryGetValue("caracteres", out var caracteres))
+                throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}'.");
+
+            // `"caracteres": null` es igual que ausente (el campo no se revisa): ParsearCaracteres recibe nulo.
+            if (caracteres == null)
+                return null;
+
+            return caracteres as IDictionary<string, object>
+                ?? throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}': tiene que ser un objeto.");
+        }
+
         /// <summary>
-        /// DN-05 (escenario 21): convierte el `caracteres` del JSON a <see cref="CaracteresPermitidos"/>. Ausente o `null` →
-        /// nulo (el campo no se revisa, así queda todo lo sembrado antes de DN-05). Una clave que falta vale `false` (o vacío,
-        /// en `otros`). Un objeto que no permite nada es un parámetro mal cargado: <see cref="FormatException"/>, incluido el
-        /// <see cref="ArgumentException"/> del constructor. Un booleano que no lo es (`"letras":"si"`) ya lo rechazó el
-        /// deserializador más arriba; un `otros` que no es texto lo rechaza esta función.
+        /// DN-05 (escenario 21, revisión hallazgo 5): convierte el `caracteres` del JSON a <see cref="CaracteresPermitidos"/>.
+        /// Ausente o `null` → nulo (el campo no se revisa, así queda todo lo sembrado antes de DN-05). Dentro del objeto:
+        /// `letras`, `digitos` y `espacio` solo admiten un booleano JSON (ni `1`, ni `"true"`, ni `null`), `otros` solo un texto,
+        /// y una clave que falta vale `false` (o vacío, en `otros`). Una clave desconocida, un tipo que no es el exacto o un objeto
+        /// que no permite nada (<see cref="ArgumentException"/> del constructor) es <see cref="FormatException"/>: un parámetro
+        /// mal cargado no puede terminar permitiendo un carácter que nadie escribió.
         /// </summary>
-        private static CaracteresPermitidos ParsearCaracteres(string nombreDelCampo, CaracteresDto caracteres)
+        private static CaracteresPermitidos ParsearCaracteres(string nombreDelCampo, IDictionary<string, object> caracteres)
         {
             if (caracteres == null)
                 return null;
 
-            // `otros` se lee como `object` y se exige texto: el deserializador convierte en silencio un número (`"otros":5`)
-            // en el texto "5", y un parámetro mal cargado no puede terminar permitiendo un carácter que nadie escribió.
-            if (caracteres.Otros != null && !(caracteres.Otros is string))
-                throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}': 'otros' tiene que ser un texto.");
+            var motivoBase = $"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}'";
+            bool letras = false, digitos = false, espacio = false;
+            string otros = null;
+            foreach (var par in caracteres)
+            {
+                switch (par.Key)
+                {
+                    case "letras": letras = Booleano(par.Value, par.Key, motivoBase); break;
+                    case "digitos": digitos = Booleano(par.Value, par.Key, motivoBase); break;
+                    case "espacio": espacio = Booleano(par.Value, par.Key, motivoBase); break;
+                    case "otros":
+                        otros = par.Value as string ?? throw new FormatException($"{motivoBase}: 'otros' tiene que ser un texto.");
+                        break;
+                    default:
+                        throw new FormatException($"{motivoBase}: la clave '{par.Key}' no existe (solo 'letras', 'digitos', 'espacio' y 'otros').");
+                }
+            }
 
             try
             {
-                return new CaracteresPermitidos(caracteres.Letras ?? false, caracteres.Digitos ?? false, caracteres.Espacio ?? false, (string)caracteres.Otros);
+                return new CaracteresPermitidos(letras, digitos, espacio, otros);
             }
             catch (ArgumentException ex)
             {
-                throw new FormatException($"El parámetro de estructura de la plantilla trae unos 'caracteres' inválidos en el campo '{nombreDelCampo}': {ex.Message}", ex);
+                throw new FormatException($"{motivoBase}: {ex.Message}", ex);
             }
+        }
+
+        private static bool Booleano(object valor, string clave, string motivoBase)
+        {
+            if (valor is bool b)
+                return b;
+
+            throw new FormatException($"{motivoBase}: '{clave}' tiene que ser verdadero o falso (un booleano de JSON).");
         }
 
         /// <summary>Filas máximas de una hoja de Excel (LP-08): la ventana (primeraFila .. primeraFila + cantidadFilas - 1)
@@ -329,20 +388,11 @@ namespace Sanic.Mppp.Plugins.Plantilla
             public CaracteresDto Caracteres { get; set; }
         }
 
+        /// <summary>Solo marca que el campo trae `caracteres` (un objeto). Sin miembros a propósito: el contenido lo lee
+        /// <see cref="CaracteresEnCrudo"/> con el parser estricto, porque el deserializador convierte tipos y ignora claves (revisión DN-05, hallazgo 5).</summary>
         [DataContract]
         private sealed class CaracteresDto
         {
-            [DataMember(Name = "letras")]
-            public bool? Letras { get; set; }
-
-            [DataMember(Name = "digitos")]
-            public bool? Digitos { get; set; }
-
-            [DataMember(Name = "espacio")]
-            public bool? Espacio { get; set; }
-
-            [DataMember(Name = "otros")]
-            public object Otros { get; set; }
         }
     }
 

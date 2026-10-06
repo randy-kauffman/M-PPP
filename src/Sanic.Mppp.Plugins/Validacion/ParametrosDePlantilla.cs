@@ -210,6 +210,18 @@ namespace Sanic.Mppp.Plugins.Validacion
             return normalizados.TryGetValue(Normalizar(recibido), out ValorDeLista valor) ? valor : null;
         }
 
+        /// <summary>
+        /// Revisión DN-05, hallazgo 4: ¿el valor CANÓNICO (el nombre del miembro del choice, no una variante) está en esa lista?
+        /// Sirve para cruzar `plan.formatos` contra `plantilla.listas` al cargar. <paramref name="lista"/> es uno de
+        /// <see cref="CamposDeFila.DeLista"/>; otro nombre es <see cref="ArgumentException"/>. Comparación exacta (Ordinal) del
+        /// valor que la lista resuelve: que el texto coincida con una variante de OTRO valor no cuenta.
+        /// </summary>
+        public bool Acepta(string lista, string valorCanonico)
+        {
+            var resuelto = Resolver(lista, valorCanonico);
+            return resuelto != null && string.Equals(resuelto.Valor, valorCanonico, StringComparison.Ordinal);
+        }
+
         /// <summary>La forma en que se comparan dos textos de lista: minúsculas invariantes, sin tildes, sin espacios a los lados, espacios internos de a uno. Nulo → vacío.</summary>
         public static string Normalizar(string texto)
         {

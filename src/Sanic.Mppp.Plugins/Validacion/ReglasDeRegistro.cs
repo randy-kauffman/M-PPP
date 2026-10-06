@@ -1178,7 +1178,9 @@ namespace Sanic.Mppp.Plugins.Validacion
                             continue;
                         }
 
-                        texto = new string(new[] { c, baja });
+                        // Revisión DN-05, hallazgo 7: un par que es invisible (selector de variación U+E0100-E01EF, marca combinante o
+                        // carácter de formato fuera del plano básico) se nombra como invisible, igual que uno suelto.
+                        texto = EsParInvisible(c, baja) ? Invisible : new string(new[] { c, baja });
                     }
                     else
                     {
@@ -1207,8 +1209,23 @@ namespace Sanic.Mppp.Plugins.Validacion
                 return mostrados;
             }
 
+            private static bool EsParInvisible(char alta, char baja)
+            {
+                var punto = char.ConvertToUtf32(alta, baja);
+                if (punto >= 0xE0100 && punto <= 0xE01EF)
+                {
+                    return true;
+                }
+
+                var categoria = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(new string(new[] { alta, baja }), 0);
+                return categoria == System.Globalization.UnicodeCategory.NonSpacingMark
+                    || categoria == System.Globalization.UnicodeCategory.EnclosingMark
+                    || categoria == System.Globalization.UnicodeCategory.Format;
+            }
+
             /// <summary>El texto con el que se nombra un carácter prohibido (no sustituto válido): el espacio común, "(espacio)";
-            /// control, formato (Cf), cualquier otro espacio en blanco y sustituto suelto, "(carácter invisible)"; el resto, él mismo.</summary>
+            /// control, formato (Cf), marca combinante (Mn, Me), selector de variación, relleno en blanco (U+3164, U+115F, U+1160, U+FFA0, U+2800),
+            /// cualquier otro espacio en blanco y sustituto suelto, "(carácter invisible)"; el resto, él mismo.</summary>
             private static string Mostrar(char c)
             {
                 if (c == ' ')
@@ -1216,8 +1233,15 @@ namespace Sanic.Mppp.Plugins.Validacion
                     return Espacio;
                 }
 
+                var categoria = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
                 if (char.IsControl(c) || char.IsWhiteSpace(c) || char.IsSurrogate(c)
-                    || System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format)
+                    || categoria == System.Globalization.UnicodeCategory.Format
+                    // Revisión DN-05, hallazgo 7: marcas combinantes (Mn, Me), selectores de variación (U+FE00-FE0F; los de
+                    // U+E0100-E01EF son pares sustitutos y ya los cubre IsSurrogate) y los rellenos que se dibujan en blanco.
+                    || categoria == System.Globalization.UnicodeCategory.NonSpacingMark
+                    || categoria == System.Globalization.UnicodeCategory.EnclosingMark
+                    || (c >= '\uFE00' && c <= '\uFE0F')
+                    || c == '\u3164' || c == '\u115F' || c == '\u1160' || c == '\uFFA0' || c == '\u2800')
                 {
                     return Invisible;
                 }

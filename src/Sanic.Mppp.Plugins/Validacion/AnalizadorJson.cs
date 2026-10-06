@@ -239,6 +239,20 @@ namespace Sanic.Mppp.Plugins.Validacion
                                 }
 
                                 var hex = _texto.Substring(_pos, 4);
+                                if (_estricto)
+                                {
+                                    // Revisión DN-05, hallazgo 6: exactamente 4 dígitos hexadecimales ASCII. `int.Parse` con
+                                    // HexNumber acepta espacios y signos (`\u 41 ` daría "A"), así que acá se mira de a un carácter.
+                                    for (var i = 0; i < 4; i++)
+                                    {
+                                        var h = hex[i];
+                                        if (!((h >= '0' && h <= '9') || (h >= 'a' && h <= 'f') || (h >= 'A' && h <= 'F')))
+                                        {
+                                            throw Falla("escape unicode inválido: se esperaban 4 dígitos hexadecimales");
+                                        }
+                                    }
+                                }
+
                                 _pos += 4;
                                 sb.Append((char)int.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                                 break;

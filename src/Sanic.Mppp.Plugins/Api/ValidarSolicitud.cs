@@ -134,6 +134,11 @@ namespace Sanic.Mppp.Plugins.Api
             var formatos = FormatosDelPlan.DesdeJson(pFormatos.Valor);
             var largosDeCuenta = LargosDeCuenta.DesdeJson(pLargos.Valor);
 
+            // Revisión DN-05, hallazgo 4: lo que `plan.formatos` completa o admite tiene que existir en `plantilla.listas`; si no,
+            // se guardaría un valor que ninguna fila podría escribir. Error real ANTES de escribir nada. Los bancos de
+            // `cuenta.largos` NO se cruzan: uno sin entrada en la lista simplemente nunca se alcanza.
+            CruzarFormatosConListas(formatos, listas);
+
             // `lectura.limites` no entra en sanic_versionparametros: no cambia cómo se valida, solo cuánto se lee (diseno/03 §1 paso 3).
             var versionParametros = string.Format(
                 CultureInfo.InvariantCulture, "estructura={0};listas={1};obligatoriedad={2};formatos={3};largos={4}",
@@ -211,6 +216,34 @@ namespace Sanic.Mppp.Plugins.Api
         private static string CuerpoAvisoPorDigitar(string numeroSolicitud) => $"La solicitud {numeroSolicitud} tiene filas por digitar.";
 
         /// <summary>Un parámetro ausente es un error real que nombra su código (diseno/03 §1 paso 3), nunca una regla fallida.</summary>
+        /// <summary>Revisión DN-05, hallazgo 4: toda clasificación, gestión y banco de `plan.formatos` está en la lista que le
+        /// corresponde de `plantilla.listas`. Si no, <see cref="InvalidOperationException"/> que nombra el parámetro, el formato y el valor.</summary>
+        private static void CruzarFormatosConListas(FormatosDelPlan formatos, ListasPlantilla listas)
+        {
+            foreach (var formato in new[] { TipoDeFormatoDelPlan._06, TipoDeFormatoDelPlan._10, TipoDeFormatoDelPlan._11 })
+            {
+                var reglas = formatos.Para(formato);
+                foreach (var v in reglas.Clasificaciones)
+                    ExigirEnLista(listas, CamposDeFila.Clasificacion, v.ToString(), formato);
+                foreach (var v in reglas.Gestiones)
+                    ExigirEnLista(listas, CamposDeFila.Gestion, v.ToString(), formato);
+                // `Bancos` nulo = cualquier banco (la clave no vino): no hay nada que cruzar.
+                foreach (var v in reglas.Bancos ?? (IReadOnlyList<Banco>)new Banco[0])
+                    ExigirEnLista(listas, CamposDeFila.Banco, v.ToString(), formato);
+            }
+        }
+
+        private static void ExigirEnLista(ListasPlantilla listas, string lista, string valor, TipoDeFormatoDelPlan formato)
+        {
+            if (!listas.Acepta(lista, valor))
+            {
+                throw new InvalidOperationException(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "El parámetro '{0}' trae '{1}' en el formato {2}, y el parámetro '{3}' no lo acepta en la lista '{4}'.",
+                    ParametroFormatos, valor, formato, ParametroListas, lista));
+            }
+        }
+
         private ParametroLeido ParametroObligatorio(string nombre)
         {
             var parametro = _catalogos.Parametro(nombre);

@@ -71,7 +71,7 @@ namespace Sanic.Mppp.Plugins.Datos
         /// <summary>El HTML del acuse (`sanic_acusecontenido`).</summary>
         public string AcuseContenido { get; set; }
 
-        /// <summary>`sanic_versionparametros`: versiones de los parámetros `plantilla.*` usadas (`listas=3;estructura=2;obligatoriedad=1`).</summary>
+        /// <summary>`sanic_versionparametros`: versiones usadas de los parámetros `plantilla.*` (estructura, listas, obligatoriedad) y, desde DN-05, de `plan.formatos` y `cuenta.largos` (`estructura=2;listas=3;obligatoriedad=1;formatos=1;largos=1`). `lectura.limites` no entra.</summary>
         public string VersionParametros { get; set; }
     }
 
