@@ -39,7 +39,9 @@ dotnet pack src/Sanic.Mppp.Plugins.Paquete/Sanic.Mppp.Plugins.Paquete.csproj -c 
 ```
 
 Comprobación antes de subir: el .nupkg tiene la fecha de hoy y su `Sanic.Mppp.Plugins.dll` contiene cada uno de los
-`tipos` de abajo (buscar el nombre de la clase en los bytes del .dll dentro del zip).
+`tipos` de abajo (buscar el nombre de la clase en los bytes del .dll dentro del zip). Los nombres de clase están en
+ASCII; un literal de texto del código (por ejemplo un código de regla) está en **UTF-16**: buscarlo en ASCII da falso
+(lo encontró el constructor el 2026-10-06, DN-05).
 
 ## 1. Identidad
 
@@ -93,7 +95,7 @@ Comprobación antes de subir: el .nupkg tiene la fecha de hoy y su `Sanic.Mppp.P
 
 - La solución `sanic_mppp_sol_mantenimientoppp` existe, es unmanaged y su publisher es `Sistemas_Abiertos_Nicaragua` (lo comprueba la herramienta).
 - El .nupkg está armado y pesa menos de 12 MB. Lleva `Sanic.Mppp.Plugins.dll`, los dos de `DocumentFormat.OpenXml` y `Sanic.Mppp.Plugins.Paquete.dll`, el ensamblado vacío (~4,6 KB) que genera el propio proyecto del paquete (observado al desplegar 1.0.21.0, 2026-10-01; el csproj del paquete no cambió desde que se creó). Nada más: el SDK de Dataverse ya vive en el sandbox y no viaja (`ExcludeAssets="runtime"` en el csproj del paquete).
-- Ningún step registrado todavía. Si hubiera steps apuntando a estos tipos, un cambio de `major`/`minor` del ensamblado NO los re-apunta solo (Learn, "Assembly versioning").
+- Hay steps registrados (27 al 2026-10-06) apuntando a estos tipos: por eso solo sube el build. Un cambio de `major`/`minor` del ensamblado NO los re-apunta solo (Learn, "Assembly versioning").
 
 ## 4. Qué NO hace esta herramienta
 
