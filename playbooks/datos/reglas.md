@@ -1,4 +1,4 @@
-# Playbook: datos · las 15 reglas del catalogo
+# Playbook: datos · las reglas del catalogo
 
 Inventario 9.2 (2 de nivel Correo + 5 de nivel Solicitud) y 9.3 (8 de nivel
 Registro). Contenido transcripto de `diseno/02-diccionario-datos.md` §156, §158
@@ -8,6 +8,15 @@ y §162. Generado por script para que no se despegue del diseno.
 `sanic_mensajecliente` queda VACIA a proposito (D-19): cuando esta vacia, el
 evaluador usa su propio mensaje por defecto, que es el texto aprobado y vive en
 el codigo. Cargar una plantilla aca duplicaria la fuente de verdad.
+
+**DN-05 (2026-10-06, `diseno/DIRECTRICES-NUEVAS.md`): cinco reglas nuevas de nivel Registro y `FORMATO_11_SOLO_ACH`
+INACTIVA** (`statecode` 1, `statuscode` 2; la reemplaza `CLASIFICACION_DEL_FORMATO`). Editado a mano, no por el script:
+las órdenes nuevas (25, 45, 50, 55, 90) se intercalan sin mover ninguna de las existentes, y cumplen "quien depende tiene
+orden mayor". **El orden de las filas importa** porque `datos.py` escribe de arriba abajo y el plugin de integridad
+(`IntegridadDeReglaStep`) valida cada guardado: `CLASIFICACION_DEL_FORMATO` se crea antes de que `REFERENCIA_FORMATO_11`
+pase a depender de ella, y `FORMATO_11_SOLO_ACH` se desactiva DESPUÉS (no se puede desactivar una regla de la que depende
+otra activa). Las reglas nuevas solo se pueden crear con el ensamblado de DN-05 ya subido (sin evaluador, el plugin de
+integridad las rechaza): este playbook va DESPUÉS del paquete 1.0.23.0.
 
 `sanic_orden` lo deriva este script (D-47): orden topologico en multiplos de 10
 dentro de cada nivel. El diseno solo fija el orden RELATIVO; el motor exige que
@@ -157,6 +166,18 @@ comprueba con un assert antes de escribir el playbook.
       }
     },
     {
+      "sanic_codigo": "CARACTERES_PERMITIDOS",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 25,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      }
+    },
+    {
       "sanic_codigo": "PLAN_EXISTE",
       "sanic_nivel": {
         "choice": "sanic_mppp_ch_nivelregla",
@@ -184,12 +205,38 @@ comprueba con un assert antes de escribir el playbook.
       "sanic_mensajecliente": "El plan {plan} no existe o usted no está autorizado sobre él."
     },
     {
-      "sanic_codigo": "FORMATO_11_SOLO_ACH",
+      "sanic_codigo": "GESTION_DEL_FORMATO",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 45,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+    },
+    {
+      "sanic_codigo": "CLASIFICACION_DEL_FORMATO",
       "sanic_nivel": {
         "choice": "sanic_mppp_ch_nivelregla",
         "etiqueta": "Registro"
       },
       "sanic_orden": 50,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+    },
+    {
+      "sanic_codigo": "BANCO_DEL_FORMATO",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 55,
       "sanic_efecto": {
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
@@ -233,7 +280,35 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "FORMATO_11_SOLO_ACH,OBLIGATORIEDAD"
+      "sanic_dependede": "CLASIFICACION_DEL_FORMATO,OBLIGATORIEDAD"
+    },
+    {
+      "sanic_codigo": "FORMATO_11_SOLO_ACH",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 50,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS",
+      "statecode": 1,
+      "statuscode": 2
+    },
+    {
+      "sanic_codigo": "CUENTA_DEL_BANCO",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 90,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "BANCO_DEL_FORMATO"
     }
   ]
 }
@@ -249,4 +324,4 @@ comprueba con un assert antes de escribir el playbook.
 - **Efecto `Envia a revision` solo en niveles Correo y Solicitud, nunca en Registro** (D-20).
 - **`AUTORIZACION_CORREO_PLAN` no admite otro efecto que `Rechaza`** (D-14).
 - Toda dependencia es del **mismo nivel** y tiene **orden menor** (`02` §152).
-- El codigo C# tiene un evaluador por cada uno de estos 15 codigos; una regla activa sin evaluador hace fallar cerrado al motor (D-13).
+- El codigo C# tiene un evaluador por cada uno de estos codigos (20 desde DN-05); una regla activa sin evaluador hace fallar cerrado al motor (D-13).
