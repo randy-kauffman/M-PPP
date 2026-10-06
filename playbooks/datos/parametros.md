@@ -417,6 +417,46 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "100",
       "sanic_descripcion": "Maximo de filas no vacias por archivo en la carga y la activacion masiva de catalogos (DN-04). Medido en Dev el 2026-10-01 (D-75): 100 filas de peor caso en 25,5 s; desde 200 la base corta a los ~40 s (error 10928). Un archivo con mas filas se rechaza entero (MPPP-CAR-006), nunca se corta."
+    },
+    {
+      "sanic_nombre": "plan.formatos",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"06\":{\"clasificaciones\":[\"BAC\"],\"gestiones\":[\"Inclusion\",\"Exclusion\",\"Modificacion\"],\"bancos\":[\"BAC\"]},\"10\":{\"clasificaciones\":[\"BAC\",\"CK\"],\"gestiones\":[\"Inclusion\",\"Exclusion\",\"Modificacion\"],\"bancos\":[\"BAC\"]},\"11\":{\"clasificaciones\":[\"ACH\"],\"gestiones\":[\"Inclusion\",\"Exclusion\"]}}",
+      "sanic_descripcion": "DN-05 (aprobador, 2026-10-06): que admite cada formato de plan. 06: solo BAC (clasificacion y banco); 10: BAC o CK, banco BAC; 11: solo ACH, cualquier banco, sin Modificacion. Banco o clasificacion vacios se completan cuando el formato admite uno solo. Lo exige el ensamblado 1.0.23.0."
+    },
+    {
+      "sanic_nombre": "cuenta.largos",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"porDefecto\":{\"minimo\":6,\"maximo\":17},\"porBanco\":{\"BANPRO\":{\"minimo\":6,\"maximo\":16},\"BDF\":{\"minimo\":10,\"maximo\":16},\"LAFISE\":{\"minimo\":9,\"maximo\":16},\"FICOHSA\":{\"minimo\":4,\"maximo\":16},\"AVANZ\":{\"minimo\":10,\"maximo\":16},\"BAC\":{\"minimo\":9,\"maximo\":16}}}",
+      "sanic_descripcion": "DN-05 escenario 20 (aprobador, 2026-10-06): largo de la cuenta por banco, con los ceros a la izquierda. BANPRO 6-16, BDF 10-16, LAFISE 9-16, FICOHSA 4-16, AVANZ 10-16, BAC 9-16; el resto 6-17. No depende de la moneda. Lo exige el ensamblado 1.0.23.0."
+    },
+    {
+      "sanic_nombre": "plantilla.estructura",
+      "sanic_version": 2,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"hoja\":\"Datos\",\"filaEncabezado\":12,\"primeraFila\":13,\"cantidadFilas\":100,\"campos\":[{\"nombre\":\"gestion\",\"columna\":\"B\",\"encabezado\":\"Gestión\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":20},{\"nombre\":\"clasificacion\",\"columna\":\"C\",\"encabezado\":\"Clasificación\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":10},{\"nombre\":\"numeroPlan\",\"columna\":\"D\",\"encabezado\":\"No. Plan\",\"formato\":\"alfanumerico\",\"largoMinimo\":1,\"largoMaximo\":4},{\"nombre\":\"nombreBeneficiario\",\"columna\":\"E\",\"encabezado\":\"Nombre Colaborador / Proveedor\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":44,\"caracteres\":{\"letras\":true,\"espacio\":true,\"otros\":\"-.,\"}},{\"nombre\":\"tipoIdentificacion\",\"columna\":\"F\",\"encabezado\":\"Tipo ID\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":10},{\"nombre\":\"numeroIdentificacion\",\"columna\":\"G\",\"encabezado\":\"No. Identificación\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":16,\"caracteres\":{\"letras\":true,\"digitos\":true}},{\"nombre\":\"referencia\",\"columna\":\"H\",\"encabezado\":\"Referencia\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":20,\"caracteres\":{\"letras\":true,\"digitos\":true}},{\"nombre\":\"numeroCuenta\",\"columna\":\"I\",\"encabezado\":\"No. Cuenta\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":17,\"caracteres\":{\"digitos\":true}},{\"nombre\":\"moneda\",\"columna\":\"J\",\"encabezado\":\"Moneda\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":10},{\"nombre\":\"banco\",\"columna\":\"K\",\"encabezado\":\"Banco\",\"formato\":\"texto\",\"largoMinimo\":1,\"largoMaximo\":20}]}",
+      "sanic_descripcion": "DN-05 (aprobador, 2026-10-06): agrega caracteres permitidos (nombre: letras, espacio, guion, punto y coma; referencia e identificacion: letras y digitos; cuenta: solo digitos; sin Ñ ni tildes) y la cuenta pasa a largo maximo 17. El ensamblado 1.0.22.0 ignora 'caracteres' (verificado con pruebas)."
+    },
+    {
+      "sanic_nombre": "plantilla.obligatoriedad",
+      "sanic_version": 3,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "JSON"
+      },
+      "sanic_valor": "{\"porDefecto\":\"obligatorio\",\"opcionales\":[{\"campo\":\"referencia\"},{\"campo\":\"moneda\"}],\"reglas\":[{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"06\",\"opcionales\":[\"clasificacion\",\"tipoIdentificacion\",\"banco\"]},{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"10\",\"opcionales\":[\"banco\"]},{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"11\",\"opcionales\":[\"clasificacion\"]}],\"porGestion\":{\"Exclusion\":{\"opcionales\":[{\"campo\":\"clasificacion\"},{\"campo\":\"nombreBeneficiario\"},{\"campo\":\"tipoIdentificacion\"},{\"campo\":\"numeroIdentificacion\"},{\"campo\":\"banco\"}],\"obligatorios\":[{\"campo\":\"referencia\"}]},\"Modificacion\":{\"opcionales\":[{\"campo\":\"clasificacion\"},{\"campo\":\"nombreBeneficiario\"},{\"campo\":\"tipoIdentificacion\"},{\"campo\":\"numeroIdentificacion\"},{\"campo\":\"banco\"}],\"obligatorios\":[{\"campo\":\"referencia\"}]}}}",
+      "sanic_descripcion": "DN-05 (aprobador, 2026-10-06): matriz de obligatoriedad del negocio. Inclusion 06: plan, nombre, identificacion, cuenta; 10: + clasificacion y tipo ID; 11: + tipo ID y banco. Exclusion y Modificacion: plan, referencia y cuenta. Moneda y referencia opcionales en la inclusion. Reemplaza el criterio de exclusion de la version 2."
     }
   ]
 }
