@@ -15,6 +15,12 @@ candidato, y qué le corresponde a este archivo frente al set dedicado
 `pruebas/03-reglas-de-registro.md` (el MD manda; acá solo se registra que la
 conclusión ya se tomó).
 
+**DN-05 (2026-10-06, desplegado en Dev con el ensamblado 1.0.23.0)**: reescribe R-10, R-12, R-18, R-20 y R-21
+contra la matriz de obligatoriedad v3 y los formatos del plan, y agrega R-29..R-38 (un caso por comportamiento
+nuevo). Las reglas nuevas de fila son `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO` (reemplaza a
+`FORMATO_11_SOLO_ACH`, que quedó inactiva), `BANCO_DEL_FORMATO`, `CARACTERES_PERMITIDOS` y `CUENTA_DEL_BANCO`
+(`diseno/DIRECTRICES-NUEVAS.md`, DN-05).
+
 **Reagrupamiento del 2026-09-28** (`CONVENCIONES.md` §4, "La regla del
 nombre"): el set `O` (`12-obligatoriedad-gestion.md`, nombrado por la
 directiva DN-03 en vez de por lo que prueba) se fusionó ACÁ, como R-19..R-28
@@ -64,6 +70,10 @@ CUMPLIDA, NOCUMPLIDA, OMITIDA = 159460001, 159460002, 159460003
 ING, NOREC, DESC, RECH, ENPROC, PROC, CERR, NOESNUEVO, VENC = (159460001 + i for i in range(9))
 FILA_RECH_VAL, FILA_SIN_AUT, FILA_VALIDADA = 159460001, 159460002, 159460003
 
+# Valores de los choices de la fila (`playbooks/choice-global/`): clasificación y banco.
+CLASIF_BAC, CLASIF_ACH, CLASIF_CK = 159460001, 159460002, 159460003
+BANCO_LAFISE, BANCO_BAC, BANCO_ATLANTIDA = 159460001, 159460002, 159460008
+
 TIPO_TEXTO = 159460001  # sanic_mppp_ch_tipoparametro: Texto
 
 PARAMETROS = "sanic_mppp_tbl_parametros"
@@ -76,6 +86,26 @@ REGLAS = "sanic_mppp_tbl_reglas"
 
 NIVEL_REGISTRO = 159460002
 EFECTO_RECHAZA = 159460001
+
+# DN-05: el contenido EXACTO sembrado de `plantilla.obligatoriedad` v3 (`playbooks/datos/parametros.md`), como
+# estructura JSON (no texto crudo: no depende de espacios ni del orden de las claves).
+_CAMPOS_DE_IDENTIFICACION = ["clasificacion", "nombreBeneficiario", "tipoIdentificacion", "numeroIdentificacion", "banco"]
+VALOR_V3_CANONICO = {
+    "porDefecto": "obligatorio",
+    "opcionales": [{"campo": "referencia"}, {"campo": "moneda"}],
+    "reglas": [
+        {"gestion": "Inclusion", "clasificacion": "*", "formato": "06",
+         "opcionales": ["clasificacion", "tipoIdentificacion", "banco"]},
+        {"gestion": "Inclusion", "clasificacion": "*", "formato": "10", "opcionales": ["banco"]},
+        {"gestion": "Inclusion", "clasificacion": "*", "formato": "11", "opcionales": ["clasificacion"]},
+    ],
+    "porGestion": {
+        "Exclusion": {"opcionales": [{"campo": c} for c in _CAMPOS_DE_IDENTIFICACION],
+                      "obligatorios": [{"campo": "referencia"}]},
+        "Modificacion": {"opcionales": [{"campo": c} for c in _CAMPOS_DE_IDENTIFICACION],
+                         "obligatorios": [{"campo": "referencia"}]},
+    },
+}
 
 # DD-16: la forma exacta de `plantilla.obligatoriedad` sanic_version=1 (sin `porGestion`). Se
 # compara como estructura JSON (no como texto crudo), para no depender de espacios/orden de claves.
@@ -96,6 +126,23 @@ def _mensaje_de(filas, numero):
         if f["sanic_numerofila"] == numero:
             return f.get("sanic_mensaje") or ""
     return None
+
+
+def _faltan(encabezados, *campos):
+    """El mensaje EXACTO de OBLIGATORIEDAD para esos campos (en el orden de la fila)."""
+    return "Faltan datos obligatorios: " + ", ".join(encabezados[c] for c in campos) + "."
+
+
+def _enviar(ctx, asunto, archivo, filas):
+    """Arma el Excel ad hoc, lo procesa con el REMITENTE de siempre y devuelve (sid, filas leídas)."""
+    ruta = ctx.excel_ad_hoc(archivo, filas)
+    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto=asunto, cantidad_adjuntos=1, cantidad_excel=1,
+                                     excel_a_subir=ruta)
+    return sid, sim.leer_filas(ctx.dv, sid)
+
+
+def _resumen(filas):
+    return str([(f["sanic_numerofila"], f["sanic_estado"], f.get("sanic_mensaje")) for f in filas])
 
 
 # ===========================================================================
@@ -321,19 +368,20 @@ def r04(ctx):
 
 
 def r05(ctx):
-    c = pc.Caso("R-05", "Plan formato 11 con clasificación que no es ACH")
+    c = pc.Caso("R-05", "Plan formato 11 con clasificación que no es ACH (CLASIFICACION_DEL_FORMATO, DN-05)")
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-05", cantidad_adjuntos=1, cantidad_excel=1,
                                      excel_a_subir=_excel("E05-formato11-no-ach.xlsx"))
     filas = sim.leer_filas(ctx.dv, sid)
     c.check("2 filas, Rechazada en validación", len(filas) == 2 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas))
     for f in filas:
         msg = f.get("sanic_mensaje") or ""
-        c.check(f"fila {f['sanic_numerofila']}: el mensaje dice 'solo admite la clasificación ACH'", "ach" in msg.lower())
+        c.check(f"fila {f['sanic_numerofila']}: el mensaje es exactamente el de CLASIFICACION_DEL_FORMATO (DN-05)",
+                msg == "El plan PR11 solo admite la clasificación ACH.", msg)
     return c
 
 
 def r06(ctx):
-    c = pc.Caso("R-06", "Campos obligatorios vacíos, y el opcional")
+    c = pc.Caso("R-06", "Campos obligatorios vacíos de una Inclusión en formato 11, y el opcional")
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-06", cantidad_adjuntos=1, cantidad_excel=1,
                                      excel_a_subir=_excel("E06-obligatoriedad.xlsx"))
     filas = sim.leer_filas(ctx.dv, sid)
@@ -392,10 +440,12 @@ def r09(ctx):
 
 
 def r10(ctx):
-    c = pc.Caso("R-10", "La referencia de formato 11 se construye sola (la prueba más importante del plan)")
+    c = pc.Caso("R-10", "La referencia de formato 11 se construye sola en la Inclusión (la prueba más importante del plan)")
     sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-10", cantidad_adjuntos=1, cantidad_excel=1,
                                      excel_a_subir=_excel("E01-feliz-formato11.xlsx"))
     filas = sim.leer_filas(ctx.dv, sid)
+    c.check("3 filas, todas Validada (E01: tres Inclusiones en PR11, DN-05)",
+            len(filas) == 3 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas), _resumen(filas))
     esperadas = {1: "00700010203040506070", 2: "00700011223344556677", 3: "00700099887766554433"}
     for f in filas:
         n = f["sanic_numerofila"]
@@ -423,9 +473,9 @@ def r12(ctx):
     filas = sim.leer_filas(ctx.dv, sid)
     c.check("1 fila, Validada", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_VALIDADA)
     if filas:
-        c.check("referencia = REF-LIBRE-000123 (tal cual, sin 007 ni ceros)", filas[0].get("sanic_referencia") == "REF-LIBRE-000123",
+        c.check("referencia = REFLIBRE000123 (tal cual, sin 007 ni ceros)", filas[0].get("sanic_referencia") == "REFLIBRE000123",
                 f"obtenida {filas[0].get('sanic_referencia')!r}")
-        c.check("referenciarecibida = REF-LIBRE-000123", filas[0].get("sanic_referenciarecibida") == "REF-LIBRE-000123")
+        c.check("referenciarecibida = REFLIBRE000123", filas[0].get("sanic_referenciarecibida") == "REFLIBRE000123")
     return c
 
 
@@ -564,29 +614,38 @@ def r17(ctx):
 
 
 def r18(ctx):
-    c = pc.Caso("R-18", "DN-03: `Exclusion` afloja numeroCuenta/banco/moneda")
+    c = pc.Caso("R-18", "DN-05: el criterio de `Exclusion` de la v3 (cuenta y referencia obligatorias, el resto opcional)")
     activo = ctx.extra["obligatoriedad_activa"]
     valor = activo.get("sanic_valor") or ""
     if "porGestion" not in valor or '"Exclusion"' not in valor:
-        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno: el "
-             "criterio ya está confirmado por el aprobador (2026-09-28, diseno/DIRECTRICES-NUEVAS.md, "
-             "DN-03) — esto es una precondición de entorno (podría faltar sembrar acá), no una duda "
-             f"sobre el criterio. Valor activo: {valor!r}")
+        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno: es una precondición "
+             "de entorno (falta sembrar la v3, DN-05), no una duda sobre el criterio. "
+             f"Valor activo: {valor!r}")
         return c
 
-    fila_dict = genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="ACH",
-                               nombre="Exclusion Prueba R-18", cuenta="", banco="", moneda="")
-    ruta = ctx.excel_ad_hoc("ZZ-R18-exclusion-aflojada.xlsx", [fila_dict])
-    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-18", cantidad_adjuntos=1,
-                                     cantidad_excel=1, excel_a_subir=ruta)
-    filas = sim.leer_filas(ctx.dv, sid)
-    c.check("1 fila, Validada (numeroCuenta/banco/moneda vacíos NO la rechazan)",
-            len(filas) == 1 and filas[0]["sanic_estado"] == FILA_VALIDADA,
-            str([(f["sanic_numerofila"], f["sanic_estado"], f.get("sanic_mensaje")) for f in filas]))
-    if filas and filas[0]["sanic_estado"] != FILA_VALIDADA:
-        msg = (filas[0].get("sanic_mensaje") or "").lower()
-        c.check("si rechazó, que NO sea citando numeroCuenta/banco/moneda (serían las reglas viejas, no DN-03)",
-                not any(x in msg for x in ("cuenta", "banco", "moneda")), msg)
+    ref = "REFEXCL0006"
+    filas_excel = [
+        # 1: lo mínimo de una exclusión (plan, referencia, cuenta); todo lo demás vacío. PR06 completa clasificación y banco.
+        genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia=ref, cuenta="10203040506070", moneda="", banco=""),
+        # 2: sin cuenta.
+        genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia=ref, cuenta="", moneda="", banco=""),
+        # 3: sin referencia.
+        genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia="", cuenta="10203040506070", moneda="", banco=""),
+    ]
+    sid, filas = _enviar(ctx, "Prueba R-18", "ZZ-R18-exclusion-aflojada.xlsx", filas_excel)
+    estados = {f["sanic_numerofila"]: f["sanic_estado"] for f in filas}
+    encabezados = ctx.extra["encabezados"]
+    c.check("fila 1 Validada (identificación, nombre, tipo ID, clasificación, banco y moneda vacíos NO la rechazan)",
+            len(filas) == 3 and estados.get(1) == FILA_VALIDADA, _resumen(filas))
+    c.check("fila 2 (sin cuenta) Rechazada en validación, y el mensaje nombra SOLO la cuenta",
+            estados.get(2) == FILA_RECH_VAL and _mensaje_de(filas, 2) == _faltan(encabezados, "numeroCuenta"),
+            _resumen(filas))
+    c.check("fila 3 (sin referencia) Rechazada en validación, y el mensaje nombra SOLO la referencia",
+            estados.get(3) == FILA_RECH_VAL and _mensaje_de(filas, 3) == _faltan(encabezados, "referencia"),
+            _resumen(filas))
     return c
 
 
@@ -695,72 +754,95 @@ def r19(ctx):
 
 
 def r20(ctx):
-    c = pc.Caso("R-20", "El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido")
-    activo = ctx.extra["obligatoriedad_activa"]
-    valor_crudo = activo.get("sanic_valor") or ""
-    if "porGestion" not in valor_crudo or '"Exclusion"' not in valor_crudo:
-        c.na("plantilla.obligatoriedad activo no trae 'porGestion.Exclusion' en este entorno "
-             "(el criterio ya está confirmado por el aprobador, 2026-09-28; esto es una precondición "
-             f"de entorno, no una duda sobre el criterio, DN-03) — no se puede evaluar hoy. "
-             f"Valor activo: {valor_crudo!r}")
+    c = pc.Caso("R-20", "El contenido sembrado de `plantilla.obligatoriedad` v3 es exactamente el de la matriz del negocio")
+    est, r, _ = ctx.dv.call(
+        "GET",
+        f"{PARAMETROS}?$select=sanic_valor,statecode&$filter=sanic_nombre eq 'plantilla.obligatoriedad'"
+        " and sanic_version eq 3")
+    filas = r.get("value", []) if est == 200 else []
+    if not filas:
+        c.na("plantilla.obligatoriedad no tiene versión 3 en este entorno: es una precondición de entorno "
+             f"(falta sembrar DN-05, `playbooks/datos/parametros.md`), no una duda sobre el criterio (HTTP {est}).")
         return c
+    c.check("la versión 3 está activa", filas[0].get("statecode") == 0, str(filas[0].get("statecode")))
     try:
-        datos = json.loads(valor_crudo)
+        datos = json.loads(filas[0].get("sanic_valor") or "{}")
     except json.JSONDecodeError as e:
-        c.check("el valor activo es JSON válido", False, str(e))
+        c.check("el valor de la v3 es JSON válido", False, str(e))
         return c
 
+    c.check("la v3 es EXACTAMENTE la sembrada (porDefecto, opcionales, reglas por formato y porGestion), "
+            "como estructura JSON", datos == VALOR_V3_CANONICO, f"obtenido {datos!r}")
+
+    # Lo que decidió el aprobador, nombrado campo por campo: si el JSON de arriba cambia, estos dicen QUÉ.
     por_gestion = datos.get("porGestion") or {}
-    entrada = por_gestion.get("Exclusion") or {}
-    aflojados = {o.get("campo") for o in (entrada.get("opcionales") or [])}
-    c.check("porGestion.Exclusion.opcionales es EXACTAMENTE {numeroCuenta, banco, moneda} (ni más ni menos)",
-            aflojados == {"numeroCuenta", "banco", "moneda"}, f"obtenido {sorted(aflojados)}")
-
-    endurecidos = {o.get("campo") for o in (entrada.get("obligatorios") or [])}
-    c.check("Exclusion no trae ningún campo en `obligatorios` (el aprobador solo pidió aflojar)",
-            not endurecidos, f"obtenido {sorted(endurecidos)}")
-
-    otras = set(por_gestion) - {"Exclusion"}
-    c.check("ninguna otra gestión tiene entrada en porGestion todavía (ver R-21)",
-            not otras, f"obtenido {sorted(otras)}")
+    for gestion in ("Exclusion", "Modificacion"):
+        entrada = por_gestion.get(gestion) or {}
+        opcionales = {o.get("campo") for o in (entrada.get("opcionales") or [])}
+        obligatorios = {o.get("campo") for o in (entrada.get("obligatorios") or [])}
+        c.check(f"{gestion}: opcionales = clasificación, nombre, tipo ID, identificación y banco",
+                opcionales == set(_CAMPOS_DE_IDENTIFICACION), f"obtenido {sorted(opcionales)}")
+        c.check(f"{gestion}: la referencia es obligatoria (cuenta y plan lo son por el bloque global)",
+                obligatorios == {"referencia"}, f"obtenido {sorted(obligatorios)}")
+    c.check("el bloque global deja opcionales la referencia y la moneda, y nada más",
+            {o.get("campo") for o in datos.get("opcionales", [])} == {"referencia", "moneda"})
     return c
 
 
 def r21(ctx):
-    c = pc.Caso("R-21", "`Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía")
+    c = pc.Caso("R-21", "DN-05: `Inclusion` tiene sus `reglas` por formato y `Modificacion` su entrada en `porGestion`")
     activo = ctx.extra["obligatoriedad_activa"]
-    valor_crudo = activo.get("sanic_valor") or ""
     try:
-        datos = json.loads(valor_crudo) if valor_crudo else {}
+        datos = json.loads(activo.get("sanic_valor") or "{}")
     except json.JSONDecodeError as e:
         c.check("el valor activo es JSON válido", False, str(e))
         return c
 
-    claves_normalizadas = {k.strip().lower() for k in (datos.get("porGestion") or {})}
-    if "inclusion" in claves_normalizadas or "modificacion" in claves_normalizadas:
-        c.na("plantilla.obligatoriedad activo YA trae una entrada de porGestion para Inclusion o "
-             f"Modificacion (cambió desde que se escribió este caso): {datos.get('porGestion')!r} — "
-             "este caso asume que siguen sin aflojamiento y hay que reescribirlo contra la forma nueva.")
-        return c
+    # Solo lectura: las dos entradas que antes de DN-05 no existían.
+    reglas = {(str(r.get("gestion")), str(r.get("formato"))): set(r.get("opcionales") or [])
+              for r in (datos.get("reglas") or [])}
+    c.check("Inclusion·06 aflojan clasificación, tipo ID y banco",
+            reglas.get(("Inclusion", "06")) == {"clasificacion", "tipoIdentificacion", "banco"}, str(reglas))
+    c.check("Inclusion·10 afloja solo el banco", reglas.get(("Inclusion", "10")) == {"banco"}, str(reglas))
+    c.check("Inclusion·11 afloja solo la clasificación", reglas.get(("Inclusion", "11")) == {"clasificacion"}, str(reglas))
+    claves = {k.strip().lower() for k in (datos.get("porGestion") or {})}
+    c.check("porGestion trae Exclusion y Modificacion (y ninguna Inclusion: esa va por `reglas`)",
+            claves == {"exclusion", "modificacion"}, str(sorted(claves)))
 
-    ruta = ctx.excel_ad_hoc("ZZ-R21-inclusion-modificacion-sin-aflojar.xlsx", [
-        genexcel.fila(gestion="Inclusion", plan="PR11", clasificacion="ACH",
-                      nombre="Inclusion Prueba R-21", cuenta="", banco="", moneda=""),
-        genexcel.fila(gestion="Modificacion", plan="PR11", clasificacion="ACH",
-                      nombre="Modificacion Prueba R-21", cuenta="", banco="", moneda=""),
-    ])
-    sid, mid, rc, rv = ctx.procesar(remitente=REMITENTE, asunto="Prueba R-21", cantidad_adjuntos=1,
-                                     cantidad_excel=1, excel_a_subir=ruta)
-    filas = sim.leer_filas(ctx.dv, sid)
-    c.check("2 filas, ambas Rechazada en validación (Inclusion y Modificacion NO se aflojan)",
-            len(filas) == 2 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas),
-            str([(f["sanic_numerofila"], f["sanic_estado"]) for f in filas]))
+    # En vivo: PR06 admite las tres gestiones; PR10 y PR11 sirven para lo obligatorio de la Inclusión.
     encabezados = ctx.extra["encabezados"]
-    for f in filas:
-        msg = f.get("sanic_mensaje") or ""
-        c.check(f"fila {f['sanic_numerofila']}: el mensaje cita al menos uno de numeroCuenta/banco/moneda "
-                "(siguen obligatorios; el bloque global no se aflojó)",
-                any(encabezados[campo] in msg for campo in ("numeroCuenta", "banco", "moneda")), msg)
+    filas_excel = [
+        # 1: Inclusión 06 con clasificación, tipo ID, banco y moneda vacíos: Validada.
+        genexcel.fila(gestion="Inclusion", plan="PR06", clasificacion="", nombre="Inclusion Seis Prueba",
+                      tipoid="", moneda="", banco=""),
+        # 2: Inclusión 10 sin clasificación: obligatoria (el formato admite dos, no se completa).
+        genexcel.fila(gestion="Inclusion", plan="PR10", clasificacion="", nombre="Inclusion Diez Prueba",
+                      moneda="USD", banco=""),
+        # 3: Inclusión 11 sin banco: obligatorio.
+        genexcel.fila(gestion="Inclusion", plan="PR11", clasificacion="ACH", nombre="Inclusion Once Prueba", banco=""),
+        # 4: Modificación 06 con solo plan, referencia y cuenta: Validada.
+        genexcel.fila(gestion="Modificacion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia="REFMODI0001", cuenta="10203040506070", moneda="", banco=""),
+        # 5: Modificación 06 sin referencia: obligatoria.
+        genexcel.fila(gestion="Modificacion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia="", cuenta="10203040506070", moneda="", banco=""),
+    ]
+    sid, filas = _enviar(ctx, "Prueba R-21", "ZZ-R21-inclusion-modificacion-sin-aflojar.xlsx", filas_excel)
+    estados = {f["sanic_numerofila"]: f["sanic_estado"] for f in filas}
+    c.check("5 filas leídas", len(filas) == 5, _resumen(filas))
+    c.check("fila 1 (Inclusión 06, sin clasificación/tipo ID/banco/moneda) Validada",
+            estados.get(1) == FILA_VALIDADA, _resumen(filas))
+    c.check("fila 2 (Inclusión 10 sin clasificación) rechazada: 'Faltan datos obligatorios: Clasificación.'",
+            estados.get(2) == FILA_RECH_VAL and _mensaje_de(filas, 2) == _faltan(encabezados, "clasificacion"),
+            _resumen(filas))
+    c.check("fila 3 (Inclusión 11 sin banco) rechazada: 'Faltan datos obligatorios: Banco.'",
+            estados.get(3) == FILA_RECH_VAL and _mensaje_de(filas, 3) == _faltan(encabezados, "banco"),
+            _resumen(filas))
+    c.check("fila 4 (Modificación 06, solo plan/referencia/cuenta) Validada",
+            estados.get(4) == FILA_VALIDADA, _resumen(filas))
+    c.check("fila 5 (Modificación 06 sin referencia) rechazada: 'Faltan datos obligatorios: Referencia.'",
+            estados.get(5) == FILA_RECH_VAL and _mensaje_de(filas, 5) == _faltan(encabezados, "referencia"),
+            _resumen(filas))
     return c
 
 
@@ -913,5 +995,171 @@ def r28(ctx):
     return c
 
 
+# ===========================================================================
+# R-29 .. R-38 — DN-05 (2026-10-06): un caso por comportamiento nuevo. Cada uno arma su Excel ad hoc y su
+# Solicitud, y cada fila falla SOLO por la regla que prueba (o por ninguna).
+# ===========================================================================
+def r29(ctx):
+    c = pc.Caso("R-29", "DN-05, escenario 9: clasificación ACH en un plan 06 (CLASIFICACION_DEL_FORMATO)")
+    sid, filas = _enviar(ctx, "Prueba R-29", "ZZ-R29-ach-en-formato06.xlsx", [
+        genexcel.fila(plan="PR06", clasificacion="ACH", nombre="Seis Con ACH")])
+    c.check("1 fila, Rechazada en validación", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_RECH_VAL, _resumen(filas))
+    c.check("el mensaje es exactamente 'El plan PR06 solo admite la clasificación BAC.'",
+            _mensaje_de(filas, 1) == "El plan PR06 solo admite la clasificación BAC.", _resumen(filas))
+    return c
+
+
+def r30(ctx):
+    c = pc.Caso("R-30", "DN-05, escenario 10: CK en un plan 11 y CK en un plan 06")
+    sid, filas = _enviar(ctx, "Prueba R-30", "ZZ-R30-ck-en-formato11-y-06.xlsx", [
+        genexcel.fila(plan="PR11", clasificacion="CK", nombre="Once Con CK Diez"),
+        genexcel.fila(plan="PR06", clasificacion="CK", nombre="Seis Con CK"),
+    ])
+    c.check("2 filas, ambas Rechazada en validación",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas), _resumen(filas))
+    c.check("fila 1 (PR11): 'El plan PR11 solo admite la clasificación ACH.'",
+            _mensaje_de(filas, 1) == "El plan PR11 solo admite la clasificación ACH.", _resumen(filas))
+    c.check("fila 2 (PR06): 'El plan PR06 solo admite la clasificación BAC.'",
+            _mensaje_de(filas, 2) == "El plan PR06 solo admite la clasificación BAC.", _resumen(filas))
+    return c
+
+
+def r31(ctx):
+    c = pc.Caso("R-31", "DN-05: clasificación y banco vacíos se completan y se GUARDAN (06 → BAC/BAC; 10 → banco BAC)")
+    sid, filas = _enviar(ctx, "Prueba R-31", "ZZ-R31-clasificacion-y-banco-vacios.xlsx", [
+        genexcel.fila(plan="PR06", clasificacion="", banco="", nombre="Seis Vacios"),
+        genexcel.fila(plan="PR10", clasificacion="CK", banco="", moneda="USD", nombre="Diez Sin Banco"),
+    ])
+    c.check("2 filas, ambas Validada",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas), _resumen(filas))
+    por_n = {f["sanic_numerofila"]: f for f in filas}
+    f1, f2 = por_n.get(1, {}), por_n.get(2, {})
+    c.check("fila 1 (PR06): sanic_clasificacion guardada = BAC", f1.get("sanic_clasificacion") == CLASIF_BAC,
+            str(f1.get("sanic_clasificacion")))
+    c.check("fila 1 (PR06): sanic_banco guardado = BAC", f1.get("sanic_banco") == BANCO_BAC, str(f1.get("sanic_banco")))
+    c.check("fila 2 (PR10): la clasificación recibida (CK) se respeta, no se pisa",
+            f2.get("sanic_clasificacion") == CLASIF_CK, str(f2.get("sanic_clasificacion")))
+    c.check("fila 2 (PR10): sanic_banco guardado = BAC", f2.get("sanic_banco") == BANCO_BAC, str(f2.get("sanic_banco")))
+    return c
+
+
+def r32(ctx):
+    c = pc.Caso("R-32", "DN-05: Modificación en un plan 11 (GESTION_DEL_FORMATO)")
+    sid, filas = _enviar(ctx, "Prueba R-32", "ZZ-R32-modificacion-en-formato11.xlsx", [
+        genexcel.fila(gestion="Modificacion", plan="PR11", clasificacion="ACH", referencia="REFMODI0011",
+                      cuenta="10203040506070", nombre="")])
+    c.check("1 fila, Rechazada en validación", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_RECH_VAL, _resumen(filas))
+    c.check("el mensaje es exactamente 'El plan PR11 no admite la gestión Modificacion.' (y nada más: "
+            "la obligatoriedad de la Modificación está cumplida)",
+            _mensaje_de(filas, 1) == "El plan PR11 no admite la gestión Modificacion.", _resumen(filas))
+    return c
+
+
+def r33(ctx):
+    c = pc.Caso("R-33", "DN-05: Exclusión en un plan 11, con referencia y sin banco — la referencia es la RECIBIDA")
+    sid, filas = _enviar(ctx, "Prueba R-33", "ZZ-R33-exclusion-formato11.xlsx", [
+        genexcel.fila(gestion="Exclusion", plan="PR11", clasificacion="ACH", referencia="REFEXCL0001",
+                      cuenta="10203040506070", nombre="", tipoid="", numeroid="", moneda="", banco="")])
+    c.check("1 fila, Validada", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_VALIDADA, _resumen(filas))
+    if filas:
+        c.check("sanic_referencia = REFEXCL0001 (la recibida; en la Exclusión NO se arma con banco + cuenta)",
+                filas[0].get("sanic_referencia") == "REFEXCL0001", f"obtenida {filas[0].get('sanic_referencia')!r}")
+        c.check("sanic_referenciarecibida = REFEXCL0001", filas[0].get("sanic_referenciarecibida") == "REFEXCL0001",
+                f"obtenida {filas[0].get('sanic_referenciarecibida')!r}")
+    return c
+
+
+def r34(ctx):
+    c = pc.Caso("R-34", "DN-05: Exclusión sin referencia (la referencia es obligatoria en la Exclusión)")
+    sid, filas = _enviar(ctx, "Prueba R-34", "ZZ-R34-exclusion-sin-referencia.xlsx", [
+        genexcel.fila(gestion="Exclusion", plan="PR11", clasificacion="ACH", referencia="",
+                      cuenta="10203040506070", nombre="", tipoid="", numeroid="", moneda="", banco="")])
+    c.check("1 fila, Rechazada en validación", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_RECH_VAL, _resumen(filas))
+    c.check("el mensaje es exactamente 'Faltan datos obligatorios: Referencia.'",
+            _mensaje_de(filas, 1) == _faltan(ctx.extra["encabezados"], "referencia"), _resumen(filas))
+    return c
+
+
+def r35(ctx):
+    c = pc.Caso("R-35", "DN-05, escenario 21: caracteres no permitidos (CARACTERES_PERMITIDOS) — el mensaje NO trae el valor")
+    enc = ctx.extra["encabezados"]
+    n, ref = enc["nombreBeneficiario"], enc["referencia"]
+    sid, filas = _enviar(ctx, "Prueba R-35", "ZZ-R35-caracteres.xlsx", [
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Nuñez Prueba"),
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Jose Ramírez"),
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Nombre Correcto", referencia="REF-0001"),
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Peña Dos", referencia="REF-0002"),
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Prueba 123"),
+    ])
+    c.check("5 filas, todas Rechazada en validación",
+            len(filas) == 5 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas), _resumen(filas))
+    esperados = {
+        1: f"Caracteres no permitidos: {n} (ñ).",
+        2: f"Caracteres no permitidos: {n} (í).",
+        3: f"Caracteres no permitidos: {ref} (-).",
+        4: f"Caracteres no permitidos: {n} (ñ); {ref} (-).",
+        5: f"Caracteres no permitidos: {n} (1 2 3).",
+    }
+    for num, esperado in esperados.items():
+        c.check(f"fila {num}: el mensaje es exactamente {esperado!r}", _mensaje_de(filas, num) == esperado, _resumen(filas))
+    for num, valor in {1: "Nuñez Prueba", 2: "Ramírez", 3: "REF-0001", 4: "Peña Dos", 5: "Prueba 123"}.items():
+        c.check(f"fila {num}: el mensaje NO contiene el valor completo {valor!r} (D-41)",
+                valor not in (_mensaje_de(filas, num) or ""), _resumen(filas))
+    return c
+
+
+def r36(ctx):
+    c = pc.Caso("R-36", "DN-05, escenario 20: cuenta de 8 dígitos en un plan 06, banco vacío → BAC (9-16) (CUENTA_DEL_BANCO)")
+    sid, filas = _enviar(ctx, "Prueba R-36", "ZZ-R36-cuenta-corta-formato06.xlsx", [
+        genexcel.fila(plan="PR06", clasificacion="BAC", banco="", cuenta="12345678", nombre="Cuenta Corta Seis")])
+    c.check("1 fila, Rechazada en validación", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_RECH_VAL, _resumen(filas))
+    msg = _mensaje_de(filas, 1) or ""
+    c.check("el mensaje es exactamente 'El largo de la cuenta no corresponde al banco BAC.'",
+            msg == "El largo de la cuenta no corresponde al banco BAC.", msg)
+    c.check("el mensaje NO trae el largo ni la cuenta (D-41)", "12345678" not in msg and "8" not in msg, msg)
+    return c
+
+
+def r37(ctx):
+    c = pc.Caso("R-37", "DN-05, escenario 20: PR11 con LAFISE y 9 dígitos, y con ATLANTIDA y 17 dígitos, son válidas")
+    sid, filas = _enviar(ctx, "Prueba R-37", "ZZ-R37-cuenta-por-banco-formato11.xlsx", [
+        genexcel.fila(plan="PR11", clasificacion="ACH", banco="LAFISE", cuenta="123456789", nombre="Lafise Nueve"),
+        genexcel.fila(plan="PR11", clasificacion="ACH", banco="ATLANTIDA", cuenta="12345678901234567",
+                      nombre="Atlantida Diecisiete"),
+    ])
+    c.check("2 filas, ambas Validada (LAFISE 9-16; ATLANTIDA usa el porDefecto 6-17)",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_VALIDADA for f in filas), _resumen(filas))
+    por_n = {f["sanic_numerofila"]: f for f in filas}
+    c.check("fila 1: banco guardado = LAFISE", por_n.get(1, {}).get("sanic_banco") == BANCO_LAFISE,
+            str(por_n.get(1, {}).get("sanic_banco")))
+    c.check("fila 2: banco guardado = ATLANTIDA", por_n.get(2, {}).get("sanic_banco") == BANCO_ATLANTIDA,
+            str(por_n.get(2, {}).get("sanic_banco")))
+    c.check("fila 1: la referencia mide 20 (006 + cuenta a 17)", len(por_n.get(1, {}).get("sanic_referencia") or "") == 20,
+            str(por_n.get(1, {}).get("sanic_referencia")))
+    c.check("fila 2: la referencia mide 20 (037 + 17 dígitos)", len(por_n.get(2, {}).get("sanic_referencia") or "") == 20,
+            str(por_n.get(2, {}).get("sanic_referencia")))
+    return c
+
+
+def r38(ctx):
+    c = pc.Caso("R-38", "DN-05: plan ajeno (PRNA) — las reglas por formato NO hablan (sin fuga del formato del plan)")
+    sid, filas = _enviar(ctx, "Prueba R-38", "ZZ-R38-plan-ajeno-sin-fuga.xlsx", [
+        # clasificación y banco que el formato del plan no admitiría, gestión Modificación
+        genexcel.fila(gestion="Modificacion", plan="PRNA", clasificacion="ACH", banco="LAFISE", referencia="REFAJENO001",
+                      nombre="Plan Ajeno Uno"),
+        # cuenta de 8 dígitos (con el banco efectivo BAC no pasaría)
+        genexcel.fila(plan="PRNA", clasificacion="BAC", banco="", cuenta="12345678", nombre="Plan Ajeno Dos"),
+    ])
+    c.check("2 filas, ambas Sin autorización",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_SIN_AUT for f in filas), _resumen(filas))
+    for num in (1, 2):
+        msg = _mensaje_de(filas, num) or ""
+        c.check(f"fila {num}: el mensaje nombra el plan PRNA", "PRNA" in msg, msg)
+        for frag in ("solo admite", "no admite", "no corresponde al banco"):
+            c.check(f"fila {num}: el mensaje NO contiene {frag!r} (ninguna regla por formato habló)", frag not in msg, msg)
+    return c
+
+
 CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18,
-         r19, r20, r21, r22, r23, r24, r25, r26, r27, r28]
+         r19, r20, r21, r22, r23, r24, r25, r26, r27, r28,
+         r29, r30, r31, r32, r33, r34, r35, r36, r37, r38]
