@@ -505,11 +505,14 @@ que sí tiene un `safe=` explícito), así que cualquier `$filter` de Graph con 
 `InvalidURL`. Se resolvió local (este set no es dueño de `graph_api.py`) pero es un defecto real del
 propio `graph_api.py`, no algo para repetir en cada set que lo use — candidato a corregir en
 `graph_api.py::Graph.call()` directamente (el mismo `safe=` que ya usa `dataverse_api.py`) la próxima
-vez que alguien lo toque. `_folders_buzon_ingesta()`, `_mensaje_por_asunto_en_carpeta()`,
+vez que alguien lo toque.
+`_folders_buzon_ingesta()`, `_mensaje_por_asunto_en_carpeta()`,
 `_esperar_mensaje_en_carpeta()` y `_limpiar_correo_real()` son candidatas a subir a un módulo común si
 otro set real necesita correo real contra un buzón de Graph con carpetas (hoy `set_v.py::v02()` y
 `set_m.py` ya tienen su propia versión de "mandar y esperar", con otro criterio de correlación —
 asunto contra Dataverse, no carpeta de Graph — así que no son el mismo helper todavía).
+
+**Corrección 2026-10-06 (la nota de arriba ya es historia).** `graph_api.py::Graph.call()` pasó a url-encodear la ruta (commit `a7e493b`), así que el `_q()` local doble-codificaba el `$filter` (`subject%2520eq…`) y Graph contestaba 400 "character '%' is not valid"; como `_mensaje_por_asunto_en_carpeta()` devolvía `None` si el HTTP no era 200, el 400 se leía como "el correo no llegó". Se eliminó `_q()` (las rutas van crudas a `Graph.call()`) y esa función ahora lanza error con el código y el cuerpo ante cualquier HTTP distinto de 200; C-05 lo reporta como FALLA visible.
 
 ---
 

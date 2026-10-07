@@ -40,7 +40,6 @@ en el propio `c06()` y en el MD.
 import os
 import sys
 import time
-import urllib.parse
 import uuid
 
 _AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -205,20 +204,16 @@ def cerrar(ctx):
 # ===========================================================================
 # Helpers de C-05/C-06 — correo real contra el buzón de producción, por Graph.
 #
-# `graph_api.Graph.call()` NO url-encodea `ruta` (a diferencia de
-# `dataverse_api.Dataverse.call()`, que sí lo hace con un `safe=` explícito) — un `$filter` con
-# espacios ("subject eq 'x'") revienta con `InvalidURL: URL can't contain control characters`.
-# Confirmado hoy contra el entorno real antes de escribir nada más. `_q()` acá abajo aplica el
-# MISMO `safe=` que ya usa `dataverse_api.py`, sin tocar `graph_api.py` (no es de este set).
+# NOTA 2026-10-06: `graph_api.Graph.call()` YA url-encodea `ruta` por sí mismo (commit a7e493b,
+# mismo `safe=` que `dataverse_api.py`). Hasta el 2026-09-28 `graph_api.py` NO lo hacía y este set
+# traía un `_q()` local que codificaba antes de llamar; tras a7e493b eso doble-codificaba el
+# `$filter` ("%2520") y Graph contestaba 400 "character '%' is not valid". `_q()` se eliminó: las
+# rutas se pasan CRUDAS a `Graph.call()`.
 # ===========================================================================
-def _q(ruta):
-    return urllib.parse.quote(ruta, safe="/?&=$(),'@._-:")
-
-
 def _folders_buzon_ingesta(g):
     """IDs de Graph de las carpetas `Inbox` y `Procesados` del buzón REAL de ingesta — una sola
     consulta, para no listar las carpetas dos veces por caso."""
-    est, r = g.call("GET", _q(f"users/{sim.BUZON_INGESTA}/mailFolders?$top=50&$select=id,displayName"))
+    est, r = g.call("GET", f"users/{sim.BUZON_INGESTA}/mailFolders?$top=50&$select=id,displayName")
     if est != 200:
         raise RuntimeError(f"no se pudieron listar las carpetas del buzón real de ingesta (HTTP {est}): {r}")
     carpetas = {f["displayName"]: f["id"] for f in r.get("value", [])}
@@ -234,9 +229,13 @@ def _mensaje_por_asunto_en_carpeta(g, folder_id, asunto):
     ingesta. `id` es el identificador de Graph DENTRO DE ESA carpeta — es justo lo que `MoveV2`
     cambia (D-66) si el tenant no tiene "Immutable Id" habilitado."""
     est, r = g.call(
-        "GET", _q(f"users/{sim.BUZON_INGESTA}/mailFolders/{folder_id}/messages"
-                  f"?$filter=subject eq '{asunto}'&$select=id,internetMessageId&$top=1"))
-    if est == 200 and r.get("value"):
+        "GET", f"users/{sim.BUZON_INGESTA}/mailFolders/{folder_id}/messages"
+               f"?$filter=subject eq '{asunto}'&$select=id,internetMessageId&$top=1")
+    if est != 200:
+        # Nunca tragar un error de Graph como "el correo no llegó" (defecto del 2026-10-06).
+        raise RuntimeError(f"Graph contestó HTTP {est} al buscar el asunto {asunto!r} en la carpeta "
+                            f"{folder_id}: {r}")
+    if r.get("value"):
         return r["value"][0]
     return None
 
@@ -277,8 +276,8 @@ def _limpiar_correo_real(g, asunto):
     el motivo y sigue, igual que `Contexto.limpiar_solicitudes()` — un residuo acá es grave (buzón
     de PRODUCCIÓN) pero no puede tumbar el resto de la limpieza del set."""
     try:
-        est, r = g.call("GET", _q(f"users/{sim.BUZON_INGESTA}/messages?$filter=subject eq '{asunto}'"
-                                   "&$select=id&$top=10"))
+        est, r = g.call("GET", f"users/{sim.BUZON_INGESTA}/messages?$filter=subject eq '{asunto}'"
+                                  "&$select=id&$top=10")
     except Exception as e:
         return [f"no se pudo buscar el correo real de C-05/C-06 para borrarlo del buzón de ingesta "
                 f"(asunto {asunto!r}, REVISAR A MANO): {type(e).__name__}: {e}"]
@@ -287,7 +286,7 @@ def _limpiar_correo_real(g, asunto):
                 f"asunto {asunto!r}, REVISAR A MANO): {r}"]
     errores = []
     for m in r.get("value", []):
-        est_del, r_del = g.call("DELETE", _q(f"users/{sim.BUZON_INGESTA}/messages/{m['id']}"))
+        est_del, r_del = g.call("DELETE", f"users/{sim.BUZON_INGESTA}/messages/{m['id']}")
         if est_del not in (200, 204):
             errores.append(f"no se pudo borrar el correo real de prueba {m['id']} del buzón de "
                             f"ingesta (HTTP {est_del}, REVISAR A MANO): {r_del}")
@@ -475,7 +474,11 @@ def c05(ctx):
     # Capturado ANTES de MoveV2, mientras el correo todavía está en Inbox — es el ÚNICO momento en
     # que se puede leer el identificador "de antes". `MPPP-REC` sondea cada 1 minuto (verificado
     # hoy contra el `recurrence` de `mppp-rec.json`), así que hay una ventana real de hasta 60s.
-    antes = _esperar_mensaje_en_carpeta(g, id_inbox, asunto, timeout=90)
+    try:
+        antes = _esperar_mensaje_en_carpeta(g, id_inbox, asunto, timeout=90)
+    except Exception as e:
+        c.check("la búsqueda del correo en Inbox no devolvió error de Graph", False, f"{type(e).__name__}: {e}")
+        return c
     c.check("el correo real llegó a la bandeja de entrada del buzón de ingesta (identificador "
             "capturado ANTES de MoveV2)", antes is not None,
             "no apareció en Inbox en 90s buscando el asunto único — Graph pudo no haber entregado "
@@ -484,7 +487,11 @@ def c05(ctx):
     # Margen: recurrence de MPPP-REC (1 min) + tiempo de ejecución de MPPP-ING (varias llamadas con
     # reintento) + colchón — bastante menos que el margen de 10+ minutos que usa V-02 para MPPP-VIG
     # (esa recurre cada 10 min; esta, cada 1).
-    despues = _esperar_mensaje_en_carpeta(g, id_procesados, asunto, timeout=280)
+    try:
+        despues = _esperar_mensaje_en_carpeta(g, id_procesados, asunto, timeout=280)
+    except Exception as e:
+        c.check("la búsqueda del correo en Procesados no devolvió error de Graph", False, f"{type(e).__name__}: {e}")
+        return c
     c.check("el correo terminó en la carpeta 'Procesados' del buzón real (MPPP-REC + MPPP-ING lo "
             "procesaron de punta a punta; margen ~4-5 min)", despues is not None,
             "no apareció en Procesados dentro del margen — si MPPP-REC está desactivado (statecode "
