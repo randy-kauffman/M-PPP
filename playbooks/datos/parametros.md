@@ -93,6 +93,14 @@ agregar la fila nueva al playbook: no hay que borrar ni desactivar la anterior p
 tome efecto, y **nunca se edita `sanic_valor` de una fila ya sembrada** para cambiar una regla de
 negocio (eso es lo que exige DN-03 con `plantilla.obligatoriedad`).
 
+> **Corrección 2026-10-06: la versión anterior SÍ se desactiva.** Que la nueva "tome efecto" sin desactivar la anterior
+> es cierto para el MOTOR, pero DD-02 (`diseno/02-diccionario-datos.md` §2.5, `sanic_version`) dice "Cambiar = crear una
+> versión nueva y **desactivar la anterior**": una sola versión activa por parámetro. El release 1.2.0.0 ya tuvo que
+> corregir `carga.filas.maximo` por esto, y el 2026-10-06 quedaron otra vez duplicadas `plantilla.obligatoriedad` y
+> `plantilla.estructura`. `parametro.py` todavía NO desactiva la anterior (D-76): hasta que lo haga, después de versionar
+> un parámetro hay que desactivar a mano la versión previa (`statecode` 1, `statuscode` 2, sin tocar `sanic_valor`).
+> R-26 lo comprueba en toda la tabla.
+
 **Cómo se cambia un parámetro desde la línea de comandos (D-53, 2026-09-28).** La auditoría probó 7 UPDATE
 a mano sobre esta tabla el 2026-09-24 (D-53/D-55, `PENDIENTES.md`): no por malicia, por comodidad — editar
 el valor en el portal es más corto que editar a mano el JSON de este archivo sin romper nada. En vez de
