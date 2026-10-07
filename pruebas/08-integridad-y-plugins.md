@@ -14,7 +14,7 @@ graves de todo el plan, y las tres se corrigen acá:
    autorización duplicada la hace una **clave alternativa** (`sanic_mppp_key_autorizacionplan_autorizado_plan`),
    nunca un plugin — no existe ni existió ningún `IntegridadAutorizacionPlanStep`. Ver I-05.
 2. **I-09 decía "10 tipos"; en vivo, el 2026-09-27, son 13** (8 clases de step + 5 Custom API,
-   `GET plugintypes` filtrado por el ensamblado). Ver I-09.
+   `GET plugintypes` filtrado por el ensamblado). Ver I-09. *(Nota 2026-10-06: desde DN-04, 2026-10-01, son 15 — se sumaron `CargarCatalogosApi` y `CambiarEstadoCatalogosApi`.)*
 3. **Dos casos citaban un archivo ajeno** (`pruebas/README.md`, la deuda declarada del
    2026-09-27: "cuatro en `04`, **dos en `08`** y uno en `07`"): I-05 decía "una autorización
    existente (P-03, `00-preparacion.md`)" e I-07 decía "una Fila existente (la de C-01 alcanza,
@@ -34,7 +34,7 @@ prosa "8 steps con su función", este archivo **nombra los 20 registros de step,
 su mensaje, su etapa y su tabla, y los verifica contra `sdkmessageprocessingsteps` EN VIVO (I-10).
 Un conteo envejece con cada step nuevo; una lista de nombres, no.
 
-**Los 13 tipos de plugin registrados** (8 clases de step + 5 Custom API — las Custom API no son
+**Los 15 tipos de plugin registrados** (8 clases de step + 7 Custom API — las Custom API no son
 steps y no se prueban en este archivo, las cubre `simulador.py`/`02`/`03`):
 
 | Clase | Qué protege |
@@ -355,7 +355,7 @@ en el botón).
 
 **Qué prueba.** Que el ensamblado en el sandbox tenga registrados exactamente los tipos de plugin
 del repositorio — **nombrados, no contados** (CONVENCIONES §7: la versión anterior de este caso
-decía "10 tipos"; hoy hay 13).
+decía "10 tipos"; hoy hay 15, desde DN-04).
 
 **Necesita.** Credenciales de lectura en Dataverse (las que ya usa `preparar()` de este set).
 
@@ -368,14 +368,14 @@ python3 herramientas/construir/paquete_plugins.py playbooks/paquete-plugins/sani
 y además, dentro del caso, `GET plugintypes` filtrado por el ensamblado, para nombrar cada uno.
 
 **Qué tiene que pasar.** `"estado": "ya_existia"` (la herramienta ya compara por NOMBRE lo que
-falta y lo que sobra — D-57 c, no un conteo), **y** cada uno de estos 13 tipos presente en
+falta y lo que sobra — D-57 c, no un conteo), **y** cada uno de estos 15 tipos presente en
 `plugintypes`, **sin ninguno de más**:
 
 `Sanic.Mppp.Plugins.Steps.ListaBlancaStep` · `NormalizarYValidarStep` · `NombreCalculadoStep` ·
 `TransicionDeFilaStep` · `PostTransicionDeFilaStep` · `AtenderPorClasificarStep` ·
 `RevisionAtendidaStep` · `IntegridadDeReglaStep` — y `Sanic.Mppp.Plugins.Api.ClasificarCorreoApi` ·
 `ExportarParaDigitarApi` · `ObtenerFilasPendientesApi` · `RegistrarResultadoRpaApi` ·
-`ValidarSolicitudApi`.
+`ValidarSolicitudApi` · `CargarCatalogosApi` · `CambiarEstadoCatalogosApi` (estas dos, desde DN-04, 2026-10-01).
 
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-09`).
 
@@ -558,7 +558,7 @@ otros roles dan 400 por falta de rol y el resultado mentiría sobre lo que en re
 | I-06 nombre calculado (4 tablas) | | |
 | **I-07 lista blanca (humano vs. identidad exenta)** | | **OK — no es defecto (reescrito 2026-09-27); falta que se cierre `diseno/PENDIENTES.md` entrada I-07** |
 | **I-08 transición ilegal** | | |
-| I-09 paquete al día (13 tipos) | | |
+| I-09 paquete al día (15 tipos) | | |
 | I-10 los 20 steps, uno por uno | | |
 | I-11 autorización por cliente duplicada (fase 2) | | |
 | I-12 puerta del RPA (fase 2) | | |

@@ -1,5 +1,5 @@
 # Plan de pruebas funcionales — MPPP
-Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · generado el 2026-10-02 por `herramientas/pruebas/armar_plan_completo.py`
+Proyecto `2026-001-referencias-planes-pago` · Entorno **Dev** · generado el 2026-10-06 por `herramientas/pruebas/armar_plan_completo.py`
 
 Este documento junta `README.md` y los 13 archivos de `pruebas/` en uno solo, para
 leerlo de corrido. Los archivos separados (y los Excel) están en el repositorio, en
@@ -1006,11 +1006,14 @@ que sí tiene un `safe=` explícito), así que cualquier `$filter` de Graph con 
 `InvalidURL`. Se resolvió local (este set no es dueño de `graph_api.py`) pero es un defecto real del
 propio `graph_api.py`, no algo para repetir en cada set que lo use — candidato a corregir en
 `graph_api.py::Graph.call()` directamente (el mismo `safe=` que ya usa `dataverse_api.py`) la próxima
-vez que alguien lo toque. `_folders_buzon_ingesta()`, `_mensaje_por_asunto_en_carpeta()`,
+vez que alguien lo toque.
+`_folders_buzon_ingesta()`, `_mensaje_por_asunto_en_carpeta()`,
 `_esperar_mensaje_en_carpeta()` y `_limpiar_correo_real()` son candidatas a subir a un módulo común si
 otro set real necesita correo real contra un buzón de Graph con carpetas (hoy `set_v.py::v02()` y
 `set_m.py` ya tienen su propia versión de "mandar y esperar", con otro criterio de correlación —
 asunto contra Dataverse, no carpeta de Graph — así que no son el mismo helper todavía).
+
+**Corrección 2026-10-06 (la nota de arriba ya es historia).** `graph_api.py::Graph.call()` pasó a url-encodear la ruta (commit `a7e493b`), así que el `_q()` local doble-codificaba el `$filter` (`subject%2520eq…`) y Graph contestaba 400 "character '%' is not valid"; como `_mensaje_por_asunto_en_carpeta()` devolvía `None` si el HTTP no era 200, el 400 se leía como "el correo no llegó". Se eliminó `_q()` (las rutas van crudas a `Graph.call()`) y esa función ahora lanza error con el código y el cuerpo ante cualquier HTTP distinto de 200; C-05 lo reporta como FALLA visible.
 
 ---
 
@@ -1384,7 +1387,14 @@ corresponde sumarla — hoy no hay ninguna.
 ---
 ## 03 — Reglas de nivel Registro
 
-Set **R** (`CONVENCIONES.md` §4). Las ocho reglas que deciden **fila por fila**. Son el corazón del
+> **Nota del 2026-10-06 (DN-05, ensamblado 1.0.23.0, ya en Dev).** Las reglas de fila pasaron de ocho a once activas:
+> `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO` (reemplaza a `FORMATO_11_SOLO_ACH`, que quedó **inactiva**),
+> `BANCO_DEL_FORMATO`, `CARACTERES_PERMITIDOS` y `CUENTA_DEL_BANCO`. `plantilla.obligatoriedad` v3 es la matriz del
+> negocio (reemplaza el criterio de exclusión de la v2, DN-03). Donde este archivo dice "las ocho reglas" o habla de
+> `FORMATO_11_SOLO_ACH` es historia de antes de DN-05: lo vigente son los casos R-05, R-10, R-12, R-18, R-20 y R-21
+> reescritos y **R-29..R-38** nuevos. El diagrama de abajo es el de antes de DN-05, se deja como historia.
+
+Set **R** (`CONVENCIONES.md` §4). Las reglas que deciden **fila por fila** (ocho hasta DN-03, once desde DN-05). Son el corazón del
 sistema: de acá sale si una referencia entra a AS400 o no.
 
 ```
@@ -1539,7 +1549,8 @@ desactivó a propósito).
 
 ### R-05 · Plan formato 11 con clasificación que no es ACH
 
-**Qué prueba.** `FORMATO_11_SOLO_ACH` (DD-17).
+**Qué prueba.** `CLASIFICACION_DEL_FORMATO` (DN-05; hasta el 2026-10-05 la misma regla era `FORMATO_11_SOLO_ACH`, DD-17,
+y el texto del mensaje es el mismo).
 
 **Necesita.** El REMITENTE; el adjunto `E05-formato11-no-ach.xlsx`; el plan `PR11`.
 
@@ -1550,10 +1561,10 @@ desactivó a propósito).
 | Qué | Valor |
 |---|---|
 | Las 2 filas | **Rechazada en validación** |
-| Mensaje | que un plan de formato 11 solo admite ACH |
+| Mensaje | exactamente **"El plan PR11 solo admite la clasificación ACH."** |
 | `REFERENCIA_FORMATO_11` en esas filas | no aplica: su dependencia falló |
 
-**Automatizable.** API (`corredor.py`, caso R-05).
+**Automatizable.** API (`correr.py R`, caso R-05).
 
 ---
 
@@ -1592,6 +1603,12 @@ desactivó a propósito).
 > atrás que pide DN-03 ("un parámetro sin `porGestion`, o una gestión sin entrada en `porGestion`, se
 > comporta EXACTAMENTE como antes"). No hace falta un caso nuevo para "v1": este mismo caso, sin
 > tocarlo, ya lo es.
+
+> **Nota DN-05 (2026-10-06).** Las 4 filas de `E06-obligatoriedad.xlsx` son **Inclusión en formato 11**. En la matriz v3 eso
+> exige gestión, plan, nombre, tipo ID, identificación, cuenta y banco; **la moneda ya es opcional** y la referencia
+> también. Las filas 1 a 3 siguen faltando de nombre, cuenta y tipo ID, así que el caso no cambia. Lo de arriba sobre
+> "todo obligatorio salvo `referencia`" (v1/v2) es historia: ahora es "todo obligatorio salvo referencia y moneda, y
+> menos todavía según gestión y formato" (R-18, R-21).
 
 **Automatizable.** API (`corredor.py`, caso R-06).
 
@@ -1661,9 +1678,10 @@ no hace falta tocarlo a mano).
 
 ---
 
-### R-10 · La referencia de formato 11 se construye sola
+### R-10 · La referencia de formato 11 se construye sola (en la Inclusión)
 
-**Qué prueba.** `REFERENCIA_FORMATO_11` con D-17 y DD-10, y que la recibida se guarde aparte.
+**Qué prueba.** `REFERENCIA_FORMATO_11` con D-17 y DD-10, y que la recibida se guarde aparte. **Desde DN-05 (decisión 3)
+la referencia se arma con banco + cuenta SOLO en Inclusión**; en Exclusión rige la recibida (R-33).
 
 **Necesita.** El `REMITENTE` de este set (autorizado sobre `PR11`); el adjunto
 `E01-feliz-formato11.xlsx` (este caso arma su propia Solicitud con `ctx.procesar()`, no depende de
@@ -1673,9 +1691,10 @@ otro set ni de otro caso — `CONVENCIONES.md` §8); que `plantilla.listas` trai
 también tenga 3 dígitos, como el `102` que documenta `diseno/PENDIENTES.md` sección B) la referencia
 esperada abajo no coincidiría, y este caso daría FALLA por una razón de datos, no del sistema.
 
-**Cómo.** Usá la Solicitud de **C-01** (`E01-feliz-formato11.xlsx`).
+**Cómo.** Correo nuevo con **`E01-feliz-formato11.xlsx`**: **tres Inclusiones** en `PR11` (hasta el 2026-10-05 eran
+Inclusión, Exclusión y Modificación; DN-05 lo cambió: el 11 no admite Modificación y la Exclusión exige referencia).
 
-**Esperado.** Por cada fila:
+**Esperado.** Las 3 filas **Validada**, y por cada una:
 
 | Campo | Valor |
 |---|---|
@@ -1694,7 +1713,7 @@ de `plantilla.listas` (BAC = `007`).
 > Esta es **la prueba más importante de todo el plan**. Una referencia mal construida no falla: le
 > paga a otra persona.
 
-**Automatizable.** API (`corredor.py`, caso R-10) — **igual conviene recalcular a mano los 20
+**Automatizable.** API (`correr.py R`, caso R-10) — **igual conviene recalcular a mano los 20
 caracteres al menos una vez**, como pide el propio caso: la automatización no reemplaza esa
 verificación puntual.
 
@@ -1718,6 +1737,11 @@ verificación puntual.
 > Que una cuenta con letras **rechace** en vez de construir una referencia rara es exactamente lo
 > que protege a AS400.
 
+> **Nota DN-05 (2026-10-06).** Estas dos cuentas ahora las rechazan **también** otras reglas: la de letras,
+> `CARACTERES_PERMITIDOS` (la cuenta solo lleva dígitos); la de 18 dígitos, `LARGOS_Y_FORMATO` (máximo 17) y
+> `CUENTA_DEL_BANCO` (BAC 9-16). No hay forma de aislar `REFERENCIA_FORMATO_11` con esos datos, así que el caso solo
+> comprueba que las dos filas **queden rechazadas**, que es lo que protege a AS400.
+
 **Automatizable.** API (`corredor.py`, caso R-11).
 
 ---
@@ -1729,20 +1753,21 @@ verificación puntual.
 **Necesita.** El REMITENTE; el adjunto `E13-formato06-referencia-libre.xlsx`; el plan `PR06`.
 
 **Cómo.** Correo nuevo con **`E13-formato06-referencia-libre.xlsx`** (plan `PR06`, referencia
-`REF-LIBRE-000123`).
+`REFLIBRE000123`; hasta el 2026-10-05 llevaba guiones, `REF-LIBRE-000123`, y DN-05 los prohíbe: la referencia solo
+admite letras y dígitos ASCII).
 
 **Esperado.**
 
 | Campo | Valor |
 |---|---|
 | Estado de la fila | **Validada** |
-| `sanic_referencia` | **`REF-LIBRE-000123`** — tal cual, sin tocar |
-| `sanic_referenciarecibida` | `REF-LIBRE-000123` |
+| `sanic_referencia` | **`REFLIBRE000123`** — tal cual, sin tocar |
+| `sanic_referenciarecibida` | `REFLIBRE000123` |
 
 **FALLA si** la referencia salió con `007` adelante o rellena con ceros: se estaría aplicando la
 regla de formato 11 a un plan que no es 11.
 
-**Automatizable.** API (`corredor.py`, caso R-12).
+**Automatizable.** API (`correr.py R`, caso R-12).
 
 ---
 
@@ -1846,7 +1871,7 @@ antes de devolver el control); el Autorizado `ZZP-` y la `AutorizacionCliente` `
 `E01-feliz-formato11.xlsx`.
 
 **Cómo.** Con `autorizacion.modo = cliente` activo, correo nuevo desde el Autorizado `ZZP-` con
-`E01-feliz-formato11.xlsx` (plan `PR11`, del Cliente compartido).
+`E01-feliz-formato11.xlsx` (plan `PR11`, del Cliente compartido; tres Inclusiones desde DN-05).
 
 **Qué tiene que pasar.**
 
@@ -1925,42 +1950,35 @@ de arriba).
 
 ---
 
-### R-18 · DN-03: `Exclusion` afloja `numeroCuenta`, `banco` y `moneda`
+### R-18 · DN-05: el criterio de `Exclusion` de la v3 (cuenta y referencia obligatorias, el resto opcional)
 
-**Qué prueba.** La versión 2 de `plantilla.obligatoriedad`, sembrada en Dev el 2026-09-27
-(`playbooks/datos/parametros.md`): una fila de gestión `Exclusion` puede omitir cuenta, banco y
-moneda sin que `OBLIGATORIEDAD` la rechace. **El criterio lo confirmó el aprobador el 2026-09-28**
-(`playbooks/datos/parametros.md`): ya no es tentativo. Sigue habiendo una dependencia de ENTORNO —
-que la versión activa hoy traiga `porGestion.Exclusion` sembrado— y ese caso se reporta `N-A`, no
-FALLA, si no está (ver abajo).
+> **Reescrito el 2026-10-06 (DN-05, decisión 2).** Hasta el 2026-10-05 este caso probaba el criterio de la v2 (DN-03,
+> confirmado el 2026-09-28): una exclusión podía omitir cuenta, banco y moneda. **La matriz del negocio lo reemplazó**:
+> en la Exclusión la **cuenta y la referencia son obligatorias** y la identificación, el nombre, el tipo ID, la
+> clasificación y el banco son opcionales. La moneda es opcional siempre.
 
-**Necesita.** La versión activa más alta de `plantilla.obligatoriedad` con `porGestion.Exclusion`
-trayendo `numeroCuenta`, `banco` y `moneda` como opcionales (lo confirma `preparar()`, sin sembrar
-nada nuevo: **no se versiona este parámetro solo para este caso** — es GLOBAL y de negocio, a
-diferencia de `autorizacion.modo` en R-16/R-17, que este set sí puede versionar y desactivar de
-forma transitoria). Un Excel ad hoc con una fila `gestion=Exclusion`, plan `PR06` (formato 06, para
-no mezclar con `REFERENCIA_FORMATO_11`), `numeroCuenta`/`banco`/`moneda` en blanco, y
-`numeroPlan`/`nombreBeneficiario`/`tipoIdentificacion`/`numeroIdentificacion` completos.
+**Qué prueba.** `plantilla.obligatoriedad` v3 aplicada a una Exclusión, en vivo, dentro del motor de reglas.
 
-**Cómo.** Correo nuevo con ese Excel ad hoc (`ZZ-R18-exclusion-aflojada.xlsx`, armado por el propio
-caso con `generar_excel.fila()` + `ctx.excel_ad_hoc()`, igual que R-09/R-14).
+**Necesita.** La versión activa más alta de `plantilla.obligatoriedad` con `porGestion.Exclusion` (lo confirma
+`preparar()`; si no está, el caso es `N-A` por precondición de entorno, no por duda sobre el criterio). El plan `PR06`
+(formato 06, para no mezclar con `REFERENCIA_FORMATO_11`).
 
-**Qué tiene que pasar.** La fila queda **Validada**: `OBLIGATORIEDAD` no la rechaza por
-`numeroCuenta`, `banco` ni `moneda` vacíos.
+**Cómo.** Correo nuevo con un Excel ad hoc (`ZZ-R18-exclusion-aflojada.xlsx`, armado con `generar_excel.fila()` +
+`ctx.excel_ad_hoc()`), tres filas `Exclusion` en `PR06`, todas con nombre, tipo ID, identificación, clasificación,
+banco y moneda **vacíos**:
 
-**Si el parámetro activo HOY no trae `porGestion.Exclusion`** (por ejemplo, en un entorno donde
-todavía no se sembró esa versión, o si alguien sembró una versión 3 que lo saca): el caso se reporta
-**N-A**, con el motivo exacto, en vez de FALLA — no es un defecto de la regla, es una precondición de
-entorno, no una duda sobre el criterio (que ya está confirmado, `CONVENCIONES.md` §3, "todo N-A se
-reporta explícitamente, con su motivo").
+| Fila | Referencia | Cuenta | Esperado |
+|---|---|---|---|
+| 1 | `REFEXCL0006` | `10203040506070` | **Validada** |
+| 2 | `REFEXCL0006` | vacía | **Rechazada**: *"Faltan datos obligatorios: No. Cuenta."* (solo la cuenta) |
+| 3 | vacía | `10203040506070` | **Rechazada**: *"Faltan datos obligatorios: Referencia."* (solo la referencia) |
 
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py R` (caso `R-18`); a mano,
-`ver_solicitud.py <MPPP-########>` sobre la fila creada.
+`ver_solicitud.py <MPPP-########>`.
 
-**Cómo se sabe que falló.** La fila se rechaza citando `numeroCuenta`, `banco` o `moneda`: la versión
-activa no trae el `porGestion.Exclusion` esperado (y en ese caso el caso debería haber dado N-A, no
-FALLA — si dio FALLA con esos tres campos citados y el parámetro SÍ trae `porGestion.Exclusion`, el
-motor no lo está aplicando).
+**Cómo se sabe que falló.** La fila 1 se rechaza citando nombre, identificación, tipo ID, clasificación o banco: la
+versión activa no es la v3 (puede seguir activa la v2 o una anterior) o el motor no aplica `porGestion.Exclusion`. Si
+la fila 2 o la 3 se valida, la cuenta o la referencia dejaron de ser obligatorias en la exclusión.
 
 **Automatizable.** API (`correr.py R`, caso `R-18`).
 
@@ -2002,6 +2020,12 @@ R-22/R-24/R-25 son de alto riesgo o de precedencia, nunca sembrados en Dev; R-26
 que versionar agrega una fila y nunca edita la vigente; R-19, R-28 cierran la compatibilidad y el
 catálogo.
 
+> **Nota del 2026-10-06 (DN-05).** Esta sección habla de la v2 como la versión vigente. Hoy la vigente es la **v3**
+> (matriz del negocio), la v1 está **inactiva** desde el 2026-09-28 (decisión pendiente del aprobador, ver R-26) y
+> la v2 sigue activa pero la v3 la tapa. Lo que cambió en los casos: R-20 y R-21 se reescribieron contra la v3 (más
+> abajo); R-19, R-22 a R-25, R-27 y R-28 siguen como están. Lo del párrafo anterior sobre "Exclusion afloja tres
+> campos" (R-18, R-20) es historia de la v2.
+
 **Necesita, en general** (además de lo que ya deja listo `preparar()` de este set, arriba): `dotnet`
 disponible en el PATH para R-22, R-24 y R-25 (`dotnet test tests/Sanic.Mppp.Plugins.Tests --filter
 <FullyQualifiedName>`).
@@ -2042,60 +2066,68 @@ encontró 0 o más de 1 prueba (el nombre del `[Fact]` cambió sin actualizar es
 
 ---
 
-### R-20 · El contenido sembrado de `porGestion.Exclusion` es exactamente el pedido
+### R-20 · El contenido sembrado de `plantilla.obligatoriedad` v3 es exactamente el de la matriz del negocio
 
-**Qué prueba.** Que la versión ACTIVA hoy de `plantilla.obligatoriedad` trae, dentro de
-`porGestion.Exclusion`, exactamente los tres campos que pidió el aprobador (`numeroCuenta`, `banco`,
-`moneda`) como `opcionales`, y ninguno como `obligatorios` — ni de más ni de menos. **La prueba EN
-VIVO de que ese aflojamiento funciona contra una Solicitud real ya la hace R-18** (arriba): este
-caso es sobre el CONTENIDO del parámetro sembrado, de solo lectura, no vuelve a mandar un Excel.
+> **Reescrito el 2026-10-06 (DN-05).** Hasta el 2026-10-05 verificaba que `porGestion.Exclusion` aflojara exactamente
+> `{numeroCuenta, banco, moneda}` (v2). Esa es historia: la v3 lo reemplazó.
 
-**Necesita.** `plantilla.obligatoriedad` en su versión activa más alta (§8.2: no se siembra nada
-acá). **El criterio lo confirmó el aprobador el 2026-09-28** (`playbooks/datos/parametros.md`): ya
-no es tentativo. Si en el entorno que se está corriendo `porGestion.Exclusion` no está sembrado
-(por ejemplo, todavía no se sembró en Test o Producción), este caso reporta `N-A` en vez de asumir
-un valor que no existe — esa sigue siendo una precondición legítima de entorno, no una duda sobre el
-criterio.
+**Qué prueba.** Que la versión 3 de `plantilla.obligatoriedad` (`playbooks/datos/parametros.md`) tiene **exactamente**
+el contenido que decidió el aprobador. **La prueba EN VIVO de que ese contenido funciona** es R-18, R-21 y R-32..R-34;
+este caso es de solo lectura.
 
-**Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` (versión activa más alta de
-`plantilla.obligatoriedad`, la misma consulta que ya hace `preparacion_comun.verificar_parametro_activo`),
-parseando su `sanic_valor` como JSON y mirando `porGestion.Exclusion`.
+**Necesita.** La fila `sanic_version = 3` de `plantilla.obligatoriedad`. Si no existe (por ejemplo, todavía no se
+sembró en Test o Producción), el caso reporta `N-A` por precondición de entorno.
 
-**Qué tiene que pasar.** `porGestion.Exclusion.opcionales` es EXACTAMENTE el conjunto
-`{numeroCuenta, banco, moneda}` (nombrados, no contados: CONVENCIONES §7), sin `obligatorios`, y
-ninguna otra gestión (`Inclusion`, `Modificacion`) tiene entrada todavía (ver R-21).
+**Cómo.** `GET` de solo lectura sobre `sanic_mppp_tbl_parametros` filtrando `sanic_version eq 3`, con el `sanic_valor`
+parseado como JSON.
+
+**Qué tiene que pasar.** La v3 está activa y su valor, como estructura JSON, es idéntico a:
+
+| Parte | Contenido |
+|---|---|
+| `porDefecto` | `obligatorio` |
+| `opcionales` (global) | `referencia`, `moneda` |
+| `reglas` | Inclusion·06 afloja `clasificacion`, `tipoIdentificacion`, `banco`; Inclusion·10 afloja `banco`; Inclusion·11 afloja `clasificacion` (todas con `clasificacion: "*"`) |
+| `porGestion.Exclusion` | opcionales: `clasificacion`, `nombreBeneficiario`, `tipoIdentificacion`, `numeroIdentificacion`, `banco`; obligatorios: `referencia` |
+| `porGestion.Modificacion` | lo mismo que Exclusion |
+
+Además el caso verifica, campo por campo (nombrados, no contados, CONVENCIONES §7), lo que decidió el aprobador para
+`Exclusion` y `Modificacion`, para que un cambio diga **qué** campo se movió.
 
 **Cómo se verifica.** La respuesta de esa consulta `GET`, ya parseada.
 
-**Cómo se sabe que falló.** Falta alguno de los tres campos, sobra alguno, o `Exclusion` trae
-`obligatorios`: el parámetro sembrado no es el que el aprobador pidió, y R-18 (que sí manda un
-Excel real) podría estar pasando por una razón distinta a la documentada.
+**Cómo se sabe que falló.** Cualquier diferencia con la tabla de arriba: el parámetro sembrado no es el que el
+aprobador pidió, y R-18/R-21 (que mandan Excel reales) podrían estar pasando por otra razón.
 
 **Automatizable.** API de solo lectura.
 
 ---
 
-### R-21 · `Inclusion` y `Modificacion` NO tienen entrada en `porGestion` todavía
+### R-21 · DN-05: `Inclusion` tiene sus `reglas` por formato y `Modificacion` su entrada en `porGestion`
 
-**Qué prueba.** Solo `Exclusion` está sembrada en `porGestion` hoy; `Inclusion` y `Modificacion`
-siguen bajo el bloque global sin ningún ajuste.
+> **Reescrito el 2026-10-06 (DN-05).** Hasta el 2026-10-05 probaba lo contrario: que `Inclusion` y `Modificacion`
+> **no** tenían entrada y seguían obligando cuenta, banco y moneda. Con la v3 ambas tienen la suya.
 
-**Necesita.** La misma versión activa que R-20 (se relee, no se asume el resultado de R-20: si
-mientras tanto `Inclusion`/`Modificacion` ganaron una entrada en `porGestion`, este caso lo detecta
-y reporta `N-A` en vez de mentir un `FALLA` contra una forma del parámetro que ya cambió).
+**Qué prueba.** (a) De solo lectura: la versión activa trae `reglas` para Inclusión en los formatos 06, 10 y 11 y
+`porGestion` para Exclusión y Modificación (y ninguna Inclusión ahí). (b) En vivo: lo que esas entradas dejan
+obligatorio y opcional.
 
-**Cómo.** Un Excel ad hoc (`ctx.excel_ad_hoc`, no a mano) con dos filas: `gestion=Inclusion` y
-`gestion=Modificacion`, las dos con `numeroCuenta`/`banco`/`moneda` en blanco.
+**Necesita.** La versión activa más alta de `plantilla.obligatoriedad` (la v3). Los planes `PR06`, `PR10`, `PR11`.
 
-**Qué tiene que pasar.** Las dos filas se rechazan por `OBLIGATORIEDAD` (esos campos siguen siendo
-obligatorios para estas dos gestiones): comportamiento idéntico al de antes de DN-03.
+**Cómo.** Correo nuevo con un Excel ad hoc (`ZZ-R21-inclusion-modificacion-sin-aflojar.xlsx`), cinco filas:
 
-**Cómo se verifica.** `sanic_estado` y `sanic_mensaje` de las dos filas (cita al menos uno de
-`numeroCuenta`/`banco`/`moneda`).
+| Fila | Qué trae | Esperado |
+|---|---|---|
+| 1 | Inclusión `PR06` sin clasificación, tipo ID, banco ni moneda | **Validada** |
+| 2 | Inclusión `PR10` sin clasificación (el formato admite dos, no se completa) | **Rechazada**: *"Faltan datos obligatorios: Clasificación."* |
+| 3 | Inclusión `PR11` sin banco | **Rechazada**: *"Faltan datos obligatorios: Banco."* |
+| 4 | Modificación `PR06` con solo plan, referencia `REFMODI0001` y cuenta | **Validada** |
+| 5 | Modificación `PR06` sin referencia | **Rechazada**: *"Faltan datos obligatorios: Referencia."* |
 
-**Cómo se sabe que falló.** Alguna fila NO se rechaza, o se rechaza sin citar ninguno de esos tres
-campos: `porGestion` se estaría aplicando a una gestión que no tiene entrada sembrada (contagio
-entre gestiones que el diseño no pide).
+**Cómo se verifica.** `correr.py R` (caso `R-21`) y `ver_solicitud.py` sobre la Solicitud creada.
+
+**Cómo se sabe que falló.** Las filas 1 o 4 se rechazan (la entrada de la v3 no se aplica), las 2, 3 o 5 se validan
+(un campo que debía ser obligatorio quedó opcional) o el mensaje nombra más campos que el esperado.
 
 **Automatizable.** API.
 
@@ -2255,6 +2287,11 @@ documenta `DD-16` (sin `porGestion`).
 
 **Cómo se verifica.** La respuesta de esa consulta.
 
+> **Nota del 2026-10-06.** El caso da **FALLA** hoy y **no es de DN-05**: la versión 1 de `plantilla.obligatoriedad` está
+> **inactiva en Dev desde el 2026-09-28** (`statecode=1`) y el primer check exige "las que hay están activas".
+> Decisión pendiente del aprobador (reactivarla o relajar el check): no se toca desde las pruebas. La v1 sigue
+> existiendo e intacta (R-19 lo confirma) y la v3 se agregó sin pisar ninguna.
+
 **Cómo se sabe que falló.** Solo aparece una fila (la versión 1 se editó en vez de agregar la 2:
 rompería `sanic_versionparametros` de Solicitudes ya procesadas con la versión anterior, que
 dejaría de decir la verdad), o la versión 1 tiene un `sanic_valor` distinto al original.
@@ -2320,6 +2357,54 @@ instrucción explícita del diseño.
 
 ---
 
+### R-29 a R-38 — DN-05 (2026-10-06): un caso por comportamiento nuevo
+
+Cada caso arma su propio Excel ad hoc (`ZZ-R29..R38-*.xlsx`) y su propia Solicitud con `ctx.excel_ad_hoc()` y
+`ctx.procesar()`, con el REMITENTE de este set. Cada fila falla **solo por la regla que prueba**, o por ninguna. Los
+mensajes salen de `ReglasDeRegistro.cs`; el nombre de los campos, de los encabezados que lee `preparar()`.
+
+**Necesitan, todos.** Lo que ya deja listo `preparar()`: el REMITENTE autorizado sobre `PR06`/`PR10`/`PR11` (y **sin**
+autorización sobre `PRNA`), `plantilla.estructura`, `plantilla.listas` y los parámetros `plan.formatos`,
+`cuenta.largos` y `plantilla.obligatoriedad` v3 activos, más las reglas de DN-05 activas en el catálogo.
+
+| Caso | Qué prueba | Excel | Esperado |
+|---|---|---|---|
+| **R-29** | Escenario 9: ACH en `PR06` | `ZZ-R29-ach-en-formato06.xlsx` | fila **Rechazada**: *"El plan PR06 solo admite la clasificación BAC."* |
+| **R-30** | Escenario 10: CK en `PR11` y CK en `PR06` | `ZZ-R30-ck-en-formato11-y-06.xlsx` | 2 filas **Rechazadas**: *"El plan PR11 solo admite la clasificación ACH."* y *"El plan PR06 solo admite la clasificación BAC."* |
+| **R-31** | Clasificación y banco vacíos en `PR06` se completan y se **guardan**; en `PR10` solo el banco | `ZZ-R31-clasificacion-y-banco-vacios.xlsx` | 2 filas **Validada**; fila 1: `sanic_clasificacion = BAC` y `sanic_banco = BAC`; fila 2 (CK recibida): clasificación CK (no se pisa) y `sanic_banco = BAC` |
+| **R-32** | Modificación en `PR11` (`GESTION_DEL_FORMATO`) | `ZZ-R32-modificacion-en-formato11.xlsx` | fila **Rechazada**: *"El plan PR11 no admite la gestión Modificacion."* y nada más |
+| **R-33** | Exclusión en `PR11`, referencia `REFEXCL0001`, sin banco | `ZZ-R33-exclusion-formato11.xlsx` | fila **Validada**; `sanic_referencia` = `sanic_referenciarecibida` = `REFEXCL0001` (no se arma con banco + cuenta) |
+| **R-34** | Exclusión en `PR11` sin referencia | `ZZ-R34-exclusion-sin-referencia.xlsx` | fila **Rechazada**: *"Faltan datos obligatorios: Referencia."* |
+| **R-35** | Escenario 21: caracteres no permitidos | `ZZ-R35-caracteres.xlsx` | 5 filas **Rechazadas** con el mensaje exacto (abajo); el mensaje **no** contiene el valor completo |
+| **R-36** | Escenario 20: `PR06`, banco vacío (BAC 9-16), cuenta de 8 dígitos | `ZZ-R36-cuenta-corta-formato06.xlsx` | fila **Rechazada**: *"El largo de la cuenta no corresponde al banco BAC."*, sin el largo ni la cuenta |
+| **R-37** | Escenario 20: `PR11` con LAFISE y 9 dígitos, y con ATLANTIDA y 17 dígitos | `ZZ-R37-cuenta-por-banco-formato11.xlsx` | 2 filas **Validada** (LAFISE 9-16; ATLANTIDA usa el `porDefecto` 6-17), referencias de 20 caracteres |
+| **R-38** | Plan ajeno `PRNA`: clasificación y banco que su formato no admitiría, Modificación, cuenta corta | `ZZ-R38-plan-ajeno-sin-fuga.xlsx` | 2 filas **Sin autorización**; el mensaje nombra `PRNA` y **ninguna** regla por formato habla (ni "solo admite", ni "no admite", ni "no corresponde al banco") |
+
+**R-35, los cinco mensajes** (el encabezado sale de `plantilla.estructura`; los caracteres, uno por prohibido, en orden
+de aparición, sin repetir):
+
+| Fila | Dato | Mensaje |
+|---|---|---|
+| 1 | nombre `Nuñez Prueba` | *"Caracteres no permitidos: Nombre Colaborador / Proveedor (ñ)."* |
+| 2 | nombre `Jose Ramírez` | *"… Nombre Colaborador / Proveedor (í)."* |
+| 3 | referencia `REF-0001` | *"… Referencia (-)."* |
+| 4 | nombre `Peña Dos` y referencia `REF-0002` | *"… Nombre Colaborador / Proveedor (ñ); Referencia (-)."* |
+| 5 | nombre `Prueba 123` | *"… Nombre Colaborador / Proveedor (1 2 3)."* |
+
+(Los encabezados exactos son los de la plantilla del cliente; el caso los lee, no los supone.)
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py R`, casos `R-29` a `R-38`; a mano, `ver_solicitud.py`
+sobre la Solicitud de cada caso.
+
+**Cómo se sabe que falló.** Un mensaje distinto del esperado (aunque el estado sea el correcto: lo lee un cliente del
+banco, `CONVENCIONES.md` §3); una fila que se valida sin que `sanic_clasificacion`/`sanic_banco` queden completados
+(R-31: la regla valida pero no guarda); en R-38, **cualquier** frase de una regla por formato en el mensaje: sería una
+fuga del formato de un plan sobre el que el remitente no tiene autorización.
+
+**Automatizable.** API (`correr.py R`).
+
+---
+
 ### Fase 2 — investigación y conclusión
 
 Se investigó si algo de `diseno/DIRECTRICES-NUEVAS.md` (DN-01, DN-02, DN-03) agrega o cambia un
@@ -2376,6 +2461,11 @@ existen.
    (incluida la unitaria y la de alto riesgo, que no se automatizan contra Dev a propósito), ahora en
    el mismo archivo en vez de en uno separado.
 
+> **Nota del 2026-10-06 (DN-05).** El punto 3 de arriba habla de DN-03 y de R-18 como "`Exclusion` afloja cuenta, banco y
+> moneda": **DN-05 lo reemplazó** (la matriz del negocio, `plantilla.obligatoriedad` v3; ver R-18, R-20 y R-21
+> reescritos). DN-05 toca este nivel con cinco reglas nuevas de fila, cubiertas por R-29..R-38. Se deja el texto de
+> DN-03 como historia.
+
 **Conclusión**: el set R suma catorce casos de fase 2 (R-15..R-28) sobre dos de sus ocho reglas
 (`AUTORIZACION_CORREO_PLAN`, `OBLIGATORIEDAD`) — cuatro (R-15..R-18) automatizados en vivo dentro del
 propio motor de reglas, diez (R-19..R-28, el ex set O) como cobertura exhaustiva de DN-03 — sin
@@ -2392,30 +2482,45 @@ propio dueño (`E`).
 | R-02 largos | | | |
 | R-03 plan inexistente | | | |
 | R-04 plan inactivo | | | |
-| R-05 formato 11 no ACH | | | |
-| R-06 obligatoriedad | | | fila 4 = Validada; gestión Inclusion, estable v1/v2 |
+| R-05 formato 11 no ACH | | | `CLASIFICACION_DEL_FORMATO`, mensaje exacto (DN-05) |
+| R-06 obligatoriedad | | | fila 4 = Validada; Inclusión en formato 11 |
 | R-07 moneda | | | |
 | R-08 sin autorización | | | |
 | R-09 prioridad + motivos | | | |
-| **R-10 referencia construida** | | | **contá los 20** |
+| **R-10 referencia construida** | | | **contá los 20**; E01 = tres Inclusiones (DN-05) |
 | R-11 referencia imposible | | | |
-| R-12 formato 06 sin derivar | | | |
+| R-12 formato 06 sin derivar | | | referencia `REFLIBRE000123` (sin guiones, DN-05) |
 | R-13 mezcla | | | |
 | R-14 duplicados pasan | | | |
 | R-15 DN-01 canon `plan` | | | |
 | R-16 DN-01 modo `cliente` | | | |
-| R-17 DN-01 valor basura degrada | | | **FALLA, bloqueado por D-59** (ya ABIERTA, pospuesta) |
-| R-18 DN-03 `Exclusion` afloja tres campos | | | confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
+| R-17 DN-01 valor basura degrada | | | D-59 cerrada el 2026-09-28; OK en la corrida del 2026-10-06 (la nota de R-17 que dice "FALLA hoy" es historia) |
+| R-18 DN-05 criterio de `Exclusion` de la v3 | | | reescrito 2026-10-06; N-A si el entorno no lo tiene sembrado |
 | R-19 compatibilidad sin `porGestion` | | | ex O-01 |
-| R-20 `Exclusion` afloja los tres campos | | | ex O-02; confirmado por el aprobador 2026-09-28; N-A si el entorno no lo tiene sembrado |
-| R-21 `Inclusion`/`Modificacion` sin cambios | | | ex O-03 |
+| R-20 contenido exacto de la v3 | | | ex O-02; reescrito 2026-10-06; N-A si el entorno no tiene la v3 |
+| R-21 `Inclusion` por formato y `Modificacion` en `porGestion` | | | ex O-03; reescrito 2026-10-06 |
 | R-22 precedencia `obligatorios` | | | ex O-04; unitario, no sembrar |
 | R-23 gestión inválida en la fila | | | ex O-05 |
 | R-24 sin distinguir caja/tildes | | | ex O-06 |
 | R-25 gestión desconocida en el parámetro | | | ex O-07; alto riesgo, preferir unitario |
-| R-26 versionar agrega, no edita | | | ex O-08 |
+| R-26 versionar agrega, no edita | | | ex O-08; **FALLA hoy, no es de DN-05**: la v1 está inactiva en Dev desde el 2026-09-28 (decisión pendiente del aprobador) |
 | R-27 mensaje al cliente sin cambios | | | ex O-09 |
 | R-28 regla sin cambio de código/orden/nivel | | | ex O-10 |
+| R-29 ACH en plan 06 | | | DN-05, escenario 9 |
+| R-30 CK en plan 11 y en plan 06 | | | DN-05, escenario 10 |
+| R-31 clasificación y banco vacíos se guardan | | | DN-05 |
+| R-32 Modificación en plan 11 | | | DN-05 |
+| R-33 Exclusión en plan 11, referencia recibida | | | DN-05 |
+| R-34 Exclusión sin referencia | | | DN-05 |
+| R-35 caracteres no permitidos | | | DN-05, escenario 21; el mensaje no trae el valor |
+| R-36 cuenta de 8 dígitos en plan 06 | | | DN-05, escenario 20 |
+| R-37 LAFISE 9 y ATLANTIDA 17 dígitos válidos | | | DN-05, escenario 20 |
+| R-38 plan ajeno sin fuga | | | DN-05 |
+
+**Corrida del 2026-10-06 contra Dev (ensamblado 1.0.23.0, después de reescribir el set):** 37 OK · 1 FALLA · 0 N-A.
+La FALLA es R-26 y no es de DN-05 (nota en el propio caso). La corrida del mismo día antes de reescribir daba 20 OK ·
+7 FALLA · 1 N-A: R-10, R-12, R-16, R-17, R-18 y R-20 por fixtures y aserciones de antes de DN-05, R-21 N-A por lo mismo,
+y R-26.
 
 ---
 ## 04 — Comunicaciones al cliente
@@ -3507,6 +3612,11 @@ A-11: `PermitidasEnSolicitud` admite `sanic_requiererevision` de una persona.
 ---
 
 ### A-13 · Multiidioma de los botones
+
+> **Decisión del aprobador (2026-10-06): el usuario Supervisor de prueba se deja en inglés (1033).** El diagnóstico de
+> esa fecha mostró que la sesión `supervisor` falla porque `usersettings` de User2 tiene `uilanguageid=1033` (los cuatro
+> usuarios de prueba están en 1033; el español 3082 está aprovisionado y la app no tiene la culpa). Mientras siga así,
+> la parte "supervisor en 3082" de A-13 queda en FALLA a sabiendas; no es un defecto de la app.
 
 **Qué prueba.** Que cada etiqueta tenga su texto en 1033 y 3082 (convención del proyecto), y que
 los mensajes del JavaScript (confirmación, resultado) también cambien de idioma.
@@ -5269,7 +5379,7 @@ graves de todo el plan, y las tres se corrigen acá:
    autorización duplicada la hace una **clave alternativa** (`sanic_mppp_key_autorizacionplan_autorizado_plan`),
    nunca un plugin — no existe ni existió ningún `IntegridadAutorizacionPlanStep`. Ver I-05.
 2. **I-09 decía "10 tipos"; en vivo, el 2026-09-27, son 13** (8 clases de step + 5 Custom API,
-   `GET plugintypes` filtrado por el ensamblado). Ver I-09.
+   `GET plugintypes` filtrado por el ensamblado). Ver I-09. *(Nota 2026-10-06: desde DN-04, 2026-10-01, son 15 — se sumaron `CargarCatalogosApi` y `CambiarEstadoCatalogosApi`.)*
 3. **Dos casos citaban un archivo ajeno** (`pruebas/README.md`, la deuda declarada del
    2026-09-27: "cuatro en `04`, **dos en `08`** y uno en `07`"): I-05 decía "una autorización
    existente (P-03, `00-preparacion.md`)" e I-07 decía "una Fila existente (la de C-01 alcanza,
@@ -5289,7 +5399,7 @@ prosa "8 steps con su función", este archivo **nombra los 20 registros de step,
 su mensaje, su etapa y su tabla, y los verifica contra `sdkmessageprocessingsteps` EN VIVO (I-10).
 Un conteo envejece con cada step nuevo; una lista de nombres, no.
 
-**Los 13 tipos de plugin registrados** (8 clases de step + 5 Custom API — las Custom API no son
+**Los 15 tipos de plugin registrados** (8 clases de step + 7 Custom API — las Custom API no son
 steps y no se prueban en este archivo, las cubre `simulador.py`/`02`/`03`):
 
 | Clase | Qué protege |
@@ -5610,7 +5720,7 @@ en el botón).
 
 **Qué prueba.** Que el ensamblado en el sandbox tenga registrados exactamente los tipos de plugin
 del repositorio — **nombrados, no contados** (CONVENCIONES §7: la versión anterior de este caso
-decía "10 tipos"; hoy hay 13).
+decía "10 tipos"; hoy hay 15, desde DN-04).
 
 **Necesita.** Credenciales de lectura en Dataverse (las que ya usa `preparar()` de este set).
 
@@ -5623,14 +5733,14 @@ python3 herramientas/construir/paquete_plugins.py playbooks/paquete-plugins/sani
 y además, dentro del caso, `GET plugintypes` filtrado por el ensamblado, para nombrar cada uno.
 
 **Qué tiene que pasar.** `"estado": "ya_existia"` (la herramienta ya compara por NOMBRE lo que
-falta y lo que sobra — D-57 c, no un conteo), **y** cada uno de estos 13 tipos presente en
+falta y lo que sobra — D-57 c, no un conteo), **y** cada uno de estos 15 tipos presente en
 `plugintypes`, **sin ninguno de más**:
 
 `Sanic.Mppp.Plugins.Steps.ListaBlancaStep` · `NormalizarYValidarStep` · `NombreCalculadoStep` ·
 `TransicionDeFilaStep` · `PostTransicionDeFilaStep` · `AtenderPorClasificarStep` ·
 `RevisionAtendidaStep` · `IntegridadDeReglaStep` — y `Sanic.Mppp.Plugins.Api.ClasificarCorreoApi` ·
 `ExportarParaDigitarApi` · `ObtenerFilasPendientesApi` · `RegistrarResultadoRpaApi` ·
-`ValidarSolicitudApi`.
+`ValidarSolicitudApi` · `CargarCatalogosApi` · `CambiarEstadoCatalogosApi` (estas dos, desde DN-04, 2026-10-01).
 
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py I` (caso `I-09`).
 
@@ -5813,7 +5923,7 @@ otros roles dan 400 por falta de rol y el resultado mentiría sobre lo que en re
 | I-06 nombre calculado (4 tablas) | | |
 | **I-07 lista blanca (humano vs. identidad exenta)** | | **OK — no es defecto (reescrito 2026-09-27); falta que se cierre `diseno/PENDIENTES.md` entrada I-07** |
 | **I-08 transición ilegal** | | |
-| I-09 paquete al día (13 tipos) | | |
+| I-09 paquete al día (15 tipos) | | |
 | I-10 los 20 steps, uno por uno | | |
 | I-11 autorización por cliente duplicada (fase 2) | | |
 | I-12 puerta del RPA (fase 2) | | |
@@ -7011,7 +7121,7 @@ haya dejado otro set. `herramientas/pruebas/sets/set_e.py` deja listo, en su pro
   arranca: sembrar el CONJUNTO de columnas es una decisión de negocio, no algo que un set de pruebas
   deba inventar — ver `playbooks/datos/parametros.md`).
 - **Su propio fixture de Filas reales**: una Solicitud simulada con `E01-feliz-formato11.xlsx` (tres
-  filas válidas — Inclusión, Exclusión, Modificación — que pasan todas las reglas y quedan en
+  Inclusiones válidas en `PR11` (hasta DN-05 eran Inclusión, Exclusión y Modificación) que pasan todas las reglas y quedan en
   Validada), creada con `ctx.procesar()`. Todos los casos de API que necesitan `filaid`s reales usan
   ESTE fixture, nunca datos de otro set ni una fila cualquiera del entorno.
 

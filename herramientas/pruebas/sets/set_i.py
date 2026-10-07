@@ -19,7 +19,7 @@ cambiaron respecto de la versión vieja, y las tres importan:
    lo que estaba mal era solo la prosa del MD, que este archivo corrige.
 2. **I-09 dejó de contar tipos.** `paquete_plugins.py --solo-verificar` YA
    compara por NOMBRE lo que falta y lo que sobra (`_verificar()`, D-57 c); acá
-   además se nombran los 13 tipos esperados, uno por uno, contra
+   además se nombran los 15 tipos esperados, uno por uno, contra
    `GET plugintypes` en vivo — no un conteo.
 3. **Se agregaron I-10 a I-13** (fase 2): los 20 registros de step nombrados
    uno por uno (I-10), la clave alternativa nueva de `AutorizacionCliente`
@@ -392,7 +392,7 @@ def i08(ctx):
 
 
 # ===========================================================================
-# I-09 — El paquete de plugins al día: 13 tipos, NOMBRADOS uno por uno contra
+# I-09 — El paquete de plugins al día: 15 tipos, NOMBRADOS uno por uno contra
 # `plugintypes` en vivo (no un conteo).
 # ===========================================================================
 TIPOS_ESPERADOS = {
@@ -409,11 +409,14 @@ TIPOS_ESPERADOS = {
     "Sanic.Mppp.Plugins.Api.ObtenerFilasPendientesApi",
     "Sanic.Mppp.Plugins.Api.RegistrarResultadoRpaApi",
     "Sanic.Mppp.Plugins.Api.ValidarSolicitudApi",
+    # DN-04 (2026-10-01): carga y cambio de estado masivos de catálogos.
+    "Sanic.Mppp.Plugins.Api.CargarCatalogosApi",
+    "Sanic.Mppp.Plugins.Api.CambiarEstadoCatalogosApi",
 }
 
 
 def i09(ctx):
-    c = pc.Caso("I-09", "El paquete de plugins está al día (13 tipos, nombrados uno por uno)")
+    c = pc.Caso("I-09", "El paquete de plugins está al día (15 tipos, nombrados uno por uno)")
     proc = subprocess.run(
         [sys.executable, os.path.join(_RAIZ, "herramientas", "construir", "paquete_plugins.py"),
          os.path.join(_RAIZ, "playbooks", "paquete-plugins", "sanic_mppp_pkg_plugins.md"), "--solo-verificar"],
@@ -433,7 +436,7 @@ def i09(ctx):
     for tipo in sorted(TIPOS_ESPERADOS):
         c.check(f"el tipo {tipo!r} está registrado", tipo in registrados)
     sobran = registrados - TIPOS_ESPERADOS
-    c.check("no hay tipos de más sin declarar (nada sobra fuera de los 13 nombrados)", not sobran, f"sobran: {sorted(sobran)}")
+    c.check("no hay tipos de más sin declarar (nada sobra fuera de los 15 nombrados)", not sobran, f"sobran: {sorted(sobran)}")
     return c
 
 
