@@ -602,6 +602,11 @@ A-11: `PermitidasEnSolicitud` admite `sanic_requiererevision` de una persona.
 
 ## A-13 · Multiidioma de los botones
 
+> **Decisión del aprobador (2026-10-06): el usuario Supervisor de prueba se deja en inglés (1033).** El diagnóstico de
+> esa fecha mostró que la sesión `supervisor` falla porque `usersettings` de User2 tiene `uilanguageid=1033` (los cuatro
+> usuarios de prueba están en 1033; el español 3082 está aprovisionado y la app no tiene la culpa). Mientras siga así,
+> la parte "supervisor en 3082" de A-13 queda en FALLA a sabiendas; no es un defecto de la app.
+
 **Qué prueba.** Que cada etiqueta tenga su texto en 1033 y 3082 (convención del proyecto), y que
 los mensajes del JavaScript (confirmación, resultado) también cambien de idioma.
 
