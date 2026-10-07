@@ -1,74 +1,95 @@
-Cierre de DN-04 del proyecto `2026-001-referencias-planes-pago`.
+Cierre de DN-05 del proyecto `2026-001-referencias-planes-pago`.
 
-Solución `sanic_mppp_sol_mantenimientoppp` **1.2.0.0** — managed y unmanaged. Ensamblado de plugins **1.0.22.0**.
-La versión sube el *minor*: todo lo nuevo es **aditivo y retrocompatible** (dos Custom API nuevas, una columna opcional,
-un parámetro nuevo y dos menús que solo ve el Administrador de planes; ningún camino existente cambia).
+Solución `sanic_mppp_sol_mantenimientoppp` **1.3.0.0** — managed y unmanaged. Ensamblado de plugins **1.0.23.0**.
+La versión sube el *minor* por decisión del aprobador, **aunque DN-05 endurece reglas**: hay archivos que antes pasaban
+la validación y ahora se rechazan (ver la sección 4). Quien consuma la solución tiene que leer esa sección antes de importar.
 
 Se adjuntan además los **parámetros** y las **reglas** activos en un `.xlsx` cada uno. El valor de `servicio.cuenta` va
 enmascarado a propósito: es un UPN de cuenta de servicio y este repositorio es público.
 
 ---
 
-## 1. Qué cambió desde v1.1.0
+## 1. Qué cambió desde v1.2.0
 
-### DN-04 · Carga masiva y activación masiva de catálogos por Excel
-El Administrador de planes deja de cargar clientes, planes, correos y autorizaciones de a uno en formularios. Dos
-menús desplegables nuevos en la grilla de las cuatro tablas de catálogos (Clientes, Planes, Correos Autorizados,
-Autorizaciones - Clientes), cada uno con *Cargar archivo* y *Descargar plantilla*:
+### DN-05 · Escenarios de prueba de Mercadeo BAC y matriz de obligatoriedad
+Mercadeo BAC mandó sus escenarios de prueba (0 a 21) y la matriz Gestión × formato del plan. Lo que se construyó:
 
-- **Carga masiva** (`sanic_mppp_capi_cargarcatalogos`): un Excel desnormalizado (hoja `CargaCatalogos`) que crea lo
-  que falte —correo, cliente (con su ejecutivo como dueño), plan y autorización por cliente— en orden de dependencias,
-  y cada cosa una sola vez aunque se repita en varias filas.
-- **Activar/Desactivar masivo** (`sanic_mppp_capi_cambiarestadocatalogos`): un Excel (hoja `ActivarDesactivar`) que
-  activa o desactiva clientes, planes, correos y autorizaciones por cliente, registro por registro, sin cascada.
+**Reglas nuevas de fila (nivel Registro, efecto Rechaza):**
+- **`CLASIFICACION_DEL_FORMATO`** — **reemplaza a `FORMATO_11_SOLO_ACH`**, que era el caso particular del formato 11.
+  El formato 06 admite solo BAC; el 10, BAC o CK; el 11, solo ACH. Si la clasificación viene vacía y el formato admite
+  una sola, la fila se guarda con esa; si viene con valor, tiene que estar entre las permitidas.
+- **`GESTION_DEL_FORMATO`** — el formato 11 no admite Modificación.
+- **`BANCO_DEL_FORMATO`** — los formatos 06 y 10 admiten solo cuentas BAC; con el banco vacío se toma BAC.
+- **`CARACTERES_PERMITIDOS`** (escenario 21) — configurable por campo en `plantilla.estructura`. El mensaje muestra
+  **solo los caracteres prohibidos, nunca el valor** (la cuenta y la identificación no se exponen).
+- **`CUENTA_DEL_BANCO`** (escenario 20) — largo de la cuenta por banco, con rechazo. Tabla en `cuenta.largos`; los
+  ceros a la izquierda cuentan.
 
-Las dos son **todo o nada**: la pasada 1 valida el archivo entero sin escribir; con un solo error de fila no se graba
-nada y se devuelve el Excel con una columna *Resultado* que dice qué corregir en cada fila. La pasada 2 corre dentro de
-la transacción de la Custom API (verificado en Dev, D-72): si algo falla, se deshace todo. Escriben **con el usuario
-que llama**, así la auditoría dice quién dio de alta o desactivó cada cosa. La plantilla la genera la misma API, con la
-misma definición de columnas que valida. Los errores de archivo tienen código propio, de `MPPP-CAR-001` a `011`.
+**Regla cambiada:** `REFERENCIA_FORMATO_11` arma la referencia (banco + cuenta) **solo en Inclusión**; en Exclusión rige
+la que manda el cliente. Ahora depende de `CLASIFICACION_DEL_FORMATO`.
 
-**Columna nueva**: `Comentarios` (texto de 50, opcional, auditada) en la autorización por cliente, en el formulario y en
-las dos vistas.
+**Parámetros:**
+- `plantilla.obligatoriedad` **v3** = la matriz del negocio; reemplaza el criterio de exclusión de la v2. En la
+  exclusión, cuenta y referencia son obligatorias; la identificación y el banco, opcionales.
+- `plan.formatos` (nuevo): qué clasificaciones, gestiones y bancos admite cada formato.
+- `cuenta.largos` (nuevo): largo mínimo y máximo por banco; por defecto 6-17.
+- `plantilla.estructura` **v2**: define los `caracteres` de cada campo y lleva la cuenta a un máximo de **17**.
 
-**Parámetro nuevo**: `carga.filas.maximo` = **100**. Se diseñó con 300 y se **midió** en Dev (D-75): el peor caso (cada
-fila crea cliente, plan, correo y autorización) graba 100 filas en ~25 s; desde 200 filas la base de Dev corta la
-transacción a los ~40 s (error 10928 de Azure SQL). El presupuesto de escritura del plugin bajó de 100 s a **30 s**,
-para que corte nuestro mensaje (`MPPP-CAR-008`, "partí el archivo") antes que la base. Una falla de la plataforma —no
-de un dato— tiene su propio código, **`MPPP-CAR-011`**, clasificado por el `ErrorCode` de Dataverse y verificado en Dev
-contra el error real (`0x80072324`): ya no se le dice al usuario "corregí esa fila" cuando la fila no tiene nada malo.
+**Escenarios cubiertos:** 9 y 10 por la regla de clasificación; 20 por `CUENTA_DEL_BANCO`; 21 por
+`CARACTERES_PERMITIDOS`; el 13 queda descartado. **Quedan pendientes del área de operaciones el escenario 9 (canal de
+pago por plan) y el 12 (requiere preregistro).**
 
-**Menús en el idioma del usuario.** Los menús llevan etiquetas localizadas (1033 y 3082), como el resto del proyecto.
-Al construirlos, un menú con etiquetas localizadas mostró "LabelText" y se concluyó que la plataforma no las soportaba
-dentro de un menú desplegable; el aprobador lo dudó y un experimento controlado le dio la razón (D-74): era la metadata
-compilada del ribbon sin regenerar.
+**Ensamblado:** `1.0.22.0` pasó a **`1.0.23.0`**.
 
-### Herramientas
-- `importar_solucion.py` genera y verifica menús desplegables (`FlyoutAnchor`), con etiquetas localizadas o texto fijo,
-  y al importar un ribbon **avisa que hay que regenerar la metadata compilada** (Command Checker > Regenerate ribbon
-  metadata): publicar no alcanza, y la regeneración tiene que ir DESPUÉS de la última importación.
-- Las diez herramientas que escriben distinguen `actualizado` de `creado`.
-- El playbook del paquete de plugins borra `bin/` y `obj/` antes de empaquetar (`dotnet pack` dejaba el `.nupkg` viejo).
+### Orden de despliegue en otro entorno (importante)
+Regla: **todo lo que el ensamblado nuevo exige se siembra antes que él, y nada de lo que se siembra antes puede aflojar
+al ensamblado viejo.** Este release (managed o unmanaged) lleva el ensamblado y la solución; **los datos (parámetros y
+reglas) no viajan en la solución: se cargan con los playbooks, en este orden** (detalle en `diseno/DIRECTRICES-NUEVAS.md`,
+DN-05, "Orden de despliegue"):
+
+1. **Parámetros**, con el ensamblado viejo todavía arriba: `plan.formatos`, `cuenta.largos`, `plantilla.estructura` v2 y
+   `plantilla.obligatoriedad` v3. Antes de este paso, comprobar con el ensamblado viejo que lee la `plantilla.estructura`
+   nueva (validar un correo de prueba).
+2. **Ensamblado** `1.0.23.0` (la importación de esta solución).
+3. **Catálogo de reglas**, en una sola pasada: las cinco reglas nuevas activas, `REFERENCIA_FORMATO_11` dependiendo de
+   `CLASIFICACION_DEL_FORMATO` y `FORMATO_11_SOLO_ACH` inactiva. Una regla activa que depende de una inactiva tumba la
+   validación (D-13), por eso va todo junto.
+
+Importar el ensamblado nuevo sin `plan.formatos` y `cuenta.largos` tumba toda la validación: el código falla cerrado.
 
 ### Arnés de pruebas
-- **Set L** nuevo (`pruebas/12-catalogos-masivos.md`, 57 casos), con su arnés: `python3 herramientas/pruebas/correr.py L`
-  junta la suite de C#, el spec de Playwright en los cuatro roles y la Web API con las sesiones reales de cada usuario.
-  Un test saltado nunca cuenta como aprobado. **Resultado: 57 OK · 0 FALLA · 0 N-A**, en las dos corridas reales.
-- **206 casos en 12 sets** en total. Suite de C#: **1581** pruebas en verde.
-- Navegación del arnés GUI más robusta: espera la entrada del sitemap y reintenta el cambio de área (cerró D-70).
+- **Set R reescrito**, con R-29 a R-38 (DN-05).
+- E01 pasó a 3 inclusiones.
+- El set C ya no doble-codifica la URL de Graph (C-05 y C-06 en verde).
+- I-09 espera 15 tipos de plugin (se sumaron `CargarCatalogosApi` y `CambiarEstadoCatalogosApi`).
+- Suite de C#: **1895** pruebas en verde (`dotnet test tests/Sanic.Mppp.Plugins.Tests`: 0 fallan, 0 saltadas).
+- **Resultados contra Dev, 2026-10-06:**
+
+| Set | Resultado |
+|---|---|
+| R | 38 OK |
+| A | 14 OK · 1 FALLA (A-13: el supervisor de prueba está en inglés; aceptado por el aprobador) |
+| B | 19 OK · 1 N-A |
+| C | 11 OK |
+| E | 8 OK · 2 N-A |
+| G | 17 OK |
+| I | 13 OK |
+| M | 7 OK |
+| S | 7 OK |
+| U | 11 OK |
+| V | 0 OK · 1 FALLA (V-01, D-71 aceptada) · 6 N-A |
+| L | **No se volvió a correr** (DN-05 no lo toca). Último resultado: 57 OK. |
 
 ---
 
 ## 2. Pendientes cerrados (`diseno/PENDIENTES.md`)
 
-| # | Qué era | Cómo quedó |
+**Ninguno de la lista numerada.** Cambios de estado de este release:
+
+| # | Qué | Cómo quedó |
 |---|---|---|
-| D-69 | `AutorizacionCliente` mostraba comandos genéricos aunque el ribbon estaba bien importado. | Era la metadata compilada sin regenerar. Regenerada; `A-02 — AutorizacionCliente` en verde en Dev. |
-| D-70 | El arnés GUI no encontraba "Correos Autorizados" en el sitemap. | Carrera en la navegación (`count()` sin esperar tras cambiar de área). Arreglado; `A-02 — Autorizado` en verde. |
-| D-72 | ¿Hay transacción en la Custom API? Prerrequisito del todo o nada. | Sí (`IsInTransaction = true`, etapa 30); una excepción deshace todo, con el servicio del usuario y con SYSTEM. |
-| D-73 | Prueba con escrituras reales y la sesión del Administrador de planes. | El cliente nuevo queda con el ejecutivo como dueño y el ejecutivo lo ve; el creador es el Administrador de planes. |
-| D-74 | ¿Etiquetas multiidioma en menús desplegables? | **Sí funcionan.** Experimento con una tabla de prueba y tres de control; las cuatro tablas pasaron a etiquetas localizadas y desapareció la excepción al multiidioma. |
-| D-75 | El tope de 300 filas no se sostenía en Dev. | Tope 100, presupuesto 30 s y `MPPP-CAR-011`, medido y verificado en Dev. El tope de la base de Producción no se mide, por decisión del aprobador. |
+| D-71 | Los 4 flujos vivos no tienen desplegado el control de concurrencia. | Pasa a **ACEPTADA tal cual** por el aprobador (2026-10-06): "si le pongo concurrencia 1 el flujo no corre". V-01 sigue en FALLA a sabiendas hasta que se investigue por qué. |
+| D-76 | `parametro.py` no desactiva la versión anterior. | **Nueva, abierta** (ver sección 3). |
 
 ---
 
@@ -77,33 +98,43 @@ compilada del ribbon sin regenerar.
 | # | Qué | Estado |
 |---|---|---|
 | D-68 | La RED 2 de V-02 (detectar al arrancar un flujo que quedó apagado por una corrida que murió de golpe) nunca se ejercitó. | **Riesgo residual ACEPTADO** por el aprobador (2026-09-28). La RED 1 sí se probó. |
-| D-71 | Los 4 flujos vivos (REC, COM, ING, VIG) **no tienen desplegado** el control de concurrencia que declaran sus `recursos/flujos/*.json`. | **Abierto.** Sin él, dos corridas del mismo flujo pueden solaparse. No lo toca este release. |
+| D-71 | Los 4 flujos vivos (REC, COM, ING, VIG) no tienen desplegado el control de concurrencia que declaran sus `recursos/flujos/*.json`. | **ACEPTADA tal cual** (2026-10-06). Sin él, dos corridas del mismo flujo pueden solaparse. V-01 queda en FALLA conocida. |
+| D-76 | `parametro.py` agrega la versión nueva sin desactivar la anterior. | **Abierta.** DD-02 pide una sola versión activa por parámetro. Pasó con `carga.filas.maximo` (1.2.0.0) y con `plantilla.obligatoriedad` y `plantilla.estructura` en DN-05. Mientras no se arregle la herramienta, cada versionado de un parámetro exige desactivar la anterior a mano. |
 
-Además, dos límites conocidos de este release, sin número de pendiente:
+Además, los límites que ya traía 1.2.0.0 siguen vigentes: el tope de la base de Producción no está medido (el usuario
+recibe `MPPP-CAR-008` o `011`, con mensaje claro y sin grabar nada) y la mitad en español de L-04 es N/A porque Dev solo
+tiene el idioma 1033.
 
-- **El tope de la base de Producción no está medido** (descartado por el aprobador). Si Producción corta antes que Dev,
-  el usuario recibe `MPPP-CAR-008` o `011`, los dos con mensaje claro y sin grabar nada.
-- **La mitad en español de L-04 es N/A**: Dev solo tiene el idioma 1033 instalado. Los menús se probaron en inglés
-  (muestran "Bulk load"); en un entorno con 3082 muestran "Carga masiva".
-
-**Resumen de estado**: **6 pendientes cerrados** (D-69, D-70, D-72 a D-75) y **2 abiertos** (D-68 aceptado, D-71).
+**Resumen de estado**: **0 pendientes cerrados** en este release; **3 abiertos** (D-68 aceptado, D-71 aceptado, D-76 abierto).
 
 ---
 
-## 4. Versión de la solución: `1.2.0.0`
+## 4. Versión de la solución: `1.3.0.0`
 
-Decisión del aprobador (2026-10-01): **1.2.0.0**. Todo lo nuevo es aditivo: dos Custom API nuevas, una columna opcional,
-un parámetro nuevo y dos menús visibles solo para el Administrador de planes. Ningún consumidor existente se rompe.
+Decisión del aprobador: **1.3.0.0**.
 
-El *ensamblado* de plugins es otro número: pasó de `1.0.19.0` (v1.1.0) a **`1.0.22.0`**. La 1.0.20.0 trajo las dos Custom
-API, la 1.0.21.0 el `MPPP-CAR-011` (desplegada a propósito con el presupuesto todavía en 100 s, para reproducir el
-error real de la base y confirmar su código) y la 1.0.22.0 el presupuesto de 30 s y el tope de 100.
+**DN-05 endurece reglas: no es retrocompatible para los archivos que se reciben.** Lo que antes pasaba y ahora se rechaza:
+
+- Exclusión **sin referencia** o **sin cuenta**.
+- **Modificación en formato 11.**
+- **Caracteres no permitidos** (Ñ, tildes y símbolos fuera de lo configurado por campo).
+- **Cuenta fuera del largo de su banco**, y cuenta con caracteres que no son dígitos.
+- **Banco que no es BAC** en los formatos 06 y 10.
+- **Clasificación no permitida** para el formato del plan.
+
+Lo que cambia es qué filas valida el motor. Quien tenga clientes que mandan archivos tiene que avisarles antes de pasar a producción.
+
+El *ensamblado* de plugins es otro número: pasó de `1.0.22.0` (v1.2.0) a **`1.0.23.0`**.
 
 ### Corrección de datos de este release
-`carga.filas.maximo` tenía **dos versiones activas** (v1 = 300 y v2 = 100), contra DD-02 ("cambiar de versión desactiva
-la anterior"): la herramienta que versiona el parámetro agregó la v2 sin desactivar la v1. Se desactivó la v1. Quedan
-**20 parámetros activos, 20 nombres distintos, cero duplicados**. (El plugin ya leía la v2, la versión activa más alta,
-así que el comportamiento no cambió.)
+**DD-02 (una sola versión activa por parámetro).** `plantilla.obligatoriedad` v1 y v2, y `plantilla.estructura` v1,
+habían quedado **activas** junto a las versiones nuevas, porque `parametro.py` no desactiva la anterior (D-76). Se
+desactivaron. Quedan **22 parámetros activos, 22 nombres distintos, cero duplicados**. (El motor lee la versión activa
+más alta, así que el comportamiento no cambiaba, pero el catálogo estaba fuera de la regla y R-26 fallaba.)
+
+**Error propio, reconocido:** el 2026-10-06 la v1 de `plantilla.obligatoriedad` se **reactivó por error**, por una
+lectura equivocada de R-26, y se volvió a desactivar el mismo día. R-26 se reescribió contra DD-02: una sola versión
+activa por parámetro, en toda la tabla.
 
 ---
 
@@ -111,17 +142,19 @@ así que el comportamiento no cambió.)
 
 | Archivo | Qué es | Verificado |
 |---|---|---|
-| `sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_unmanaged.zip` | Export unmanaged (`ExportSolution`, `Managed: false`), publicado antes de exportar (`PublishAllXml`). | `solution.xml`: `Version=1.2.0.0`, `Managed=0`. El DLL de plugins dentro del `.nupkg` trae `1.0.22.0` y ninguna otra versión del proyecto. |
-| `sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Version=1.2.0.0`, `Managed=1`. Mismo DLL `1.0.22.0`. |
-| `sanic_mppp_tbl_parametros_activos_2026-10-02.xlsx` | Los **20** parámetros activos. Columnas: Nombre, Version, Tipo, Valor, Descripcion. | Contra el de 2026-09-28: la única diferencia es la fila nueva `carga.filas.maximo` (v2, Numero, 100). `servicio.cuenta` enmascarado; ningún otro valor ni descripción trae cuenta, dominio, tenant id ni URL. |
-| `sanic_mppp_tbl_reglas_activas_2026-10-02.xlsx` | Las **15** reglas activas. Columnas: Codigo, Nivel, Orden, Efecto, Dependencias, Estado. | Idénticas fila por fila a las de 2026-09-28 (DN-04 no tocó reglas). |
+| `sanic_mppp_sol_mantenimientoppp_1_3_0_0_dn05_20261006_unmanaged.zip` | Export unmanaged (`ExportSolution`, `Managed: false`), publicado antes de exportar (`PublishAllXml`). | `solution.xml`: `Version=1.3.0.0`, `Managed=0`. El DLL de plugins dentro del `.nupkg` trae `1.0.23.0` y ninguna otra versión del proyecto. |
+| `sanic_mppp_sol_mantenimientoppp_1_3_0_0_dn05_20261006_managed.zip` | Mismo export, `Managed: true`. | `solution.xml`: `Version=1.3.0.0`, `Managed=1`. Mismo DLL `1.0.23.0`. |
+| `sanic_mppp_tbl_parametros_activos_2026-10-06.xlsx` | Los **22** parámetros activos. Columnas: Nombre, Version, Tipo, Valor, Descripcion. | Contra el de 2026-10-02: dos filas nuevas (`plan.formatos` v1 y `cuenta.largos` v1, JSON); `plantilla.estructura` pasa de v1 a v2; `plantilla.obligatoriedad` de v2 a v3. Ningún parámetro quitado. `servicio.cuenta` enmascarado; ningún otro valor ni descripción trae cuenta, dominio, tenant id ni URL. |
+| `sanic_mppp_tbl_reglas_activas_2026-10-06.xlsx` | Las **19** reglas activas (2 Correo, 5 Solicitud, 12 Registro). Columnas: Codigo, Nivel, Orden, Efecto, Dependencias, Estado. | Contra el de 2026-10-02: cinco reglas nuevas (`CARACTERES_PERMITIDOS` 25, `GESTION_DEL_FORMATO` 45, `CLASIFICACION_DEL_FORMATO` 50, `BANCO_DEL_FORMATO` 55, `CUENTA_DEL_BANCO` 90); sale `FORMATO_11_SOLO_ACH` (inactiva, no aparece); `REFERENCIA_FORMATO_11` ahora depende de `CLASIFICACION_DEL_FORMATO,OBLIGATORIEDAD`. El resto, idéntico. |
 
 El `.nupkg` también lleva `Sanic.Mppp.Plugins.Paquete.dll` (versión 1.0.0.0): es el ensamblado vacío que genera el
 proyecto del paquete, ya presente en v1.1.0; no tiene código.
 
 ### Después de importar esta solución en otro entorno
-Regenerar la metadata del ribbon (`&ribbondebug=true` > Command Checker > Regenerate ribbon metadata), DESPUÉS de la
-importación. Sin eso, los menús nuevos no aparecen o aparecen con "LabelText".
+1. Cargar los datos en el orden de la sección 1 (parámetros, ensamblado, reglas). Sin eso, la validación falla cerrada.
+2. Si el entorno tenía la solución anterior, regenerar la metadata del ribbon (`&ribbondebug=true` > Command Checker >
+   Regenerate ribbon metadata), DESPUÉS de la importación, por si algún menú de DN-04 aparece con "LabelText". DN-05 no
+   toca el ribbon.
 
 ---
 
@@ -131,7 +164,7 @@ importación. Sin eso, los menús nuevos no aparecen o aparecen con "LabelText".
 python3 - <<'PY'
 import zipfile, io, re
 for n in ["unmanaged", "managed"]:
-    z = zipfile.ZipFile(f"solution/sanic_mppp_sol_mantenimientoppp_1_2_0_0_dn04_20261002_{n}.zip")
+    z = zipfile.ZipFile(f"solution/sanic_mppp_sol_mantenimientoppp_1_3_0_0_dn05_20261006_{n}.zip")
     sol = z.read("solution.xml").decode()
     nupkg = [x for x in z.namelist() if x.endswith(".nupkg")][0]
     dll = zipfile.ZipFile(io.BytesIO(z.read(nupkg))).read("lib/net462/Sanic.Mppp.Plugins.dll")
@@ -141,8 +174,9 @@ for n in ["unmanaged", "managed"]:
 PY
 ```
 
-Y el set de este release contra Dev:
+La suite de C# y los sets de este release contra Dev:
 
 ```
-python3 herramientas/pruebas/correr.py L
+dotnet test tests/Sanic.Mppp.Plugins.Tests
+python3 herramientas/pruebas/correr.py R
 ```
