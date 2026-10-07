@@ -959,11 +959,13 @@ def r26(ctx):
     por_nombre = {}
     for f in todas:
         por_nombre.setdefault(f.get("sanic_nombre"), []).append(f)
+    # En TODA la tabla: exactamente UNA versión activa por nombre (DD-02). No se exige que sea la más alta: los sets R y U
+    # siembran versiones temporales de `autorizacion.modo` (y antes de `rpa.puedeaprobar`) y las desactivan al terminar,
+    # así que en esos parámetros de arnés la activa legítima puede no ser la mayor. Para un parámetro versionado por
+    # negocio, "la activa es la más alta" se comprueba arriba (plantilla.obligatoriedad).
     for nombre, filas in sorted(por_nombre.items()):
         activas = sorted(f.get("sanic_version") for f in filas if f.get("statecode") == 0)
-        mas_alta = max(f.get("sanic_version") for f in filas)
-        c.check(f"{nombre}: exactamente una versión activa y es la más alta (v{mas_alta})",
-                activas == [mas_alta], f"activas {activas}, más alta {mas_alta}")
+        c.check(f"{nombre}: exactamente una versión activa", len(activas) == 1, f"activas {activas}")
     return c
 
 

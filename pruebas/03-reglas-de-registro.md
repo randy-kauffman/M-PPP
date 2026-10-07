@@ -905,12 +905,15 @@ asc,sanic_version asc` (toda la tabla, sin ningún `POST`/`PATCH`).
 2. La v1 conserva EXACTO `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}]}` y la v2 conserva EXACTO
    `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}],"porGestion":{"Exclusion":{"opcionales":[{"campo":"numeroCuenta"},{"campo":"banco"},{"campo":"moneda"}]}}}`
    (comparación como JSON, no como texto).
-3. En TODA la tabla, cada nombre tiene exactamente una versión activa y es la más alta (si no, FALLA nombrando el
-   parámetro).
+3. En TODA la tabla, cada nombre tiene exactamente UNA versión activa (si no, FALLA nombrando el parámetro). No se
+   exige que sea la más alta en toda la tabla: los sets R y U siembran versiones temporales de `autorizacion.modo` (y
+   antes de `rpa.puedeaprobar`) y las desactivan al terminar, así que en esos parámetros de arnés la activa legítima
+   es la v1. Para `plantilla.obligatoriedad`, versionado por negocio, sí se exige que la activa sea la más alta (punto 1).
 
 **Cómo se verifica.** La respuesta de esa consulta.
 
-**Cómo se sabe que falló.** Una versión vieja sigue activa (duplicada), la activa no es la más alta, falta una de las
+**Cómo se sabe que falló.** Una versión vieja sigue activa (duplicada), la activa de `plantilla.obligatoriedad` no es la
+más alta, falta una de las
 versiones 1/2/3 de `plantilla.obligatoriedad`, o el `sanic_valor` de la v1/v2 cambió (alguien editó en vez de agregar
 una versión: rompería `sanic_versionparametros` de Solicitudes ya procesadas).
 
@@ -1136,7 +1139,8 @@ propio dueño (`E`).
 | R-38 plan ajeno sin fuga | | | DN-05 |
 
 **Corrida del 2026-10-06 contra Dev (ensamblado 1.0.23.0, después de reescribir el set):** 37 OK · 1 FALLA · 0 N-A.
-Después de reescribir R-26 contra DD-02 y desactivar los duplicados de Dev: 37 OK · 1 FALLA · 0 N-A. La FALLA es R-26 y es
-real: `autorizacion.modo` y `rpa.puedeaprobar` tienen activa la v1 y la versión más alta inactiva (decisión pendiente del
-aprobador; no son duplicados activos y no se tocaron). La corrida anterior, antes de reescribir el set, daba 20 OK · 7 FALLA ·
+Después de reescribir R-26 contra DD-02 y desactivar los duplicados de Dev: 37 OK · 1 FALLA · 0 N-A. La FALLA era R-26, por
+`autorizacion.modo` y `rpa.puedeaprobar` (activa la v1, la más alta inactiva). No es un defecto de datos: son versiones
+temporales que siembran y desactivan los propios sets R y U. Se ajustó el punto 3 del caso a "exactamente una activa por
+nombre" (coordinador, 2026-10-06). Corrida posterior: **38 OK · 0 FALLA · 0 N-A**. La corrida anterior, antes de reescribir el set, daba 20 OK · 7 FALLA ·
 1 N-A: R-10, R-12, R-16, R-17, R-18 y R-20 por fixtures y aserciones de antes de DN-05, R-21 N-A por lo mismo, y R-26.
