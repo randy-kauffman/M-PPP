@@ -637,8 +637,8 @@ def v02(ctx):
                 estado and bool(estado.get("sanic_fechaacuseenviado")), str(estado))
 
         filas = sim.leer_filas(dv, sid)
-        c.check("3 filas, todas Validadas (E01-feliz-formato11.xlsx: Inclusión, Exclusión, "
-                "Modificación, las tres pasan todas las reglas)",
+        c.check("3 filas, todas Validadas (E01-feliz-formato11.xlsx: tres Inclusiones "
+                "en PR11, DN-05, las tres pasan todas las reglas)",
                 len(filas) == 3 and all(f.get("sanic_estado") == FILA_VALIDADA for f in filas),
                 f"{len(filas)} filas: {filas}")
     except Exception as e:

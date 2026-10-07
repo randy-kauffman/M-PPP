@@ -19,7 +19,7 @@ haya dejado otro set. `herramientas/pruebas/sets/set_e.py` deja listo, en su pro
   arranca: sembrar el CONJUNTO de columnas es una decisión de negocio, no algo que un set de pruebas
   deba inventar — ver `playbooks/datos/parametros.md`).
 - **Su propio fixture de Filas reales**: una Solicitud simulada con `E01-feliz-formato11.xlsx` (tres
-  filas válidas — Inclusión, Exclusión, Modificación — que pasan todas las reglas y quedan en
+  Inclusiones válidas en `PR11` (hasta DN-05 eran Inclusión, Exclusión y Modificación) que pasan todas las reglas y quedan en
   Validada), creada con `ctx.procesar()`. Todos los casos de API que necesitan `filaid`s reales usan
   ESTE fixture, nunca datos de otro set ni una fila cualquiera del entorno.
 

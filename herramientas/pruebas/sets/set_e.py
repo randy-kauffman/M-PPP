@@ -106,8 +106,8 @@ def preparar(ctx):
       parametros.md", pero sembrarlo desde cero es una decisión de negocio del
       CONJUNTO de columnas — no algo que este set deba inventar).
     - **El fixture propio de Filas reales**: una Solicitud simulada con
-      `E01-feliz-formato11.xlsx` (tres filas válidas: Inclusión, Exclusión,
-      Modificación — pasan TODAS las reglas, quedan en Validada), creada acá
+      `E01-feliz-formato11.xlsx` (tres Inclusiones válidas en PR11 desde DN-05
+      — pasan TODAS las reglas, quedan en Validada), creada acá
       mismo con `ctx.procesar()`. TODOS los casos de este set que necesitan
       `filaid`s reales usan ESTE fixture (`ctx.extra["filas"]`) — ninguno
       supone una Fila que dejó otro set (CONVENCIONES §8: "un set no depende

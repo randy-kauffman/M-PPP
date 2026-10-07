@@ -46,14 +46,23 @@ def fila(gestion="Inclusion", clasificacion="ACH", plan="PR11", nombre="Juan Per
 # ---------------------------------------------------------------------------
 # Los casos. Cada uno: (archivo, [filas], hoja a renombrar o None)
 # ---------------------------------------------------------------------------
+def _letras(i):
+    """El indice como dos letras (AA, AB, ...), unico hasta 676."""
+    return chr(65 + (i // 26) % 26) + chr(65 + i % 26)
+
+
 def casos():
     c = []
 
-    # E01 — todo bien, plan formato 11 (ACH). Tres filas validas.
+    # E01 — todo bien, plan formato 11 (ACH). Tres filas validas, las tres de gestion Inclusion.
+    # DN-05 (2026-10-06): antes eran Inclusion, Exclusion y Modificacion. Ya no puede ser: el formato 11 no admite
+    # Modificacion (GESTION_DEL_FORMATO) y una Exclusion exige la referencia (plantilla.obligatoriedad v3), que
+    # este archivo no trae. La cobertura de Exclusion y Modificacion vive en casos propios del set R (R-18, R-21,
+    # R-32, R-33, R-34). Los nombres y las cuentas quedan como estaban: R-10 compara las referencias construidas.
     c.append(("E01-feliz-formato11.xlsx", [
         fila(nombre="Ana Lopez Prueba", cuenta="10203040506070"),
-        fila(gestion="Exclusion", nombre="Bruno Diaz Prueba", cuenta="11223344556677"),
-        fila(gestion="Modificacion", nombre="Carla Ruiz Prueba", cuenta="99887766554433"),
+        fila(nombre="Bruno Diaz Prueba", cuenta="11223344556677"),
+        fila(nombre="Carla Ruiz Prueba", cuenta="99887766554433"),
     ], None))
 
     # E02 — valores fuera de las listas. Falla LISTAS_VALIDAS.
@@ -65,11 +74,13 @@ def casos():
         fila(clasificacion="TRANSFER", nombre="Falla Clasificacion"),
     ], None))
 
-    # E03 — largos por encima del maximo de `plantilla.estructura`.
+    # E03 — largos por encima del maximo de `plantilla.estructura` (la cuenta, 17 desde DN-05).
+    # La cuenta de 21 digitos tambien la rechaza CUENTA_DEL_BANCO (no hay largo valido por encima de 17); el
+    # caso solo comprueba que el mensaje nombre el campo.
     c.append(("E03-largos-invalidos.xlsx", [
         fila(nombre="Nombre Larguisimo De Beneficiario Que Pasa Los Cuarenta Y Cuatro"),  # max 44
         fila(plan="PR11XX", nombre="Plan Largo"),                                          # max 4
-        fila(cuenta="123456789012345678901", nombre="Cuenta Larga"),                       # max 16
+        fila(cuenta="123456789012345678901", nombre="Cuenta Larga"),                       # max 17
         fila(numeroid="0011805900012XABCDEFGH", nombre="Identificacion Larga"),            # max 16
     ], None))
 
@@ -78,14 +89,15 @@ def casos():
         fila(plan="ZZ99", nombre="Plan Fantasma"),
     ], None))
 
-    # E05 — plan formato 11 con clasificacion distinta de ACH. Falla FORMATO_11_SOLO_ACH.
+    # E05 — plan formato 11 con clasificacion distinta de ACH. Falla CLASIFICACION_DEL_FORMATO
+    # (que desde DN-05 reemplaza a FORMATO_11_SOLO_ACH, inactiva).
     c.append(("E05-formato11-no-ach.xlsx", [
         fila(clasificacion="BAC", nombre="Once Con BAC"),
         fila(clasificacion="CK", nombre="Once Con CK"),
     ], None))
 
-    # E06 — campos obligatorios vacios. Falla OBLIGATORIEDAD.
-    # La ultima fila deja vacia SOLO la Referencia, que es opcional: tiene que pasar.
+    # E06 — campos obligatorios vacios (Inclusion en formato 11: nombre, cuenta y tipo de ID). Falla OBLIGATORIEDAD.
+    # La ultima fila deja vacia SOLO la Referencia, que es opcional en la inclusion: tiene que pasar.
     c.append(("E06-obligatoriedad.xlsx", [
         fila(nombre="", ),
         fila(cuenta="", nombre="Sin Cuenta"),
@@ -103,7 +115,9 @@ def casos():
         fila(plan="PRNA", clasificacion="BAC", nombre="Plan Sin Autorizacion"),
     ], None))
 
-    # E09 — referencia de formato 11 que no se puede construir.
+    # E09 — referencia de formato 11 que no se puede construir. Desde DN-05 estas cuentas las rechazan ademas
+    # CARACTERES_PERMITIDOS (letras) y LARGOS_Y_FORMATO / CUENTA_DEL_BANCO (18 digitos): no hay forma de aislar
+    # REFERENCIA_FORMATO_11, y R-11 solo comprueba que las dos filas queden rechazadas.
     c.append(("E09-referencia-formato11.xlsx", [
         fila(cuenta="1234ABCD5678", nombre="Cuenta Con Letras"),
         fila(cuenta="123456789012345678", nombre="Cuenta De Dieciocho"),
@@ -123,14 +137,16 @@ def casos():
     # E12 — la hoja de datos se llama distinto. Falla ESTRUCTURA_PLANTILLA.
     c.append(("E12-hoja-renombrada.xlsx", [fila(nombre="No Se Deberia Leer")], "Datos2"))
 
-    # E13 — plan formato 06: la referencia se respeta TAL CUAL, no se deriva.
+    # E13 — plan formato 06: la referencia se respeta TAL CUAL, no se deriva. Sin guiones: desde DN-05 la
+    # referencia solo admite letras y digitos ASCII (CARACTERES_PERMITIDOS).
     c.append(("E13-formato06-referencia-libre.xlsx", [
-        fila(plan="PR06", clasificacion="BAC", referencia="REF-LIBRE-000123", nombre="Formato Seis"),
+        fila(plan="PR06", clasificacion="BAC", referencia="REFLIBRE000123", nombre="Formato Seis"),
     ], None))
 
-    # E14 — volumen: 100 filas validas, para mirar el tiempo de la validacion.
+    # E14 — volumen: 100 filas validas, para mirar el tiempo de la validacion. Nombres unicos y sin digitos
+    # (DN-05: el nombre solo admite letras, espacio, guion, punto y coma): el sufijo es el indice en letras.
     c.append(("E14-volumen-100.xlsx", [
-        fila(nombre=f"Beneficiario Volumen {i:03}", cuenta=f"{10000000000000 + i}")
+        fila(nombre=f"Beneficiario Volumen {_letras(i)}", cuenta=f"{10000000000000 + i}")
         for i in range(1, 101)
     ], None))
 
