@@ -704,7 +704,7 @@ def _leer_fuente_tests(c):
 # entorno. **Ninguno de estos diez casos escribe sobre esa tabla.** Ni un solo `POST`/`PATCH` sobre
 # `sanic_mppp_tbl_parametros`:
 #
-# - R-19, R-20, R-26 leen lo YA sembrado (versión 1 y versión 2 activas hoy), nunca lo cambian.
+# - R-19, R-20, R-26 leen lo YA sembrado (hoy solo la v3 activa; v1 y v2 existen inactivas), nunca lo cambian.
 # - R-21, R-23, R-27 mandan Excel contra las Custom API, pero ejercitan gestiones/escenarios que la
 #   versión YA activa cubre (nunca siembran una versión nueva para forzar un escenario).
 # - R-22 (precedencia), R-24 (claves de `porGestion` sin distinguir caja/tildes) y R-25 (clave
@@ -928,29 +928,42 @@ def r25(ctx):
     return c
 
 
+VALOR_V2_CANONICO = {
+    "porDefecto": "obligatorio",
+    "opcionales": [{"campo": "referencia"}],
+    "porGestion": {"Exclusion": {"opcionales": [{"campo": "numeroCuenta"}, {"campo": "banco"}, {"campo": "moneda"}]}},
+}
+
+
 def r26(ctx):
-    c = pc.Caso("R-26", "Versionar es AGREGAR una fila, nunca editar la vigente")
+    c = pc.Caso("R-26", "Versionar agrega una fila y desactiva la anterior: UNA sola versión activa por parámetro (DD-02)")
     est, r, _ = ctx.dv.call(
-        "GET",
-        f"{PARAMETROS}?$select=sanic_version,sanic_valor,statecode"
-        "&$filter=sanic_nombre eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc")
-    filas = r.get("value", []) if est == 200 else []
-    c.check("hay al menos dos versiones (1 y 2), y las que hay están activas",
-            len(filas) >= 2 and all(f.get("statecode") == 0 for f in filas), str(filas))
+        "GET", f"{PARAMETROS}?$select=sanic_nombre,sanic_version,sanic_valor,statecode&$orderby=sanic_nombre asc,sanic_version asc")
+    todas = r.get("value", []) if est == 200 else []
+    c.check("se leyó toda la tabla de parámetros", est == 200 and len(todas) > 0, f"HTTP {est}")
 
-    v1 = next((f for f in filas if f.get("sanic_version") == 1), None)
-    v1_ok = False
-    if v1 is not None:
+    obl = {f.get("sanic_version"): f for f in todas if f.get("sanic_nombre") == "plantilla.obligatoriedad"}
+    c.check("plantilla.obligatoriedad tiene las versiones 1, 2 y 3", {1, 2, 3} <= set(obl), f"hay {sorted(obl)}")
+    c.check("de plantilla.obligatoriedad SOLO la versión 3 está activa",
+            sorted(v for v, f in obl.items() if f.get("statecode") == 0) == [3],
+            str({v: f.get("statecode") for v, f in obl.items()}))
+    for version, canonico in ((1, VALOR_V1_CANONICO), (2, VALOR_V2_CANONICO)):
+        fila = obl.get(version)
         try:
-            v1_ok = json.loads(v1.get("sanic_valor") or "{}") == VALOR_V1_CANONICO
+            valor = json.loads(fila.get("sanic_valor") or "{}") if fila else None
         except json.JSONDecodeError:
-            v1_ok = False
-    c.check("la versión 1 existe y su sanic_valor es EXACTO al de DD-16 (sin porGestion, nunca editada)",
-            v1 is not None and v1_ok, str(v1))
+            valor = None
+        c.check(f"la versión {version} conserva EXACTO su sanic_valor (como JSON; versionar nunca edita)",
+                fila is not None and valor == canonico, f"obtenido {valor!r}")
 
-    v2 = next((f for f in filas if f.get("sanic_version") == 2), None)
-    c.check("la versión 2 existe y su sanic_valor es DISTINTO del de la versión 1 (se agregó, no se pisó)",
-            v2 is not None and v1 is not None and v2.get("sanic_valor") != v1.get("sanic_valor"), str(v2))
+    por_nombre = {}
+    for f in todas:
+        por_nombre.setdefault(f.get("sanic_nombre"), []).append(f)
+    for nombre, filas in sorted(por_nombre.items()):
+        activas = sorted(f.get("sanic_version") for f in filas if f.get("statecode") == 0)
+        mas_alta = max(f.get("sanic_version") for f in filas)
+        c.check(f"{nombre}: exactamente una versión activa y es la más alta (v{mas_alta})",
+                activas == [mas_alta], f"activas {activas}, más alta {mas_alta}")
     return c
 
 

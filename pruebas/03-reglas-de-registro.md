@@ -611,7 +611,7 @@ versión nueva la vuelve la ACTIVA de inmediato, para toda Solicitud que se vali
 activa, en TODO el entorno. **Ninguno de estos diez casos siembra una versión nueva.** Ni un solo
 `POST`/`PATCH` sobre `sanic_mppp_tbl_parametros`:
 
-- R-19, R-20 y R-26 leen lo YA sembrado (versión 1 y versión 2 activas hoy), nunca lo cambian.
+- R-19, R-20 y R-26 leen lo YA sembrado (hoy solo la v3 activa; v1 y v2 existen inactivas), nunca lo cambian.
 - R-21, R-23 y R-27 mandan Excel contra las Custom API, pero ejercitan gestiones/escenarios que la
   versión YA activa cubre (nunca siembran una versión nueva para forzar un escenario).
 - R-22 (precedencia), R-24 (claves de `porGestion` sin distinguir caja/tildes) y R-25 (clave
@@ -634,8 +634,7 @@ que versionar agrega una fila y nunca edita la vigente; R-19, R-28 cierran la co
 catálogo.
 
 > **Nota del 2026-10-06 (DN-05).** Esta sección habla de la v2 como la versión vigente. Hoy la vigente es la **v3**
-> (matriz del negocio), la v1 está **inactiva** desde el 2026-09-28 (decisión pendiente del aprobador, ver R-26) y
-> la v2 sigue activa pero la v3 la tapa. Lo que cambió en los casos: R-20 y R-21 se reescribieron contra la v3 (más
+> (matriz del negocio), v1 y v2 están **inactivas** (DD-02: una sola versión activa; ver R-26). Lo que cambió en los casos: R-20 y R-21 se reescribieron contra la v3 (más
 > abajo); R-19, R-22 a R-25, R-27 y R-28 siguen como están. Lo del párrafo anterior sobre "Exclusion afloja tres
 > campos" (R-18, R-20) es historia de la v2.
 
@@ -882,32 +881,38 @@ Dev (fuera de este arnés, ver "Cómo").
 
 ---
 
-## R-26 · Versionar es AGREGAR una fila, nunca editar la vigente
+## R-26 · Versionar agrega una fila y desactiva la anterior: UNA sola versión activa por parámetro
 
-**Qué prueba.** DD-02/la nota de `playbooks/datos/parametros.md`: cambiar una regla de negocio
-siembra `sanic_version` más alto como fila NUEVA; la anterior queda intacta, de respaldo/histórico,
-y el motor resuelve la activa por `sanic_version` descendente con `statecode` activo.
+> **Nota del 2026-10-06 (orden del aprobador).** La versión anterior de este caso ("Versionar es AGREGAR una fila,
+> nunca editar la vigente") exigía que la v1 y la v2 de `plantilla.obligatoriedad` siguieran ACTIVAS. Eso contradecía
+> DD-02 (`diseno/02-diccionario-datos.md` §2.5, `sanic_version`: "Cambiar = crear una versión nueva y desactivar la
+> anterior"). La v1 se reactivó por error en Dev el 2026-10-06 para satisfacer ese check, y se volvió a desactivar el
+> mismo día junto con la v2 de `plantilla.obligatoriedad` y la v1 de `plantilla.estructura`, que habían quedado
+> duplicadas activas porque `parametro.py` agrega la versión nueva sin desactivar la anterior. El caso se reescribió
+> abajo. El historial de la versión anterior (y su FALLA del 2026-09-28) queda en git.
+
+**Qué prueba.** DD-02/la nota de `playbooks/datos/parametros.md`: cambiar una regla de negocio siembra
+`sanic_version` más alto como fila NUEVA y **desactiva** la anterior; nunca se edita `sanic_valor`. Resultado: cada
+parámetro tiene exactamente UNA versión activa, la más alta, y las viejas quedan inactivas e intactas como historia.
 
 **Necesita.** Nada que crear: alcanza con leer lo ya sembrado.
 
-**Cómo.** `GET sanic_mppp_tbl_parametros?$select=sanic_version,sanic_valor,statecode&$filter=sanic_nombre
-eq 'plantilla.obligatoriedad'&$orderby=sanic_version asc` (mismo patrón de lectura que usa
-`preparacion_comun.py`, sin ningún `POST`/`PATCH`).
+**Cómo.** `GET sanic_mppp_tbl_parametros?$select=sanic_nombre,sanic_version,sanic_valor,statecode&$orderby=sanic_nombre
+asc,sanic_version asc` (toda la tabla, sin ningún `POST`/`PATCH`).
 
-**Qué tiene que pasar.** Aparecen AL MENOS dos filas (`sanic_version=1` y `sanic_version=2`), las
-dos activas, con `sanic_valor` distinto entre sí, y la versión 1 sigue exactamente como la
-documenta `DD-16` (sin `porGestion`).
+**Qué tiene que pasar.**
+1. `plantilla.obligatoriedad` tiene las versiones 1, 2 y 3, y SOLO la 3 está activa.
+2. La v1 conserva EXACTO `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}]}` y la v2 conserva EXACTO
+   `{"porDefecto":"obligatorio","opcionales":[{"campo":"referencia"}],"porGestion":{"Exclusion":{"opcionales":[{"campo":"numeroCuenta"},{"campo":"banco"},{"campo":"moneda"}]}}}`
+   (comparación como JSON, no como texto).
+3. En TODA la tabla, cada nombre tiene exactamente una versión activa y es la más alta (si no, FALLA nombrando el
+   parámetro).
 
 **Cómo se verifica.** La respuesta de esa consulta.
 
-> **Nota del 2026-10-06.** El caso da **FALLA** hoy y **no es de DN-05**: la versión 1 de `plantilla.obligatoriedad` está
-> **inactiva en Dev desde el 2026-09-28** (`statecode=1`) y el primer check exige "las que hay están activas".
-> Decisión pendiente del aprobador (reactivarla o relajar el check): no se toca desde las pruebas. La v1 sigue
-> existiendo e intacta (R-19 lo confirma) y la v3 se agregó sin pisar ninguna.
-
-**Cómo se sabe que falló.** Solo aparece una fila (la versión 1 se editó en vez de agregar la 2:
-rompería `sanic_versionparametros` de Solicitudes ya procesadas con la versión anterior, que
-dejaría de decir la verdad), o la versión 1 tiene un `sanic_valor` distinto al original.
+**Cómo se sabe que falló.** Una versión vieja sigue activa (duplicada), la activa no es la más alta, falta una de las
+versiones 1/2/3 de `plantilla.obligatoriedad`, o el `sanic_valor` de la v1/v2 cambió (alguien editó en vez de agregar
+una versión: rompería `sanic_versionparametros` de Solicitudes ya procesadas).
 
 **Automatizable.** API.
 
@@ -1116,7 +1121,7 @@ propio dueño (`E`).
 | R-23 gestión inválida en la fila | | | ex O-05 |
 | R-24 sin distinguir caja/tildes | | | ex O-06 |
 | R-25 gestión desconocida en el parámetro | | | ex O-07; alto riesgo, preferir unitario |
-| R-26 versionar agrega, no edita | | | ex O-08; **FALLA hoy, no es de DN-05**: la v1 está inactiva en Dev desde el 2026-09-28 (decisión pendiente del aprobador) |
+| R-26 versionar agrega, no edita | | | ex O-08; reescrito el 2026-10-06 contra DD-02 (una sola versión activa por parámetro) |
 | R-27 mensaje al cliente sin cambios | | | ex O-09 |
 | R-28 regla sin cambio de código/orden/nivel | | | ex O-10 |
 | R-29 ACH en plan 06 | | | DN-05, escenario 9 |
@@ -1131,6 +1136,7 @@ propio dueño (`E`).
 | R-38 plan ajeno sin fuga | | | DN-05 |
 
 **Corrida del 2026-10-06 contra Dev (ensamblado 1.0.23.0, después de reescribir el set):** 37 OK · 1 FALLA · 0 N-A.
-La FALLA es R-26 y no es de DN-05 (nota en el propio caso). La corrida del mismo día antes de reescribir daba 20 OK ·
-7 FALLA · 1 N-A: R-10, R-12, R-16, R-17, R-18 y R-20 por fixtures y aserciones de antes de DN-05, R-21 N-A por lo mismo,
-y R-26.
+Después de reescribir R-26 contra DD-02 y desactivar los duplicados de Dev: 37 OK · 1 FALLA · 0 N-A. La FALLA es R-26 y es
+real: `autorizacion.modo` y `rpa.puedeaprobar` tienen activa la v1 y la versión más alta inactiva (decisión pendiente del
+aprobador; no son duplicados activos y no se tocaron). La corrida anterior, antes de reescribir el set, daba 20 OK · 7 FALLA ·
+1 N-A: R-10, R-12, R-16, R-17, R-18 y R-20 por fixtures y aserciones de antes de DN-05, R-21 N-A por lo mismo, y R-26.
