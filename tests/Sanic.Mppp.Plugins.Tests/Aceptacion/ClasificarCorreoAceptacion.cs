@@ -323,6 +323,10 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(EstadoDeLaSolicitud.NoReconocida, m.Estado(id));
             Assert.Equal(2, m.Resultados(id).Count);
             Assert.Single(m.Avisos.Enviados);
+            // Cambió el estado: ningún camino que mueve la Solicitud termina sin rastro (diseno/03 §0).
+            var eventos = m.Bitacora(id);
+            Assert.Equal(2, eventos.Count);
+            Assert.All(eventos, e => Assert.Equal((int)EventoDeBitacora.CorreoClasificado, e.GetAttributeValue<OptionSetValue>("sanic_evento").Value));
         }
 
         // ------------------------------------------------------------------ catálogos y errores reales
