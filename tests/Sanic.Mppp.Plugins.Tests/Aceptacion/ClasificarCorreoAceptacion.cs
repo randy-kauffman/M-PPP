@@ -291,6 +291,28 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         }
 
         [Fact]
+        public void La_clave_alternativa_no_distingue_mayusculas_y_la_reclasificacion_tampoco()
+        {
+            // Dataverse compara la clave "Solicitud y código de regla" sin distinguir mayúsculas
+            // (docs/investigacion/web-api-claves-alternativas.md). Un resultado guardado con otro casing ES el mismo registro.
+            var m = new Mundo();
+            var id = m.Solicitud();
+            m.Correr(id);
+            foreach (var resultado in m.Resultados(id))
+            {
+                var cambiado = new Entity(TablasHistorico.ResultadoRegla, resultado.Id) { ["sanic_reglacodigo"] = ((string)resultado["sanic_reglacodigo"]).ToLowerInvariant() };
+                m.Svc.Update(cambiado);
+            }
+
+            var llamadasAntes = m.Svc.Llamadas.Count;
+            var r = m.Correr(id);
+
+            Assert.Equal((true, Clasificaciones.Nuevo, false), (r.Procesar, r.Clasificacion, r.YaProcesada));
+            Assert.Equal(0, m.Svc.Llamadas.Skip(llamadasAntes).Count(l => l.Operacion == "Create"));
+            Assert.Equal(2, m.Resultados(id).Count);
+        }
+
+        [Fact]
         public void La_reclasificacion_no_crea_ningun_resultado_regla()
         {
             var m = new Mundo();
