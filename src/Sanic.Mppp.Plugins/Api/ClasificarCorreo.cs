@@ -324,10 +324,11 @@ namespace Sanic.Mppp.Plugins.Api
                 idsDeReglaPorCodigo[regla.Definicion.Codigo] = regla.Id;
             }
 
+            // La clave alternativa de Dataverse no distingue mayúsculas: los códigos se comparan igual.
             // D-77: la Solicitud puede seguir en Ingresada con la clasificación ya guardada (se procesó y Validar falló). Reinsertar
             // chocaría con la clave alternativa "Solicitud y código de regla"; se omite el guardado y la Bitácora, la decisión se honra.
             var codigosGuardados = _solicitudes.CodigosConResultado(solicitudId, resultados.Select(r => r.Codigo));
-            var yaClasificada = resultados.Any(r => codigosGuardados.Contains(r.Codigo));
+            var yaClasificada = resultados.Any(r => codigosGuardados.Contains(r.Codigo, StringComparer.OrdinalIgnoreCase));
 
             if (!yaClasificada)
             {

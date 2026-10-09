@@ -274,7 +274,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
         /// <summary>
         /// De los `codigos` pedidos, los que la Solicitud ya tiene guardados en `sanic_mppp_tbl_resultadoregla` (D-77): UNA consulta
-        /// filtrada por `sanic_solicitudid` Y `sanic_reglacodigo` In (los pedidos), con SOLO `sanic_reglacodigo`. Distintos, sin orden.
+        /// filtrada por `sanic_solicitudid` Y `sanic_reglacodigo` In (los pedidos), con SOLO `sanic_reglacodigo`. Distintos (sin distinguir mayúsculas, como la clave alternativa), sin orden.
         /// Sirve para no reinsertar resultados que chocarían con la clave alternativa "Solicitud y código de regla" (0x80060892).
         /// `codigos` nulo: <see cref="ArgumentNullException"/>; vacío: devuelve vacío SIN llamar al servicio. Si la consulta trae
         /// `MoreRecords` falla con <see cref="InvalidOperationException"/>: una lista truncada haría creer que falta un código.
@@ -288,7 +288,7 @@ namespace Sanic.Mppp.Plugins.Datos
                 throw new ArgumentNullException(nameof(codigos));
             }
 
-            var pedidos = codigos.Where(c => !string.IsNullOrEmpty(c)).Distinct(StringComparer.Ordinal).ToList();
+            var pedidos = codigos.Where(c => !string.IsNullOrEmpty(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (pedidos.Count == 0)
             {
                 return new List<string>();
@@ -307,7 +307,7 @@ namespace Sanic.Mppp.Plugins.Datos
             return respuesta.Entities
                 .Select(e => e.GetAttributeValue<string>("sanic_reglacodigo"))
                 .Where(c => !string.IsNullOrEmpty(c))
-                .Distinct(StringComparer.Ordinal)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 

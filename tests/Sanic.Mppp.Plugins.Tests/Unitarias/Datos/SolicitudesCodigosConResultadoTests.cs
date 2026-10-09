@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 using Sanic.Mppp.Plugins.Datos;
 using Sanic.Mppp.Plugins.Tests.Dobles;
 using Xunit;
@@ -65,6 +66,49 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Datos
             var codigos = new SolicitudesDataverse(svc).CodigosConResultado(mia, Pedidos);
 
             Assert.Equal(new[] { "A", "B" }, codigos.OrderBy(c => c, StringComparer.Ordinal));
+        }
+
+        [Fact]
+        public void La_comparacion_no_distingue_mayusculas_como_la_clave_alternativa()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var id = Guid.NewGuid();
+            svc.Create(Resultado(id, "es_correo_nuevo"));
+            svc.Create(Resultado(id, "ES_CORREO_NUEVO"));
+
+            var codigos = new SolicitudesDataverse(svc).CodigosConResultado(id, new[] { "Es_Correo_Nuevo" });
+
+            Assert.Single(codigos);
+            Assert.Equal("es_correo_nuevo", codigos.Single(), StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Una_consulta_que_trae_MoreRecords_es_un_error_real()
+        {
+            var svc = new SiempreTruncado(new OrganizationServiceEnMemoria());
+            Assert.Throws<InvalidOperationException>(() => new SolicitudesDataverse(svc).CodigosConResultado(Guid.NewGuid(), Pedidos));
+        }
+
+        private sealed class SiempreTruncado : IOrganizationService
+        {
+            private readonly IOrganizationService _real;
+
+            public SiempreTruncado(IOrganizationService real) { _real = real; }
+
+            public EntityCollection RetrieveMultiple(QueryBase query)
+            {
+                var r = _real.RetrieveMultiple(query);
+                r.MoreRecords = true;
+                return r;
+            }
+
+            public Guid Create(Entity entity) => _real.Create(entity);
+            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _real.Retrieve(entityName, id, columnSet);
+            public void Update(Entity entity) => _real.Update(entity);
+            public void Delete(string entityName, Guid id) => _real.Delete(entityName, id);
+            public OrganizationResponse Execute(OrganizationRequest request) => _real.Execute(request);
+            public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Associate(entityName, entityId, relationship, relatedEntities);
+            public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Disassociate(entityName, entityId, relationship, relatedEntities);
         }
 
         private sealed class SinLlamadas : IOrganizationService
