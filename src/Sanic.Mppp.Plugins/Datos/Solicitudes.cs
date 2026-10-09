@@ -272,6 +272,45 @@ namespace Sanic.Mppp.Plugins.Datos
             }
         }
 
+        /// <summary>
+        /// De los `codigos` pedidos, los que la Solicitud ya tiene guardados en `sanic_mppp_tbl_resultadoregla` (D-77): UNA consulta
+        /// filtrada por `sanic_solicitudid` Y `sanic_reglacodigo` In (los pedidos), con SOLO `sanic_reglacodigo`. Distintos, sin orden.
+        /// Sirve para no reinsertar resultados que chocarían con la clave alternativa "Solicitud y código de regla" (0x80060892).
+        /// `codigos` nulo: <see cref="ArgumentNullException"/>; vacío: devuelve vacío SIN llamar al servicio. Si la consulta trae
+        /// `MoreRecords` falla con <see cref="InvalidOperationException"/>: una lista truncada haría creer que falta un código.
+        /// </summary>
+        public IReadOnlyCollection<string> CodigosConResultado(Guid solicitudId, IEnumerable<string> codigos)
+        {
+            ValidarSolicitudId(solicitudId);
+
+            if (codigos == null)
+            {
+                throw new ArgumentNullException(nameof(codigos));
+            }
+
+            var pedidos = codigos.Where(c => !string.IsNullOrEmpty(c)).Distinct(StringComparer.Ordinal).ToList();
+            if (pedidos.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            var consulta = new QueryExpression(TablasHistorico.ResultadoRegla) { ColumnSet = new ColumnSet("sanic_reglacodigo") };
+            consulta.Criteria.AddCondition("sanic_solicitudid", ConditionOperator.Equal, solicitudId);
+            consulta.Criteria.AddCondition("sanic_reglacodigo", ConditionOperator.In, pedidos.Cast<object>().ToArray());
+
+            var respuesta = _servicio.RetrieveMultiple(consulta);
+            if (respuesta.MoreRecords)
+            {
+                throw new InvalidOperationException($"Los resultados de reglas de la solicitud {solicitudId} no caben en una página: no se puede saber qué códigos ya existen.");
+            }
+
+            return respuesta.Entities
+                .Select(e => e.GetAttributeValue<string>("sanic_reglacodigo"))
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
+
         /// <summary>UN `Create` en Bitácora: fecha, evento, origen, `sanic_numerofila` (0 = de la solicitud), `sanic_actortexto` (recortado a 200, puede ser nulo), `sanic_detalle` (recortado a 10000).</summary>
         public Guid RegistrarEvento(Guid solicitudId, DateTime fecha, EventoDeBitacora evento, OrigenDelEvento origen, int numeroFila, string actor, string detalle)
         {

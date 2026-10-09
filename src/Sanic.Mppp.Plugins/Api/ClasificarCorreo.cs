@@ -201,6 +201,10 @@ namespace Sanic.Mppp.Plugins.Api
     ///     `remitente_no_reconocido` → No reconocida; en los tres, `sanic_motivoclasificacion` con el motivo, Bitácora "Correo
     ///     clasificado" (origen Custom API) y un aviso a los ejecutivos; `Procesar` = false. `nuevo`/`reenvio` → la Solicitud sigue en
     ///     Ingresada, `Procesar` = true, y también Bitácora "Correo clasificado" (ningún camino termina sin rastro);
+    ///     Idempotencia en Ingresada (D-77): si la Solicitud ya tiene ResultadoRegla de alguna regla de Correo evaluada (se procesó
+    ///     y Validar falló, y se reintenta), recalcula y devuelve la decisión igual, pero NO crea ResultadoRegla (chocarían con la
+    ///     clave alternativa "Solicitud y código de regla") ni Bitácora si sigue procesándose; si la decisión nueva es "no procesar"
+    ///     (p. ej. se quitó la autorización), hace el cambio de estado, el aviso (falla cerrado) y la Bitácora, sin reescribir los resultados;
     ///  5. no abre el Excel, no carga planes por código, no arma ninguna comunicación al remitente;
     ///  6. una excepción real (catálogo mal armado, servicio) se propaga tal cual: la transacción la revierte la plataforma.
     /// Nada de acá lee el reloj: la fecha llega por parámetro (el plugin la toma del contexto) y tiene que ser UTC.
@@ -320,15 +324,27 @@ namespace Sanic.Mppp.Plugins.Api
                 idsDeReglaPorCodigo[regla.Definicion.Codigo] = regla.Id;
             }
 
-            _solicitudes.GuardarResultados(solicitudId, resultados, idsDeReglaPorCodigo, ahoraUtc);
+            // D-77: la Solicitud puede seguir en Ingresada con la clasificación ya guardada (se procesó y Validar falló). Reinsertar
+            // chocaría con la clave alternativa "Solicitud y código de regla"; se omite el guardado y la Bitácora, la decisión se honra.
+            var codigosGuardados = _solicitudes.CodigosConResultado(solicitudId, resultados.Select(r => r.Codigo));
+            var yaClasificada = resultados.Any(r => codigosGuardados.Contains(r.Codigo));
+
+            if (!yaClasificada)
+            {
+                _solicitudes.GuardarResultados(solicitudId, resultados, idsDeReglaPorCodigo, ahoraUtc);
+            }
 
             if (!procesar)
             {
                 _solicitudes.Clasificar(solicitudId, new ClasificacionDelCorreo { Estado = estadoFinal, Motivo = motivo });
             }
 
-            // Ningún camino termina sin rastro: Bitácora "Correo clasificado" también cuando sigue en Ingresada.
-            _solicitudes.RegistrarEvento(solicitudId, ahoraUtc, EventoDeBitacora.CorreoClasificado, OrigenDelEvento.CustomAPI, 0, null, null);
+            // Ningún camino termina sin rastro: Bitácora "Correo clasificado" también cuando sigue en Ingresada. D-77: solo se omite
+            // en el reintento feliz (ya clasificada Y procesar, nada cambia); si el reintento cambia el estado, se registra.
+            if (!yaClasificada || !procesar)
+            {
+                _solicitudes.RegistrarEvento(solicitudId, ahoraUtc, EventoDeBitacora.CorreoClasificado, OrigenDelEvento.CustomAPI, 0, null, null);
+            }
 
             if (!procesar)
             {
