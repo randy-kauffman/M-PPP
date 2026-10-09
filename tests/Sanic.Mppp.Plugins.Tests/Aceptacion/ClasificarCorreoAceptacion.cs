@@ -251,6 +251,80 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(1, llamadasDelPlugin); // solo la lectura de la Solicitud
         }
 
+        // ------------------------------------------------------------------ idempotencia en Ingresada (D-77)
+        // Clasificar deja la Solicitud en Ingresada cuando se procesa. Si Validar falla, el reintento (MPPP-VIG bloque 2,
+        // o reenviar la corrida) vuelve a clasificar la MISMA Solicitud: en BAC (2026-10-09) eso chocaba con la clave
+        // alternativa "Solicitud y código de regla" (0x80060892) y tapaba para siempre el error original de Validar.
+        // El doble no hace cumplir claves alternativas: por eso se mide la CANTIDAD de registros, no la ausencia de excepción.
+        [Fact]
+        public void Reclasificar_una_solicitud_que_sigue_en_ingresada_no_duplica_resultados_ni_bitacora_y_vuelve_a_dejarla_procesar()
+        {
+            var m = new Mundo();
+            var id = m.Solicitud();
+            var primera = m.Correr(id);
+
+            var segunda = new ClasificarCorreo(new SolicitudesDataverse(m.Svc), new CatalogosDataverse(m.Svc), m.Archivos, m.Avisos)
+                .Ejecutar(id, Ahora.AddMinutes(10));
+
+            Assert.Equal((primera.Procesar, primera.Clasificacion, primera.YaProcesada), (segunda.Procesar, segunda.Clasificacion, segunda.YaProcesada));
+            Assert.Equal((true, Clasificaciones.Nuevo, false), (segunda.Procesar, segunda.Clasificacion, segunda.YaProcesada)); // el flujo sigue a Validar
+            Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado(id));
+            var resultados = m.Resultados(id);
+            Assert.Equal(new[] { ReglasDelCorreo.EsCorreoNuevo, ReglasDelCorreo.RemitenteReconocido }, resultados.Select(x => (string)x["sanic_reglacodigo"]));
+            Assert.All(resultados, x => Assert.Equal(Ahora, x["sanic_fechaevaluacion"])); // quedan los de la primera evaluación
+            Assert.Single(m.Bitacora(id));
+            Assert.Empty(m.Avisos.Enviados);
+        }
+
+        [Fact]
+        public void Reclasificar_tres_veces_sigue_dejando_un_resultado_por_regla()
+        {
+            var m = new Mundo();
+            var id = m.Solicitud();
+            m.Correr(id);
+            m.Correr(id);
+            m.Correr(id);
+
+            Assert.Equal(2, m.Resultados(id).Count);
+            Assert.Equal(2, m.Resultados(id).Select(x => (string)x["sanic_reglacodigo"]).Distinct().Count());
+            Assert.Single(m.Bitacora(id));
+        }
+
+        [Fact]
+        public void La_reclasificacion_no_crea_ningun_resultado_regla()
+        {
+            var m = new Mundo();
+            var id = m.Solicitud();
+            m.Correr(id);
+            var llamadasAntes = m.Svc.Llamadas.Count;
+
+            m.Correr(id);
+
+            var creates = m.Svc.Llamadas.Skip(llamadasAntes).Count(l => l.Operacion == "Create");
+            Assert.Equal(0, creates);
+        }
+
+        [Fact]
+        public void Si_entre_corridas_el_remitente_perdio_la_autorizacion_la_reclasificacion_falla_cerrado_y_no_se_procesa()
+        {
+            // Decisión abierta para el aprobador (D-77): se honra la decisión NUEVA (falla cerrado: no se procesa lo que hoy
+            // no está autorizado) y los ResultadoRegla de la primera evaluación NO se reescriben (la clave no lo permite).
+            var m = new Mundo();
+            var id = m.Solicitud();
+            m.Correr(id);
+            foreach (var autorizacion in m.Svc.Registros(Tablas.AutorizacionPlan))
+            {
+                m.Svc.Delete(Tablas.AutorizacionPlan, autorizacion.Id);
+            }
+
+            var r = m.Correr(id);
+
+            Assert.Equal((false, Clasificaciones.RemitenteNoReconocido, false), (r.Procesar, r.Clasificacion, r.YaProcesada));
+            Assert.Equal(EstadoDeLaSolicitud.NoReconocida, m.Estado(id));
+            Assert.Equal(2, m.Resultados(id).Count);
+            Assert.Single(m.Avisos.Enviados);
+        }
+
         // ------------------------------------------------------------------ catálogos y errores reales
         [Fact]
         public void Sin_el_parametro_de_prefijos_o_con_uno_ilegible_es_un_error_real_y_nada_queda_a_medias()
