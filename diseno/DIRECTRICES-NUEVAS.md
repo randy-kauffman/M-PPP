@@ -1010,9 +1010,9 @@ su tipo: una cédula de 5 dígitos pasa.
 | CNA | `DDMMAA` (posiciones 4 a 9) es una fecha real; el año vale en 1900 o en 2000 | *El número de identificación no es una cédula válida: la fecha de nacimiento no existe.* |
 | CNA | la letra = `ABCDEFGHJKLMNPQRSTUVWXY`[número de 13 dígitos % 23] | *El número de identificación no es una cédula válida: la letra final no corresponde al número.* |
 | RUC | 14 caracteres | *El número de identificación no es un RUC válido: debe tener 14 caracteres.* |
-| RUC | si empieza con un dígito: tiene que ser una cédula válida (las tres de CNA) | los tres de CNA, diciendo **RUC** en lugar de **cédula** |
+| RUC | si son 13 dígitos + 1 letra (forma de cédula): tiene que ser una cédula válida (fecha y letra de CNA) | los de fecha y letra de CNA, diciendo **RUC** en lugar de **cédula** |
 | RUC | si empieza con `J`: `J` + 13 dígitos | *El número de identificación no es un RUC válido: después de la J debe tener 13 dígitos.* |
-| RUC | otro comienzo: solo el largo | — |
+| RUC | cualquier otra forma (por ejemplo los prefijos `E`, `R`, `N` o `0` de otros contribuyentes): solo el largo | — |
 | PAS, PEX | 6 a 9 caracteres | *El número de identificación no es un pasaporte válido: debe tener entre 6 y 9 letras o números.* |
 
 Ningún mensaje repite el número (dato sensible, DD-08). Sin marcadores: el catálogo puede reemplazar el texto (D-19), pero
