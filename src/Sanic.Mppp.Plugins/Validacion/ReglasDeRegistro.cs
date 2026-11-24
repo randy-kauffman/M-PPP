@@ -615,6 +615,9 @@ namespace Sanic.Mppp.Plugins.Validacion
         public const string CaracteresPermitidos = "CARACTERES_PERMITIDOS";
         public const string CuentaDelBanco = "CUENTA_DEL_BANCO";
 
+        /// <summary>DN-07 (aprobador, 2026-11-24): el número de identificación se valida según su tipo.</summary>
+        public const string IdentificacionDelTipo = "IDENTIFICACION_DEL_TIPO";
+
         /// <summary>Un evaluador por cada código de arriba, ni uno más. Instancias nuevas en cada llamada: no guardan estado.</summary>
         public static IList<IEvaluador<FilaEnValidacion>> Evaluadores()
         {
@@ -634,6 +637,7 @@ namespace Sanic.Mppp.Plugins.Validacion
                 new EvaluadorCaracteresPermitidos(),
                 new EvaluadorCuentaDelBanco(),
                 new EvaluadorPlanRequierePreregistro(),
+                new EvaluadorIdentificacionDelTipo(),
             };
         }
 
@@ -1030,6 +1034,32 @@ namespace Sanic.Mppp.Plugins.Validacion
                 }
 
                 return plan.RequierePreregistro ? Veredicto.Cumplida() : Veredicto.NoCumplida("Este plan no requiere pre-registro.");
+            }
+        }
+
+        /// <summary>
+        /// `IDENTIFICACION_DEL_TIPO` (DN-07, aprobador 2026-11-24): el número de identificación tiene que corresponder a su tipo.
+        /// Sin Tipo ID válido no hay contra qué validar (eso lo dice LISTAS_VALIDAS). El motivo no lleva marcadores ni cita el número.
+        /// </summary>
+        private sealed class EvaluadorIdentificacionDelTipo : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => IdentificacionDelTipo;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var tipo = fila.TipoIdentificacion;
+                if (tipo == null)
+                {
+                    return Veredicto.Cumplida();
+                }
+
+                var motivo = IdentificacionPorTipo.Motivo(tipo.Value, fila.Recibido(CamposDeFila.NumeroIdentificacion));
+                return motivo == null ? Veredicto.Cumplida() : Veredicto.NoCumplida(motivo);
             }
         }
 
