@@ -33,6 +33,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.25.0 (2026-11-24)**: Excel más pesado que el tope: el cliente recibe solo "El archivo de Excel pesa más de lo permitido (máximo N MB). Por favor, envíe un archivo más liviano." (`ESTRUCTURA_PLANTILLA` con rechazo `PesoExcedido`, también el tope descomprimido LP-03). Mismos tipos, sin steps nuevos.
 
+**1.0.26.0 (2026-11-24)**: D-81: plan vacío → 'Falta el número de plan.' (PLAN_EXISTE sin marcadores). D-82: la fecha del acuse sale en la zona de `respuesta.zonahoraria` (opcional, -06:00 por defecto). Mismos tipos, sin steps nuevos.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
