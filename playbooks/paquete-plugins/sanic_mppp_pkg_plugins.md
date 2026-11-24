@@ -27,6 +27,10 @@ Verificado ese mismo día: llegó como `0x80072324` y salió como MPPP-CAR-011.
 (con el ensamblado viejo arriba, que no los lee): si sube antes, toda validación de correos falla con "Falta el
 parámetro". Y ANTES de `playbooks/datos/reglas.md` (el plugin de integridad rechaza una regla sin evaluador).
 
+**1.0.24.0 (2026-11-23, D-77)**: `ClasificarCorreo` es idempotente con la Solicitud en Ingresada (no reinserta
+`ResultadoRegla` ni repite la Bitácora en el reintento). Mismos tipos, sin steps nuevos, sin parámetros nuevos. Viaja
+también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`MPPP-ING`).
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
