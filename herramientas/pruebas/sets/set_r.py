@@ -16,7 +16,7 @@ candidato, y qué le corresponde a este archivo frente al set dedicado
 conclusión ya se tomó).
 
 **DN-05 (2026-10-06, desplegado en Dev con el ensamblado 1.0.23.0)**: reescribe R-10, R-12, R-18, R-20 y R-21
-contra la matriz de obligatoriedad v3 y los formatos del plan, y agrega R-29..R-38 (DN-05) y R-39..R-41 (DN-06) (un caso por comportamiento
+contra la matriz de obligatoriedad v3 y los formatos del plan, y agrega R-29..R-38 (DN-05) R-39..R-41 (DN-06) y R-42 (DN-07) (un caso por comportamiento
 nuevo). Las reglas nuevas de fila son `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO` (reemplaza a
 `FORMATO_11_SOLO_ACH`, que quedó inactiva), `BANCO_DEL_FORMATO`, `CARACTERES_PERMITIDOS` y `CUENTA_DEL_BANCO`
 (`diseno/DIRECTRICES-NUEVAS.md`, DN-05).
@@ -1251,7 +1251,53 @@ def r41(ctx):
     return c
 
 
+# ===========================================================================
+# DN-07 (aprobador, 2026-11-24): el número de identificación según su tipo. Cédulas SINTÉTICAS.
+# ===========================================================================
+def r42(ctx):
+    c = pc.Caso("R-42", "DN-07: IDENTIFICACION_DEL_TIPO — cédula, RUC y pasaporte, en Inclusión y en Modificación")
+    sid, filas = _enviar(ctx, "Prueba R-42", "ZZ-R42-identificacion-por-tipo.xlsx", [
+        # 1: la cédula por defecto del arnés (letra correcta)
+        genexcel.fila(plan="PR11", nombre="Cedula Buena", cuenta="10000000000001"),
+        # 2: la misma con la letra que no corresponde
+        genexcel.fila(plan="PR11", nombre="Cedula Letra Mal", cuenta="10000000000002", numeroid="0011805900012X"),
+        # 3: 32/13: fecha imposible (la letra sí corresponde)
+        genexcel.fila(plan="PR11", nombre="Cedula Fecha Mal", cuenta="10000000000003", numeroid="0013213800000M"),
+        # 4: RUC de persona jurídica
+        genexcel.fila(plan="PR11", nombre="Ruc Juridico", cuenta="10000000000004", tipoid="RUC", numeroid="J0310000001234"),
+        # 5: pasaporte de 5 caracteres
+        genexcel.fila(plan="PR11", nombre="Pasaporte Corto", cuenta="10000000000005", tipoid="PAS", numeroid="AB123"),
+        # 6: Modificación (identificación opcional) con una cédula mal escrita: si viene, se valida
+        genexcel.fila(gestion="Modificacion", plan="PR06", clasificacion="", nombre="", tipoid="CNA", numeroid="0011805900012X",
+                      referencia="REFMODI0042", cuenta="10203040506070", moneda="", banco=""),
+        # 7: la letra en minúscula vale
+        genexcel.fila(plan="PR11", nombre="Cedula Minuscula", cuenta="10000000000007", numeroid="0011805900012n"),
+    ])
+    por_n = {f["sanic_numerofila"]: f for f in filas}
+    esperado = {
+        1: (FILA_VALIDADA, None),
+        2: (FILA_RECH_VAL, "El número de identificación no es una cédula válida: la letra final no corresponde al número."),
+        3: (FILA_RECH_VAL, "El número de identificación no es una cédula válida: la fecha de nacimiento no existe."),
+        4: (FILA_VALIDADA, None),
+        5: (FILA_RECH_VAL, "El número de identificación no es un pasaporte válido: debe tener entre 6 y 9 letras o números."),
+        6: (FILA_RECH_VAL, "El número de identificación no es una cédula válida: la letra final no corresponde al número."),
+        7: (FILA_VALIDADA, None),
+    }
+    c.check("7 filas leídas", len(filas) == 7, _resumen(filas))
+    for n, (estado, mensaje) in esperado.items():
+        f = por_n.get(n, {})
+        if mensaje is None:
+            c.check(f"fila {n} Validada", f.get("sanic_estado") == estado, _resumen(filas))
+        else:
+            c.check(f"fila {n} rechazada con {mensaje!r}",
+                    f.get("sanic_estado") == estado and f.get("sanic_mensaje") == mensaje, _resumen(filas))
+    for n in (2, 3, 6):
+        c.check(f"fila {n}: el mensaje no repite el número", "0011805900012" not in (por_n.get(n, {}).get("sanic_mensaje") or "")
+                and "0013213800000" not in (por_n.get(n, {}).get("sanic_mensaje") or ""), _resumen(filas))
+    return c
+
+
 CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18,
          r19, r20, r21, r22, r23, r24, r25, r26, r27, r28,
          r29, r30, r31, r32, r33, r34, r35, r36, r37, r38,
-         r39, r40, r41]
+         r39, r40, r41, r42]

@@ -1031,6 +1031,22 @@ Cada caso cambia una columna de un plan del fixture **solo mientras dura** y la 
 sin el parámetro" (error real que lo nombra) no se prueba en vivo: obligaría a desactivar un parámetro compartido de Dev.
 Lo cubren las pruebas de aceptación (`Dn06Aceptacion`, `ValidarSolicitudAceptacion`).
 
+## R-42 — DN-07 (2026-11-24): el número de identificación según su tipo
+
+Un Excel, una fila por comportamiento. Todas las cédulas son **sintéticas** (calculadas con el algoritmo).
+
+| Fila | Qué se manda | Qué tiene que pasar |
+|---|---|---|
+| 1 | Inclusión `PR11`, CNA `0011805900012N` (la cédula por defecto del arnés) | **Validada** |
+| 2 | La misma con la letra `X` | **Rechazada**: *"…no es una cédula válida: la letra final no corresponde al número."* |
+| 3 | CNA `0013213800000M` (32/13) | **Rechazada**: *"…no es una cédula válida: la fecha de nacimiento no existe."* |
+| 4 | RUC `J0310000001234` | **Validada** |
+| 5 | PAS `AB123` | **Rechazada**: *"…no es un pasaporte válido: debe tener entre 6 y 9 letras o números."* |
+| 6 | Modificación `PR06` con CNA de letra mal (la identificación es opcional, pero vino) | **Rechazada** por la letra |
+| 7 | CNA con la letra en minúscula | **Validada** |
+
+Y ningún mensaje repite el número. **Cómo se verifica.** `python3 herramientas/pruebas/correr.py R`, caso `R-42`.
+
 **Cómo se sabe que falló.** Un mensaje distinto del esperado (aunque el estado sea el correcto: lo lee un cliente del
 banco, `CONVENCIONES.md` §3); una fila que se valida sin que `sanic_clasificacion`/`sanic_banco` queden completados
 (R-31: la regla valida pero no guarda); en R-38, **cualquier** frase de una regla por formato en el mensaje: sería una
