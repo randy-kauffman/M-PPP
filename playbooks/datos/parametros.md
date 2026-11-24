@@ -174,6 +174,7 @@ Valores con fuente:
 - `plantilla.obligatoriedad` `sanic_version=1`: DD-16 ("todo obligatorio salvo Referencia") con la forma de D-18.
 - `rpa.lote.maximo` `sanic_version=2`: mismo texto medido que ya traía este archivo desde el 2026-09-26 (BP-PP-053); solo corrige el texto sembrado en Dev, que había quedado atrás. Sembrado con `parametro.py` (D-53) el 2026-09-28.
 - `plantilla.obligatoriedad` `sanic_version=2`: `porGestion.Exclusion` agregado por orden del aprobador (2026-09-27, DN-03) — confirmado por el aprobador el 2026-09-28.
+- `respuesta.zonahoraria` v1: D-82, decisión del aprobador (2026-11-24). Opcional: si no existe el código usa -06:00; el acuse escribe la fecha de recibido en esa zona.
 - Los tres de `vigilancia.*` y los dos de `retencion.dias.*`: **decididos por el aprobador el 2026-09-22** (D-45); no estaban en ningun archivo.
 
 Ojo: los fixtures de prueba (`ParametrosDePlantillaAceptacion`) y el mockup
@@ -479,6 +480,16 @@ coinciden con la plantilla real del cliente.
       },
       "sanic_valor": "{\"porDefecto\":\"obligatorio\",\"opcionales\":[{\"campo\":\"referencia\"},{\"campo\":\"moneda\"}],\"reglas\":[{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"06\",\"opcionales\":[\"clasificacion\",\"tipoIdentificacion\",\"banco\"]},{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"10\",\"opcionales\":[\"banco\"]},{\"gestion\":\"Inclusion\",\"clasificacion\":\"*\",\"formato\":\"11\",\"opcionales\":[\"clasificacion\"]}],\"porGestion\":{\"Exclusion\":{\"opcionales\":[{\"campo\":\"clasificacion\"},{\"campo\":\"nombreBeneficiario\"},{\"campo\":\"tipoIdentificacion\"},{\"campo\":\"numeroIdentificacion\"},{\"campo\":\"banco\"}],\"obligatorios\":[{\"campo\":\"referencia\"}]},\"Modificacion\":{\"opcionales\":[{\"campo\":\"clasificacion\"},{\"campo\":\"nombreBeneficiario\"},{\"campo\":\"tipoIdentificacion\"},{\"campo\":\"numeroIdentificacion\"},{\"campo\":\"banco\"}],\"obligatorios\":[{\"campo\":\"referencia\"}]}}}",
       "sanic_descripcion": "DN-05 (aprobador, 2026-10-06): matriz de obligatoriedad del negocio. Inclusion 06: plan, nombre, identificacion, cuenta; 10: + clasificacion y tipo ID; 11: + tipo ID y banco. Exclusion y Modificacion: plan, referencia y cuenta. Moneda y referencia opcionales en la inclusion. Reemplaza el criterio de exclusion de la version 2."
+    },
+    {
+      "sanic_nombre": "respuesta.zonahoraria",
+      "sanic_version": 1,
+      "sanic_tipo": {
+        "choice": "sanic_mppp_ch_tipoparametro",
+        "etiqueta": "Texto"
+      },
+      "sanic_valor": "-06:00",
+      "sanic_descripcion": "D-82: desfase respecto de UTC con que el acuse escribe la fecha de recibido, formato +HH:mm o -HH:mm (signo obligatorio, entre -14:00 y +14:00). Opcional: si no existe se usa -06:00 (Nicaragua)."
     }
   ]
 }
