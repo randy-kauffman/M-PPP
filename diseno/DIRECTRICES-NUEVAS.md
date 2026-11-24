@@ -699,7 +699,7 @@ Acá queda **solo lo que se decidió construir**.
 | 6 | La cuenta lleva **solo dígitos**, en todas las clasificaciones, incluida CK (escenario 21) |
 | 7 | **Caracteres permitidos por campo**: regla nueva de fila, configurable por campo (escenario 21). Nombre: A-Z, a-z, espacio, guion, punto y coma ("S.A."). Referencia e identificación: solo letras A-Z/a-z y dígitos. **Sin Ñ ni tildes** en ninguno |
 | 8 | **Largo de la cuenta por banco**, con **rechazo** de la fila (escenario 20). BANPRO 6-16, BDF 10-16, LAFISE 9-16, FICOHSA 4-16, AVANZ 10-16, BAC 9-16; cualquier otro banco, 6-17. No depende de la moneda. Los ceros a la izquierda cuentan. El largo máximo real es **17** |
-| 9 | Escenarios **9** (canal de pago) y **12** (requiere preregistro): **pendientes**, esperan al área de operaciones. Escenario **13**: descartado |
+| 9 | Escenarios **9** (canal de pago) y **12** (requiere preregistro): resueltos en **DN-06**. Escenario **13**: descartado |
 | 10 | Formatos 06 y 10: **solo cuentas BAC**, y Banco vacío se toma como BAC. CK también es cuenta BAC. Formato 11: el banco es obligatorio en la **inclusión**; en la **exclusión no hace falta** (corregido por el aprobador el mismo día, la matriz original ya lo decía) |
 
 ## Matriz del negocio (Sí = obligatorio)
@@ -855,3 +855,110 @@ al ensamblado viejo.**
 ## Pendientes del negocio
 
 - **Escenarios 9 y 12**, la respuesta del área de operaciones.
+
+# DN-06 · Canal y pre-registro del plan, segunda matriz de obligatoriedad y alto del valor del parámetro
+
+Recibida el **2026-11-24** del aprobador. Cierra los escenarios **9** (canal de pago) y **12** (requiere pre-registro)
+que DN-05 dejó pendientes. Mapa de impacto relevado contra el código el mismo día.
+
+**Estado: diseño APROBADO el 2026-11-24, en construcción.**
+
+## Decisiones del aprobador (2026-11-24)
+
+| # | Decisión |
+|---|---|
+| 1 | Plan: columna **Requiere pre-registro** (Sí/No), **obligatoria**, por defecto **Sí** |
+| 2 | Si el plan tiene Requiere pre-registro = **No**, se rechazan **todas** sus filas con *"Este plan no requiere pre-registro."* Con una **regla nueva** (no dentro de la autorización) |
+| 3 | Plan: columna **Canal**, choice global con **Banca en Linea** y **Conectividad**, **obligatoria** |
+| 4 | El canal bifurca la matriz de obligatoriedad: Banca en Linea usa la de hoy (`plantilla.obligatoriedad`); Conectividad usa un **parámetro aparte**, `plantilla.obligatoriedad.conectividad`, con el mismo esquema y, por ahora, **copia** de la vigente (v3) |
+| 5 | Planes existentes: **Requiere pre-registro = Sí** y **Canal = Banca en Linea** (el comportamiento no cambia) |
+| 6 | Carga masiva de planes: dos columnas nuevas; **Canal obligatorio** al crear un plan, **Requiere pre-registro opcional** (vacío = Sí) |
+| 7 | Formulario de Parámetro: `sanic_descripcion` **arriba**, y `sanic_valor` solo en la última sección, **expandido a todo el alto disponible** |
+
+## Diseño propuesto
+
+### A. Esquema
+
+- **Choice global** `sanic_mppp_ch_canal` ("CH - MPPP - Canal"): 159460001 **Banca en Linea**, 159460002 **Conectividad**.
+  Sin tilde (BP-PP-197, `choice_global.py` la rechaza; y `generar_enums.py` genera el enum `Canal` a partir de la etiqueta).
+- **Plan** (`sanic_mppp_tbl_plan`), dos columnas con `tabla.py --agregar-columnas`:
+  - `sanic_requierepreregistro`: sí/no, requerida, por defecto Sí.
+  - `sanic_canal`: choice `sanic_mppp_ch_canal`, requerida, por defecto Banca en Linea.
+  - Las filas que ya existen quedan **vacías** en las dos: el valor por defecto rige solo para las nuevas. De ahí el
+    paso de datos (C) y la lectura tolerante (B).
+- **Formulario del Plan**: las dos columnas en la sección "Datos". **Vista "Planes activos"**: Canal y Requiere pre-registro.
+- **Formulario de Parámetro**: sección "Descripcion" con `sanic_descripcion` y, al final, sección "Valor" con
+  `sanic_valor` solo y expandido. `formulario.py` hoy fija `rowspan="1"` en toda celda de campo: se extiende con
+  una propiedad de sección (`expandir`) que emite el `rowspan` y `auto="true"`. Antes de construir, se confirma el atributo
+  exacto contra un formulario exportado al que se le marcó la opción a mano.
+
+### B. Validación (ensamblado 1.0.27.0)
+
+- `PlanDelCatalogo` suma `Canal` y `RequierePreregistro`. La consulta de planes (`Datos/Catalogos.cs:193`) los pide.
+- **Lectura tolerante, a propósito**: `sanic_canal` vacío = Banca en Linea, `sanic_requierepreregistro` vacío = Sí. En
+  el otro ambiente el parche trae columnas y ensamblado **juntos**, antes del paso de datos. Con una lectura estricta
+  la validación entera fallaría hasta cargar los planes. Los valores por defecto son los mismos que la decisión 5, así
+  que leer vacío como esos valores no cambia ningún resultado.
+- **Regla nueva `PLAN_REQUIERE_PREREGISTRO`** (nivel Registro, **orden 42**, efecto Rechaza):
+  - Cumple si el plan requiere pre-registro. Si no, falla con *"Este plan no requiere pre-registro."*, sin marcadores y
+    sin citar el plan.
+  - Depende de `AUTORIZACION_CORREO_PLAN`: solo se le dice a un remitente autorizado sobre el plan (criterio D-41).
+  - `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO`, `BANCO_DEL_FORMATO`, `OBLIGATORIEDAD` y `MONEDA_DEL_PLAN` pasan a
+    depender de `PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS` en vez de `AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS`. Así el
+    cliente recibe **solo** ese motivo.
+  - La fila queda **Rechazada en validación**, no Sin autorización (la autorización sí se cumplió).
+- **Obligatoriedad por canal**:
+  - `CatalogosDeValidacion` suma la matriz de Conectividad, como parámetro **opcional** del constructor.
+  - `OBLIGATORIEDAD` elige la matriz por `fila.Plan.Canal`.
+  - **`plantilla.obligatoriedad.conectividad` se exige solo cuando hace falta**: si una fila es de un plan Conectividad
+    y el parámetro no existe, error real que nombra el parámetro (falla cerrado, nada a medias). Si ningún plan es de
+    Conectividad, no hace falta. Así el parche no tumba la validación en un ambiente donde todavía no se cargó.
+  - `sanic_versionparametros` suma `;obligatoriedadconectividad=N` **solo si el parámetro existe**.
+- **Fuera de alcance, sin cambios**:
+  - `REMITENTE_RECONOCIDO` (nivel Correo) no mira el pre-registro. Un remitente autorizado solo sobre planes que no
+    requieren pre-registro sigue siendo reconocido, y sus filas se rechazan una por una.
+  - Al bot (RPA) no se le manda el canal.
+
+### C. Carga masiva de catálogos (DN-04)
+
+- Dos columnas **al final**: **L "Canal"** y **M "Requiere preregistro"**. "Resultado" pasa de L a **N**. Al final y
+  no en el medio para no desplazar las letras H-K.
+- **Una planilla descargada antes del cambio se rechaza** (lectura estricta, MPPP-CAR-005): hay que bajar la nueva.
+- Valores: Canal `Banca en Linea` / `Conectividad`. Requiere preregistro `Si` / `No`, vacío = Sí. Se normalizan sin
+  distinguir mayúsculas, y la tilde de "Sí" se acepta.
+- **Plan nuevo**: Canal obligatorio ("hace falta para crear el plan", como formato y moneda).
+- **Plan existente**: igual que formato y moneda hoy. La carga no modifica planes: vacío pasa, y un valor distinto al
+  grabado es error de la fila.
+
+### D. Datos
+
+- **Backfill de planes**: todos los planes, activos e inactivos, con Canal = Banca en Linea y Requiere pre-registro =
+  Sí. Es un script idempotente que solo completa lo que está vacío, nunca pisa un valor cargado, y sirve igual para Dev
+  y para el otro ambiente.
+- **Parámetro** `plantilla.obligatoriedad.conectividad` v1 = el valor de `plantilla.obligatoriedad` v3, con `parametro.py`.
+- **Catálogo de reglas** (`playbooks/datos/reglas.md` + `datos.py --completar`): la regla nueva y las 5 dependencias.
+
+## Orden de despliegue
+
+Regla de DN-05: todo lo que el ensamblado nuevo exige se siembra antes que él. Con la lectura tolerante y el parámetro
+exigido solo cuando hace falta, el ensamblado nuevo **no exige nada**, y el orden queda así:
+
+1. Choice, columnas, formularios y vista. Con el ensamblado viejo no cambia nada: no lee las columnas.
+2. Backfill de planes y parámetro de Conectividad.
+3. Ensamblado 1.0.27.0. Sin la regla en el catálogo, no evalúa el pre-registro, y la obligatoriedad por canal da lo
+   mismo que hoy porque todos los planes son Banca en Linea.
+4. Catálogo de reglas, en una sola pasada: primero la regla nueva y después las 5 dependencias. Necesita el ensamblado
+   arriba, porque `IntegridadDeRegla` rechaza un código sin evaluador.
+
+**En el otro ambiente**: importar el parche (pasos 1 y 3 juntos) y correr el paso de datos (2 y 4). Entre la
+importación y el paso de datos todo sigue funcionando como hoy.
+
+## Parche
+
+La solución `sanic_mppp_sol_parche_1_3_1` suma: el choice, las dos columnas del Plan (como subcomponentes de la
+tabla, sin arrastrar la tabla entera), los formularios de Plan y Parámetro, la vista "Planes activos" y el
+ensamblado. **Los datos (D) no viajan en el parche**: van en un script con instrucciones.
+
+## Pendientes del negocio
+
+- La matriz de Conectividad, que el aprobador va a actualizar sobre la copia.
