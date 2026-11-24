@@ -25,6 +25,10 @@ requiere pre-registro."). `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO`, `B
 script escribe de arriba abajo y la integridad exige que la dependencia exista). Se corre con `--completar` y solo con el
 ensamblado 1.0.27.0 ya subido. `FORMATO_11_SOLO_ACH` (inactiva) no se toca.
 
+**DN-07 (2026-11-24): regla nueva `IDENTIFICACION_DEL_TIPO`** (Registro, orden 27, Rechaza, depende de `LISTAS_VALIDAS`;
+sin `sanic_mensajecliente`: rigen los textos del evaluador). Valida el número de identificación según su tipo. Se crea con el
+ensamblado 1.0.28.0 ya subido (`herramientas/despliegue/dn07_datos.py`, o `datos.py --completar` en Dev).
+
 `sanic_orden` lo deriva este script (D-47): orden topologico en multiplos de 10
 dentro de cada nivel. El diseno solo fija el orden RELATIVO; el motor exige que
 quien depende tenga orden estrictamente mayor (`02` §152), y el script lo
@@ -183,6 +187,19 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       }
+    },
+    {
+      "sanic_codigo": "IDENTIFICACION_DEL_TIPO",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 27,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "PLAN_EXISTE",
@@ -344,4 +361,4 @@ comprueba con un assert antes de escribir el playbook.
 - **Efecto `Envia a revision` solo en niveles Correo y Solicitud, nunca en Registro** (D-20).
 - **`AUTORIZACION_CORREO_PLAN` no admite otro efecto que `Rechaza`** (D-14).
 - Toda dependencia es del **mismo nivel** y tiene **orden menor** (`02` §152).
-- El codigo C# tiene un evaluador por cada uno de estos codigos (20 desde DN-05, 21 desde DN-06); una regla activa sin evaluador hace fallar cerrado al motor (D-13).
+- El codigo C# tiene un evaluador por cada uno de estos codigos (20 desde DN-05, 21 desde DN-06, 22 desde DN-07); una regla activa sin evaluador hace fallar cerrado al motor (D-13).

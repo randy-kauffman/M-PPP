@@ -35,7 +35,8 @@ COLUMNAS = {"gestion": "B", "clasificacion": "C", "numeroPlan": "D", "nombreBene
 
 
 def fila(gestion="Inclusion", clasificacion="ACH", plan="PR11", nombre="Juan Perez Prueba",
-         tipoid="CNA", numeroid="0011805900012X", referencia="", cuenta="12345678901234",
+         tipoid="CNA", numeroid="0011805900012N",  # DN-07: letra del Módulo 23 correcta (era X)
+         referencia="", cuenta="12345678901234",
          moneda="COR", banco="BAC"):
     return {"gestion": gestion, "clasificacion": clasificacion, "numeroPlan": plan,
             "nombreBeneficiario": nombre, "tipoIdentificacion": tipoid,
@@ -81,7 +82,7 @@ def casos():
         fila(nombre="Nombre Larguisimo De Beneficiario Que Pasa Los Cuarenta Y Cuatro"),  # max 44
         fila(plan="PR11XX", nombre="Plan Largo"),                                          # max 4
         fila(cuenta="123456789012345678901", nombre="Cuenta Larga"),                       # max 17
-        fila(numeroid="0011805900012XABCDEFGH", nombre="Identificacion Larga"),            # max 16
+        fila(numeroid="0011805900012NABCDEFGH", nombre="Identificacion Larga"),            # max 16
     ], None))
 
     # E04 — plan que no existe. Falla PLAN_EXISTE.
