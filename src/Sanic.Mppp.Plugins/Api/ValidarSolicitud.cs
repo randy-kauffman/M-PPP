@@ -70,6 +70,19 @@ namespace Sanic.Mppp.Plugins.Api
         public const string ParametroFormatos = FormatosDelPlan.NombreParametro;
         public const string ParametroLargosDeCuenta = LargosDeCuenta.NombreParametro;
 
+        /// <summary>
+        /// D-82 (aprobador, 2026-11-24): parámetro OPCIONAL con el desfase respecto de UTC en que se escribe la fecha del acuse,
+        /// con formato estricto `+HH:mm` o `-HH:mm` (ver <see cref="DesfaseDeZonaHoraria"/>). No entra en `sanic_versionparametros`:
+        /// no cambia cómo se valida, solo cómo se ve una fecha.
+        /// </summary>
+        public const string ParametroZonaHoraria = "respuesta.zonahoraria";
+
+        /// <summary>
+        /// D-82: desfase que se usa si el parámetro `respuesta.zonahoraria` no existe: -06:00, la hora de Nicaragua (sin horario
+        /// de verano desde 2006, por eso un desfase fijo alcanza). Sin esto el acuse decía la hora UTC (06:12 cuando allá eran las 00:12).
+        /// </summary>
+        public static readonly TimeSpan DesfaseDeZonaHorariaPorDefecto = TimeSpan.FromHours(-6);
+
         /// <summary>`sanic_exceloriginal`, la columna de archivo de la que se lee la plantilla.</summary>
         public const string ColumnaExcel = "sanic_exceloriginal";
 
@@ -126,6 +139,8 @@ namespace Sanic.Mppp.Plugins.Api
             // puede validar nada (error real que nombra el parámetro, no una regla fallida).
             var pFormatos = ParametroObligatorio(ParametroFormatos);
             var pLargos = ParametroObligatorio(ParametroLargosDeCuenta);
+            // D-82: opcional, pero si existe y está mal escrito es un error real. Se parsea AQUÍ, antes de escribir nada.
+            var desfaseDelAcuse = LeerDesfaseDeZonaHoraria();
 
             var estructura = ConfiguracionPlantilla.DesdeJson(pEstructura.Valor);
             var listas = ListasPlantilla.DesdeJson(pListas.Valor);
@@ -182,7 +197,7 @@ namespace Sanic.Mppp.Plugins.Api
             var filasValidas = estadosDeFilas.Count(e => e == EstadoDeLaFila.Validada);
             var filasRechazadas = filasParaGuardar.Count - filasValidas;
 
-            var acuse = ArmarAcuse(solicitud, estadoFinal, resultadosSolicitud, filasParaRespuesta);
+            var acuse = ArmarAcuse(solicitud, estadoFinal, resultadosSolicitud, filasParaRespuesta, desfaseDelAcuse);
 
             _solicitudes.CerrarValidacion(solicitudId, new CierreDeValidacion
             {
@@ -243,6 +258,59 @@ namespace Sanic.Mppp.Plugins.Api
                     ParametroFormatos, valor, formato, ParametroListas, lista));
             }
         }
+
+        /// <summary>
+        /// D-82: lee `respuesta.zonahoraria`. No existe → <see cref="DesfaseDeZonaHorariaPorDefecto"/>. Existe y no tiene el
+        /// formato aprobado → <see cref="InvalidOperationException"/> que nombra el parámetro (y el formato esperado).
+        /// Un valor vacío lo rechaza la propia lectura del catálogo (columna requerida): se re-lanza nombrando el parámetro.
+        /// </summary>
+        private TimeSpan LeerDesfaseDeZonaHoraria()
+        {
+            ParametroLeido parametro;
+            try
+            {
+                parametro = _catalogos.Parametro(ParametroZonaHoraria);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // El catálogo rechaza un valor vacío con un texto genérico que no nombra el parámetro: acá se lo nombramos.
+                throw new InvalidOperationException(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "El parámetro '{0}' está vacío o mal cargado, y el formato esperado es '+HH:mm' o '-HH:mm' (signo obligatorio, entre -14:00 y +14:00), por ejemplo '-06:00'.",
+                    ParametroZonaHoraria), ex);
+            }
+
+            return parametro == null ? DesfaseDeZonaHorariaPorDefecto : DesfaseDeZonaHoraria(parametro.Valor);
+        }
+
+        /// <summary>
+        /// Parser estricto de `+HH:mm` / `-HH:mm`: signo ASCII obligatorio, HH 00-14, mm 00-59 y total dentro de -14:00..+14:00
+        /// (el rango real de husos del mundo). Se recortan los espacios de los lados; todo lo demás (sin signo, "-6", "-06",
+        /// "UTC-6", el menos tipográfico U+2212...) es un error de configuración: no se adivina la intención. Parseo manual,
+        /// sin Regex ni cultura: `char.IsDigit` aceptaría dígitos de otros alfabetos, por eso se compara contra '0'..'9'.
+        /// </summary>
+        internal static TimeSpan DesfaseDeZonaHoraria(string valor)
+        {
+            var texto = (valor ?? string.Empty).Trim();
+            if (texto.Length == 6 && (texto[0] == '+' || texto[0] == '-') && texto[3] == ':'
+                && EsDigito(texto[1]) && EsDigito(texto[2]) && EsDigito(texto[4]) && EsDigito(texto[5]))
+            {
+                var horas = (texto[1] - '0') * 10 + (texto[2] - '0');
+                var minutos = (texto[4] - '0') * 10 + (texto[5] - '0');
+                var total = new TimeSpan(horas, minutos, 0);
+                if (minutos <= 59 && total <= TimeSpan.FromHours(14))
+                {
+                    return texto[0] == '-' ? total.Negate() : total;
+                }
+            }
+
+            throw new InvalidOperationException(string.Format(
+                CultureInfo.InvariantCulture,
+                "El parámetro '{0}' trae '{1}', y el formato esperado es '+HH:mm' o '-HH:mm' (signo obligatorio, entre -14:00 y +14:00), por ejemplo '-06:00'.",
+                ParametroZonaHoraria, valor));
+        }
+
+        private static bool EsDigito(char c) => c >= '0' && c <= '9';
 
         private ParametroLeido ParametroObligatorio(string nombre)
         {
@@ -393,7 +461,7 @@ namespace Sanic.Mppp.Plugins.Api
         }
 
         /// <summary>Arma el acuse (RF-04, DD-09). No reconocida no tiene acuse: no se le responde al cliente sin que la mire una persona (D-39).</summary>
-        private static string ArmarAcuse(SolicitudLeida solicitud, EstadoDeLaSolicitud estado, IList<ResultadoDeRegla> resultadosSolicitud, IList<FilaParaRespuesta> filas)
+        private static string ArmarAcuse(SolicitudLeida solicitud, EstadoDeLaSolicitud estado, IList<ResultadoDeRegla> resultadosSolicitud, IList<FilaParaRespuesta> filas, TimeSpan desfaseDeZona)
         {
             if (estado == EstadoDeLaSolicitud.NoReconocida)
             {
@@ -409,7 +477,9 @@ namespace Sanic.Mppp.Plugins.Api
             return ArmadorRespuesta.Acuse(new SolicitudParaRespuesta
             {
                 Numero = solicitud.Numero,
-                FechaRecibidoTexto = solicitud.FechaRecibido.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture),
+                // D-82: `sanic_fecharecibido` llega de Dataverse en UTC (Datos/Solicitudes.cs la devuelve tal cual, sin convertir;
+                // se asume UTC sin mirar el Kind, y a propósito no se usa TimeZoneInfo: la zona del servidor no cuenta).
+                FechaRecibidoTexto = (solicitud.FechaRecibido + desfaseDeZona).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture),
                 Estado = estado,
                 MotivosDelSobre = motivosDelSobre,
                 Filas = filas,

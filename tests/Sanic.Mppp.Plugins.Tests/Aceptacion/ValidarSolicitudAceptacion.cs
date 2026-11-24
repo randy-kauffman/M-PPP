@@ -306,7 +306,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             Assert.Equal(30, r.FilasValidas);
             var consultas = m.Svc.Llamadas.Count(l => l.Operacion == "RetrieveMultiple");
-            Assert.InRange(consultas, 1, 14); // 6 parámetros (DN-05 sumó 2) + 2 niveles de reglas + planes + autorizaciones (hasta 4)
+            Assert.InRange(consultas, 1, 15); // 7 parámetros (DN-05 sumó 2, D-82 la zona horaria) + 2 niveles de reglas + planes + autorizaciones (hasta 4)
             Assert.Equal(30, m.Svc.Llamadas.Count(l => l.Operacion == "Create" && l.Entidad == TablasHistorico.Fila));
             Assert.All(m.Filas(), f => Assert.StartsWith("MPPP-00000123-F", (string)f["sanic_nombre"]));
         }
@@ -489,6 +489,75 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
             Assert.Empty(m.Filas());
             Assert.Empty(m.Resultados());
+        }
+
+        // ------------------------------------------------------------------ D-82: la hora del acuse (aprobador, 2026-11-24)
+        // Antes el acuse decía la hora UTC ("la recibimos el 24/11/2026 06:12" cuando en Nicaragua eran las 00:12).
+        // Parámetro OPCIONAL `respuesta.zonahoraria` ("+HH:mm" / "-HH:mm"); si no existe, -06:00. Mal escrito: error real.
+        // Ahora = 21/09/2026 17:00 UTC.
+        private static string Acuse(Mundo m) => (string)m.Solicitud()["sanic_acusecontenido"];
+
+        [Fact]
+        public void Sin_el_parametro_de_zona_horaria_el_acuse_dice_la_hora_de_nicaragua()
+        {
+            var m = new Mundo(Excel(Fila()));
+
+            m.Correr();
+
+            Assert.Contains("y la recibimos el 21/09/2026 11:00.", Acuse(m));
+            Assert.DoesNotContain("17:00", Acuse(m));
+        }
+
+        [Theory]
+        [InlineData("-06:00", "21/09/2026 11:00")]
+        [InlineData("+00:00", "21/09/2026 17:00")]
+        [InlineData("-05:30", "21/09/2026 11:30")]
+        [InlineData("+08:00", "22/09/2026 01:00")] // cambia el día
+        [InlineData("-14:00", "21/09/2026 03:00")]
+        [InlineData("+14:00", "22/09/2026 07:00")]
+        [InlineData(" -06:00 ", "21/09/2026 11:00")] // espacios a los lados: se recortan
+        public void Con_el_parametro_de_zona_horaria_el_acuse_dice_la_hora_de_esa_zona(string valor, string esperado)
+        {
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroZonaHoraria, valor);
+
+            m.Correr();
+
+            Assert.Contains("y la recibimos el " + esperado + ".", Acuse(m));
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("6")]
+        [InlineData("-6")]
+        [InlineData("-06")]
+        [InlineData("-6:00")]
+        [InlineData("06:00")] // sin signo: no se adivina
+        [InlineData("-06:60")]
+        [InlineData("+14:30")] // fuera de -14:00..+14:00
+        [InlineData("-15:00")]
+        [InlineData("UTC-6")]
+        [InlineData("-6 horas")]
+        [InlineData("−06:00")] // signo menos tipográfico (U+2212), no el guion
+        public void Una_zona_horaria_mal_escrita_es_un_error_real_que_nombra_el_parametro_y_nada_queda_a_medias(string valor)
+        {
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroZonaHoraria, valor);
+
+            var ex = Record.Exception(() => m.Correr());
+
+            Assert.NotNull(ex);
+            Assert.IsNotType<NullReferenceException>(ex);
+            Assert.Contains(ValidarSolicitud.ParametroZonaHoraria, ex.Message);
+            Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
+            Assert.Empty(m.Filas());
+            Assert.Empty(m.Resultados());
+        }
+
+        [Fact]
+        public void El_nombre_del_parametro_de_zona_horaria_es_el_aprobado()
+        {
+            Assert.Equal("respuesta.zonahoraria", ValidarSolicitud.ParametroZonaHoraria);
         }
 
         [Fact]
