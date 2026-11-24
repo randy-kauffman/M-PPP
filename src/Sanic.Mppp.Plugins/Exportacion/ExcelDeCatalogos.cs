@@ -58,7 +58,7 @@ namespace Sanic.Mppp.Plugins.Exportacion
             return letras.ToString();
         }
 
-        /// <summary>Excel 1: hoja <see cref="ColumnasDeCarga.Hoja"/>, columnas <see cref="ColumnasDeCarga.Todas"/> (A–K) y Resultado en L.</summary>
+        /// <summary>Excel 1: hoja <see cref="ColumnasDeCarga.Hoja"/>, columnas <see cref="ColumnasDeCarga.Todas"/> (A–M) y Resultado en N.</summary>
         public static EstructuraDeExcelDeCatalogo Carga => EstructuraCarga;
 
         /// <summary>Excel 2: hoja <see cref="ColumnasDeCambioDeEstado.Hoja"/>, columnas A–F y Resultado en G.</summary>

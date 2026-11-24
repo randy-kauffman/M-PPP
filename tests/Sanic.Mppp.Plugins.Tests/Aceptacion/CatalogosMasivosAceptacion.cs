@@ -252,9 +252,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             {
                 // Cliente nuevo con su plan nuevo y un correo nuevo autorizado sobre él (con fecha y comentario).
                 Fila(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "beto@banco.com"),
-                    ("E", "N1"), ("F", "11"), ("G", "USD"), ("H", "nuevo@empresa.com"), ("I", "Nuevo"), ("J", "15/09/2024"), ("K", "Ok")),
+                    ("E", "N1"), ("F", "11"), ("G", "USD"), ("L", "Banca en Linea"), ("H", "nuevo@empresa.com"), ("I", "Nuevo"), ("J", "15/09/2024"), ("K", "Ok")),
                 // Plan nuevo de un cliente existente, y un correo existente autorizado sobre el cliente nuevo (sin fecha ni comentario).
-                Fila(3, ("A", "123"), ("E", "N2"), ("F", "06"), ("G", "COR")),
+                Fila(3, ("A", "123"), ("E", "N2"), ("F", "06"), ("G", "COR"), ("L", "Banca en Linea")),
                 Fila(4, ("A", "555"), ("H", "juan@empresa.com")),
             }, foto, new DateTime(2026, 10, 1));
             Assert.False(plan.TieneErrores, string.Join(" | ", plan.Filas.SelectMany(f => f.Errores)));

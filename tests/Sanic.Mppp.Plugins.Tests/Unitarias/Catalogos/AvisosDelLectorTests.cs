@@ -87,7 +87,7 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
         [Fact]
         public void Un_aviso_de_la_columna_Resultado_no_es_de_la_estructura_de_dominio()
         {
-            Assert.ThrowsAny<ArgumentException>(() => PlanificadorDeCarga.Planificar(new[] { Fila(2, ("A", "123")) }, Foto(), Hoy, new[] { Aviso(2, "L", "x") }));
+            Assert.ThrowsAny<ArgumentException>(() => PlanificadorDeCarga.Planificar(new[] { Fila(2, ("A", "123")) }, Foto(), Hoy, new[] { Aviso(2, "N", "x") }));
         }
     }
 }

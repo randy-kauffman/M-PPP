@@ -4,6 +4,7 @@ using System.Globalization;
 using Sanic.Mppp.Plugins.Dominio;
 using Sanic.Mppp.Plugins.Plantilla;
 using Sanic.Mppp.Plugins.Steps;
+using Sanic.Mppp.Plugins.Validacion;
 
 namespace Sanic.Mppp.Plugins.Catalogos
 {
@@ -21,6 +22,8 @@ namespace Sanic.Mppp.Plugins.Catalogos
         internal static readonly string NombreContacto = ColumnasDeCarga.EncabezadoDe(ColumnasDeCarga.NombreContacto);
         internal static readonly string FechaDocumento = ColumnasDeCarga.EncabezadoDe(ColumnasDeCarga.FechaDocumento);
         internal static readonly string Comentarios = ColumnasDeCarga.EncabezadoDe(ColumnasDeCarga.Comentarios);
+        internal static readonly string Canal = ColumnasDeCarga.EncabezadoDe(ColumnasDeCarga.Canal);
+        internal static readonly string RequierePreregistro = ColumnasDeCarga.EncabezadoDe(ColumnasDeCarga.RequierePreregistro);
 
         /// <summary>Cuando el problema es del cliente en conjunto y no de una de sus dos claves (DN-04, regla 1 y siguientes).</summary>
         internal const string Cliente = "CIF BAC / CIF COM";
@@ -57,20 +60,26 @@ namespace Sanic.Mppp.Plugins.Catalogos
             f.Razon = Texto(f, Encabezados.RazonSocial, razon, MaximoRazonSocial);
             f.CorreoEjecutivo = LeerCorreo(f, Encabezados.CorreoEjecutivo, Celda(valores, ColumnasDeCarga.CorreoEjecutivo));
 
-            // Plan (regla 5): tipo de formato y moneda son datos de un plan, y sin código no hay plan.
+            // Plan (regla 5): tipo de formato, moneda y (DN-06) canal y requiere preregistro son datos de un plan, y sin código no hay plan.
             var codigo = Celda(valores, ColumnasDeCarga.CodigoPlan);
             var formato = Celda(valores, ColumnasDeCarga.TipoFormato);
             var moneda = Celda(valores, ColumnasDeCarga.Moneda);
+            var canal = Celda(valores, ColumnasDeCarga.Canal);
+            var preregistro = Celda(valores, ColumnasDeCarga.RequierePreregistro);
             f.CodigoPlan = Normalizar(f, Encabezados.CodigoPlan, codigo, Normalizacion.CodigoDePlan);
             if (codigo == null)
             {
                 f.Formato = SinPlan(f, Encabezados.TipoFormato, formato, new Campo<TipoDeFormatoDelPlan>());
                 f.Moneda = SinPlan(f, Encabezados.Moneda, moneda, new Campo<Moneda>());
+                f.Canal = SinPlan(f, Encabezados.Canal, canal, new Campo<Canal>());
+                f.RequierePreregistro = SinPlan(f, Encabezados.RequierePreregistro, preregistro, new Campo<bool>());
             }
             else
             {
                 f.Formato = LeerFormato(f, formato);
                 f.Moneda = LeerMoneda(f, moneda);
+                f.Canal = LeerCanal(f, canal);
+                f.RequierePreregistro = LeerPreregistro(f, preregistro);
             }
 
             // Correo y autorización (regla 8): nombre, fecha y comentarios son datos de una autorización, y sin correo no hay autorización.
@@ -196,6 +205,46 @@ namespace Sanic.Mppp.Plugins.Catalogos
             else
             {
                 f.Error(Encabezados.Moneda + ": \"" + MotivosDeCarga.Mostrar(crudo) + "\" no es una moneda válida. Usá COR o USD. Corregila.");
+                return campo;
+            }
+
+            campo.Valido = true;
+            return campo;
+        }
+
+        /// <summary>DN-06: "Banca en Linea" o "Conectividad", sin distinguir caja, tildes ni espacios de más (misma comparación que las listas).</summary>
+        private static Campo<Canal> LeerCanal(FilaDeTrabajo f, string crudo)
+        {
+            var campo = new Campo<Canal>();
+            if (crudo == null) return campo;
+
+            campo.Presente = true;
+            var normalizado = ListasPlantilla.Normalizar(crudo);
+            if (normalizado == "banca en linea") campo.Valor = Canal.BancaEnLinea;
+            else if (normalizado == "conectividad") campo.Valor = Canal.Conectividad;
+            else
+            {
+                f.Error(Encabezados.Canal + ": \"" + MotivosDeCarga.Mostrar(crudo) + "\" no es un canal válido. Usá Banca en Linea o Conectividad. Corregilo.");
+                return campo;
+            }
+
+            campo.Valido = true;
+            return campo;
+        }
+
+        /// <summary>DN-06: Si o No, sin distinguir caja y con la tilde de "Sí" aceptada. La celda vacía no llega acá (nulo = no vino).</summary>
+        private static Campo<bool> LeerPreregistro(FilaDeTrabajo f, string crudo)
+        {
+            var campo = new Campo<bool>();
+            if (crudo == null) return campo;
+
+            campo.Presente = true;
+            var normalizado = ListasPlantilla.Normalizar(crudo);
+            if (normalizado == "si") campo.Valor = true;
+            else if (normalizado == "no") campo.Valor = false;
+            else
+            {
+                f.Error(Encabezados.RequierePreregistro + ": \"" + MotivosDeCarga.Mostrar(crudo) + "\" no es un valor válido. Usá Si o No. Corregilo.");
                 return campo;
             }
 

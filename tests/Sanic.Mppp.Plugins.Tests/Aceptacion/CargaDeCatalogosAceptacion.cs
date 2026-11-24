@@ -390,7 +390,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [Fact]
         public void Plan_nuevo_de_cliente_existente_se_crea_normalizado()
         {
-            var plan = Planificar(F(2, A("123"), E("a1"), Fo("6"), Mo(" usd ")));
+            var plan = Planificar(F(2, A("123"), E("a1"), Fo("6"), Mo(" usd "), Ca("Banca en Linea")));
             SinErrores(plan);
             var p = Assert.Single(plan.Planes);
             Assert.Equal("00A1", p.Codigo);
@@ -407,7 +407,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData("11", TipoDeFormatoDelPlan._11)]
         public void Tipo_formato_acepta_06_10_11_y_6(string valor, TipoDeFormatoDelPlan esperado)
         {
-            var plan = Planificar(F(2, A("123"), E("ZZ1"), Fo(valor), Mo("COR")));
+            var plan = Planificar(F(2, A("123"), E("ZZ1"), Fo(valor), Mo("COR"), Ca("Banca en Linea")));
             SinErrores(plan);
             Assert.Equal(esperado, Assert.Single(plan.Planes).Formato);
         }
@@ -416,7 +416,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Formato_11_no_tiene_regla_de_moneda_ni_de_clasificacion_al_crear_el_plan()
         {
             // FORMATO_11_SOLO_ACH es una regla de Registro sobre la Fila, NO del alta del plan (DN-04, corrección del 2026-10-01).
-            SinErrores(Planificar(F(2, A("123"), E("ZZ1"), Fo("11"), Mo("COR"))));
+            SinErrores(Planificar(F(2, A("123"), E("ZZ1"), Fo("11"), Mo("COR"), Ca("Banca en Linea"))));
         }
 
         [Theory]
@@ -491,7 +491,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [Fact]
         public void Plan_nuevo_de_un_cliente_nuevo_apunta_al_cliente_por_su_CIF_BAC()
         {
-            var plan = Planificar(F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("10"), Mo("USD") }).ToArray()));
+            var plan = Planificar(F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("10"), Mo("USD"), Ca("Banca en Linea") }).ToArray()));
             SinErrores(plan);
             var p = Assert.Single(plan.Planes);
             Assert.Null(p.Cliente.IdExistente);
@@ -546,7 +546,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Correo_existente_con_otro_nombre_es_error_y_con_el_mismo_no()
         {
             UnErrorQueEmpiezaCon(Unica(Planificar(F(2, A("456"), H("juan.perez@empresa.com"), I("Juan P.")))), "Nombre contacto: ");
-            var plan = Planificar(F(2, A("123"), E("ZZ1"), Fo("06"), Mo("COR"), H("juan.perez@empresa.com"), I(" JUAN PÉREZ ")));
+            var plan = Planificar(F(2, A("123"), E("ZZ1"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("juan.perez@empresa.com"), I(" JUAN PÉREZ ")));
             SinErrores(plan);
         }
 
@@ -647,9 +647,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Archivo_desnormalizado_tipico_crea_cada_cosa_una_sola_vez_y_la_atribuye_a_la_primera_fila()
         {
             var plan = Planificar(
-                F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), H("nuevo@empresa.com"), I("Nuevo") }).ToArray()),
-                F(3, A("555"), E("N2"), Fo("10"), Mo("USD"), H("nuevo@empresa.com")),
-                F(4, B("NUE000000555"), E("N3"), Fo("11"), Mo("USD"), H("nuevo@empresa.com")));
+                F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("nuevo@empresa.com"), I("Nuevo") }).ToArray()),
+                F(3, A("555"), E("N2"), Fo("10"), Mo("USD"), Ca("Banca en Linea"), H("nuevo@empresa.com")),
+                F(4, B("NUE000000555"), E("N3"), Fo("11"), Mo("USD"), Ca("Banca en Linea"), H("nuevo@empresa.com")));
             SinErrores(plan);
             Assert.Single(plan.Clientes);
             Assert.Equal(3, plan.Planes.Count);
@@ -752,8 +752,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void La_misma_autorizacion_en_varias_filas_se_crea_una_vez_y_las_celdas_vacias_no_contradicen()
         {
             var plan = Planificar(
-                F(2, A("123"), E("N1"), Fo("06"), Mo("COR"), H("n@empresa.com"), I("X"), K("Firmado")),
-                F(3, A("123"), E("N2"), Fo("06"), Mo("COR"), H("n@empresa.com")));
+                F(2, A("123"), E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("n@empresa.com"), I("X"), K("Firmado")),
+                F(3, A("123"), E("N2"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("n@empresa.com")));
             SinErrores(plan);
             var aut = Assert.Single(plan.Autorizaciones);
             Assert.Equal("Firmado", aut.Comentarios);
@@ -765,7 +765,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Con_un_error_en_cualquier_fila_no_se_crea_nada_y_las_filas_sanas_lo_dicen()
         {
             var plan = Planificar(
-                F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), H("nuevo@empresa.com"), I("Nuevo") }).ToArray()),
+                F(2, ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("nuevo@empresa.com"), I("Nuevo") }).ToArray()),
                 F(3, A("123"), E("ZZZZZ")));
             Assert.True(plan.TieneErrores);
             Assert.Empty(plan.Clientes); Assert.Empty(plan.Planes); Assert.Empty(plan.Autorizados); Assert.Empty(plan.Autorizaciones);
@@ -787,7 +787,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [Fact]
         public void El_texto_lleva_errores_luego_la_accion_y_al_final_las_advertencias()
         {
-            var plan = Planificar(F(2, A("789"), E("N1"), Fo("06"), Mo("COR")));
+            var plan = Planificar(F(2, A("789"), E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea")));
             SinErrores(plan);
             var fila = Unica(plan);
             Assert.Equal("Creado: plan" + string.Concat(fila.Advertencias.Select(a => " | Advertencia: " + a)), fila.Texto);
@@ -869,8 +869,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void Un_CIF_BAC_solo_y_un_CIF_COM_solo_son_el_mismo_cliente_nuevo_si_otra_fila_trae_los_dos()
         {
             var plan = Planificar(
-                F(2, A("555"), E("N1"), Fo("06"), Mo("COR")),
-                F(3, B("NUE000000555"), E("N2"), Fo("06"), Mo("cor")),
+                F(2, A("555"), E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea")),
+                F(3, B("NUE000000555"), E("N2"), Fo("06"), Mo("cor"), Ca("Banca en Linea")),
                 F(4, ClienteNuevo()));
             SinErrores(plan);
             var cliente = Assert.Single(plan.Clientes);
@@ -974,7 +974,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var filas = Enumerable.Range(0, 5000).Select(i =>
                 F(i + 2, A((100000 + i).ToString(CultureInfo.InvariantCulture)), B($"NUE{i:D6}001"), C($"Cliente {i}"), D("ana@banco.com"),
                   // 0x2000 en adelante: "2000".."3387", lejos de los planes de la foto (0A12, 0B34, 0C56 caerían en el rango 0..4999).
-                  E((i + 0x2000).ToString("X4", CultureInfo.InvariantCulture)), Fo("06"), Mo("COR"), H($"c{i}@empresa.com"), I($"Contacto {i}")))
+                  E((i + 0x2000).ToString("X4", CultureInfo.InvariantCulture)), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H($"c{i}@empresa.com"), I($"Contacto {i}")))
                 .ToArray();
             var reloj = Stopwatch.StartNew();
             var plan = PlanificadorDeCarga.Planificar(filas, Foto(), Hoy);

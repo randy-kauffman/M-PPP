@@ -36,7 +36,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
     /// <summary>
     /// La estructura del Excel 1, FIJA en el código (DN-04: excepción a LP-08). Una sola fuente: de acá salen la
     /// configuración del lector, la plantilla vacía y el prefijo de cada mensaje. Las claves de
-    /// <see cref="FilaPlantilla.Valores"/> son las LETRAS (A a K), igual que las deja <c>LectorOpenXml</c>.
+    /// <see cref="FilaPlantilla.Valores"/> son las LETRAS (A a M), igual que las deja <c>LectorOpenXml</c>.
     /// </summary>
     public static class ColumnasDeCarga
     {
@@ -54,6 +54,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         public const string FechaDocumento = "fechaDocumento";
         public const string Comentarios = "comentarios";
 
+        /// <summary>DN-06 (aprobador, 2026-11-24): al FINAL (L y M) para no desplazar las letras de las columnas de antes.</summary>
+        public const string Canal = "canal";
+        public const string RequierePreregistro = "requierePreregistro";
+
         private static readonly ReadOnlyCollection<ColumnaDeCatalogo> TodasLasColumnas = new ReadOnlyCollection<ColumnaDeCatalogo>(new[]
         {
             new ColumnaDeCatalogo("A", CifBac, "CIF BAC"),
@@ -67,9 +71,11 @@ namespace Sanic.Mppp.Plugins.Catalogos
             new ColumnaDeCatalogo("I", NombreContacto, "Nombre contacto"),
             new ColumnaDeCatalogo("J", FechaDocumento, "Fecha documento"),
             new ColumnaDeCatalogo("K", Comentarios, "Comentarios"),
+            new ColumnaDeCatalogo("L", Canal, "Canal"),
+            new ColumnaDeCatalogo("M", RequierePreregistro, "Requiere preregistro"),
         });
 
-        /// <summary>Las 11 columnas, A a K, en orden (DN-04 §"Excel 1"). Lista de solo lectura por tipo.</summary>
+        /// <summary>Las 13 columnas, A a M, en orden (DN-04 §"Excel 1"). Lista de solo lectura por tipo.</summary>
         public static IReadOnlyList<ColumnaDeCatalogo> Todas => TodasLasColumnas;
 
         internal static string LetraDe(string campo) => Buscar(campo).Letra;
@@ -108,9 +114,11 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
     public sealed class PlanExistente
     {
-        public PlanExistente(Guid id, string codigo, Guid clienteId, TipoDeFormatoDelPlan formato, Moneda moneda, bool activo)
+        public PlanExistente(Guid id, string codigo, Guid clienteId, TipoDeFormatoDelPlan formato, Moneda moneda, bool activo,
+            Canal canal = Canal.BancaEnLinea, bool requierePreregistro = true)
         {
             Id = id; Codigo = codigo; ClienteId = clienteId; Formato = formato; Moneda = moneda; Activo = activo;
+            Canal = canal; RequierePreregistro = requierePreregistro;
         }
 
         public Guid Id { get; }
@@ -120,6 +128,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         public TipoDeFormatoDelPlan Formato { get; }
         public Moneda Moneda { get; }
         public bool Activo { get; }
+        /// <summary>DN-06: lo grabado, ya con la lectura tolerante (vacío = Banca en Linea).</summary>
+        public Canal Canal { get; }
+        /// <summary>DN-06: lo grabado, ya con la lectura tolerante (vacío = Sí).</summary>
+        public bool RequierePreregistro { get; }
     }
 
     public sealed class AutorizadoExistente
@@ -331,9 +343,11 @@ namespace Sanic.Mppp.Plugins.Catalogos
 
     public sealed class PlanACrear
     {
-        public PlanACrear(string codigo, TipoDeFormatoDelPlan formato, Moneda moneda, ReferenciaACliente cliente, int filaOrigen)
+        public PlanACrear(string codigo, TipoDeFormatoDelPlan formato, Moneda moneda, ReferenciaACliente cliente, int filaOrigen,
+            Canal canal = Canal.BancaEnLinea, bool requierePreregistro = true)
         {
             Codigo = codigo; Formato = formato; Moneda = moneda; Cliente = cliente; FilaOrigen = filaOrigen;
+            Canal = canal; RequierePreregistro = requierePreregistro;
         }
 
         public string Codigo { get; }
@@ -341,6 +355,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         public Moneda Moneda { get; }
         public ReferenciaACliente Cliente { get; }
         public int FilaOrigen { get; }
+        /// <summary>DN-06: obligatorio al crear (el planificador no crea un plan sin canal).</summary>
+        public Canal Canal { get; }
+        /// <summary>DN-06: vacío en todas las filas del plan = Sí.</summary>
+        public bool RequierePreregistro { get; }
     }
 
     public sealed class AutorizadoACrear
@@ -462,7 +480,7 @@ namespace Sanic.Mppp.Plugins.Catalogos
     public static class PlanificadorDeCarga
     {
         /// <param name="filas">Las filas no vacías que devolvió el lector, con <see cref="FilaPlantilla.Valores"/> por LETRA
-        /// de columna (A a K, <see cref="ColumnasDeCarga.Todas"/>). Una clave que falta, o un valor nulo, equivale a celda vacía.
+        /// de columna (A a M, <see cref="ColumnasDeCarga.Todas"/>). Una clave que falta, o un valor nulo, equivale a celda vacía.
         /// <see cref="FilaPlantilla.Valores"/> nulo equivale a fila sin valores. Nula, o con un elemento nulo, o con
         /// dos filas con el mismo número de fila de Excel → <see cref="ArgumentException"/> (es un error de quien llama).</param>
         /// <param name="estado">La foto de lo que existe. Nula → <see cref="ArgumentNullException"/>.</param>

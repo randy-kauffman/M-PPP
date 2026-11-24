@@ -56,7 +56,7 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Exportacion
             var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, valores) }, Textos((2, "mal\u0000")));
             var celdas = CeldasPorReferencia(archivo, e.Hoja);
             Assert.Equal("Cliente\uFFFD", celdas["C2"]);
-            Assert.Equal("mal\uFFFD", celdas["L2"]);
+            Assert.Equal("mal\uFFFD", celdas["N2"]);
         }
 
         [Fact]

@@ -313,6 +313,20 @@ namespace Sanic.Mppp.Plugins.Catalogos
                         + ". La carga no modifica planes que ya existen: usá la moneda grabada o dejá la celda vacía.");
             }
 
+            // DN-06: igual que formato y moneda, la carga no modifica un plan que ya existe. Se compara contra lo grabado ya leído
+            // con tolerancia (vacío = Banca en Linea / Sí).
+            if (f.Canal.Usable && f.Canal.Valor != p.Canal)
+            {
+                f.Error(Encabezados.Canal + ": el plan " + p.Codigo + " está grabado con canal " + TextoDeCanal(p.Canal) + ", no " + TextoDeCanal(f.Canal.Valor)
+                        + ". La carga no modifica planes que ya existen: usá el canal grabado o dejá la celda vacía.");
+            }
+
+            if (f.RequierePreregistro.Usable && f.RequierePreregistro.Valor != p.RequierePreregistro)
+            {
+                f.Error(Encabezados.RequierePreregistro + ": el plan " + p.Codigo + " está grabado con " + TextoDeSiNo(p.RequierePreregistro) + ", no " + TextoDeSiNo(f.RequierePreregistro.Valor)
+                        + ". La carga no modifica planes que ya existen: usá el valor grabado o dejá la celda vacía.");
+            }
+
             if (!p.Activo)
                 f.Advertencia(Encabezados.CodigoPlan + ": el plan " + p.Codigo + " está inactivo. Lo que se le cargue no va a estar vigente hasta que se lo active.");
         }
@@ -333,6 +347,15 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 otras => Encabezados.Moneda + ": el plan " + g.Codigo + " aparece con otra moneda en " + MotivosDeCarga.Filas(otras) + ". Usá la misma en todas.");
             if (!conflictoDeMoneda && !g.Filas.Any(f => f.Moneda.Presente))
                 ErrorEnTodas(g, Encabezados.Moneda + ": hace falta para crear el plan " + g.Codigo + ". Completala (COR o USD).");
+
+            // DN-06: el canal es obligatorio al crear (como formato y moneda); requiere preregistro no (ausente en todas = Sí).
+            var conflictoDeCanal = Contradicciones(g.Filas, f => f.Canal.Usable ? f.Canal.Valor.ToString() : null, StringComparer.Ordinal,
+                otras => Encabezados.Canal + ": el plan " + g.Codigo + " aparece con otro canal en " + MotivosDeCarga.Filas(otras) + ". Usá el mismo en todas.");
+            if (!conflictoDeCanal && !g.Filas.Any(f => f.Canal.Presente))
+                ErrorEnTodas(g, Encabezados.Canal + ": hace falta para crear el plan " + g.Codigo + ". Completalo (Banca en Linea o Conectividad).");
+
+            Contradicciones(g.Filas, f => f.RequierePreregistro.Usable ? f.RequierePreregistro.Valor.ToString() : null, StringComparer.Ordinal,
+                otras => Encabezados.RequierePreregistro + ": el plan " + g.Codigo + " aparece con otro valor en " + MotivosDeCarga.Filas(otras) + ". Usá el mismo en todas.");
         }
 
         private string NombreDelCliente(Guid clienteId)
@@ -353,6 +376,10 @@ namespace Sanic.Mppp.Plugins.Catalogos
         }
 
         private static string TextoDeMoneda(Moneda moneda) => moneda == Moneda.COR ? "COR" : "USD";
+
+        private static string TextoDeCanal(Canal canal) => canal == Canal.Conectividad ? "Conectividad" : "Banca en Linea";
+
+        private static string TextoDeSiNo(bool valor) => valor ? "Si" : "No";
 
         // ================================================================================================ correo (reglas 9 a 11)
 
@@ -498,7 +525,8 @@ namespace Sanic.Mppp.Plugins.Catalogos
                 {
                     var origen = g.FilaDeOrigen;
                     origen.Creados.Add("plan");
-                    planes.Add(new PlanACrear(g.Codigo, g.PrimerValor(f => f.Formato), g.PrimerValor(f => f.Moneda), ReferenciaAlCliente(g.Filas[0]), origen.Numero));
+                    planes.Add(new PlanACrear(g.Codigo, g.PrimerValor(f => f.Formato), g.PrimerValor(f => f.Moneda), ReferenciaAlCliente(g.Filas[0]), origen.Numero,
+                        g.PrimerValor(f => f.Canal), g.Filas.Any(f => f.RequierePreregistro.Usable) ? g.PrimerValor(f => f.RequierePreregistro) : true));
                 }
 
                 foreach (var g in _gruposDeCorreo.OrderBy(x => x.FilaDeOrigen.Numero))

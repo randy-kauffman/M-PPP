@@ -107,6 +107,9 @@ namespace Sanic.Mppp.Plugins.Catalogos
         public Campo<string> CodigoPlan { get; set; } = new Campo<string>();
         public Campo<TipoDeFormatoDelPlan> Formato { get; set; } = new Campo<TipoDeFormatoDelPlan>();
         public Campo<Moneda> Moneda { get; set; } = new Campo<Moneda>();
+        /// <summary>DN-06: columnas L y M. Solo cuentan para un plan (sin código de plan son un error de la fila).</summary>
+        public Campo<Canal> Canal { get; set; } = new Campo<Canal>();
+        public Campo<bool> RequierePreregistro { get; set; } = new Campo<bool>();
         public Campo<string> Correo { get; set; } = new Campo<string>();
         public Campo<string> Nombre { get; set; } = new Campo<string>();
         public Campo<DateTime> Fecha { get; set; } = new Campo<DateTime>();

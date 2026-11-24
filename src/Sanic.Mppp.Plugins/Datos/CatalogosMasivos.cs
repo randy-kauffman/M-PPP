@@ -115,7 +115,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
         private List<PlanExistente> LeerPlanes(IReadOnlyCollection<string> codigos)
         {
-            var consulta = NuevaConsulta(Tablas.Plan, LogicalOperator.And, "sanic_codigo", "sanic_tipoformato", "sanic_moneda", "sanic_clienteid", ColumnaEstado);
+            var consulta = NuevaConsulta(Tablas.Plan, LogicalOperator.And, "sanic_codigo", "sanic_tipoformato", "sanic_moneda", "sanic_clienteid", "sanic_canal", "sanic_requierepreregistro", ColumnaEstado);
             AgregarIn(consulta, "sanic_codigo", codigos);
             return Leer(_catalogos, consulta, APlan);
         }
@@ -290,7 +290,10 @@ namespace Sanic.Mppp.Plugins.Datos
             CatalogosDataverse.RequeridoReferencia(r, "sanic_clienteid").Id,
             CatalogosDataverse.RequeridoChoice<TipoDeFormatoDelPlan>(r, "sanic_tipoformato"),
             CatalogosDataverse.RequeridoChoice<Moneda>(r, "sanic_moneda"),
-            Activo(r));
+            Activo(r),
+            // DN-06: lectura tolerante (vacío = Banca en Linea / Sí): los planes viejos quedan sin valor hasta el paso de datos.
+            CatalogosDataverse.CanalTolerante(r),
+            CatalogosDataverse.RequierePreregistroTolerante(r));
 
         // El nombre de contacto es opcional al LEER: la columna se agregó el 2026-09-24 (diseno/02 §2.3) y un correo anterior puede no tenerla.
         private static AutorizadoExistente AAutorizado(Entity r) => new AutorizadoExistente(
@@ -349,7 +352,7 @@ namespace Sanic.Mppp.Plugins.Datos
         /// <summary>
         /// Crea en orden Clientes, Planes, Correos, Autorizaciones (el orden de las listas del plan). Columnas:
         /// Cliente: sanic_nombre (razón social), sanic_cifbac, sanic_cifcom, ownerid (systemuser del dueño).
-        /// Plan: sanic_codigo, sanic_tipoformato y sanic_moneda (OptionSetValue del enum), sanic_clienteid.
+        /// Plan: sanic_codigo, sanic_tipoformato, sanic_moneda y (DN-06) sanic_canal (OptionSetValue del enum), sanic_requierepreregistro (bool), sanic_clienteid.
         /// Autorizado: sanic_nombre (el correo), sanic_nombrecontacto.
         /// AutorizacionCliente: sanic_autorizadoid, sanic_clienteid, y sanic_fechadocumento y sanic_comentarios SOLO si vienen.
         /// Nunca escribe sanic_nombre de Plan ni de AutorizacionCliente (lo calcula NombreCalculadoStep). Una referencia a algo
@@ -384,6 +387,8 @@ namespace Sanic.Mppp.Plugins.Datos
                 entidad["sanic_codigo"] = p.Codigo;
                 entidad["sanic_tipoformato"] = new OptionSetValue((int)p.Formato);
                 entidad["sanic_moneda"] = new OptionSetValue((int)p.Moneda);
+                entidad["sanic_canal"] = new OptionSetValue((int)p.Canal);
+                entidad["sanic_requierepreregistro"] = p.RequierePreregistro;
                 entidad["sanic_clienteid"] = new EntityReference(Tablas.Cliente, IdDelCliente(p.Cliente, clientesNuevos));
                 Crear(entidad, p.FilaOrigen, avance);
             }

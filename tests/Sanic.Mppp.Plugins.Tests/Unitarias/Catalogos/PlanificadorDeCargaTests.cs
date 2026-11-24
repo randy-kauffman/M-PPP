@@ -246,7 +246,7 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Catalogos
         public void Un_plan_que_se_crea_en_una_fila_y_se_nombra_en_otra_de_un_cliente_nuevo_apunta_al_mismo_cliente()
         {
             var plan = Planificar(Foto(),
-                F(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Nueva"), ("D", "ana@banco.com"), ("E", "p1"), ("F", "06"), ("G", "COR")),
+                F(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Nueva"), ("D", "ana@banco.com"), ("E", "p1"), ("F", "06"), ("G", "COR"), ("L", "Banca en Linea")),
                 F(3, ("B", "NUE000000555"), ("E", "p1")));
             Assert.False(plan.TieneErrores);
             var p = Assert.Single(plan.Planes);
