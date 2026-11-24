@@ -204,8 +204,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             var lectura = new LectorOpenXml().Leer(Convert.FromBase64String(r.ResultadoBase64), EstructuraDeExcelDeCatalogo.Carga.ConfiguracionDeLectura(300));
             Assert.True(lectura.EsValido, string.Join(" | ", lectura.Errores));
-            Assert.StartsWith("Sin errores — no se grabó", lectura.Filas[0].Valores["L"]);
-            Assert.StartsWith("Error: Codigo plan: ", lectura.Filas[1].Valores["L"]);
+            Assert.StartsWith("Sin errores — no se grabó", lectura.Filas[0].Valores["N"]);
+            Assert.StartsWith("Error: Codigo plan: ", lectura.Filas[1].Valores["N"]);
         }
 
         [Fact]
@@ -215,13 +215,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var sistema = Sistema();
             var r = Nucleo(cat, sistema).Cargar(Archivo(EstructuraDeExcelDeCatalogo.Carga,
                 Fila(2, ("A", "555"), ("B", "NUE000000555"), ("C", "Comercial Nueva"), ("D", "ana@banco.com"),
-                    ("E", "N1"), ("F", "06"), ("G", "COR"), ("H", "nuevo@empresa.com"), ("I", "Nuevo"), ("K", "Ok"))));
+                    ("E", "N1"), ("F", "06"), ("G", "COR"), ("H", "nuevo@empresa.com"), ("I", "Nuevo"), ("K", "Ok"), ("L", "Banca en Linea"))));
             Assert.True(r.Grabado);
             Assert.Equal((1, 0, 1, 1, 1, 1), (r.Filas, r.Errores, r.ClientesCreados, r.PlanesCreados, r.CorreosCreados, r.AutorizacionesCreadas));
             Assert.Equal(4, Escrituras(cat).Count());
             Assert.Empty(Escrituras(sistema));
             var lectura = new LectorOpenXml().Leer(Convert.FromBase64String(r.ResultadoBase64), EstructuraDeExcelDeCatalogo.Carga.ConfiguracionDeLectura(300));
-            Assert.Equal("Creado: cliente, plan, correo, autorización", Assert.Single(lectura.Filas).Valores["L"]);
+            Assert.Equal("Creado: cliente, plan, correo, autorización", Assert.Single(lectura.Filas).Valores["N"]);
         }
 
         [Fact]

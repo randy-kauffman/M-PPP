@@ -95,6 +95,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         private static (string, string) I(string v) => ("I", v);   // Nombre contacto
         private static (string, string) J(string v) => ("J", v);   // Fecha documento
         private static (string, string) K(string v) => ("K", v);   // Comentarios
+        private static (string, string) Ca(string v) => ("L", v);  // Canal (DN-06)
+        private static (string, string) Pr(string v) => ("M", v);  // Requiere preregistro (DN-06)
 
         /// <summary>Cliente nuevo completo (A, B, C, D) con CIF BAC = <paramref name="cifBac"/>.</summary>
         private static (string, string)[] ClienteNuevo(string cifBac = "555", string cifCom = "NUE000000555", string razon = "Comercial Nueva", string ejecutivo = "ana@banco.com")
@@ -118,7 +120,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
         // ================================================================================================ estructura fija
         [Fact]
-        public void Las_once_columnas_A_a_K_con_sus_encabezados_exactos()
+        public void Las_trece_columnas_A_a_M_con_sus_encabezados_exactos()
         {
             var esperado = new[]
             {
@@ -126,6 +128,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                 ("D", "correoEjecutivo", "Correo ejecutivo"), ("E", "codigoPlan", "Codigo plan"), ("F", "tipoFormato", "Tipo formato"),
                 ("G", "moneda", "Moneda"), ("H", "correo", "Correo"), ("I", "nombreContacto", "Nombre contacto"),
                 ("J", "fechaDocumento", "Fecha documento"), ("K", "comentarios", "Comentarios"),
+                ("L", "canal", "Canal"), ("M", "requierePreregistro", "Requiere preregistro"), // DN-06
             };
             var reales = ColumnasDeCarga.Todas.Select(c => (c.Letra, c.Campo, c.Encabezado)).ToArray();
             Assert.Equal(esperado, reales);
@@ -136,8 +139,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         public void La_lista_de_columnas_no_se_puede_modificar_desde_afuera()
         {
             var lista = ColumnasDeCarga.Todas;
-            Assert.Throws<NotSupportedException>(() => ((ICollection<ColumnaDeCatalogo>)lista).Add(new ColumnaDeCatalogo("L", "x", "X")));
-            Assert.Equal(11, ColumnasDeCarga.Todas.Count);
+            Assert.Throws<NotSupportedException>(() => ((ICollection<ColumnaDeCatalogo>)lista).Add(new ColumnaDeCatalogo("N", "x", "X")));
+            Assert.Equal(13, ColumnasDeCarga.Todas.Count);
         }
 
         // ================================================================================================ argumentos
@@ -822,9 +825,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         {
             // Una celda de Excel admite 32.767 caracteres; el Resultado no puede acercarse. Cada columna, una por una.
             var enorme = new string('x', 30000);
-            foreach (var letra in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" })
+            foreach (var letra in new[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M" })
             {
-                var valores = ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), H("n@empresa.com"), I("X") })
+                var valores = ClienteNuevo().Concat(new[] { E("N1"), Fo("06"), Mo("COR"), Ca("Banca en Linea"), H("n@empresa.com"), I("X") })
                     .Where(v => v.Item1 != letra).Concat(new[] { (letra, enorme) }).ToArray();
                 var fila = Unica(Planificar(F(2, valores)));
                 Assert.NotEmpty(fila.Errores);

@@ -487,12 +487,51 @@
                 <Description description="Unique identifier for the user that owns the record." languagecode="1033" />
               </Descriptions>
             </attribute>
+            <attribute PhysicalName="sanic_canal">
+              <Type>picklist</Type>
+              <Name>sanic_canal</Name>
+              <LogicalName>sanic_canal</LogicalName>
+              <RequiredLevel>required</RequiredLevel>
+              <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
+              <ValidForUpdateApi>1</ValidForUpdateApi>
+              <ValidForReadApi>1</ValidForReadApi>
+              <ValidForCreateApi>1</ValidForCreateApi>
+              <IsCustomField>1</IsCustomField>
+              <IsAuditEnabled>1</IsAuditEnabled>
+              <IsSecured>0</IsSecured>
+              <IntroducedVersion>1.3.0.0</IntroducedVersion>
+              <IsCustomizable>1</IsCustomizable>
+              <IsRenameable>1</IsRenameable>
+              <CanModifySearchSettings>1</CanModifySearchSettings>
+              <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+              <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+              <SourceType>0</SourceType>
+              <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+              <IsSortableEnabled>0</IsSortableEnabled>
+              <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+              <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+              <IsDataSourceSecret>0</IsDataSourceSecret>
+              <AutoNumberFormat />
+              <IsSearchable>0</IsSearchable>
+              <IsFilterable>0</IsFilterable>
+              <IsRetrievable>0</IsRetrievable>
+              <IsLocalizable>0</IsLocalizable>
+              <OptionSetName>sanic_mppp_ch_canal</OptionSetName>
+              <displaynames>
+                <displayname description="Canal" languagecode="1033" />
+              </displaynames>
+              <Descriptions>
+                <Description description="Canal por el que el cliente opera el plan: Banca en Linea o Conectividad. Decide qué matriz de obligatoriedad se aplica a sus filas. Vacío se lee como Banca en Linea." languagecode="1033" />
+              </Descriptions>
+            </attribute>
             <attribute PhysicalName="sanic_clienteid">
               <Type>lookup</Type>
               <Name>sanic_clienteid</Name>
               <LogicalName>sanic_clienteid</LogicalName>
               <RequiredLevel>required</RequiredLevel>
               <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
               <ValidForUpdateApi>1</ValidForUpdateApi>
               <ValidForReadApi>1</ValidForReadApi>
               <ValidForCreateApi>1</ValidForCreateApi>
@@ -595,6 +634,7 @@
               <IsFilterable>0</IsFilterable>
               <IsRetrievable>0</IsRetrievable>
               <IsLocalizable>0</IsLocalizable>
+              <AppDefaultValue>-1</AppDefaultValue>
               <OptionSetName>sanic_mppp_ch_moneda</OptionSetName>
               <displaynames>
                 <displayname description="Moneda" languagecode="1033" />
@@ -680,6 +720,67 @@
                 <Description description="Nombre calculado por la solución: código del plan y nombre del cliente. Nadie lo digita." languagecode="1033" />
               </Descriptions>
             </attribute>
+            <attribute PhysicalName="sanic_requierepreregistro">
+              <Type>bit</Type>
+              <Name>sanic_requierepreregistro</Name>
+              <LogicalName>sanic_requierepreregistro</LogicalName>
+              <RequiredLevel>required</RequiredLevel>
+              <DisplayMask>ValidForAdvancedFind|ValidForForm|ValidForGrid</DisplayMask>
+              <ImeMode>auto</ImeMode>
+              <ValidForUpdateApi>1</ValidForUpdateApi>
+              <ValidForReadApi>1</ValidForReadApi>
+              <ValidForCreateApi>1</ValidForCreateApi>
+              <IsCustomField>1</IsCustomField>
+              <IsAuditEnabled>1</IsAuditEnabled>
+              <IsSecured>0</IsSecured>
+              <IntroducedVersion>1.3.0.0</IntroducedVersion>
+              <IsCustomizable>1</IsCustomizable>
+              <IsRenameable>1</IsRenameable>
+              <CanModifySearchSettings>1</CanModifySearchSettings>
+              <CanModifyRequirementLevelSettings>1</CanModifyRequirementLevelSettings>
+              <CanModifyAdditionalSettings>1</CanModifyAdditionalSettings>
+              <SourceType>0</SourceType>
+              <IsGlobalFilterEnabled>0</IsGlobalFilterEnabled>
+              <IsSortableEnabled>0</IsSortableEnabled>
+              <CanModifyGlobalFilterSettings>1</CanModifyGlobalFilterSettings>
+              <CanModifyIsSortableSettings>1</CanModifyIsSortableSettings>
+              <IsDataSourceSecret>0</IsDataSourceSecret>
+              <AutoNumberFormat />
+              <IsSearchable>0</IsSearchable>
+              <IsFilterable>0</IsFilterable>
+              <IsRetrievable>0</IsRetrievable>
+              <IsLocalizable>0</IsLocalizable>
+              <AppDefaultValue>1</AppDefaultValue>
+              <optionset Name="sanic_mppp_tbl_plan_sanic_requierepreregistro">
+                <OptionSetType>bit</OptionSetType>
+                <IntroducedVersion>1.3.0.0</IntroducedVersion>
+                <IsCustomizable>1</IsCustomizable>
+                <displaynames>
+                  <displayname description="Requiere pre-registro" languagecode="1033" />
+                </displaynames>
+                <Descriptions>
+                  <Description description="Si es No, el plan no admite pre-registro de referencias: toda fila de ese plan se rechaza con la regla PLAN_REQUIERE_PREREGISTRO. Vacío se lee como Si." languagecode="1033" />
+                </Descriptions>
+                <options>
+                  <option value="1" ExternalValue="" IsHidden="0">
+                    <labels>
+                      <label description="Si" languagecode="1033" />
+                    </labels>
+                  </option>
+                  <option value="0" ExternalValue="" IsHidden="0">
+                    <labels>
+                      <label description="No" languagecode="1033" />
+                    </labels>
+                  </option>
+                </options>
+              </optionset>
+              <displaynames>
+                <displayname description="Requiere pre-registro" languagecode="1033" />
+              </displaynames>
+              <Descriptions>
+                <Description description="Si es No, el plan no admite pre-registro de referencias: toda fila de ese plan se rechaza con la regla PLAN_REQUIERE_PREREGISTRO. Vacío se lee como Si." languagecode="1033" />
+              </Descriptions>
+            </attribute>
             <attribute PhysicalName="sanic_tipoformato">
               <Type>picklist</Type>
               <Name>sanic_tipoformato</Name>
@@ -710,6 +811,7 @@
               <IsFilterable>0</IsFilterable>
               <IsRetrievable>0</IsRetrievable>
               <IsLocalizable>0</IsLocalizable>
+              <AppDefaultValue>-1</AppDefaultValue>
               <OptionSetName>sanic_mppp_ch_tipoformatoplan</OptionSetName>
               <displaynames>
                 <displayname description="Tipo de formato" languagecode="1033" />
@@ -1113,34 +1215,70 @@
             <IntroducedVersion>1.0.0.0</IntroducedVersion>
             <FormPresentation>1</FormPresentation>
             <FormActivationState>1</FormActivationState>
-            <form>
+            <form headerdensity="HighWithControls">
               <tabs>
-                <tab verticallayout="true" id="{6511001c-aa1b-40c5-bf96-57fd4fa133b9}" IsUserDefined="1">
+                <tab verticallayout="true" id="{197B938C-6235-5DEB-8F9F-16D288F5FB62}" IsUserDefined="1" labelid="{92C1A078-03AE-5433-8599-BF7A9DAAF387}">
                   <labels>
                     <label description="General" languagecode="1033" />
                   </labels>
                   <columns>
                     <column width="100%">
                       <sections>
-                        <section showlabel="false" showbar="false" IsUserDefined="0" id="{dbbc69e5-2fc9-4357-8691-fd878c560016}">
+                        <section showlabel="true" showbar="false" IsUserDefined="0" id="{EAAC11E8-A150-5FA3-A822-2DECFD3C12B4}" labelid="{C6EBF9A8-A3F2-5182-81D2-4431D939EFCC}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">
                           <labels>
-                            <label description="General" languagecode="1033" />
+                            <label description="Datos" languagecode="1033" />
                           </labels>
                           <rows>
                             <row>
-                              <cell id="{2ace1212-dc71-43c4-b9d9-6f2f133a3c16}">
+                              <cell id="{330E05C9-4273-5F64-A807-6CF41859A884}" locklevel="0" colspan="1" rowspan="1" labelid="{E54F6E2C-C0BF-5BD5-B7B5-F0A825702A7E}">
                                 <labels>
                                   <label description="Nombre" languagecode="1033" />
                                 </labels>
-                                <control id="sanic_nombre" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="sanic_nombre" />
+                                <control id="sanic_nombre" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="sanic_nombre" disabled="false" />
                               </cell>
                             </row>
                             <row>
-                              <cell id="{b3ac7d0b-509e-41c9-88a0-13abdbff54bb}">
+                              <cell id="{F2DFF1CC-9651-5066-A4CB-BD5964B012DF}" locklevel="0" colspan="1" rowspan="1" labelid="{D845BDA8-74CA-58BF-9C19-12D610024F19}">
                                 <labels>
-                                  <label description="Owner" languagecode="1033" />
+                                  <label description="Moneda" languagecode="1033" />
                                 </labels>
-                                <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" />
+                                <control id="sanic_moneda" classid="{3EF39988-22BB-4f0b-BBBE-64B5A3748AEE}" datafieldname="sanic_moneda" disabled="false" />
+                              </cell>
+                            </row>
+                            <row>
+                              <cell id="{33F94AD9-55A0-57C2-A4D1-6D2D92C03CBF}" locklevel="0" colspan="1" rowspan="1" labelid="{CF7416FA-8F6B-544E-9A58-2B18DF015606}">
+                                <labels>
+                                  <label description="Tipo de formato" languagecode="1033" />
+                                </labels>
+                                <control id="sanic_tipoformato" classid="{3EF39988-22BB-4f0b-BBBE-64B5A3748AEE}" datafieldname="sanic_tipoformato" disabled="false" />
+                              </cell>
+                            </row>
+                          </rows>
+                        </section>
+                        <section showlabel="true" showbar="false" IsUserDefined="0" id="{4C3D8B09-2BE3-581F-8B8F-225D4FA078AE}" labelid="{CE60E6E3-B4E0-533A-9AC4-40EBE1B3D270}" columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">
+                          <labels>
+                            <label description="Correos autorizados sobre este plan" languagecode="1033" />
+                          </labels>
+                          <rows>
+                            <row>
+                              <cell id="{592702CA-2AF6-5D36-B257-6261567C6DA4}" locklevel="0" colspan="1" rowspan="6" auto="false" labelid="{9C25904C-6F5B-5491-9C21-8E1DC9EFC676}">
+                                <labels>
+                                  <label description="Correos autorizados sobre este plan" languagecode="1033" />
+                                </labels>
+                                <control indicationOfSubgrid="true" id="Subgrid_1" classid="{E7A81278-8635-4D9E-8D4D-59480B391C5B}">
+                                  <parameters>
+                                    <RecordsPerPage>10</RecordsPerPage>
+                                    <AutoExpand>Fixed</AutoExpand>
+                                    <EnableQuickFind>false</EnableQuickFind>
+                                    <EnableViewPicker>false</EnableViewPicker>
+                                    <EnableChartPicker>false</EnableChartPicker>
+                                    <ChartGridMode>Grid</ChartGridMode>
+                                    <TargetEntityType>sanic_mppp_tbl_autorizacionplan</TargetEntityType>
+                                    <ViewId>{F42FEAF8-8CB6-F111-AAAD-000D3A350099}</ViewId>
+                                    <ViewIds>{F42FEAF8-8CB6-F111-AAAD-000D3A350099}</ViewIds>
+                                    <RelationshipName>sanic_mppp_plan_autorizacionplan</RelationshipName>
+                                  </parameters>
+                                </control>
                               </cell>
                             </row>
                           </rows>
@@ -1150,14 +1288,37 @@
                   </columns>
                 </tab>
               </tabs>
+              <header id="{254513F8-C902-5157-9F2E-F86B5A800434}" celllabelposition="Top" columns="111" labelwidth="115" celllabelalignment="Left">
+                <rows>
+                  <row>
+                    <cell id="{3E79FE1C-3269-5BFF-A917-3856F7003EAA}" locklevel="0" colspan="1" rowspan="1" labelid="{4FAE2FC0-5D3A-5735-A358-9B3082C78495}">
+                      <labels>
+                        <label description="Codigo" languagecode="1033" />
+                      </labels>
+                      <control id="sanic_codigo" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="sanic_codigo" disabled="false" />
+                    </cell>
+                    <cell id="{6B87D9C2-FEF3-5E5E-9759-4456C0D2FFCE}" locklevel="0" colspan="1" rowspan="1" labelid="{8B71A66F-1393-5912-BCAF-8DBF09366C6C}">
+                      <labels>
+                        <label description="Cliente" languagecode="1033" />
+                      </labels>
+                      <control id="sanic_clienteid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="sanic_clienteid" disabled="false" />
+                    </cell>
+                    <cell id="{BE530962-6BD4-523A-A0B5-AA3014CCF6D8}" showlabel="false" labelid="{C1E5B1F7-3870-5BB8-A59C-176240545C26}">
+                      <labels>
+                        <label description="" languagecode="1033" />
+                      </labels>
+                    </cell>
+                  </row>
+                </rows>
+              </header>
             </form>
             <IsCustomizable>1</IsCustomizable>
             <CanBeDeleted>1</CanBeDeleted>
             <LocalizedNames>
-              <LocalizedName description="Information" languagecode="1033" />
+              <LocalizedName description="Plan" languagecode="1033" />
             </LocalizedNames>
             <Descriptions>
-              <Description description="A form for this entity." languagecode="1033" />
+              <Description description="Formulario principal de Plan. Lo edita el Administrador de planes." languagecode="1033" />
             </Descriptions>
           </systemform>
         </forms>
@@ -1220,7 +1381,7 @@
             <CanBeDeleted>0</CanBeDeleted>
             <isquickfindquery>0</isquickfindquery>
             <isprivate>0</isprivate>
-            <isdefault>1</isdefault>
+            <isdefault>0</isdefault>
             <savedqueryid>{8c1335da-eafd-4959-a694-2ccc14f0605e}</savedqueryid>
             <layoutxml>
               <grid name="resultset" jump="sanic_nombre" select="1" icon="1" preview="1">
@@ -1410,6 +1571,47 @@
           </savedquery>
           <savedquery>
             <IsCustomizable>1</IsCustomizable>
+            <CanBeDeleted>1</CanBeDeleted>
+            <isquickfindquery>0</isquickfindquery>
+            <isprivate>0</isprivate>
+            <isdefault>1</isdefault>
+            <savedqueryid>{8a2f0300-8db6-f111-aaad-000d3a350099}</savedqueryid>
+            <layoutxml>
+              <grid name="resultset" jump="sanic_codigo" select="1" preview="1" icon="1">
+                <row name="result" id="sanic_mppp_tbl_planid">
+                  <cell name="sanic_codigo" width="100" />
+                  <cell name="sanic_nombre" width="240" />
+                  <cell name="sanic_moneda" width="90" />
+                  <cell name="sanic_tipoformato" width="120" />
+                </row>
+              </grid>
+            </layoutxml>
+            <querytype>0</querytype>
+            <fetchxml>
+              <fetch version="1.0" output-format="xml-platform" mapping="logical">
+                <entity name="sanic_mppp_tbl_plan">
+                  <attribute name="sanic_mppp_tbl_planid" />
+                  <attribute name="sanic_codigo" />
+                  <attribute name="sanic_nombre" />
+                  <attribute name="sanic_moneda" />
+                  <attribute name="sanic_tipoformato" />
+                  <order attribute="sanic_codigo" descending="false" />
+                  <filter type="and">
+                    <condition attribute="statecode" operator="eq" value="0" />
+                  </filter>
+                </entity>
+              </fetch>
+            </fetchxml>
+            <IntroducedVersion>1.0.0.0</IntroducedVersion>
+            <LocalizedNames>
+              <LocalizedName description="Planes activos" languagecode="1033" />
+            </LocalizedNames>
+            <Descriptions>
+              <Description description="Planes de pago vigentes." languagecode="1033" />
+            </Descriptions>
+          </savedquery>
+          <savedquery>
+            <IsCustomizable>1</IsCustomizable>
             <CanBeDeleted>0</CanBeDeleted>
             <isquickfindquery>1</isquickfindquery>
             <isprivate>0</isprivate>
@@ -1448,17 +1650,353 @@
         </savedqueries>
       </SavedQueries>
       <RibbonDiffXml>
-        <CustomActions />
+        <CustomActions>
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Abandon.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Abandon" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddAppointment.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddCampaignResponse.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddCampaignResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddConnection.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddConnectionNew.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddConnectionToMe.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddEmail.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddFax.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddFax" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddFile.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddFile" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddLetter.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddLetter" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddNote.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddNote" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddOtherActivities.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddOtherActivities" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddPhone.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddPhone" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddRecurringAppointment.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddRecurringAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddServiceActivity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddServiceActivity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddTask.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddTask" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-AddToQueue.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Assign.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Convert-Case.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Convert.Case" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Convert-Opportunity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Convert.Opportunity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-CustomizeEntity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.CustomizeEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Delete.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-EditSalesProcess.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.EditSalesProcess" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-FinishStage.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.FinishStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Flows-RefreshCommandBar.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Flows-RefreshCommandBar-RunWorkflow.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Flows.RefreshCommandBar.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-FormDesign.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.FormDesign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-MailMerge.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-OpenActiveStage.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.OpenActiveStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Permissions.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Permissions" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Permissions-Sharing.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Permissions.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Permissions-SharingNonRefresh.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Permissions.SharingNonRefresh" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-PromoteToResponse.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.PromoteToResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-PublishAll.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.PublishAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-PublishEntity.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.PublishEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-QueueItemDetail.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.QueueItemDetail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-Reports.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.Reports" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-RunScript.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-RunWorkflow.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-SaveAsComplete.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.SaveAsComplete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-SendSelected.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.SendSelected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-SuggestProduct.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.SuggestProduct" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-SwitchProcess.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.SwitchProcess" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-Form-sanic_mppp_tbl_plan-WordTemplate.HideAction" Location="Mscrm.Form.sanic_mppp_tbl_plan.WordTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddAppointment.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddCampaignResponse.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddCampaignResponse" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddConnection.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddConnectionNew.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddConnectionToMe.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddFax.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddFax" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddFile.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddFile" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddLetter.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddLetter" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddNote.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddNote" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddOtherActivities.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddOtherActivities" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddPhone.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddPhone" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddRecurringAppointment.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddRecurringAppointment" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddServiceActivity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddServiceActivity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddTask.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddTask" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-AddToQueue.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Assign.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-BulkDelete.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.BulkDelete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-CustomizeEntity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.CustomizeEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-CustomizePreviewPane.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.CustomizePreviewPane" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Delete.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-DeleteMenu.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.DeleteMenu" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-DesignView.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.DesignView" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Detect.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Detect" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Detect-All.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Detect.All" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Detect-Selected.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Detect.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-DocumentTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.DocumentTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-DynamicPivotTable.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.DynamicPivotTable" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-DynamicWorkesheet.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.DynamicWorkesheet" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ExportSelectedToExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ExportSelectedToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ExportTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ExportTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ExportToExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ExportToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ExportToExcelOnline.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ExportToExcelOnline" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Flows-RefreshCommandBar.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Flows-RefreshCommandBar-RunWorkflow.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Flows.RefreshCommandBar.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Import.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Import" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ImportData.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ImportData" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ImportDataFromCSV.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ImportDataFromCSV" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ImportDataFromExcel.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ImportDataFromExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-ImportDataFromXML.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.ImportDataFromXML" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-MailMerge.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-MBPF-ConvertTo.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.MBPF.ConvertTo" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-modern-SendDirectEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.modern.SendDirectEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-OpenActiveStage.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.OpenActiveStage" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-PublishAll.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.PublishAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-PublishEntity.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.PublishEntity" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-RunReport.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.RunReport" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-RunScript.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-RunWorkflow.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Send.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Send" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-SendDirectEmail.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.SendDirectEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Send-Selected.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Send.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Send-View.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Send.View" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-Sharing.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-StaticWorksheet.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.StaticWorksheet" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-StaticWorksheetAll.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.StaticWorksheetAll" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-HomepageGrid-sanic_mppp_tbl_plan-WordTemplate.HideAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.WordTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AddConnection.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AddConnection" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AddConnectionNew.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AddConnectionNew" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AddConnectionToMe.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AddConnectionToMe" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AddEmail.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AddToQueue.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AddToQueue" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AdvMergeRecords.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AdvMergeRecords" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Assign.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Assign" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-AssociateParentChildCase.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.AssociateParentChildCase" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-BulkDelete.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.BulkDelete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Delete.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Delete" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Detect.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Detect" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Detect-All.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Detect.All" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Detect-Selected.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Detect.Selected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-DocumentTemplate.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.DocumentTemplate" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-ExportSelectedToExcel.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.ExportSelectedToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-ExportToExcel.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.ExportToExcel" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-ExportToExcelOnline.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.ExportToExcelOnline" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Flows-RefreshCommandBar.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Flows.RefreshCommandBar" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-MailMerge.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.MailMerge" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-modern-AddEmail.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.modern.AddEmail" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Remove.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Remove" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-RunReport.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.RunReport" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-RunScript.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.RunScript" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-RunWorkflow.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.RunWorkflow" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-SendSelected.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.SendSelected" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-Sharing.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.Sharing" />
+          <HideCustomAction HideActionId="sanic.mppp.hide.Mscrm-SubGrid-sanic_mppp_tbl_plan-WordTemplate.HideAction" Location="Mscrm.SubGrid.sanic_mppp_tbl_plan.WordTemplate" />
+          <CustomAction Id="sanic.mppp.plan.activardesactivar.HomepageGrid.CustomAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.MainTab.Management.Controls._children" Sequence="90">
+            <CommandUIDefinition>
+              <FlyoutAnchor Id="sanic.mppp.plan.activardesactivar.HomepageGrid.FlyoutAnchor" Command="sanic.mppp.plan.activardesactivar.Command" Sequence="90" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.activardesactivar.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.activardesactivar.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.activardesactivar.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.activardesactivar.Button.ToolTipDescription" Image16by16="$webresource:sanic_mppp_wr_svg_cmdactivardesactivar" Image32by32="$webresource:sanic_mppp_wr_svg_cmdactivardesactivar" ModernImage="$webresource:sanic_mppp_wr_svg_cmdactivardesactivar">
+                <Menu Id="sanic.mppp.plan.activardesactivar.HomepageGrid.Menu">
+                  <MenuSection Id="sanic.mppp.plan.activardesactivar.HomepageGrid.MenuSection" Sequence="10" DisplayMode="Menu16">
+                    <Controls Id="sanic.mppp.plan.activardesactivar.HomepageGrid.Controls">
+                      <Button Command="sanic.mppp.plan.activardesactivar.cargar.Command" Id="sanic.mppp.plan.activardesactivar.HomepageGrid.cargar.Button" Sequence="10" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.activardesactivar.cargar.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.activardesactivar.cargar.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.activardesactivar.cargar.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.activardesactivar.cargar.Button.ToolTipDescription" />
+                      <Button Command="sanic.mppp.plan.activardesactivar.plantilla.Command" Id="sanic.mppp.plan.activardesactivar.HomepageGrid.plantilla.Button" Sequence="20" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.activardesactivar.plantilla.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.activardesactivar.plantilla.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.activardesactivar.plantilla.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.activardesactivar.plantilla.Button.ToolTipDescription" />
+                    </Controls>
+                  </MenuSection>
+                </Menu>
+              </FlyoutAnchor>
+            </CommandUIDefinition>
+          </CustomAction>
+          <CustomAction Id="sanic.mppp.plan.cargamasiva.HomepageGrid.CustomAction" Location="Mscrm.HomepageGrid.sanic_mppp_tbl_plan.MainTab.Management.Controls._children" Sequence="80">
+            <CommandUIDefinition>
+              <FlyoutAnchor Id="sanic.mppp.plan.cargamasiva.HomepageGrid.FlyoutAnchor" Command="sanic.mppp.plan.cargamasiva.Command" Sequence="80" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.cargamasiva.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.cargamasiva.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.cargamasiva.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.cargamasiva.Button.ToolTipDescription" Image16by16="$webresource:sanic_mppp_wr_svg_cmdcargamasiva" Image32by32="$webresource:sanic_mppp_wr_svg_cmdcargamasiva" ModernImage="$webresource:sanic_mppp_wr_svg_cmdcargamasiva">
+                <Menu Id="sanic.mppp.plan.cargamasiva.HomepageGrid.Menu">
+                  <MenuSection Id="sanic.mppp.plan.cargamasiva.HomepageGrid.MenuSection" Sequence="10" DisplayMode="Menu16">
+                    <Controls Id="sanic.mppp.plan.cargamasiva.HomepageGrid.Controls">
+                      <Button Command="sanic.mppp.plan.cargamasiva.cargar.Command" Id="sanic.mppp.plan.cargamasiva.HomepageGrid.cargar.Button" Sequence="10" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.cargamasiva.cargar.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.cargamasiva.cargar.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.cargamasiva.cargar.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.cargamasiva.cargar.Button.ToolTipDescription" />
+                      <Button Command="sanic.mppp.plan.cargamasiva.plantilla.Command" Id="sanic.mppp.plan.cargamasiva.HomepageGrid.plantilla.Button" Sequence="20" TemplateAlias="o1" LabelText="$LocLabels:sanic.mppp.plan.cargamasiva.plantilla.Button.LabelText" Alt="$LocLabels:sanic.mppp.plan.cargamasiva.plantilla.Button.LabelText" ToolTipTitle="$LocLabels:sanic.mppp.plan.cargamasiva.plantilla.Button.ToolTipTitle" ToolTipDescription="$LocLabels:sanic.mppp.plan.cargamasiva.plantilla.Button.ToolTipDescription" />
+                    </Controls>
+                  </MenuSection>
+                </Menu>
+              </FlyoutAnchor>
+            </CommandUIDefinition>
+          </CustomAction>
+        </CustomActions>
         <Templates>
           <RibbonTemplates Id="Mscrm.Templates" />
         </Templates>
-        <CommandDefinitions />
+        <CommandDefinitions>
+          <CommandDefinition Id="sanic.mppp.plan.activardesactivar.cargar.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.activardesactivar.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions>
+              <JavaScriptFunction FunctionName="Sanic.Mppp.Comandos.cambiarEstadoCatalogos" Library="$webresource:sanic_mppp_wr_js_comandos">
+                <CrmParameter Value="SelectedControl" />
+              </JavaScriptFunction>
+            </Actions>
+          </CommandDefinition>
+          <CommandDefinition Id="sanic.mppp.plan.activardesactivar.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.activardesactivar.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions />
+          </CommandDefinition>
+          <CommandDefinition Id="sanic.mppp.plan.activardesactivar.plantilla.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.activardesactivar.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions>
+              <JavaScriptFunction FunctionName="Sanic.Mppp.Comandos.plantillaCambioEstado" Library="$webresource:sanic_mppp_wr_js_comandos">
+                <CrmParameter Value="SelectedControl" />
+              </JavaScriptFunction>
+            </Actions>
+          </CommandDefinition>
+          <CommandDefinition Id="sanic.mppp.plan.cargamasiva.cargar.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.cargamasiva.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions>
+              <JavaScriptFunction FunctionName="Sanic.Mppp.Comandos.cargarCatalogos" Library="$webresource:sanic_mppp_wr_js_comandos">
+                <CrmParameter Value="SelectedControl" />
+              </JavaScriptFunction>
+            </Actions>
+          </CommandDefinition>
+          <CommandDefinition Id="sanic.mppp.plan.cargamasiva.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.cargamasiva.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions />
+          </CommandDefinition>
+          <CommandDefinition Id="sanic.mppp.plan.cargamasiva.plantilla.Command">
+            <EnableRules>
+              <EnableRule Id="sanic.mppp.plan.cargamasiva.EnableRule" />
+            </EnableRules>
+            <DisplayRules />
+            <Actions>
+              <JavaScriptFunction FunctionName="Sanic.Mppp.Comandos.plantillaCarga" Library="$webresource:sanic_mppp_wr_js_comandos">
+                <CrmParameter Value="SelectedControl" />
+              </JavaScriptFunction>
+            </Actions>
+          </CommandDefinition>
+        </CommandDefinitions>
         <RuleDefinitions>
           <TabDisplayRules />
           <DisplayRules />
-          <EnableRules />
+          <EnableRules>
+            <EnableRule Id="sanic.mppp.plan.activardesactivar.EnableRule">
+              <CustomRule FunctionName="Sanic.Mppp.Comandos.esAdministradorDePlanes" Library="$webresource:sanic_mppp_wr_js_comandos" Default="false">
+                <CrmParameter Value="SelectedControl" />
+              </CustomRule>
+            </EnableRule>
+            <EnableRule Id="sanic.mppp.plan.cargamasiva.EnableRule">
+              <CustomRule FunctionName="Sanic.Mppp.Comandos.esAdministradorDePlanes" Library="$webresource:sanic_mppp_wr_js_comandos" Default="false">
+                <CrmParameter Value="SelectedControl" />
+              </CustomRule>
+            </EnableRule>
+          </EnableRules>
         </RuleDefinitions>
-        <LocLabels />
+        <LocLabels>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.Button.LabelText">
+            <Titles>
+              <Title description="Bulk activate/deactivate" languagecode="1033" />
+              <Title description="Activar/Desactivar masivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Activates or deactivates clients, plans, emails and client authorizations from Excel." languagecode="1033" />
+              <Title description="Activa o desactiva desde Excel clientes, planes, correos y autorizaciones por cliente." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Bulk activate/deactivate" languagecode="1033" />
+              <Title description="Activar/Desactivar masivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.cargar.Button.LabelText">
+            <Titles>
+              <Title description="Upload file" languagecode="1033" />
+              <Title description="Cargar archivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.cargar.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Uploads the filled-in Excel template and processes it: all or nothing." languagecode="1033" />
+              <Title description="Sube la plantilla de Excel completada y la procesa: todo o nada." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.cargar.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Upload file" languagecode="1033" />
+              <Title description="Cargar archivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.plantilla.Button.LabelText">
+            <Titles>
+              <Title description="Download template" languagecode="1033" />
+              <Title description="Descargar plantilla" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.plantilla.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Downloads the empty Excel template with the expected columns." languagecode="1033" />
+              <Title description="Descarga la plantilla de Excel vacía con las columnas esperadas." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.activardesactivar.plantilla.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Download template" languagecode="1033" />
+              <Title description="Descargar plantilla" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.Button.LabelText">
+            <Titles>
+              <Title description="Bulk load" languagecode="1033" />
+              <Title description="Carga masiva" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Bulk load of clients, plans, emails and client authorizations from Excel." languagecode="1033" />
+              <Title description="Carga masiva de clientes, planes, correos y autorizaciones por cliente desde Excel." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Bulk load" languagecode="1033" />
+              <Title description="Carga masiva" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.cargar.Button.LabelText">
+            <Titles>
+              <Title description="Upload file" languagecode="1033" />
+              <Title description="Cargar archivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.cargar.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Uploads the filled-in Excel template and processes it: all or nothing." languagecode="1033" />
+              <Title description="Sube la plantilla de Excel completada y la procesa: todo o nada." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.cargar.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Upload file" languagecode="1033" />
+              <Title description="Cargar archivo" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.plantilla.Button.LabelText">
+            <Titles>
+              <Title description="Download template" languagecode="1033" />
+              <Title description="Descargar plantilla" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.plantilla.Button.ToolTipDescription">
+            <Titles>
+              <Title description="Downloads the empty Excel template with the expected columns." languagecode="1033" />
+              <Title description="Descarga la plantilla de Excel vacía con las columnas esperadas." languagecode="3082" />
+            </Titles>
+          </LocLabel>
+          <LocLabel Id="sanic.mppp.plan.cargamasiva.plantilla.Button.ToolTipTitle">
+            <Titles>
+              <Title description="Download template" languagecode="1033" />
+              <Title description="Descargar plantilla" languagecode="3082" />
+            </Titles>
+          </LocLabel>
+        </LocLabels>
       </RibbonDiffXml>
     </Entity>
     

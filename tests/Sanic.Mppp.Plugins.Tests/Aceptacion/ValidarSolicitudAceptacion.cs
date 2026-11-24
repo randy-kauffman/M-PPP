@@ -127,10 +127,10 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
                         ("sanic_dependede", i == 0 ? null : sobre[i - 1]), ("sanic_efecto", new OptionSetValue((int)EfectoDeLaRegla.Rechaza))));
                 }
 
-                // DN-05 (2026-10-06): el catálogo de registro DESTINO (FORMATO_11_SOLO_ACH inactiva, las cinco reglas nuevas
-                // activas). El catálogo de la transición, con FORMATO_11_SOLO_ACH todavía activa, lo cubre
+                // DN-06 (2026-11-24): el catálogo de registro DESTINO (el de DN-05 más PLAN_REQUIERE_PREREGISTRO, con las cinco
+                // reglas que dependían de la autorización colgando de ella). Antes, DN-05 (FORMATO_11_SOLO_ACH inactiva). El catálogo de la transición, con FORMATO_11_SOLO_ACH todavía activa, lo cubre
                 // ModoDeAutorizacionWiringAceptacion.
-                var registro = Dn05Aceptacion.SemillaRegistro
+                var registro = Dn06Aceptacion.SemillaRegistro
                     .Select(r => (r.codigo, dependeDe: r.dependeDe.Length == 0 ? null : string.Join(",", r.dependeDe)))
                     .ToArray();
                 for (var i = 0; i < registro.Length; i++)
@@ -306,7 +306,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
             Assert.Equal(30, r.FilasValidas);
             var consultas = m.Svc.Llamadas.Count(l => l.Operacion == "RetrieveMultiple");
-            Assert.InRange(consultas, 1, 15); // 7 parámetros (DN-05 sumó 2, D-82 la zona horaria) + 2 niveles de reglas + planes + autorizaciones (hasta 4)
+            Assert.InRange(consultas, 1, 16); // 8 parámetros (DN-05 sumó 2, D-82 la zona horaria, DN-06 la obligatoriedad de conectividad) + 2 niveles de reglas + planes + autorizaciones (hasta 4)
             Assert.Equal(30, m.Svc.Llamadas.Count(l => l.Operacion == "Create" && l.Entidad == TablasHistorico.Fila));
             Assert.All(m.Filas(), f => Assert.StartsWith("MPPP-00000123-F", (string)f["sanic_nombre"]));
         }
@@ -791,6 +791,95 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var fila = m.Filas().Single();
             Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
             Assert.Contains("El plan 0042 no admite la gestión Modificacion.", fila.GetAttributeValue<string>("sanic_mensaje"));
+    
+        // ------------------------------------------------------------------ DN-06 (aprobador, 2026-11-24): canal y pre-registro del plan
+        private void CambiarPlan(Mundo m, params (string atributo, object valor)[] cambios)
+        {
+            var e = new Entity(Tablas.Plan, m.PlanId);
+            foreach (var (a, v) in cambios)
+            {
+                e[a] = v;
+            }
+
+            m.Svc.Update(e);
         }
+
+        [Fact]
+        public void Dn06_las_filas_de_un_plan_que_no_requiere_preregistro_se_rechazan_con_el_texto_del_aprobador()
+        {
+            var m = new Mundo(Excel(Fila(), Fila(cuenta: "987654321")));
+            CambiarPlan(m, ("sanic_requierepreregistro", false));
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.Rechazada, 2, 0, 2), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            Assert.All(m.Filas(), f =>
+            {
+                Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, f.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
+                Assert.Equal("Este plan no requiere pre-registro.", f["sanic_mensaje"]);
+            });
+        }
+
+        [Fact]
+        public void Dn06_un_plan_grabado_sin_canal_ni_preregistro_se_valida_como_antes()
+        {
+            // El Mundo siembra los planes SIN las columnas nuevas: es el ambiente recién parchado, antes del paso de datos.
+            var m = new Mundo(Excel(Fila()));
+            var r = m.Correr();
+            Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            Assert.Equal("estructura=1;listas=1;obligatoriedad=1;formatos=1;largos=1", m.Solicitud()["sanic_versionparametros"]);
+        }
+
+        [Fact]
+        public void Dn06_una_fila_de_conectividad_sin_el_parametro_es_un_error_real_que_lo_nombra_antes_de_escribir()
+        {
+            var m = new Mundo(Excel(Fila()));
+            CambiarPlan(m, ("sanic_canal", new OptionSetValue((int)Canal.Conectividad)));
+
+            var ex = Assert.ThrowsAny<InvalidOperationException>(() => m.Correr());
+
+            Assert.Contains("plantilla.obligatoriedad.conectividad", ex.Message);
+            Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
+            Assert.Empty(m.Filas());
+        }
+
+        [Fact]
+        public void Dn06_una_fila_de_conectividad_usa_su_matriz_y_la_version_queda_registrada()
+        {
+            // La matriz de Conectividad de esta prueba exige la referencia, que Fila() deja vacía; la de siempre no.
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroObligatoriedadConectividad, @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""moneda""}]}", version: 2);
+            CambiarPlan(m, ("sanic_canal", new OptionSetValue((int)Canal.Conectividad)));
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.Rechazada, 1, 0, 1), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            Assert.StartsWith("Faltan datos obligatorios:", (string)Assert.Single(m.Filas())["sanic_mensaje"]);
+            Assert.Equal("estructura=1;listas=1;obligatoriedad=1;formatos=1;largos=1;obligatoriedadconectividad=2", m.Solicitud()["sanic_versionparametros"]);
+        }
+
+        [Fact]
+        public void Dn06_con_el_parametro_cargado_una_fila_de_banca_en_linea_sigue_usando_la_matriz_de_siempre()
+        {
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroObligatoriedadConectividad, @"{""porDefecto"":""obligatorio"",""opcionales"":[{""campo"":""moneda""}]}");
+
+            var r = m.Correr();
+
+            Assert.Equal((EstadoDeLaSolicitud.EnProceso, 1, 1, 0), (r.Estado, r.FilasTotales, r.FilasValidas, r.FilasRechazadas));
+            Assert.Equal("estructura=1;listas=1;obligatoriedad=1;formatos=1;largos=1;obligatoriedadconectividad=1", m.Solicitud()["sanic_versionparametros"]);
+        }
+
+        [Fact]
+        public void Dn06_el_parametro_de_conectividad_mal_cargado_es_un_error_real_aunque_ninguna_fila_lo_use()
+        {
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroObligatoriedadConectividad, "{no es json");
+
+            Assert.ThrowsAny<Exception>(() => m.Correr());
+            Assert.Equal(EstadoDeLaSolicitud.Ingresada, m.Estado());
+            Assert.Empty(m.Filas());
+        }
+    }
 }
 }

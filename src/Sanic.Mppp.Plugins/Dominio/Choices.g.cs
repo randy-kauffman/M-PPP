@@ -25,6 +25,15 @@ namespace Sanic.Mppp.Plugins.Dominio
         ATLANTIDA = 159460008,
     }
 
+    /// <summary>Choice global <c>sanic_mppp_ch_canal</c> (CH - MPPP - Canal).</summary>
+    public enum Canal
+    {
+        /// <summary>Banca en Linea</summary>
+        BancaEnLinea = 159460001,
+        /// <summary>Conectividad</summary>
+        Conectividad = 159460002,
+    }
+
     /// <summary>Choice global <c>sanic_mppp_ch_clasificacion</c> (CH - MPPP - Clasificacion).</summary>
     public enum Clasificacion
     {

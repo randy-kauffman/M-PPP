@@ -62,13 +62,13 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
 
         // ================================================================================================ estructuras
         [Fact]
-        public void La_estructura_de_la_carga_son_las_once_columnas_mas_Resultado_en_L()
+        public void La_estructura_de_la_carga_son_las_trece_columnas_mas_Resultado_en_N()
         {
             var e = EstructuraDeExcelDeCatalogo.Carga;
             Assert.Equal("CargaCatalogos", e.Hoja);
-            Assert.Equal(ColumnasDeCarga.Todas.Select(c => (c.Letra, c.Campo, c.Encabezado)).Concat(new[] { ("L", "resultado", "Resultado") }),
+            Assert.Equal(ColumnasDeCarga.Todas.Select(c => (c.Letra, c.Campo, c.Encabezado)).Concat(new[] { ("N", "resultado", "Resultado") }),
                 e.Columnas.Select(c => (c.Letra, c.Campo, c.Encabezado)));
-            Assert.Equal("L", e.ColumnaResultado.Letra);
+            Assert.Equal("N", e.ColumnaResultado.Letra); // DN-06: L y M son Canal y Requiere preregistro
             Assert.Throws<NotSupportedException>(() => ((ICollection<ColumnaDeCatalogo>)e.Columnas).Clear());
         }
 
@@ -123,7 +123,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var e = EstructuraDeExcelDeCatalogo.Carga;
             var filas = new[]
             {
-                Fila(5, ("A", "123"), ("H", "juan@empresa.com"), ("L", "un resultado viejo que se reemplaza")),
+                Fila(5, ("A", "123"), ("H", "juan@empresa.com"), ("N", "un resultado viejo que se reemplaza")),
                 Fila(2, ("A", "000123"), ("C", "=SUMA(A1)"), ("K", "  ")),
                 Fila(3, ("B", "ABC123456001"), ("E", "0A12")),
             };
@@ -139,9 +139,9 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.All(celdas.Values, c => Assert.False(c.formula, "ninguna celda puede ser fórmula"));
             Assert.All(celdas.Values, c => Assert.True(c.tipo == CellValues.SharedString || c.tipo == CellValues.InlineString, "toda celda es texto"));
             Assert.False(celdas.ContainsKey("K2"), "una celda en blanco no se escribe");
-            Assert.Equal("Creado: cliente", celdas["L2"].texto);
-            Assert.Equal("Error: Codigo plan: algo", celdas["L3"].texto);
-            Assert.StartsWith("Sin errores", celdas["L5"].texto);
+            Assert.Equal("Creado: cliente", celdas["N2"].texto);
+            Assert.Equal("Error: Codigo plan: algo", celdas["N3"].texto);
+            Assert.StartsWith("Sin errores", celdas["N5"].texto);
             Assert.Equal("juan@empresa.com", celdas["H5"].texto);
 
             // Bajar, corregir y volver a subir: el lector estricto lo acepta y lee los mismos valores en las mismas filas.
@@ -215,7 +215,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var archivo = ArmadorDeExcelDeCatalogos.Resultado(e, new[] { Fila(2, ("C", "a\u0001b 😀")) }, new Dictionary<int, string> { [2] = "Error: x\u0002y \uD800 z" });
             var celdas = Celdas(archivo, e.Hoja);
             Assert.Equal("a\uFFFDb 😀", celdas["C2"].texto);
-            Assert.Equal("Error: x\uFFFDy \uFFFD z", celdas["L2"].texto);
+            Assert.Equal("Error: x\uFFFDy \uFFFD z", celdas["N2"].texto);
             Assert.True(Releer(archivo, e).EsValido);
         }
 
