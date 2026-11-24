@@ -1,6 +1,6 @@
 {
   "triggers": {
-    "Cuando_lo_llama_un_flujo": {
+    "manual": {
       "type": "Request",
       "kind": "Button",
       "inputs": {
