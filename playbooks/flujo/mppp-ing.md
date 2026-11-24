@@ -16,8 +16,13 @@ idempotentes.
 `Guardar_el_identificador_nuevo` corre tambien si mover fallo (DF-04): el identificador de Outlook
 CAMBIA al mover, y si no se pudo mover sirve el original.
 
-Todo va dentro de un ambito Try; el Catch escribe la Bitacora con el evento Error y **los nombres
-de las acciones que fallaron, nunca el cuerpo del correo ni datos de la plantilla**.
+Dos ambitos (D-79, 2026-11-23). `Ingerir` llega hasta `Guardar_el_identificador_nuevo`; si falla, su
+Catch (`Si_algo_fallo`) escribe la Bitacora con el evento Error, **nunca el cuerpo del correo ni datos
+de la plantilla**, y el flujo termina fallido (el correo sigue en la bandeja: reintentar sirve).
+`Procesar` (clasificar, Bitacora Ingresada, validar) corre si `Ingerir` salio bien; si falla,
+`Si_fallo_el_procesamiento` escribe la Bitacora Error vinculada a la Solicitud y **el flujo igual
+responde al que llama**: el correo ya se movio, su identificador original ya no existe, y el reintento
+lo hace `MPPP-VIG` sobre la Solicitud.
 
 ## Dos cosas que NO estan verificadas, y hay que mirarlas en la primera corrida
 
