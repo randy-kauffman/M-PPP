@@ -35,6 +35,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.26.0 (2026-11-24)**: D-81: plan vacío → 'Falta el número de plan.' (PLAN_EXISTE sin marcadores). D-82: la fecha del acuse sale en la zona de `respuesta.zonahoraria` (opcional, -06:00 por defecto). Mismos tipos, sin steps nuevos.
 
+**1.0.27.0 (2026-11-24)**: DN-06: regla PLAN_REQUIERE_PREREGISTRO, obligatoriedad por canal del plan (`plantilla.obligatoriedad.conectividad`, opcional), lectura tolerante de `sanic_canal` y `sanic_requierepreregistro`, carga masiva con L Canal y M Requiere preregistro (Resultado en N). Mismos tipos, sin steps nuevos. Después del despliegue: `herramientas/despliegue/dn06_datos.py`.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el

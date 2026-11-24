@@ -138,7 +138,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         {
             var unos = ReglasDeRegistro.Evaluadores();
             // DN-05 (2026-10-06): cinco evaluadores más. FORMATO_11_SOLO_ACH sigue mientras el catálogo de Dev la tenga activa.
-            var esperados = Semilla.Select(s => s.codigo).Concat(Dn05Aceptacion.CodigosNuevos);
+            // DN-06 (2026-11-24): más PLAN_REQUIERE_PREREGISTRO.
+            var esperados = Semilla.Select(s => s.codigo).Concat(Dn05Aceptacion.CodigosNuevos).Concat(new[] { ReglasDeRegistro.PlanRequierePreregistro });
             Assert.Equal(esperados.OrderBy(c => c, StringComparer.Ordinal), unos.Select(e => e.Codigo).OrderBy(c => c, StringComparer.Ordinal));
             Assert.Empty(unos.Intersect(ReglasDeRegistro.Evaluadores()));
             Assert.Equal(EstadosPorReglas.CodigoAutorizacion, ReglasDeRegistro.AutorizacionCorreoPlan);
