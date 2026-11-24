@@ -38,7 +38,7 @@ const OPCION_CARGAR = ["Cargar archivo", "Upload file"];
 const OPCION_PLANTILLA = ["Descargar plantilla", "Download template"];
 
 const ENCABEZADOS_CARGA = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecutivo", "Codigo plan", "Tipo formato",
-  "Moneda", "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"];
+  "Moneda", "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Canal", "Requiere preregistro", "Resultado"]; // DN-06
 const ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"];
 
 // L-04: los menús siguen el idioma de la interfaz (`$LocLabels`, D-74 cerrada el 2026-10-02). Con la interfaz en inglés
@@ -355,7 +355,7 @@ test.describe("DN-04 — menús de catálogos (Administrador de planes)", () => 
     await descarga.saveAs(ruta);
     const { filas } = await leerXlsx(ruta);
     expect(filas.length).toBe(1);
-    expect(filas[0][11], "La columna Resultado (L) de la fila con error").toMatch(/^Error: /);
+    expect(filas[0][13], "La columna Resultado (N) de la fila con error").toMatch(/^Error: /);
 
     const { texto } = await textoDelDialogo(page);
     expect(texto).toMatch(/No se grabó nada|Nothing was saved/);
@@ -517,8 +517,8 @@ test.describe("DN-04 — carga y cambio de estado que graban (L-09, Administrado
       await descarga.saveAs(ruta);
       const { filas } = await leerXlsx(ruta);
       expect(filas.length, "El resultado tiene una fila por cada fila de datos del archivo subido.").toBe(2);
-      expect(filas[0][11], "Columna Resultado (L) de la fila 2: crea el cliente, el plan, el correo y la autorización.").toMatch(/^Creado: cliente, plan, correo, autorización/);
-      expect(filas[1][11], "Columna Resultado (L) de la fila 3: el cliente 999980005 existe INACTIVO, no se crea nada y se advierte.").toMatch(/^Sin cambios.*Advertencia: .*inactivo/);
+      expect(filas[0][13], "Columna Resultado (N) de la fila 2: crea el cliente, el plan, el correo y la autorización.").toMatch(/^Creado: cliente, plan, correo, autorización/);
+      expect(filas[1][13], "Columna Resultado (N) de la fila 3: el cliente 999980005 existe INACTIVO, no se crea nada y se advierte.").toMatch(/^Sin cambios.*Advertencia: .*inactivo/);
 
       // El resumen, con el texto EXACTO del JS: 1 cliente, 1 plan, 1 correo y 1 autorización creados, más la advertencia de
       // la fila 3. `exact: true` exige que el elemento diga eso y nada más.

@@ -91,7 +91,8 @@ SPEC_GUI = "dn-04-catalogos-masivos"
 PAPELES = ["admin_planes", "ejecutivo", "supervisor", "admin_tecnico"]
 
 ENCABEZADOS_CARGA = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecutivo", "Codigo plan", "Tipo formato", "Moneda",
-                     "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"]
+                     "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Canal", "Requiere preregistro",
+                     "Resultado"]  # DN-06: Canal (L) y Requiere preregistro (M); Resultado pasa a N
 ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"]
 
 # Títulos de los `describe` del spec (los casos exigen sus pruebas por título EXACTO: un título que cambia sin
@@ -633,8 +634,12 @@ def l43(ctx):
 # Casos con la Web API y sesiones reales
 # ===========================================================================
 def _fila_carga(cif_bac, cif_com, razon, correo_ejecutivo, plan="", formato="", moneda="", correo="", contacto="",
-                fecha="", comentarios=""):
-    return [cif_bac, cif_com, razon, correo_ejecutivo, plan, formato, moneda, correo, contacto, fecha, comentarios]
+                fecha="", comentarios="", canal=None, preregistro=""):
+    # DN-06: el canal es obligatorio al crear un plan. Con plan y sin canal explícito va "Banca en Linea", que también es
+    # lo que tiene grabado todo plan existente después del backfill (la carga no lo modifica: igual pasa).
+    if canal is None:
+        canal = "Banca en Linea" if plan else ""
+    return [cif_bac, cif_com, razon, correo_ejecutivo, plan, formato, moneda, correo, contacto, fecha, comentarios, canal, preregistro]
 
 
 def _peor_caso(ctx, digito, n, letra_plan, letra_com, prefijo_correo):

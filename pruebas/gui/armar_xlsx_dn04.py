@@ -10,7 +10,8 @@ import io, os, zipfile
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DESTINO = os.path.join(AQUI, "datos", "dn04")
 ENCABEZADOS = ["CIF BAC", "CIF COM", "Razon social", "Correo ejecutivo", "Codigo plan", "Tipo formato", "Moneda",
-               "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Resultado"]
+               "Correo", "Nombre contacto", "Fecha documento", "Comentarios", "Canal", "Requiere preregistro",
+               "Resultado"]  # DN-06: L Canal, M Requiere preregistro; Resultado en N
 ENCABEZADOS_ESTADO = ["Tipo", "Accion", "CIF BAC", "CIF COM", "Codigo plan", "Correo", "Resultado"]
 # Correo de "# User 1" (el ejecutivo dueño del cliente nuevo). Se verificó contra `systemusers` de Dev el 2026-10-02; si
 # el usuario cambia de correo, la fila 2 de `dn04-carga-ok.xlsx` falla con la regla 4 (ejecutivo no habilitado).
@@ -51,7 +52,8 @@ def main():
         # INACTIVO: no crea nada y provoca la advertencia de cliente inactivo.
         "dn04-carga-ok.xlsx": xlsx("CargaCatalogos", [encabezado,
             (2, [("A2", "999980004"), ("B2", "ZZPCA0004001"), ("C2", "ZZP-Cliente 4"), ("D2", CORREO_EJECUTIVO),
-                 ("E2", "PZ04"), ("F2", "10"), ("G2", "USD"), ("H2", "zz-l-ana@pruebas.mppp.local"), ("I2", "Ana ZZP")]),
+                 ("E2", "PZ04"), ("F2", "10"), ("G2", "USD"), ("H2", "zz-l-ana@pruebas.mppp.local"), ("I2", "Ana ZZP"),
+                 ("L2", "Banca en Linea")]),
             (3, [("A3", "999980005"), ("B3", "ZZPCA0005001")])]),
         # L-09 paso 4: desactiva el cliente que creó la carga anterior y "activa" el correo que ya está activo (sin cambios).
         "dn04-estado-ok.xlsx": xlsx("ActivarDesactivar", [encabezado_estado,
