@@ -861,7 +861,7 @@ al ensamblado viejo.**
 Recibida el **2026-11-24** del aprobador. Cierra los escenarios **9** (canal de pago) y **12** (requiere pre-registro)
 que DN-05 dejó pendientes. Mapa de impacto relevado contra el código el mismo día.
 
-**Estado: APROBADO el 2026-11-24. Construido y desplegado en Dev el mismo día (ensamblado 1.0.27.0, `dn06_datos.py` corrido, set R en vivo con R-39..R-41 OK). Viaja en el parche `sanic_mppp_sol_parche_1_3_1` 1.3.1.1 (`solution/sanic_mppp_sol_parche_1_3_1_1_unmanaged.zip`). Carga masiva y formularios probados a mano por el aprobador en Dev el mismo día (plantilla de 13 columnas, alta con canal y pre-registro, errores sin grabar, valor del parámetro expandido); verificado lo grabado y borrados los planes de prueba ZD61 y ZD62. El set L automático quedó sin correr (sesiones vencidas).**
+**Estado: APROBADO el 2026-11-24. Construido y desplegado en Dev el mismo día (ensamblado 1.0.27.0, `dn06_datos.py` corrido, set R en vivo 41/41 OK, con R-39..R-41 de DN-06). Viaja en el parche `sanic_mppp_sol_parche_1_3_1` 1.3.1.1 (`solution/sanic_mppp_sol_parche_1_3_1_1_unmanaged.zip`). Carga masiva y formularios probados a mano por el aprobador en Dev el mismo día (plantilla de 13 columnas, alta con canal y pre-registro, errores sin grabar, valor del parámetro expandido); verificado lo grabado y borrados los planes de prueba ZD61 y ZD62. El set L automático quedó sin correr (sesiones vencidas).**
 
 ## Decisiones del aprobador (2026-11-24)
 
