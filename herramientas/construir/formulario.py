@@ -204,9 +204,9 @@ def _validar_estructura(datos):
     for i, s in enumerate(secciones):
         aqui = f"la sección [{i}]"
         exigir_forma(s, dict, aqui, "seccion")
-        sobran = sorted(set(s) - {"titulo", "campos", "subgrilla", "webresource"})
+        sobran = sorted(set(s) - {"titulo", "campos", "subgrilla", "webresource", "expandir"})
         if sobran or "titulo" not in s:
-            raise ErrorPlaybook(f"{aqui}: se admite {{titulo, campos, subgrilla, webresource}}; falta 'titulo' o sobra {sobran}")
+            raise ErrorPlaybook(f"{aqui}: se admite {{titulo, campos, subgrilla, webresource, expandir}}; falta 'titulo' o sobra {sobran}")
         exigir_forma(s["titulo"], str, aqui, "titulo", no_vacio=True)
         exigir_sin_tildes(s["titulo"], f"{aqui}.titulo")
         cuantos = sum(1 for c in ("campos", "subgrilla", "webresource") if c in s)
@@ -224,6 +224,13 @@ def _validar_estructura(datos):
             if not 1 <= wr["alto"] <= 20:
                 raise ErrorPlaybook(f"{aqui}.webresource: 'alto' va en filas, entre 1 y 20")
 
+        if "expandir" in s:
+            # DN-06: un campo que ocupa todo el alto disponible. Solo tiene sentido con un campo solo en la
+            # sección; `bool` es subclase de `int` en Python, por eso se descarta aparte.
+            if "campos" not in s or not isinstance(s["campos"], list) or len(s["campos"]) != 1:
+                raise ErrorPlaybook(f"{aqui}: 'expandir' va en una sección con un solo campo")
+            if type(s["expandir"]) is not int or not 2 <= s["expandir"] <= 40:
+                raise ErrorPlaybook(f"{aqui}: 'expandir' es el alto mínimo en filas, un entero entre 2 y 40")
         if "campos" in s:
             for columna in exigir_forma(s["campos"], [str], aqui, "campos", no_vacio=True):
                 if columna in columnas_vistas:
@@ -252,9 +259,13 @@ def validar_playbook(datos):
 # ---------------------------------------------------------------------------
 # Generación del formxml
 # ---------------------------------------------------------------------------
-def _celda(datos, ruta, columna, etiqueta, classid, deshabilitado):
+def _celda(datos, ruta, columna, etiqueta, classid, deshabilitado, expandir=None):
+    """`expandir` (DN-06): alto mínimo en filas y `auto="true"` para que use el espacio disponible.
+    Es la misma marca que llevan los memo de los formularios de sistema del entorno (contact,
+    importmap, kbarticletemplate, leídos en Dev el 2026-11-24). Sin `expandir`, la celda es la de siempre."""
+    alto = f'rowspan="{expandir}" auto="true"' if expandir else 'rowspan="1"'
     return (
-        f'<cell id="{guid(datos["nombre"], ruta, "cell")}" locklevel="0" colspan="1" rowspan="1" '
+        f'<cell id="{guid(datos["nombre"], ruta, "cell")}" locklevel="0" colspan="1" {alto} '
         f'labelid="{guid(datos["nombre"], ruta, "label")}">'
         f'<labels><label description={quoteattr(etiqueta)} languagecode="1033" /></labels>'
         f'<control id={quoteattr(columna)} classid="{classid}" datafieldname={quoteattr(columna)} '
@@ -312,7 +323,7 @@ def formxml(datos, etiquetas, controles, subgrillas):
         if "campos" in s:
             for j, columna in enumerate(s["campos"]):
                 partes.append("<row>" + _celda(datos, f"{ruta_sec}.{j}", columna, etiquetas[columna],
-                                               controles[columna], solo_lectura) + "</row>")
+                                               controles[columna], solo_lectura, s.get("expandir")) + "</row>")
         elif "webresource" in s:
             wr = s["webresource"]
             partes.append("<row>" + _celda_webresource(

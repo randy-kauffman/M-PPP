@@ -221,6 +221,49 @@ class WebResourceEnElFormulario(Base):
             webresource={"nombre": "sanic_mppp_wr_html_comunicacion"})]), "faltan ['alto']")
 
 
+class CampoExpandido(Base):
+    """DN-06: el `sanic_valor` del Parámetro tiene que ocupar todo el alto. La celda lleva
+    `rowspan` (alto mínimo) y `auto="true"` (usar el espacio disponible), igual que los memo de
+    los formularios de sistema del entorno (contact, importmap, kbarticletemplate; leídos el 2026-11-24)."""
+
+    def rechaza(self, componente, fragmento):
+        centinela = FabricaCentinela()
+        estado, _, detalle = fo.construir(self.escribir(componente), False, centinela)
+        self.assertEqual("error", estado, detalle)
+        self.assertIn(fragmento, detalle)
+        self.assertFalse(centinela.llamada)
+
+    def xml(self, secciones):
+        datos = comp(secciones=secciones)
+        return fo.formxml(datos, ETIQUETAS, {c: "{X}" for c in TIPOS}, {})
+
+    def test_la_celda_expandida_lleva_rowspan_y_auto(self):
+        x = self.xml([{"titulo": "Valor", "campos": ["sanic_mensaje"], "expandir": 20}])
+        self.assertIn('rowspan="20" auto="true"', x)
+
+    def test_una_seccion_sin_expandir_queda_igual_que_antes(self):
+        x = self.xml([{"titulo": "Datos", "campos": ["sanic_mensaje"]}])
+        self.assertIn('rowspan="1" labelid=', x)
+        self.assertNotIn('auto="true"', x)
+
+    def test_expandir_exige_un_solo_campo(self):
+        self.rechaza(comp(secciones=[{"titulo": "Valor", "campos": ["sanic_mensaje", "sanic_gestion"],
+                                      "expandir": 20}]), "un solo campo")
+
+    def test_expandir_no_va_con_subgrilla(self):
+        self.rechaza(comp(secciones=[{"titulo": "Filas", "expandir": 20, "subgrilla": {
+            "tabla": "x", "lookup": "y", "vista": "z"}}]), "un solo campo")
+
+    def test_expandir_fuera_de_rango_se_rechaza(self):
+        for malo in (1, 41):
+            self.rechaza(comp(secciones=[{"titulo": "Valor", "campos": ["sanic_mensaje"], "expandir": malo}]),
+                         "entre 2 y 40")
+
+    def test_expandir_tiene_que_ser_entero(self):
+        self.rechaza(comp(secciones=[{"titulo": "Valor", "campos": ["sanic_mensaje"], "expandir": True}]),
+                     "entre 2 y 40")
+
+
 class ValidacionOffline(Base):
     def rechaza(self, componente, fragmento):
         centinela = FabricaCentinela()
