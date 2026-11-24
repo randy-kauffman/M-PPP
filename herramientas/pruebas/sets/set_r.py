@@ -16,7 +16,7 @@ candidato, y qué le corresponde a este archivo frente al set dedicado
 conclusión ya se tomó).
 
 **DN-05 (2026-10-06, desplegado en Dev con el ensamblado 1.0.23.0)**: reescribe R-10, R-12, R-18, R-20 y R-21
-contra la matriz de obligatoriedad v3 y los formatos del plan, y agrega R-29..R-38 (un caso por comportamiento
+contra la matriz de obligatoriedad v3 y los formatos del plan, y agrega R-29..R-38 (DN-05) y R-39..R-41 (DN-06) (un caso por comportamiento
 nuevo). Las reglas nuevas de fila son `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO` (reemplaza a
 `FORMATO_11_SOLO_ACH`, que quedó inactiva), `BANCO_DEL_FORMATO`, `CARACTERES_PERMITIDOS` y `CUENTA_DEL_BANCO`
 (`diseno/DIRECTRICES-NUEVAS.md`, DN-05).
@@ -1175,6 +1175,82 @@ def r38(ctx):
     return c
 
 
+# ===========================================================================
+# DN-06 (aprobador, 2026-11-24): canal y pre-registro del plan
+# ===========================================================================
+PLANES = "sanic_mppp_tbl_plans"
+CANAL_BANCA, CANAL_CONECTIVIDAD = 159460001, 159460002
+
+
+class _PlanCambiado:
+    """Cambia columnas de un plan del fixture y las DEVUELVE a lo que tenían al salir, pase lo que pase."""
+
+    def __init__(self, dv, codigo, **cambios):
+        self.dv, self.codigo, self.cambios = dv, codigo, cambios
+
+    def __enter__(self):
+        cols = ",".join(self.cambios)
+        est, r, _ = self.dv.call("GET", f"{PLANES}?$select={cols}&$filter=sanic_codigo eq '{self.codigo}'")
+        if est != 200 or len(r.get("value", [])) != 1:
+            raise RuntimeError(f"no encuentro el plan {self.codigo}: HTTP {est} {r}")
+        fila = r["value"][0]
+        self.id = fila["sanic_mppp_tbl_planid"]
+        self.antes = {k: fila.get(k) for k in self.cambios}
+        est, r, _ = self.dv.call("PATCH", f"{PLANES}({self.id})", self.cambios)
+        if est not in (200, 204):
+            raise RuntimeError(f"no pude cambiar el plan {self.codigo}: HTTP {est} {r}")
+        return self
+
+    def __exit__(self, *_):
+        self.dv.call("PATCH", f"{PLANES}({self.id})", self.antes)
+        return False
+
+
+def r39(ctx):
+    c = pc.Caso("R-39", "DN-06: plan con Requiere pre-registro = No — todas sus filas se rechazan con 'Este plan no requiere pre-registro.'")
+    with _PlanCambiado(ctx.dv, "PR11", sanic_requierepreregistro=False):
+        sid, filas = _enviar(ctx, "Prueba R-39", "ZZ-R39-plan-sin-preregistro.xlsx", [
+            genexcel.fila(plan="PR11", clasificacion="ACH", banco="LAFISE", cuenta="123456789", nombre="Sin Preregistro Uno"),
+            # además le falta el nombre: OBLIGATORIEDAD no tiene que hablar
+            genexcel.fila(plan="PR11", clasificacion="ACH", banco="LAFISE", cuenta="123456789", nombre=""),
+        ])
+    c.check("2 filas, ambas Rechazada en validación (no Sin autorización)",
+            len(filas) == 2 and all(f["sanic_estado"] == FILA_RECH_VAL for f in filas), _resumen(filas))
+    for num in (1, 2):
+        c.check(f"fila {num}: mensaje exacto 'Este plan no requiere pre-registro.'",
+                _mensaje_de(filas, num) == "Este plan no requiere pre-registro.", _mensaje_de(filas, num))
+    return c
+
+
+def r40(ctx):
+    c = pc.Caso("R-40", "DN-06: plan de canal Conectividad — usa plantilla.obligatoriedad.conectividad y lo registra en la versión")
+    with _PlanCambiado(ctx.dv, "PR06", sanic_canal=CANAL_CONECTIVIDAD):
+        sid, filas = _enviar(ctx, "Prueba R-40", "ZZ-R40-plan-conectividad.xlsx", [
+            genexcel.fila(gestion="Inclusion", plan="PR06", clasificacion="", nombre="Conectividad Seis Prueba",
+                          tipoid="", moneda="", banco=""),
+        ])
+    solicitud = sim.leer_solicitud(ctx.dv, sid)
+    version = solicitud.get("sanic_versionparametros") or ""
+    c.check("la fila se valida (la v1 de Conectividad es copia de la v3)",
+            len(filas) == 1 and filas[0]["sanic_estado"] == FILA_VALIDADA, _resumen(filas))
+    c.check("sanic_versionparametros termina en ';obligatoriedadconectividad=N'",
+            re.search(r";obligatoriedadconectividad=\d+$", version) is not None, version)
+    return c
+
+
+def r41(ctx):
+    c = pc.Caso("R-41", "DN-06: plan ajeno sin pre-registro — solo se dice que no está autorizado (D-41)")
+    with _PlanCambiado(ctx.dv, "PRNA", sanic_requierepreregistro=False):
+        sid, filas = _enviar(ctx, "Prueba R-41", "ZZ-R41-plan-ajeno-sin-preregistro.xlsx", [
+            genexcel.fila(plan="PRNA", clasificacion="ACH", banco="LAFISE", cuenta="123456789", nombre="Ajeno Sin Preregistro"),
+        ])
+    msg = _mensaje_de(filas, 1) or ""
+    c.check("1 fila, Sin autorización", len(filas) == 1 and filas[0]["sanic_estado"] == FILA_SIN_AUT, _resumen(filas))
+    c.check("el mensaje NO habla del pre-registro", "pre-registro" not in msg, msg)
+    return c
+
+
 CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18,
          r19, r20, r21, r22, r23, r24, r25, r26, r27, r28,
-         r29, r30, r31, r32, r33, r34, r35, r36, r37, r38]
+         r29, r30, r31, r32, r33, r34, r35, r36, r37, r38,
+         r39, r40, r41]

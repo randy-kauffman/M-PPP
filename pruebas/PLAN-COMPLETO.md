@@ -2396,6 +2396,20 @@ de aparición, sin repetir):
 **Cómo se verifica.** `python3 herramientas/pruebas/correr.py R`, casos `R-29` a `R-38`; a mano, `ver_solicitud.py`
 sobre la Solicitud de cada caso.
 
+### R-39 a R-41 — DN-06 (2026-11-24): canal y pre-registro del plan
+
+Cada caso cambia una columna de un plan del fixture **solo mientras dura** y la devuelve a lo que tenía al salir.
+
+| Caso | Qué se manda | Excel | Qué tiene que pasar |
+|---|---|---|---|
+| **R-39** | `PR11` con *Requiere pre-registro* = No: una fila buena y una sin nombre | `ZZ-R39-plan-sin-preregistro.xlsx` | 2 filas **Rechazada en validación** (no Sin autorización), las dos con el mensaje exacto *"Este plan no requiere pre-registro."*: OBLIGATORIEDAD no habla |
+| **R-40** | `PR06` con *Canal* = Conectividad: una Inclusión buena | `ZZ-R40-plan-conectividad.xlsx` | la fila **Validada** (la v1 de Conectividad es copia de la v3), y `sanic_versionparametros` termina en `;obligatoriedadconectividad=N` |
+| **R-41** | Plan ajeno `PRNA` con *Requiere pre-registro* = No | `ZZ-R41-plan-ajeno-sin-preregistro.xlsx` | **Sin autorización**, y el mensaje **no** habla del pre-registro (D-41) |
+
+**Cómo se verifica.** `python3 herramientas/pruebas/correr.py R`, casos `R-39` a `R-41`. El camino "fila de Conectividad
+sin el parámetro" (error real que lo nombra) no se prueba en vivo: obligaría a desactivar un parámetro compartido de Dev.
+Lo cubren las pruebas de aceptación (`Dn06Aceptacion`, `ValidarSolicitudAceptacion`).
+
 **Cómo se sabe que falló.** Un mensaje distinto del esperado (aunque el estado sea el correcto: lo lee un cliente del
 banco, `CONVENCIONES.md` §3); una fila que se valida sin que `sanic_clasificacion`/`sanic_banco` queden completados
 (R-31: la regla valida pero no guarda); en R-38, **cualquier** frase de una regla por formato en el mensaje: sería una
