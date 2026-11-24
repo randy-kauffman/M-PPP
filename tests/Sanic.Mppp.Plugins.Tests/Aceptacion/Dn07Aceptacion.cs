@@ -204,6 +204,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
         [InlineData(TipoDeIdentificacion.RUC, "J-0310000001234")]
         [InlineData(TipoDeIdentificacion.PAS, "AB.12345")]
         [InlineData(TipoDeIdentificacion.CNA, "00101018000０0R")] // un dígito de ancho completo: no es ASCII
+        [InlineData(TipoDeIdentificacion.PAS, "ABCıDEF")]          // i sin punto: en mayúscula sería una I ASCII
+        [InlineData(TipoDeIdentificacion.PAS, "ABCſDEF")]          // s larga: en mayúscula sería una S ASCII
         public void Con_caracteres_que_no_son_letras_o_digitos_ASCII_no_se_mira(TipoDeIdentificacion tipo, string numero)
         {
             // Lo rechaza CARACTERES_PERMITIDOS: el cliente no recibe dos motivos por lo mismo.

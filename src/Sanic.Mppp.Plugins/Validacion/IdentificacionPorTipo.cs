@@ -24,14 +24,18 @@ namespace Sanic.Mppp.Plugins.Validacion
                 return null;
             }
 
-            var valor = numero.Trim().ToUpperInvariant();
-            foreach (var c in valor)
+            // Primero se mira que todo sea ASCII y DESPUÉS se pasa a mayúscula: al revés, la 'ı' (i sin punto) o la 'ſ' (s larga)
+            // se convierten en 'I' y 'S' ASCII y pasarían como letras válidas (revisión del arquitecto, DN-07).
+            var recortado = numero.Trim();
+            foreach (var c in recortado)
             {
                 if (!EsLetraAscii(c) && !EsDigitoAscii(c))
                 {
                     return null;
                 }
             }
+
+            var valor = recortado.ToUpperInvariant();
 
             switch (tipo)
             {
