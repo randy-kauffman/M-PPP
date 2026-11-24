@@ -391,6 +391,50 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(0, m.Lector.Lecturas); // ni se abre: el tamaño se controla antes (LP-02)
         }
 
+        // Aprobador, 2026-11-24: un Excel pesado se rechaza SOLO por el peso, con este texto exacto. Antes el cliente recibía
+        // además "no tiene la estructura de la plantilla esperada... solicite la plantilla vigente", que era falso.
+        [Theory]
+        [InlineData(2L * 1024 * 1024, "El archivo de Excel pesa más de lo permitido (máximo 2 MB). Por favor, envíe un archivo más liviano.")]
+        [InlineData(10L * 1024 * 1024, "El archivo de Excel pesa más de lo permitido (máximo 10 MB). Por favor, envíe un archivo más liviano.")]
+        [InlineData(2621440L, "El archivo de Excel pesa más de lo permitido (máximo 2,5 MB). Por favor, envíe un archivo más liviano.")]
+        public void El_mensaje_de_peso_excedido_cita_el_maximo_configurado_en_megas(long maximoBytes, string esperado)
+        {
+            Assert.Equal(esperado, ValidarSolicitud.MensajeDePesoExcedido(maximoBytes));
+        }
+
+        [Fact]
+        public void Un_excel_mas_pesado_que_el_limite_le_dice_al_cliente_solo_que_pesa_demasiado()
+        {
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroLimites, @"{""maximoBytesComprimido"":10,""maximoBytesDescomprimido"":20}", version: 2);
+
+            m.Correr();
+
+            var estructura = m.Resultados().Single(x => (string)x["sanic_reglacodigo"] == ReglasDelSobre.EstructuraPlantilla);
+            Assert.Equal((int)ResultadoDeLaRegla.NoCumplida, estructura.GetAttributeValue<OptionSetValue>("sanic_resultado").Value);
+            Assert.Equal(ValidarSolicitud.MensajeDePesoExcedido(10), (string)estructura["sanic_razon"]);
+            Assert.DoesNotContain("estructura", (string)m.Solicitud()["sanic_acusecontenido"], StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Un_excel_que_pasa_el_tope_comprimido_pero_no_el_descomprimido_recibe_el_mismo_mensaje_de_peso_sin_jerga()
+        {
+            // LP-03: el lector lo rechaza por el tamaño declarado en el zip. Al cliente no le llega "bytes descomprimidos" ni
+            // "zip": recibe el mismo texto del peso, con el máximo del archivo que él manda (el comprimido).
+            var m = new Mundo(Excel(Fila()));
+            m.Parametro(ValidarSolicitud.ParametroLimites, @"{""maximoBytesComprimido"":10485760,""maximoBytesDescomprimido"":20}", version: 2);
+
+            var r = m.Correr();
+
+            Assert.Equal(EstadoDeLaSolicitud.Rechazada, r.Estado);
+            Assert.Equal(1, m.Lector.Lecturas);
+            var estructura = m.Resultados().Single(x => (string)x["sanic_reglacodigo"] == ReglasDelSobre.EstructuraPlantilla);
+            var razon = (string)estructura["sanic_razon"];
+            Assert.Equal(ValidarSolicitud.MensajeDePesoExcedido(10485760), razon);
+            Assert.DoesNotContain("zip", razon, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("bytes", razon, StringComparison.OrdinalIgnoreCase);
+        }
+
         // ------------------------------------------------------------------ idempotencia y errores
         [Theory]
         [InlineData(EstadoDeLaSolicitud.EnProceso)]

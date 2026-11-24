@@ -258,7 +258,9 @@ namespace Sanic.Mppp.Plugins.Api
         /// <summary>
         /// Baja el Excel de `sanic_exceloriginal` y lo lee. LP-02: un archivo más pesado que el límite NO revienta acá:
         /// vuelve como un resultado de lectura inválido, para que sea la regla ESTRUCTURA_PLANTILLA la que no se cumpla,
-        /// con un motivo para el cliente (diseno/03 §7).
+        /// con un motivo para el cliente (diseno/03 §7). Aprobador, 2026-11-24: el cliente recibe SOLO la frase del peso, con
+        /// el máximo configurado (<see cref="MensajeDePesoExcedido"/>), sea que el tope roto sea el comprimido (acá) o el
+        /// descomprimido LP-03 (el lector lo rechaza con un texto técnico, que se reemplaza por este mismo mensaje).
         /// </summary>
         private ResultadoLecturaPlantilla LeerPlantilla(Guid solicitudId, LimitesLectura limites, ConfiguracionPlantilla estructura, ILectorPlantilla lector)
         {
@@ -270,10 +272,31 @@ namespace Sanic.Mppp.Plugins.Api
             catch (ArchivoExcedeElMaximoException)
             {
                 return ResultadoLecturaPlantilla.ConError(
-                    "El archivo de Excel pesa más de lo permitido. Por favor, envíe un archivo más liviano.");
+                    TipoDeRechazoLectura.PesoExcedido, MensajeDePesoExcedido(limites.TamanoMaximoBytesEntrada));
             }
 
-            return lector.Leer(excel, estructura);
+            var lectura = lector.Leer(excel, estructura);
+            if (lectura.Rechazo == TipoDeRechazoLectura.PesoExcedido)
+            {
+                return ResultadoLecturaPlantilla.ConError(
+                    TipoDeRechazoLectura.PesoExcedido, MensajeDePesoExcedido(limites.TamanoMaximoBytesEntrada));
+            }
+
+            return lectura;
+        }
+
+        /// <summary>
+        /// Texto EXACTO para el cliente cuando el Excel pesa más que el tope (aprobador, 2026-11-24). El máximo va en megas:
+        /// entero si es exacto ("2"), si no con un decimal y coma ("2,5"). Formato independiente de la cultura del hilo.
+        /// </summary>
+        public static string MensajeDePesoExcedido(long maximoBytes)
+        {
+            const double BytesPorMega = 1048576d;
+            var formato = new NumberFormatInfo { NumberDecimalSeparator = "," };
+            var megas = maximoBytes % 1048576L == 0
+                ? (maximoBytes / 1048576L).ToString("0", formato)
+                : (maximoBytes / BytesPorMega).ToString("0.0", formato);
+            return "El archivo de Excel pesa más de lo permitido (máximo " + megas + " MB). Por favor, envíe un archivo más liviano.";
         }
 
         /// <summary>

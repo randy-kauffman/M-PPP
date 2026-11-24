@@ -144,6 +144,47 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal("El archivo no es la plantilla vigente (ESTRUCTURA_PLANTILLA). Falta la hoja 'Datos'. El encabezado de la columna C no es 'Gestion'.", razon);
         }
 
+        // ------------------------------------------------------------------ el archivo pesado (aprobador, 2026-11-24)
+        [Fact]
+        public void Un_rechazo_por_peso_le_habla_al_cliente_solo_del_peso_sin_el_texto_general_de_la_estructura()
+        {
+            // Antes: "no tiene la estructura de la plantilla esperada... solicite la plantilla vigente" + "pesa más de lo permitido".
+            // El archivo puede ser la plantilla correcta: lo único que falla es el peso, y eso es lo único que se le dice.
+            const string motivo = "El archivo de Excel pesa más de lo permitido (máximo 2 MB). Por favor, envíe un archivo más liviano.";
+            var lectura = ResultadoLecturaPlantilla.ConError(TipoDeRechazoLectura.PesoExcedido, motivo);
+
+            var rs = Correr(new SobreEnValidacion(1, 1, () => lectura));
+
+            Assert.Equal("CCCNO", Letras(rs));
+            Assert.Equal(motivo, rs[3].Razon);
+        }
+
+        [Fact]
+        public void Un_rechazo_por_peso_con_varios_motivos_los_junta_en_su_orden_sin_el_texto_general()
+        {
+            var lectura = ResultadoLecturaPlantilla.ConErrores(TipoDeRechazoLectura.PesoExcedido, new List<string> { "Uno.", "Dos." });
+
+            var veredicto = Evaluador(ReglasDelSobre.EstructuraPlantilla).Evaluar(new SobreEnValidacion(1, 1, () => lectura));
+
+            Assert.False(veredicto.Cumple);
+            Assert.Equal("Uno. Dos.", veredicto.Razon);
+            Assert.True(string.IsNullOrEmpty(veredicto.Precision));
+        }
+
+        [Theory]
+        [InlineData(TipoDeRechazoLectura.HojaInexistente)]
+        [InlineData(TipoDeRechazoLectura.Encabezado)]
+        [InlineData(TipoDeRechazoLectura.ArchivoIlegible)]
+        public void Cualquier_otro_rechazo_sigue_con_el_texto_general_de_la_estructura_y_el_motivo_del_lector(TipoDeRechazoLectura tipo)
+        {
+            var lectura = ResultadoLecturaPlantilla.ConError(tipo, "Falta la hoja 'Datos'.");
+
+            var razon = Correr(new SobreEnValidacion(1, 1, () => lectura))[3].Razon;
+
+            Assert.StartsWith("El archivo de Excel no tiene la estructura de la plantilla esperada.", razon);
+            Assert.EndsWith(" Falta la hoja 'Datos'.", razon);
+        }
+
         [Fact]
         public void Una_plantilla_valida_sin_ninguna_fila_con_datos_falla_tiene_filas()
         {

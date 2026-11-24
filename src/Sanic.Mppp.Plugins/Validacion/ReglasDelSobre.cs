@@ -186,7 +186,9 @@ namespace Sanic.Mppp.Plugins.Validacion
         /// ESTRUCTURA_PLANTILLA = hay exactamente un Excel Y el lector de 7.2 lo da por válido (diseno/02 §2.6). Sin exactamente
         /// un Excel no se abre nada (contrato de la pieza, ni por el motor ni suelto): eso ya lo dice UN_SOLO_EXCEL. Si el lector
         /// lo rechaza, la PRECISIÓN son sus Errores, todos y en su orden, separados por un espacio — nunca su DetalleTecnico
-        /// (diseno/03 §1 "Errores": ese detalle es solo para la traza).
+        /// (diseno/03 §1 "Errores": ese detalle es solo para la traza). Excepción (aprobador, 2026-11-24): si el rechazo es
+        /// PesoExcedido, la razón al cliente son SOLO los motivos del lector, sin el texto general de la estructura (que sería
+        /// falso: el archivo no tiene un problema de estructura) y sin precisión.
         /// </summary>
         private sealed class EstructuraPlantillaEvaluador : IEvaluador<SobreEnValidacion>
         {
@@ -211,6 +213,11 @@ namespace Sanic.Mppp.Plugins.Validacion
                 }
 
                 var precision = string.Join(" ", lectura.Errores);
+                if (lectura.Rechazo == TipoDeRechazoLectura.PesoExcedido && !string.IsNullOrWhiteSpace(precision))
+                {
+                    return Veredicto.NoCumplida(precision);
+                }
+
                 return Veredicto.NoCumplida(RazonPorDefecto, null, precision);
             }
         }
