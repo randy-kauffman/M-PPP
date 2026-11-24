@@ -37,6 +37,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.27.0 (2026-11-24)**: DN-06: regla PLAN_REQUIERE_PREREGISTRO, obligatoriedad por canal del plan (`plantilla.obligatoriedad.conectividad`, opcional), lectura tolerante de `sanic_canal` y `sanic_requierepreregistro`, carga masiva con L Canal y M Requiere preregistro (Resultado en N). Mismos tipos, sin steps nuevos. Después del despliegue: `herramientas/despliegue/dn06_datos.py`.
 
+**1.0.28.0 (2026-11-24)**: DN-07: regla IDENTIFICACION_DEL_TIPO (CNA con fecha y Módulo 23, RUC, PAS y PEX). Mismos tipos, sin steps nuevos. Después del despliegue: `herramientas/despliegue/dn07_datos.py`.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
