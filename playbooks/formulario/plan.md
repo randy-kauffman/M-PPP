@@ -42,7 +42,9 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
       "campos": [
         "sanic_nombre",
         "sanic_moneda",
-        "sanic_tipoformato"
+        "sanic_tipoformato",
+        "sanic_canal",
+        "sanic_requierepreregistro"
       ]
     },
     {
@@ -56,6 +58,8 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
   ]
 }
 ```
+
+DN-06 (2026-11-24): suma `sanic_canal` y `sanic_requierepreregistro` al final de la sección "Datos".
 
 ## 3. Precondiciones
 

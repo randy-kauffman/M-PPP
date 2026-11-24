@@ -39,15 +39,23 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
   ],
   "secciones": [
     {
-      "titulo": "Valor",
+      "titulo": "Descripcion",
       "campos": [
-        "sanic_valor",
         "sanic_descripcion"
       ]
+    },
+    {
+      "titulo": "Valor",
+      "campos": [
+        "sanic_valor"
+      ],
+      "expandir": 20
     }
   ]
 }
 ```
+
+DN-06 (2026-11-24): la descripción va arriba, y `sanic_valor` va solo en la última sección con `expandir: 20`. La celda sale con `rowspan="20" auto="true"`: 20 filas como mínimo, y el resto del alto disponible. Es la misma marca que llevan los memo de los formularios de sistema del entorno. Antes, `sanic_valor` era una celda de una fila, y el JSON del parámetro no se podía leer.
 
 ## 3. Precondiciones
 

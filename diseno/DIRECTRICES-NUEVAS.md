@@ -883,8 +883,9 @@ que DN-05 dejó pendientes. Mapa de impacto relevado contra el código el mismo 
   Sin tilde (BP-PP-197, `choice_global.py` la rechaza; y `generar_enums.py` genera el enum `Canal` a partir de la etiqueta).
 - **Plan** (`sanic_mppp_tbl_plan`), dos columnas con `tabla.py --agregar-columnas`:
   - `sanic_requierepreregistro`: sí/no, requerida, por defecto Sí.
-  - `sanic_canal`: choice `sanic_mppp_ch_canal`, requerida, por defecto Banca en Linea.
-  - Las filas que ya existen quedan **vacías** en las dos: el valor por defecto rige solo para las nuevas. De ahí el
+  - `sanic_canal`: choice `sanic_mppp_ch_canal`, requerida, **sin valor por defecto** (la decisión 3 no lo pide y
+    `tabla.py` no soporta un defecto en columnas choice): quien crea un plan elige el canal.
+  - Las filas que ya existen quedan **vacías** en las dos: el valor por defecto del sí/no rige solo para las nuevas. De ahí el
     paso de datos (C) y la lectura tolerante (B).
 - **Formulario del Plan**: las dos columnas en la sección "Datos". **Vista "Planes activos"**: Canal y Requiere pre-registro.
 - **Formulario de Parámetro**: sección "Descripcion" con `sanic_descripcion` y, al final, sección "Valor" con

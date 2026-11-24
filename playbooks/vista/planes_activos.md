@@ -52,6 +52,14 @@ desde las columnas, el orden y el filtro.
     {
       "nombre": "sanic_tipoformato",
       "ancho": 120
+    },
+    {
+      "nombre": "sanic_canal",
+      "ancho": 130
+    },
+    {
+      "nombre": "sanic_requierepreregistro",
+      "ancho": 130
     }
   ],
   "orden": [
@@ -75,6 +83,8 @@ desde las columnas, el orden y el filtro.
   }
 }
 ```
+
+DN-06 (2026-11-24): suma las columnas Canal y Requiere pre-registro al final.
 
 ## 3. Precondiciones
 
