@@ -192,7 +192,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
             var consulta = new QueryExpression(Tablas.Plan)
             {
-                ColumnSet = new ColumnSet("sanic_codigo", "sanic_tipoformato", "sanic_moneda", "sanic_clienteid")
+                ColumnSet = new ColumnSet("sanic_codigo", "sanic_tipoformato", "sanic_moneda", "sanic_clienteid", "sanic_canal", "sanic_requierepreregistro")
             };
             consulta.Criteria.AddCondition("sanic_codigo", ConditionOperator.In, codigosLimpios.Cast<object>().ToArray());
             consulta.Criteria.AddCondition(ColumnaEstado, ConditionOperator.Equal, Tablas.Activo);
@@ -206,7 +206,9 @@ namespace Sanic.Mppp.Plugins.Datos
                     RequeridoTexto(registro, "sanic_codigo"),
                     RequeridoChoice<TipoDeFormatoDelPlan>(registro, "sanic_tipoformato"),
                     RequeridoChoice<Moneda>(registro, "sanic_moneda"),
-                    OpcionalReferencia(registro, "sanic_clienteid")?.Id));
+                    OpcionalReferencia(registro, "sanic_clienteid")?.Id,
+                    CanalTolerante(registro),
+                    RequierePreregistroTolerante(registro)));
             }
 
             return planes;
@@ -404,6 +406,32 @@ namespace Sanic.Mppp.Plugins.Datos
             }
 
             throw ErrorColumna(registro, columna);
+        }
+
+        /// <summary>
+        /// DN-06: `sanic_canal` del plan con lectura TOLERANTE. Ausente o nulo = <see cref="Canal.BancaEnLinea"/> (los planes que ya
+        /// existían quedan sin valor hasta el paso de datos; una lectura estricta tumbaría la validación entera). Un valor que no
+        /// es del choice sí es un error real que nombra la columna y el registro.
+        /// </summary>
+        internal static Canal CanalTolerante(Entity registro)
+        {
+            if (!registro.Contains("sanic_canal") || registro["sanic_canal"] == null)
+            {
+                return Canal.BancaEnLinea;
+            }
+
+            return RequeridoChoice<Canal>(registro, "sanic_canal");
+        }
+
+        /// <summary>DN-06: `sanic_requierepreregistro` con lectura TOLERANTE: ausente o nulo = Sí (verdadero).</summary>
+        internal static bool RequierePreregistroTolerante(Entity registro)
+        {
+            if (!registro.Contains("sanic_requierepreregistro") || registro["sanic_requierepreregistro"] == null)
+            {
+                return true;
+            }
+
+            return RequeridoValor<bool>(registro, "sanic_requierepreregistro");
         }
 
         internal static EntityReference RequeridoReferencia(Entity registro, string columna)

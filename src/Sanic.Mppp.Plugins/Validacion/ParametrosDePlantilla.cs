@@ -324,6 +324,12 @@ namespace Sanic.Mppp.Plugins.Validacion
     /// </summary>
     public sealed class ObligatoriedadPlantilla
     {
+        /// <summary>
+        /// DN-06 (aprobador, 2026-11-24): el parámetro con la matriz del canal Conectividad. Mismo esquema que `plantilla.obligatoriedad`.
+        /// Se exige solo cuando una fila es de un plan de Conectividad.
+        /// </summary>
+        public const string NombreParametroConectividad = "plantilla.obligatoriedad.conectividad";
+
         /// <summary>Todos los nombres válidos de campo (<see cref="CamposDeFila.Todos"/>), para no recalcularlos por cada opcional.</summary>
         private static readonly HashSet<string> CamposValidos = new HashSet<string>(CamposDeFila.Todos(), StringComparer.Ordinal);
 

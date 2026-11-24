@@ -10,13 +10,16 @@ namespace Sanic.Mppp.Plugins.Validacion
     /// <summary>Un plan ACTIVO del maestro (`sanic_mppp_tbl_plan`), tal como lo entrega la capa de datos. Sin SDK.</summary>
     public sealed class PlanDelCatalogo
     {
-        public PlanDelCatalogo(Guid id, string codigo, TipoDeFormatoDelPlan tipoFormato, Moneda moneda, Guid? clienteId = null)
+        public PlanDelCatalogo(Guid id, string codigo, TipoDeFormatoDelPlan tipoFormato, Moneda moneda, Guid? clienteId = null,
+            Canal canal = Canal.BancaEnLinea, bool requierePreregistro = true)
         {
             Id = id;
             Codigo = codigo;
             TipoFormato = tipoFormato;
             Moneda = moneda;
             ClienteId = clienteId;
+            Canal = canal;
+            RequierePreregistro = requierePreregistro;
         }
 
         public Guid Id { get; }
@@ -34,6 +37,18 @@ namespace Sanic.Mppp.Plugins.Validacion
         /// NUNCA se da por autorizado: no se inventa un cliente (mismo criterio de "nunca se adivina" de esta clase).
         /// </summary>
         public Guid? ClienteId { get; }
+
+        /// <summary>
+        /// DN-06 (aprobador, 2026-11-24): el canal del plan (`sanic_canal`). Decide qué matriz de obligatoriedad se usa. Ausente
+        /// = <see cref="Canal.BancaEnLinea"/>: es el valor de los planes que ya existían.
+        /// </summary>
+        public Canal Canal { get; }
+
+        /// <summary>
+        /// DN-06: `sanic_requierepreregistro`. Si es falso, la regla `PLAN_REQUIERE_PREREGISTRO` rechaza todas las filas del plan.
+        /// Ausente = verdadero (el valor de los planes que ya existían).
+        /// </summary>
+        public bool RequierePreregistro { get; }
     }
 
     /// <summary>
@@ -122,8 +137,12 @@ namespace Sanic.Mppp.Plugins.Validacion
             ModoDeAutorizacion modo = ModoDeAutorizacion.Plan,
             IEnumerable<Guid> clientesAutorizadosDelRemitente = null,
             FormatosDelPlan formatos = null,
-            LargosDeCuenta largosDeCuenta = null)
+            LargosDeCuenta largosDeCuenta = null,
+            ObligatoriedadPlantilla obligatoriedadConectividad = null)
         {
+            // DN-06: la matriz del canal Conectividad es OPCIONAL al armar el catálogo. Solo se exige (ObligatoriedadPara) cuando
+            // una fila es de un plan de Conectividad: así un ambiente sin el parámetro cargado sigue validando Banca en Linea.
+            ObligatoriedadConectividad = obligatoriedadConectividad;
             // DN-05: nulos admitidos para no romper a quien arma el catálogo sin ellos (pruebas, normalización de planes).
             // Una regla ACTIVA que los necesita y no los encuentra lanza InvalidOperationException (error de configuración,
             // falla cerrado): nunca se da por buena una fila que no se pudo comprobar.
@@ -233,6 +252,24 @@ namespace Sanic.Mppp.Plugins.Validacion
         public ListasPlantilla Listas { get; }
 
         public ObligatoriedadPlantilla Obligatoriedad { get; }
+
+        /// <summary>DN-06: `plantilla.obligatoriedad.conectividad`, la matriz del canal Conectividad. Puede ser nula (ver el constructor).</summary>
+        public ObligatoriedadPlantilla ObligatoriedadConectividad { get; }
+
+        /// <summary>
+        /// DN-06: la matriz de obligatoriedad del canal. Banca en Linea usa la de siempre; Conectividad usa su parámetro propio y,
+        /// si no está cargado, es un error real que lo nombra (falla cerrado: no se valida con la matriz equivocada).
+        /// </summary>
+        public ObligatoriedadPlantilla ObligatoriedadPara(Canal canal)
+        {
+            if (canal == Canal.Conectividad)
+            {
+                return ObligatoriedadConectividad ?? throw new InvalidOperationException(
+                    $"Falta el parámetro '{ObligatoriedadPlantilla.NombreParametroConectividad}' en el catálogo de validación: el plan es del canal Conectividad y no se puede comprobar la obligatoriedad.");
+            }
+
+            return Obligatoriedad;
+        }
 
         /// <summary>DN-05: `plan.formatos`. Puede ser nulo (ver el constructor). FIRMA DEL ARQUITECTO.</summary>
         public FormatosDelPlan Formatos { get; }
@@ -567,6 +604,9 @@ namespace Sanic.Mppp.Plugins.Validacion
         public const string MonedaDelPlan = "MONEDA_DEL_PLAN";
         public const string AutorizacionCorreoPlan = "AUTORIZACION_CORREO_PLAN";
 
+        /// <summary>DN-06 (aprobador, 2026-11-24): rechaza las filas de un plan que no requiere pre-registro.</summary>
+        public const string PlanRequierePreregistro = "PLAN_REQUIERE_PREREGISTRO";
+
         // DN-05 (aprobador, 2026-10-06). FIRMA DEL ARQUITECTO. FORMATO_11_SOLO_ACH queda en el código mientras el catálogo
         // de Dev la tenga activa (orden de despliegue de DN-05): CLASIFICACION_DEL_FORMATO la reemplaza.
         public const string ClasificacionDelFormato = "CLASIFICACION_DEL_FORMATO";
@@ -593,6 +633,7 @@ namespace Sanic.Mppp.Plugins.Validacion
                 new EvaluadorBancoDelFormato(),
                 new EvaluadorCaracteresPermitidos(),
                 new EvaluadorCuentaDelBanco(),
+                new EvaluadorPlanRequierePreregistro(),
             };
         }
 
@@ -816,7 +857,7 @@ namespace Sanic.Mppp.Plugins.Validacion
                 }
 
                 // DN-05: la clasificación EFECTIVA (la que se completó sola, si el formato admite una) y el banco efectivo.
-                var opcionales = fila.Catalogos.Obligatoriedad.CamposOpcionales(fila.Gestion, fila.ClasificacionEfectiva, fila.Plan?.TipoFormato);
+                var opcionales = fila.Catalogos.ObligatoriedadPara(fila.Plan?.Canal ?? Canal.BancaEnLinea).CamposOpcionales(fila.Gestion, fila.ClasificacionEfectiva, fila.Plan?.TipoFormato);
                 var faltantes = new List<string>();
 
                 foreach (var campo in CamposDeFila.Todos())
@@ -963,6 +1004,32 @@ namespace Sanic.Mppp.Plugins.Validacion
 
                 var marcadores = new Dictionary<string, string> { ["plan"] = plan.Codigo };
                 return Veredicto.NoCumplida($"Su correo no está autorizado sobre el plan {plan.Codigo}.", marcadores, null);
+            }
+        }
+
+        /// <summary>
+        /// `PLAN_REQUIERE_PREREGISTRO` (DN-06, aprobador 2026-11-24): un plan con Requiere pre-registro = No rechaza todas sus
+        /// filas. El texto no cita el plan ni lleva marcadores: es el del aprobador, tal cual. Depende de la autorización (solo
+        /// se le dice a un remitente autorizado sobre el plan, criterio D-41).
+        /// </summary>
+        private sealed class EvaluadorPlanRequierePreregistro : IEvaluador<FilaEnValidacion>
+        {
+            public string Codigo => PlanRequierePreregistro;
+
+            public Veredicto Evaluar(FilaEnValidacion fila)
+            {
+                if (fila == null)
+                {
+                    throw new ArgumentNullException(nameof(fila));
+                }
+
+                var plan = fila.Plan;
+                if (plan == null)
+                {
+                    return Veredicto.NoCumplida("No se puede comprobar el pre-registro porque el plan no existe.");
+                }
+
+                return plan.RequierePreregistro ? Veredicto.Cumplida() : Veredicto.NoCumplida("Este plan no requiere pre-registro.");
             }
         }
 

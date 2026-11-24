@@ -66,6 +66,12 @@ namespace Sanic.Mppp.Plugins.Validacion
 
         public bool Cumple { get; }
 
+        /// <summary>
+        /// DN-06: el veredicto como <see cref="ResultadoDeLaRegla"/> (Cumplida o NoCumplida). Un evaluador nunca devuelve Omitida:
+        /// eso lo decide el motor cuando una dependencia no se cumple.
+        /// </summary>
+        public ResultadoDeLaRegla Resultado => Cumple ? ResultadoDeLaRegla.Cumplida : ResultadoDeLaRegla.NoCumplida;
+
         /// <summary>Texto POR DEFECTO para el cliente (el caso general): rige cuando el catálogo no trae plantilla o la trae mal escrita.</summary>
         public string Razon { get; }
 
