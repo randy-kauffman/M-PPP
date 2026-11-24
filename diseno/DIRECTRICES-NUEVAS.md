@@ -964,3 +964,75 @@ ensamblado. **Los datos (D) no viajan en el parche**: van en un script con instr
 ## Pendientes del negocio
 
 - La matriz de Conectividad, que el aprobador va a actualizar sobre la copia.
+
+---
+
+# DN-07 · Validación del número de identificación según su tipo
+
+Recibida el **2026-11-24** del aprobador. Hasta ahora el número de identificación se valida igual para todos los tipos: 1 a
+16 caracteres (`LARGOS_Y_FORMATO`) y solo letras y dígitos (`CARACTERES_PERMITIDOS`). Ninguna regla relaciona el número con
+su tipo: una cédula de 5 dígitos pasa.
+
+**Estado: diseño PROPUESTO, falta la orden de construir del aprobador.**
+
+## Decisiones del aprobador (2026-11-24)
+
+| # | Decisión |
+|---|---|
+| 1 | Se valida **siempre que el número venga escrito**, en cualquier gestión. La matriz de obligatoriedad solo decide cuándo puede venir vacío |
+| 2 | La Modificación **sigue sin exigir** la identificación (la matriz v3 no cambia) |
+| 3 | **CNA** (cédula): 14 caracteres sin guiones, `XXX-DDMMAA-XXXX-L`. Los 3 primeros dígitos son el municipio, `DDMMAA` es una fecha real y la letra es el Módulo 23 de los 13 dígitos sobre `ABCDEFGHJKLMNPQRSTUVWXY` |
+| 4 | **RUC**: 14 caracteres. Persona natural = cédula (13 dígitos + letra, se valida igual). Persona jurídica = `J` + 13 dígitos. Otros prefijos de la DGI: solo el largo |
+| 5 | **PAS** (pasaporte) y **PEX** (pasaporte extranjero): 6 a 9 letras o dígitos (ICAO 9303) |
+| 6 | **CRE** (cédula de residencia): sin formato conocido, sigue con la validación genérica de hoy |
+| 7 | La letra en **minúscula** se acepta como mayúscula |
+| 8 | Efecto **Rechaza** desde el primer día. El aprobador entregó un lote de **2070 cédulas reales**: las 2070 pasan forma, fecha y Módulo 23 (probado el 2026-11-24 fuera del repo; el lote no se guardó) |
+| 9 | Los textos al cliente son los de la tabla de abajo |
+
+## Diseño
+
+### Regla nueva `IDENTIFICACION_DEL_TIPO`
+
+- Nivel **Registro**, efecto **Rechaza**, **orden 27**, depende de **`LISTAS_VALIDAS`** (necesita un Tipo ID válido para
+  saber qué validar). No depende del plan ni de la autorización: no revela nada del plan, igual que `CARACTERES_PERMITIDOS`.
+- **Se cumple sin mirar nada** si el número viene vacío (eso lo decide `OBLIGATORIEDAD`), si el Tipo ID viene vacío (no hay
+  contra qué validar), si el tipo es **CRE**, o si el número trae algún caracter que no sea letra o dígito ASCII (ese caso ya
+  lo rechaza `CARACTERES_PERMITIDOS`: así el cliente no recibe dos motivos por lo mismo).
+- La comparación de letras no distingue mayúsculas. El valor se guarda **tal como vino**: la regla no lo modifica.
+- Los formatos viven en el **código**: son formatos legales, no configuración del negocio, y el Módulo 23 no se puede
+  expresar en un parámetro. El apagado de emergencia es el catálogo: si algo falla, se desactiva la regla sin desplegar.
+
+### Validación por tipo, en este orden (la primera que falla da el motivo)
+
+| Tipo | Comprobación | Motivo al cliente |
+|---|---|---|
+| CNA | 13 dígitos + 1 letra | *El número de identificación no es una cédula válida: debe tener 13 dígitos y una letra al final, sin guiones.* |
+| CNA | `DDMMAA` (posiciones 4 a 9) es una fecha real; el año vale en 1900 o en 2000 | *El número de identificación no es una cédula válida: la fecha de nacimiento no existe.* |
+| CNA | la letra = `ABCDEFGHJKLMNPQRSTUVWXY`[número de 13 dígitos % 23] | *El número de identificación no es una cédula válida: la letra final no corresponde al número.* |
+| RUC | 14 caracteres | *El número de identificación no es un RUC válido: debe tener 14 caracteres.* |
+| RUC | si empieza con un dígito: tiene que ser una cédula válida (las tres de CNA) | los tres de CNA, diciendo **RUC** en lugar de **cédula** |
+| RUC | si empieza con `J`: `J` + 13 dígitos | *El número de identificación no es un RUC válido: después de la J debe tener 13 dígitos.* |
+| RUC | otro comienzo: solo el largo | — |
+| PAS, PEX | 6 a 9 caracteres | *El número de identificación no es un pasaporte válido: debe tener entre 6 y 9 letras o números.* |
+
+Ningún mensaje repite el número (dato sensible, DD-08). Sin marcadores: el catálogo puede reemplazar el texto (D-19), pero
+`sanic_mensajecliente` queda vacío.
+
+### Construcción
+
+- Pruebas de aceptación (las escribe el arquitecto): cada tipo y cada motivo, minúscula aceptada, casos que se cumplen sin
+  mirar (vacío, sin tipo, CRE, caracteres inválidos), fecha 29/02 (vale si el año es bisiesto en 1900 o 2000: `00` sí,
+  `01` no), y un lote de cédulas **sintéticas** válidas generadas con el algoritmo (nunca las reales).
+- Implementación de Sonnet; ensamblado **1.0.28.0**.
+- Catálogo: la fila de la regla en `playbooks/datos/reglas.md` y un script de datos para el otro ambiente
+  (`herramientas/despliegue/dn07_datos.py`, igual que el de DN-06: idempotente, `--env`, `--solo-verificar`).
+- Orden: ensamblado primero (sin evaluador, `IntegridadDeRegla` rechaza la regla), después la regla.
+- Parche: el ensamblado (versión de la solución 1.3.1.2). La regla es un dato: viaja en el script.
+- En vivo: casos R-42 en adelante (una cédula buena, una con la letra mal, una fecha imposible, un RUC jurídico, un
+  pasaporte corto, una Modificación con cédula mal formada).
+
+### Fuera de alcance
+
+- El municipio contra el catálogo del CSE (se puede sumar después como parámetro).
+- El formato de CRE (cuando el negocio lo tenga).
+- Normalizar a mayúscula el valor guardado.
