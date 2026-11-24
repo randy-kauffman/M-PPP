@@ -18,6 +18,13 @@ pase a depender de ella, y `FORMATO_11_SOLO_ACH` se desactiva DESPUÉS (no se pu
 otra activa). Las reglas nuevas solo se pueden crear con el ensamblado de DN-05 ya subido (sin evaluador, el plugin de
 integridad las rechaza): este playbook va DESPUÉS del paquete 1.0.23.0.
 
+**DN-06 (2026-11-24, `diseno/DIRECTRICES-NUEVAS.md`): regla nueva `PLAN_REQUIERE_PREREGISTRO`** (Registro, orden 42,
+Rechaza, depende de `AUTORIZACION_CORREO_PLAN`; sin `sanic_mensajecliente`, rige el texto del evaluador "Este plan no
+requiere pre-registro."). `GESTION_DEL_FORMATO`, `CLASIFICACION_DEL_FORMATO`, `BANCO_DEL_FORMATO`, `OBLIGATORIEDAD` y
+`MONEDA_DEL_PLAN` pasan a depender de `PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS`. La fila nueva va ANTES que ellas (el
+script escribe de arriba abajo y la integridad exige que la dependencia exista). Se corre con `--completar` y solo con el
+ensamblado 1.0.27.0 ya subido. `FORMATO_11_SOLO_ACH` (inactiva) no se toca.
+
 `sanic_orden` lo deriva este script (D-47): orden topologico en multiplos de 10
 dentro de cada nivel. El diseno solo fija el orden RELATIVO; el motor exige que
 quien depende tenga orden estrictamente mayor (`02` §152), y el script lo
@@ -205,6 +212,19 @@ comprueba con un assert antes de escribir el playbook.
       "sanic_mensajecliente": "El plan {plan} no existe o usted no está autorizado sobre él."
     },
     {
+      "sanic_codigo": "PLAN_REQUIERE_PREREGISTRO",
+      "sanic_nivel": {
+        "choice": "sanic_mppp_ch_nivelregla",
+        "etiqueta": "Registro"
+      },
+      "sanic_orden": 42,
+      "sanic_efecto": {
+        "choice": "sanic_mppp_ch_efectoregla",
+        "etiqueta": "Rechaza"
+      },
+      "sanic_dependede": "AUTORIZACION_CORREO_PLAN"
+    },
+    {
       "sanic_codigo": "GESTION_DEL_FORMATO",
       "sanic_nivel": {
         "choice": "sanic_mppp_ch_nivelregla",
@@ -215,7 +235,7 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+      "sanic_dependede": "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "CLASIFICACION_DEL_FORMATO",
@@ -228,7 +248,7 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+      "sanic_dependede": "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "BANCO_DEL_FORMATO",
@@ -241,7 +261,7 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+      "sanic_dependede": "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "OBLIGATORIEDAD",
@@ -254,7 +274,7 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+      "sanic_dependede": "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "MONEDA_DEL_PLAN",
@@ -267,7 +287,7 @@ comprueba con un assert antes de escribir el playbook.
         "choice": "sanic_mppp_ch_efectoregla",
         "etiqueta": "Rechaza"
       },
-      "sanic_dependede": "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS"
+      "sanic_dependede": "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS"
     },
     {
       "sanic_codigo": "REFERENCIA_FORMATO_11",
@@ -324,4 +344,4 @@ comprueba con un assert antes de escribir el playbook.
 - **Efecto `Envia a revision` solo en niveles Correo y Solicitud, nunca en Registro** (D-20).
 - **`AUTORIZACION_CORREO_PLAN` no admite otro efecto que `Rechaza`** (D-14).
 - Toda dependencia es del **mismo nivel** y tiene **orden menor** (`02` §152).
-- El codigo C# tiene un evaluador por cada uno de estos codigos (20 desde DN-05); una regla activa sin evaluador hace fallar cerrado al motor (D-13).
+- El codigo C# tiene un evaluador por cada uno de estos codigos (20 desde DN-05, 21 desde DN-06); una regla activa sin evaluador hace fallar cerrado al motor (D-13).

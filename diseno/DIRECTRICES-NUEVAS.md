@@ -941,18 +941,19 @@ que DN-05 dejó pendientes. Mapa de impacto relevado contra el código el mismo 
 
 ## Orden de despliegue
 
-Regla de DN-05: todo lo que el ensamblado nuevo exige se siembra antes que él. Con la lectura tolerante y el parámetro
-exigido solo cuando hace falta, el ensamblado nuevo **no exige nada**, y el orden queda así:
+Con la lectura tolerante y el parámetro exigido solo cuando hace falta, el ensamblado nuevo **no exige nada** de los
+datos. Por eso el orden es el mismo en Dev y en el otro ambiente:
 
 1. Choice, columnas, formularios y vista. Con el ensamblado viejo no cambia nada: no lee las columnas.
-2. Backfill de planes y parámetro de Conectividad.
-3. Ensamblado 1.0.27.0. Sin la regla en el catálogo, no evalúa el pre-registro, y la obligatoriedad por canal da lo
-   mismo que hoy porque todos los planes son Banca en Linea.
-4. Catálogo de reglas, en una sola pasada: primero la regla nueva y después las 5 dependencias. Necesita el ensamblado
-   arriba, porque `IntegridadDeRegla` rechaza un código sin evaluador.
+2. Ensamblado 1.0.27.0. Sin la regla en el catálogo, no evalúa el pre-registro, y la obligatoriedad por canal da lo
+   mismo que hoy porque los planes vacíos se leen como Banca en Linea.
+3. `herramientas/despliegue/dn06_datos.py`, de una vez: backfill de planes, parámetro de Conectividad y catálogo de
+   reglas (primero la regla nueva, después las 5 dependencias). Va después del ensamblado porque `IntegridadDeRegla`
+   rechaza un código sin evaluador. Es idempotente, toma los valores de los playbooks y acepta `--env=<archivo>` y
+   `--solo-verificar`.
 
-**En el otro ambiente**: importar el parche (pasos 1 y 3 juntos) y correr el paso de datos (2 y 4). Entre la
-importación y el paso de datos todo sigue funcionando como hoy.
+**En el otro ambiente**: importar el parche (pasos 1 y 2 juntos) y correr el script (paso 3). Entre la importación y
+el script todo sigue funcionando como hoy.
 
 ## Parche
 
