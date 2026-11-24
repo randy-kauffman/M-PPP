@@ -973,7 +973,7 @@ Recibida el **2026-11-24** del aprobador. Hasta ahora el número de identificaci
 16 caracteres (`LARGOS_Y_FORMATO`) y solo letras y dígitos (`CARACTERES_PERMITIDOS`). Ninguna regla relaciona el número con
 su tipo: una cédula de 5 dígitos pasa.
 
-**Estado: diseño PROPUESTO, falta la orden de construir del aprobador.**
+**Estado: APROBADO y construido el 2026-11-24. Desplegado en Dev (ensamblado 1.0.28.0, regla creada con `dn07_datos.py`, set R en vivo 42/42 con R-42). Viaja en el parche `sanic_mppp_sol_parche_1_3_1` 1.3.1.2 (`solution/sanic_mppp_sol_parche_1_3_1_2_unmanaged.zip`).**
 
 ## Decisiones del aprobador (2026-11-24)
 
