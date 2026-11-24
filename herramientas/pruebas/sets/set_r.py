@@ -1004,8 +1004,9 @@ def r28(ctx):
     c.check("efecto = Rechaza (no cambió a Advierte/Envía a revisión)", regla.get("sanic_efecto") == EFECTO_RECHAZA, str(regla))
     c.check("orden = 60 (misma posición relativa: después de AUTORIZACION_CORREO_PLAN=50, antes de MONEDA_DEL_PLAN=70)",
             regla.get("sanic_orden") == 60, str(regla))
-    c.check("depende de AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS (mismas dependencias que antes de DN-03)",
-            regla.get("sanic_dependede") == "AUTORIZACION_CORREO_PLAN,LISTAS_VALIDAS", str(regla))
+    # DN-06 (2026-11-24): pasó a depender de PLAN_REQUIERE_PREREGISTRO, que a su vez depende de la autorización.
+    c.check("depende de PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS (DN-06)",
+            regla.get("sanic_dependede") == "PLAN_REQUIERE_PREREGISTRO,LISTAS_VALIDAS", str(regla))
     c.check("está activa", regla.get("statecode") == 0, str(regla))
     return c
 
