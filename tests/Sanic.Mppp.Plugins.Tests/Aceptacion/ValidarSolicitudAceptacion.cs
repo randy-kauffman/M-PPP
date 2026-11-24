@@ -791,7 +791,8 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             var fila = m.Filas().Single();
             Assert.Equal((int)EstadoDeLaFila.RechazadaEnValidacion, fila.GetAttributeValue<OptionSetValue>("sanic_estado").Value);
             Assert.Contains("El plan 0042 no admite la gestión Modificacion.", fila.GetAttributeValue<string>("sanic_mensaje"));
-    
+        }
+
         // ------------------------------------------------------------------ DN-06 (aprobador, 2026-11-24): canal y pre-registro del plan
         private void CambiarPlan(Mundo m, params (string atributo, object valor)[] cambios)
         {
@@ -881,5 +882,4 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Empty(m.Filas());
         }
     }
-}
 }
