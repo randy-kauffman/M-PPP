@@ -354,6 +354,56 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.Equal(EstadoDeLaFila.RechazadaEnValidacion, EstadosPorReglas.DeLaFila(rs)); // la autorización quedó Omitida: no es Sin autorización
         }
 
+        // ------------------------------------------------------------------ plan vacío (aprobador, 2026-11-24, D-81)
+        // Antes: con el plan vacío el cliente recibía "El plan  no existe o usted no está autorizado sobre él." (el texto del
+        // catálogo, con {plan} en blanco). Ahora recibe solo "Falta el número de plan.". El plan escrito sigue igual.
+        private const string TextoDelCatalogoParaElPlan = "El plan {plan} no existe o usted no está autorizado sobre él.";
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("\t")]
+        public void Con_el_plan_vacio_la_razon_es_que_falta_el_numero_de_plan_sin_marcadores_que_lo_citen(string recibido)
+        {
+            var veredicto = Suelta(ReglasDeRegistro.PlanExiste, Fila(("numeroPlan", recibido)));
+
+            Assert.False(veredicto.Cumple);
+            Assert.Equal("Falta el número de plan.", veredicto.Razon);
+            // Sin {plan} ni {valor}: la plantilla del catálogo que los usa no se puede completar y rige este texto (D-19).
+            Assert.False(veredicto.Marcadores.ContainsKey("plan"));
+            Assert.False(veredicto.Marcadores.ContainsKey("valor"));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void Con_el_plan_vacio_el_cliente_recibe_solo_falta_el_numero_de_plan_aunque_el_catalogo_traiga_su_texto(string recibido)
+        {
+            var mensajes = new Dictionary<string, string>
+            {
+                [ReglasDeRegistro.PlanExiste] = TextoDelCatalogoParaElPlan,
+                [ReglasDeRegistro.AutorizacionCorreoPlan] = TextoDelCatalogoParaElPlan,
+            };
+
+            var rs = Correr(Fila(("numeroPlan", recibido)), mensajes);
+
+            Assert.Equal("Falta el número de plan.", Razon(rs, ReglasDeRegistro.PlanExiste));
+            Assert.Single(rs.Where(r => r.Resultado == ResultadoDeLaRegla.NoCumplida)); // todo lo que depende del plan queda Omitida
+            Assert.Equal(ResultadoDeLaRegla.Omitida, rs.Single(r => r.Codigo == ReglasDeRegistro.AutorizacionCorreoPlan).Resultado);
+        }
+
+        [Fact]
+        public void Con_un_plan_escrito_que_no_existe_el_texto_del_catalogo_sigue_citandolo_como_antes()
+        {
+            var mensajes = new Dictionary<string, string> { [ReglasDeRegistro.PlanExiste] = TextoDelCatalogoParaElPlan };
+
+            var rs = Correr(Fila(("numeroPlan", "9999")), mensajes);
+
+            Assert.Equal("El plan 9999 no existe o usted no está autorizado sobre él.", Razon(rs, ReglasDeRegistro.PlanExiste));
+        }
+
         // ------------------------------------------------------------------ FORMATO_11_SOLO_ACH
         [Theory]
         [InlineData("42", "ACH", true)]

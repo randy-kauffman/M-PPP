@@ -731,7 +731,13 @@ namespace Sanic.Mppp.Plugins.Validacion
             }
         }
 
-        /// <summary>`PLAN_EXISTE` (diseno/03 §1 paso 5): el plan normalizado tiene que existir activo. Nunca se adivina un plan parecido.</summary>
+        /// <summary>
+        /// `PLAN_EXISTE` (diseno/03 §1 paso 5): el plan normalizado tiene que existir activo. Nunca se adivina un plan parecido.
+        /// D-81 (aprobador, 2026-11-24): con el número de plan vacío o en blanco el cliente recibe SOLO "Falta el número de plan.".
+        /// Para eso el veredicto sale SIN marcadores: si la plantilla del catálogo cita {plan} o {valor}, <see cref="MensajeAlCliente"/>
+        /// no sabe completarla (marcador desconocido) y rige el texto por defecto (D-19). El arreglo depende de que esa plantilla use
+        /// {plan} o {valor}; una plantilla sin marcadores se mostraría tal cual. Con un plan escrito (exista o no) todo sigue igual.
+        /// </summary>
         private sealed class EvaluadorPlanExiste : IEvaluador<FilaEnValidacion>
         {
             public string Codigo => PlanExiste;
@@ -746,6 +752,12 @@ namespace Sanic.Mppp.Plugins.Validacion
                 if (fila.Plan != null)
                 {
                     return Veredicto.Cumplida();
+                }
+
+                // D-81: plan vacío -> "Falta el número de plan." sin marcadores (ver el resumen de la clase).
+                if (string.IsNullOrWhiteSpace(fila.Recibido(CamposDeFila.NumeroPlan)))
+                {
+                    return Veredicto.NoCumplida("Falta el número de plan.");
                 }
 
                 // D-41 (aprobador, 2026-09-21): menos detalle. El texto por defecto ya NO cita lo que escribió el cliente
