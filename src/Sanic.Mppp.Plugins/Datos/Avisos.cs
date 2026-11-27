@@ -15,6 +15,12 @@ namespace Sanic.Mppp.Plugins.Datos
         public const string Rol = "role";
         public const string UsuarioRol = "systemuserroles";
 
+        /// <summary>DN-08: intersect entity usuario ↔ equipo (`systemuserid`, `teamid`, los dos `Guid` crudos).</summary>
+        public const string MiembroDeEquipo = "teammembership";
+
+        /// <summary>DN-08: intersect entity equipo ↔ rol (`teamid`, `roleid`, los dos `Guid` crudos).</summary>
+        public const string RolDeEquipo = "teamroles";
+
         // Los nombres de los roles, tal como se LLAMAN en el entorno (columna `name` de la tabla
         // `role`), que es por donde el plugin los busca. No es el nombre del archivo del playbook.
         //
