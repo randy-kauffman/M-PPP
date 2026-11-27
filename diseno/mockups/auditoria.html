@@ -1,0 +1,563 @@
+<title>MPPP Auditoría</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: mismo armazón que la app model-driven (encabezado, navegación por áreas, contenido); el formulario apila secciones y cierra con el timeline a todo el ancho. */
+:root{
+  --bg:#f3f5f8;--surface:#fff;--surface2:#eef1f5;--line:#dce1e7;--text:#1a1f25;--muted:#5a6572;
+  --brand:#0f6cbd;--brandink:#fff;--header:#0b3a66;--headerink:#fff;--sel:#e3f0fb;
+  --ok:#0e700e;--okbg:#e3f3e3;--warn:#8a6100;--warnbg:#fbf0d5;--bad:#b3263e;--badbg:#fbe4e8;--info:#0f6cbd;--infobg:#e3f0fb;
+  --ph-rec:#5b5fc7;--ph-val:#0f6cbd;--ph-acu:#0b7a75;--ph-reg:#8a5a00;--ph-cie:#0e700e;--ph-inc:#b3263e;
+  --shadow:0 8px 28px rgba(12,30,54,.18);
+  --f-ui:"Segoe UI","Segoe UI Web (West European)",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --f-data:ui-monospace,"Cascadia Mono","Consolas",monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13161a;--surface:#1b2026;--surface2:#232a32;--line:#343d48;--text:#e7eaee;--muted:#9ba6b3;--brand:#58aaf0;--brandink:#06121d;--header:#0a2745;--headerink:#eaf2fb;--sel:#15324d;
+  --ok:#6fd06f;--okbg:#173317;--warn:#e6bb4f;--warnbg:#3a2f12;--bad:#f47c8a;--badbg:#3d1a20;--info:#58aaf0;--infobg:#15324d;
+  --ph-rec:#9a9dff;--ph-val:#58aaf0;--ph-acu:#4fc7c0;--ph-reg:#e6bb4f;--ph-cie:#6fd06f;--ph-inc:#f47c8a;--shadow:0 8px 28px rgba(0,0,0,.55);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13161a;--surface:#1b2026;--surface2:#232a32;--line:#343d48;--text:#e7eaee;--muted:#9ba6b3;--brand:#58aaf0;--brandink:#06121d;--header:#0a2745;--headerink:#eaf2fb;--sel:#15324d;
+  --ok:#6fd06f;--okbg:#173317;--warn:#e6bb4f;--warnbg:#3a2f12;--bad:#f47c8a;--badbg:#3d1a20;--info:#58aaf0;--infobg:#15324d;
+  --ph-rec:#9a9dff;--ph-val:#58aaf0;--ph-acu:#4fc7c0;--ph-reg:#e6bb4f;--ph-cie:#6fd06f;--ph-inc:#f47c8a;--shadow:0 8px 28px rgba(0,0,0,.55);color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--f-ui);display:flex;flex-direction:column}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.num{font-variant-numeric:tabular-nums}
+.hdr{background:var(--header);color:var(--headerink);display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hdr .app{font-weight:600;font-size:15px;margin-right:auto}
+.hdr .app small{font-weight:400;opacity:.75;font-size:12px;margin-left:8px}
+.hdr label{font-size:12px;display:flex;align-items:center;gap:6px}
+.hdr select{background:rgba(255,255,255,.12);color:var(--headerink);border:1px solid rgba(255,255,255,.28);border-radius:4px;padding:4px 8px}
+.hdr select option{color:#111;background:#fff}
+.mock{background:var(--warnbg);color:var(--warn);font-size:12px;padding-block:4px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+.shell{flex:1;display:flex;min-height:0}
+nav{width:210px;flex:none;background:var(--surface);border-right:1px solid var(--line);overflow:auto;padding-block:8px}
+nav h4{margin:12px 16px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600}
+nav button{display:block;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:7px 14px}
+nav button:hover{background:var(--surface2)}
+nav button.on{background:var(--sel);border-left-color:var(--brand);font-weight:600}
+nav button.off{color:var(--muted)}
+main{flex:1;min-width:0;overflow:auto;padding-block:14px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:20px;font-weight:600;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 10px}
+.cmd{display:flex;flex-wrap:wrap;gap:2px;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;padding:4px 6px;min-height:38px;align-items:center}
+.cmd button{background:none;border:0;border-radius:4px;padding:5px 10px}
+.cmd button:hover{background:var(--surface2)}
+.cmd .none{color:var(--muted);font-size:12px;padding:0 6px}
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:0 0 6px 6px}
+.tw.solo{border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:12px;background:var(--surface2)}
+td.wrap{white-space:normal;min-width:220px}
+tbody tr:hover{background:var(--surface2)}
+tbody tr.clic{cursor:pointer}
+tr.selrow{background:var(--sel)!important}
+a.lnk{color:var(--brand);text-decoration:none;font-weight:600;cursor:pointer}
+a.lnk:hover{text-decoration:underline}
+.pill{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600}
+.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-bad{background:var(--badbg);color:var(--bad)}.p-info{background:var(--infobg);color:var(--info)}
+.form-top{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:12px}
+.form-top .back{background:none;border:1px solid var(--line);border-radius:4px;padding:3px 9px}
+.form-top .kv{font-size:12px;color:var(--muted)}
+.form-top .kv b{display:block;color:var(--text);font-size:13.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px;margin-bottom:12px}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 14px;min-width:0}
+.sec h2{font-size:13px;margin:0 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.sec h2 span{color:var(--text);text-transform:none;letter-spacing:0;font-size:14px;margin-left:4px}
+.flds{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px;margin-bottom:8px}
+.fld{font-size:12px;color:var(--muted);min-width:0}
+.fld b{display:block;font-weight:400;color:var(--text);font-size:13.5px;overflow-wrap:anywhere}
+.file{color:var(--brand)}
+details.txt{border:1px solid var(--line);border-radius:4px;padding:6px 9px;margin-top:6px;background:var(--surface2)}
+details.txt summary{cursor:pointer;font-size:12.5px;color:var(--brand)}
+details.txt pre{white-space:pre-wrap;font:12.5px/1.5 var(--f-ui);margin:6px 0 0}
+.sub-h{font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px}
+/* timeline */
+.tl-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:3px 11px;font-size:12.5px}
+.chip.on{background:var(--brand);color:var(--brandink);border-color:var(--brand)}
+.tl-bar select{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:3px 9px;font-size:12.5px}
+.tl-bar .print{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px 10px;font-size:12.5px}
+.tl{position:relative;margin:0;padding:0;list-style:none}
+.tl:before{content:"";position:absolute;left:96px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.phase{margin:14px 0 6px 112px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.ev{display:grid;grid-template-columns:86px 20px 1fr;gap:0 6px;align-items:start;padding:4px 0}
+.ev .t{text-align:right;font-size:12px;line-height:1.3}
+.ev .t b{display:block;font-weight:600;font-size:12.5px}
+.ev .t span{color:var(--muted)}
+.dot{width:12px;height:12px;border-radius:50%;margin:3px 0 0 4px;border:2px solid var(--surface);box-shadow:0 0 0 2px currentColor;background:currentColor;position:relative;z-index:1}
+.card{background:var(--surface2);border:1px solid var(--line);border-left:3px solid currentColor;border-radius:4px;padding:6px 10px;min-width:0}
+.card .ti{font-weight:600;color:var(--text)}
+.card .me{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:1px}
+.card .why{margin-top:5px;font-size:13px;color:var(--text);background:var(--surface);border-radius:3px;padding:5px 8px;white-space:pre-wrap}
+.card details{margin-top:5px;color:var(--text)}
+.card details summary{cursor:pointer;font-size:12.5px;color:var(--brand)}
+.card details pre{white-space:pre-wrap;font:12.5px/1.5 var(--f-ui);margin:5px 0 0}
+.fchip{border:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 7px;font-size:11.5px;font-weight:600;color:var(--brand)}
+.c-rec{color:var(--ph-rec)}.c-val{color:var(--ph-val)}.c-acu{color:var(--ph-acu)}.c-reg{color:var(--ph-reg)}.c-cie{color:var(--ph-cie)}.c-inc{color:var(--ph-inc)}
+.rules{margin:6px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--text)}
+.rules li{padding:3px 0;border-top:1px dashed var(--line)}
+.empty{color:var(--muted);font-size:13px;padding:10px 0}
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);box-shadow:var(--shadow);padding:0;width:min(560px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(10,20,35,.45)}
+dialog header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
+dialog header button{background:none;border:0;font-size:18px;line-height:1}
+dialog .body{padding:12px 14px;max-height:70vh;overflow:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--text);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+@media (max-width:720px){
+  .shell{flex-direction:column}
+  nav{width:auto;border-right:0;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;padding:4px}
+  nav h4{width:100%;margin:6px 10px 2px}
+  nav button{width:auto;border-left:0;border-bottom:3px solid transparent;padding:6px 10px}
+  nav button.on{border-bottom-color:var(--brand)}
+  .tl:before{left:58px}.phase{margin-left:74px}
+  .ev{grid-template-columns:50px 20px 1fr}.ev .t span{display:none}
+}
+@media (prefers-reduced-motion:no-preference){.card{transition:background .15s}}
+</style>
+
+<div class="hdr">
+  <div class="app" id="appName">Mantenimiento PPP<small id="appSub">mockup de auditoría · datos ficticios</small></div>
+  <label><span id="lblRol">Ver como</span>
+    <select id="rol">
+      <option value="aud">Auditor</option>
+      <option value="eje">Ejecutivo</option>
+      <option value="sup">Supervisor</option>
+      <option value="ambos">Ejecutivo + Supervisor</option>
+    </select></label>
+  <label><span id="lblIdioma">Idioma</span>
+    <select id="idioma"><option value="3082">Español</option><option value="1033">English</option></select></label>
+</div>
+<div class="mock" id="mockNote"></div>
+<div class="shell">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<dialog id="dlg"><header><span id="dlgT"></span><button id="dlgX" aria-label="Cerrar">×</button></header><div class="body" id="dlgB"></div></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ------------------------------------------------------------------ textos (1033 / 3082)
+  var T = {
+    3082: {
+      sub: "mockup de auditoría · datos ficticios", rol: "Ver como", idioma: "Idioma",
+      mock: "MOCKUP con datos ficticios. Cambiá \"Ver como\" para ver qué botones le aparecen a cada rol. En Dataverse el timeline es el web resource sanic_mppp_wr_html_auditoria dentro del formulario.",
+      areaTrabajo: "Trabajo", areaAud: "Auditoría", navSol: "Solicitudes", navFil: "Filas", navBit: "Bitácora",
+      vSol: "Solicitudes · Auditoría", vSolSub: "Todas las solicitudes, activas e inactivas, la más reciente primero.",
+      vBit: "Bitácora · Auditoría", vBitSub: "Todos los eventos de todas las solicitudes. Sirve para preguntas transversales: qué hizo una persona, qué errores hubo.",
+      vFil: "Filas", vFilSub: "La vista de trabajo de hoy (no es de auditoría): está para mostrar los botones según el rol.",
+      cN: "N°", cRec: "Recibida", cRem: "Remitente", cEst: "Estado", cVal: "Válidas", cRech: "Rechazadas", cAcu: "Acuse enviado", cResp: "Respuesta final", cCer: "Cerrada",
+      cFecha: "Fecha", cSol: "Solicitud", cEv: "Evento", cFila: "Fila", cQuien: "Quién", cOrig: "Origen", cDet: "Detalle",
+      sinBotones: "Sin botones para este rol", volver: "← Volver",
+      s1: "Qué recibimos", s2: "Qué pasó con la solicitud", s3: "Qué pasó con cada registro", s4: "Qué respondimos", s5: "Timeline",
+      fRem: "Remitente", fAsu: "Asunto", fEml: "Correo (.eml)", fXls: "Excel original", fMot: "Motivo de clasificación", fRecib: "Recibida",
+      fValid: "Validada", fTot: "Filas", fRev: "Requiere revisión", fMotRev: "Motivo de revisión", reglas: "Resultado de regla",
+      rOrd: "Orden", rReg: "Regla", rRes: "Resultado", rEf: "Efecto", rRaz: "Razón",
+      fG: "Gestión", fP: "Plan", fB: "Beneficiario", fDig: "Digitó", fApr: "Aprobó", fMsg: "Mensaje al cliente",
+      acuse: "Acuse", respFinal: "Respuesta final", verCont: "Ver lo que se le mandó al cliente", noEnviado: "No se envió",
+      todo: "Todo", fSolic: "Solicitud", fRegs: "Registros", fInc: "Incidencias", unaFila: "Recorrido de una fila", todasFilas: "Todas las filas",
+      imprimir: "Imprimir", impToast: "En Dataverse abre la vista de impresión del timeline.",
+      ph: { rec: "Recepción", val: "Validación", acu: "Acuse", reg: "Trabajo sobre los registros", cie: "Cierre y respuesta", inc: "Incidencia" },
+      desde: "desde recibida", servicio: "Cuenta de servicio", sistema: "Sistema", noCumplidas: "Reglas no cumplidas",
+      verReglas: "Ver reglas no cumplidas", verTexto: "Ver texto completo", sinEventos: "No hay eventos con este filtro.",
+      si: "Sí", no: "No", de: "de", validas: "válidas", rechazadas: "rechazadas",
+      fichaFila: "Fila", fTipoId: "Tipo de identificación", fNumId: "Número de identificación", fCta: "Cuenta", fBanco: "Banco", fMon: "Moneda",
+      fRefR: "Referencia recibida", fRefV: "Referencia vigente", fNota: "Nota interna", fCuando: "cuándo", abrirFila: "Abrir la fila",
+      hecho: "Se ejecutaría: ", cerrar: "Cerrar"
+    },
+    1033: {
+      sub: "audit mockup · sample data", rol: "View as", idioma: "Language",
+      mock: "MOCKUP with sample data. Change \"View as\" to see which buttons each role gets. In Dataverse the timeline is the sanic_mppp_wr_html_auditoria web resource inside the form.",
+      areaTrabajo: "Work", areaAud: "Audit", navSol: "Requests", navFil: "Rows", navBit: "Log",
+      vSol: "Requests · Audit", vSolSub: "All requests, active and inactive, newest first.",
+      vBit: "Log · Audit", vBitSub: "Every event of every request. For questions across requests: what one person did, which errors happened.",
+      vFil: "Rows", vFilSub: "Today's work view (not an audit view): it is here to show the buttons by role.",
+      cN: "No.", cRec: "Received", cRem: "Sender", cEst: "Status", cVal: "Valid", cRech: "Rejected", cAcu: "Receipt sent", cResp: "Final reply", cCer: "Closed",
+      cFecha: "Date", cSol: "Request", cEv: "Event", cFila: "Row", cQuien: "Who", cOrig: "Source", cDet: "Detail",
+      sinBotones: "No buttons for this role", volver: "← Back",
+      s1: "What we received", s2: "What happened to the request", s3: "What happened to each row", s4: "What we replied", s5: "Timeline",
+      fRem: "Sender", fAsu: "Subject", fEml: "Email (.eml)", fXls: "Original Excel", fMot: "Classification reason", fRecib: "Received",
+      fValid: "Validated", fTot: "Rows", fRev: "Needs review", fMotRev: "Review reason", reglas: "Rule results",
+      rOrd: "Order", rReg: "Rule", rRes: "Result", rEf: "Effect", rRaz: "Reason",
+      fG: "Action", fP: "Plan", fB: "Beneficiary", fDig: "Keyed by", fApr: "Approved by", fMsg: "Message to customer",
+      acuse: "Receipt", respFinal: "Final reply", verCont: "See what the customer received", noEnviado: "Not sent",
+      todo: "All", fSolic: "Request", fRegs: "Rows", fInc: "Incidents", unaFila: "One row's trail", todasFilas: "All rows",
+      imprimir: "Print", impToast: "In Dataverse this opens the timeline print view.",
+      ph: { rec: "Intake", val: "Validation", acu: "Receipt", reg: "Work on the rows", cie: "Closing and reply", inc: "Incident" },
+      desde: "since received", servicio: "Service account", sistema: "System", noCumplidas: "Rules not met",
+      verReglas: "See rules not met", verTexto: "See full text", sinEventos: "No events match this filter.",
+      si: "Yes", no: "No", de: "of", validas: "valid", rechazadas: "rejected",
+      fichaFila: "Row", fTipoId: "ID type", fNumId: "ID number", fCta: "Account", fBanco: "Bank", fMon: "Currency",
+      fRefR: "Reference received", fRefV: "Current reference", fNota: "Internal note", fCuando: "when", abrirFila: "Open the row",
+      hecho: "Would run: ", cerrar: "Close"
+    }
+  };
+
+  // Eventos de la Bitácora (sanic_mppp_ch_eventobitacora) -> etapa del timeline y texto en los dos idiomas.
+  var EV = {
+    Ingresada: ["rec", "Ingresada", "Received"],
+    CorreoClasificado: ["rec", "Correo clasificado", "Email classified"],
+    ValidacionTerminada: ["val", "Validación terminada", "Validation finished"],
+    AcuseIniciado: ["acu", "Acuse iniciado", "Receipt started"],
+    AcuseEnviado: ["acu", "Acuse enviado", "Receipt sent"],
+    FilaDigitada: ["reg", "Fila digitada", "Row keyed"],
+    FilaAprobada: ["reg", "Fila aprobada", "Row approved"],
+    FilaDevuelta: ["reg", "Fila devuelta", "Row returned"],
+    FilaRechazadaEnAS400: ["reg", "Fila rechazada en AS400", "Row rejected in AS400"],
+    FilaAnulada: ["reg", "Fila anulada", "Row voided"],
+    Procesada: ["cie", "Procesada", "Processed"],
+    RespuestaFinalIniciada: ["cie", "Respuesta final iniciada", "Final reply started"],
+    RespuestaFinalEnviada: ["cie", "Respuesta final enviada", "Final reply sent"],
+    Cerrada: ["cie", "Cerrada", "Closed"],
+    NoReconocidaAtendida: ["cie", "No reconocida atendida", "Unrecognized handled"],
+    Descartada: ["cie", "Descartada", "Discarded"],
+    Vencida: ["inc", "Vencida", "Expired"],
+    Reintento: ["inc", "Reintento", "Retry"],
+    RequiereRevision: ["inc", "Requiere revisión", "Needs review"],
+    RevisionAtendida: ["inc", "Revisión atendida", "Review handled"],
+    Error: ["inc", "Error", "Error"]
+  };
+  var ORIGEN = { Flujo: ["Flujo", "Flow"], Plugin: ["Plugin", "Plugin"], CustomAPI: ["Custom API", "Custom API"] };
+  var ESTADO_SOL = {
+    Procesada: ["Procesada", "Processed", "p-ok"], Cerrada: ["Cerrada", "Closed", "p-ok"], EnProceso: ["En proceso", "In progress", "p-info"],
+    NoReconocida: ["No reconocida", "Unrecognized", "p-warn"], Validada: ["Validada", "Validated", "p-info"]
+  };
+  var ESTADO_FILA = {
+    Validada: ["Validada", "Validated", "p-info"], Digitada: ["Digitada", "Keyed", "p-info"], Aprobada: ["Aprobada", "Approved", "p-ok"],
+    Rechazada: ["Rechazada", "Rejected", "p-bad"], RechazadaEnAS400: ["Rechazada en AS400", "Rejected in AS400", "p-bad"], Anulada: ["Anulada", "Voided", "p-warn"]
+  };
+
+  // ------------------------------------------------------------------ datos ficticios
+  function d(s) { return new Date(s); }
+  var SOL = [
+    {
+      id: "s1", n: "MPPP-00002171", rec: d("2026-11-24T09:12:00"), rem: "ana.mora@ferreteriasol.com.ni", asu: "Inclusiones plan 0B34 noviembre",
+      est: "Cerrada", mot: "", validada: d("2026-11-24T09:13:10"), tot: 6, val: 4, rech: 2, rev: false, motRev: "",
+      acuse: d("2026-11-24T09:14:02"), resp: d("2026-11-25T16:03:40"), cer: d("2026-11-25T16:03:41"),
+      acuseTxt: "Estimado cliente:\nRecibimos su solicitud MPPP-00002171 con 6 registros.\n4 registros fueron aceptados y 2 rechazados:\n- Fila 2: El número de identificación no es una cédula válida: la letra final no corresponde al número.\n- Fila 5: El plan 0B35 no existe o no le pertenece.",
+      respTxt: "Estimado cliente:\nTerminamos de procesar su solicitud MPPP-00002171.\n- Filas 1, 3 y 6: aplicadas.\n- Fila 4: rechazada en AS400: la cuenta está cerrada.",
+      reglas: [
+        [1, "REMITENTE_RECONOCIDO", "Cumplida", "Rechaza", ""],
+        [2, "ESTRUCTURA_PLANTILLA", "Cumplida", "Rechaza", ""],
+        [3, "UN_SOLO_EXCEL", "Cumplida", "Rechaza", ""],
+        [4, "FILAS_MAXIMAS", "Cumplida", "Rechaza", ""]
+      ],
+      filas: [
+        { n: 1, g: "Inclusión", p: "0B34", b: "Juan Pérez Rocha", e: "Aprobada", dig: "María López", fd: d("2026-11-24T15:40:00"), apr: "Carlos Ruiz", fa: d("2026-11-25T10:02:00"), msg: "", nota: "", tid: "CNA", nid: "0010101800000R", cta: "100200300", banco: "BAC", mon: "USD", refr: "", refv: "0B34000001" },
+        { n: 2, g: "Inclusión", p: "0B34", b: "Rosa Mairena", e: "Rechazada", dig: "", apr: "", msg: "El número de identificación no es una cédula válida: la letra final no corresponde al número.", nota: "", tid: "CNA", nid: "0010101800000S", cta: "100200301", banco: "BAC", mon: "USD", refr: "", refv: "" },
+        { n: 3, g: "Modificación", p: "0B34", b: "Luis Téllez", e: "Aprobada", dig: "María López", fd: d("2026-11-25T09:20:00"), apr: "Carlos Ruiz", fa: d("2026-11-25T10:05:00"), msg: "", nota: "Falta el banco en AS400: revisá la cuenta antes de digitar.", tid: "PAS", nid: "C1234567", cta: "100200302", banco: "BAC", mon: "USD", refr: "0B34000003", refv: "0B34000003" },
+        { n: 4, g: "Inclusión", p: "0B34", b: "Karla Gómez", e: "RechazadaEnAS400", dig: "", apr: "", msg: "La cuenta está cerrada.", nota: "", tid: "CNA", nid: "0011805900012N", cta: "100200303", banco: "BAC", mon: "USD", refr: "", refv: "0B34000004" },
+        { n: 5, g: "Inclusión", p: "0B35", b: "Pedro Arana", e: "Rechazada", dig: "", apr: "", msg: "El plan 0B35 no existe o no le pertenece.", nota: "", tid: "RUC", nid: "J0310000000001", cta: "100200304", banco: "BAC", mon: "USD", refr: "", refv: "" },
+        { n: 6, g: "Exclusión", p: "0B34", b: "Mario Salinas", e: "Aprobada", dig: "María López", fd: d("2026-11-24T15:42:00"), apr: "Carlos Ruiz", fa: d("2026-11-25T10:03:00"), msg: "", nota: "", tid: "CNA", nid: "0010101800000R", cta: "100200305", banco: "BAC", mon: "USD", refr: "0B34000006", refv: "0B34000006" }
+      ],
+      bit: [
+        ["2026-11-24T09:12:30", "Ingresada", "Flujo", 0, "srv", ""],
+        ["2026-11-24T09:12:41", "CorreoClasificado", "CustomAPI", 0, "", ""],
+        ["2026-11-24T09:13:10", "ValidacionTerminada", "CustomAPI", 0, "", "6 filas: 4 válidas, 2 rechazadas."],
+        ["2026-11-24T09:13:55", "AcuseIniciado", "Flujo", 0, "srv", ""],
+        ["2026-11-24T09:14:02", "AcuseEnviado", "Flujo", 0, "srv", ""],
+        ["2026-11-24T15:40:00", "FilaDigitada", "Plugin", 1, "María López", ""],
+        ["2026-11-24T15:41:00", "FilaDigitada", "Plugin", 3, "María López", ""],
+        ["2026-11-24T15:42:00", "FilaDigitada", "Plugin", 6, "María López", ""],
+        ["2026-11-24T15:44:00", "FilaRechazadaEnAS400", "Plugin", 4, "María López", "Mensaje al cliente: La cuenta está cerrada."],
+        ["2026-11-24T16:10:00", "FilaDevuelta", "Plugin", 3, "Carlos Ruiz", "Nota interna: Falta el banco en AS400: revisá la cuenta antes de digitar."],
+        ["2026-11-25T09:20:00", "FilaDigitada", "Plugin", 3, "María López", ""],
+        ["2026-11-25T10:02:00", "FilaAprobada", "Plugin", 1, "Carlos Ruiz", ""],
+        ["2026-11-25T10:03:00", "FilaAprobada", "Plugin", 6, "Carlos Ruiz", ""],
+        ["2026-11-25T10:05:00", "FilaAprobada", "Plugin", 3, "Carlos Ruiz", ""],
+        ["2026-11-25T10:05:01", "Procesada", "Plugin", 0, "", ""],
+        ["2026-11-25T16:03:30", "RespuestaFinalIniciada", "Flujo", 0, "srv", ""],
+        ["2026-11-25T16:03:40", "RespuestaFinalEnviada", "Flujo", 0, "srv", ""],
+        ["2026-11-25T16:03:41", "Cerrada", "Flujo", 0, "srv", ""]
+      ]
+    },
+    {
+      id: "s2", n: "MPPP-00002170", rec: d("2026-11-24T08:50:00"), rem: "pagos@desconocido.com", asu: "RE: planilla",
+      est: "Cerrada", mot: "El remitente no está registrado como autorizado de ningún cliente.", validada: null, tot: 0, val: 0, rech: 0, rev: false, motRev: "",
+      acuse: null, resp: null, cer: d("2026-11-24T11:20:00"), acuseTxt: "", respTxt: "",
+      reglas: [[1, "ES_CORREO_NUEVO", "Cumplida", "Rechaza", ""], [2, "REMITENTE_RECONOCIDO", "No cumplida", "Envia a revision", "El remitente no está registrado como autorizado de ningún cliente."]],
+      filas: [],
+      bit: [
+        ["2026-11-24T08:50:20", "Ingresada", "Flujo", 0, "srv", ""],
+        ["2026-11-24T08:50:31", "CorreoClasificado", "CustomAPI", 0, "", "No reconocida: el remitente no está registrado como autorizado de ningún cliente."],
+        ["2026-11-24T11:20:00", "NoReconocidaAtendida", "Plugin", 0, "María López", "Cerrada por la persona."]
+      ]
+    },
+    {
+      id: "s3", n: "MPPP-00002168", rec: d("2026-11-23T17:05:00"), rem: "tesoreria@distluna.com.ni", asu: "Exclusiones plan 0A12",
+      est: "EnProceso", mot: "", validada: d("2026-11-23T17:31:00"), tot: 2, val: 2, rech: 0, rev: false, motRev: "Validación fallida 3 veces",
+      acuse: d("2026-11-23T17:32:00"), resp: null, cer: null,
+      acuseTxt: "Estimado cliente:\nRecibimos su solicitud MPPP-00002168 con 2 registros. Los 2 fueron aceptados.", respTxt: "",
+      reglas: [[1, "REMITENTE_RECONOCIDO", "Cumplida", "Rechaza", ""], [2, "ESTRUCTURA_PLANTILLA", "Cumplida", "Rechaza", ""]],
+      filas: [
+        { n: 1, g: "Exclusión", p: "0A12", b: "Ana Castillo", e: "Validada", dig: "", apr: "", msg: "", nota: "", tid: "CNA", nid: "0010101800000R", cta: "200300400", banco: "BAC", mon: "NIO", refr: "0A12000001", refv: "0A12000001" },
+        { n: 2, g: "Exclusión", p: "0A12", b: "José Ortega", e: "Digitada", dig: "María López", fd: d("2026-11-24T08:10:00"), apr: "", msg: "", nota: "", tid: "CNA", nid: "0011805900012N", cta: "200300401", banco: "BAC", mon: "NIO", refr: "0A12000002", refv: "0A12000002" }
+      ],
+      bit: [
+        ["2026-11-23T17:05:20", "Ingresada", "Flujo", 0, "srv", ""],
+        ["2026-11-23T17:05:30", "Error", "Flujo", 0, "srv", "La validación no respondió a tiempo (timeout)."],
+        ["2026-11-23T17:15:00", "Reintento", "Flujo", 0, "srv", "Reintento 1 de 3."],
+        ["2026-11-23T17:25:00", "RequiereRevision", "Flujo", 0, "srv", "Validación fallida 3 veces"],
+        ["2026-11-23T17:30:00", "RevisionAtendida", "Plugin", 0, "María López", "Motivo que había escrito la máquina: Validación fallida 3 veces"],
+        ["2026-11-23T17:31:00", "ValidacionTerminada", "CustomAPI", 0, "", "2 filas: 2 válidas, 0 rechazadas."],
+        ["2026-11-23T17:32:00", "AcuseEnviado", "Flujo", 0, "srv", ""],
+        ["2026-11-24T08:10:00", "FilaDigitada", "Plugin", 2, "María López", ""]
+      ]
+    }
+  ];
+
+  // ------------------------------------------------------------------ botones por rol (E de DN-09)
+  // Misma tabla que el servidor. Quien tiene Ejecutivo y Supervisor a la vez no ve ninguno (D-25); el Auditor, ninguno.
+  var BOTONES_FILA = [
+    { id: "digitada", es: "Digitada", en: "Keyed", rol: "eje", desde: ["Validada"] },
+    { id: "rechazadaas400", es: "Rechazada en AS400", en: "Rejected in AS400", rol: "eje", desde: ["Validada", "Digitada"] },
+    { id: "anular", es: "Anular", en: "Void", rol: "eje", desde: ["Validada", "Digitada"] },
+    { id: "atendida", es: "Atendida", en: "Handled", rol: "eje", desde: null },
+    { id: "descargar", es: "Descargar para digitar", en: "Download to key", rol: "eje", desde: null },
+    { id: "aprobar", es: "Aprobar", en: "Approve", rol: "sup", desde: ["Digitada"] },
+    { id: "devolver", es: "Devolver", en: "Return", rol: "sup", desde: ["Digitada"] }
+  ];
+  var BOTONES_SOL = [
+    { id: "atendido", es: "Atendido", en: "Handled", rol: "eje" },
+    { id: "descartar", es: "Descartar", en: "Discard", rol: "eje" },
+    { id: "revisado", es: "Revisado", en: "Reviewed", rol: "eje" }
+  ];
+  function puedeVer(boton) {
+    var r = estado.rol;
+    if (r === "ambos" || r === "aud") return false;
+    return boton.rol === r;
+  }
+
+  // ------------------------------------------------------------------ estado y utilidades
+  var estado = { lcid: "3082", rol: "aud", vista: "sol", sol: null, filtro: "todo", fila: "", selFilas: {} };
+  try { var g = JSON.parse(localStorage.getItem("mppp-aud") || "{}"); if (g.lcid) estado.lcid = g.lcid; if (g.rol) estado.rol = g.rol; } catch (e) { /* sin almacenamiento */ }
+  function guardar() { try { localStorage.setItem("mppp-aud", JSON.stringify({ lcid: estado.lcid, rol: estado.rol })); } catch (e) { /* nada */ } }
+  function t(k) { return T[estado.lcid][k]; }
+  function en() { return estado.lcid === "1033"; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; }); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fecha(x) { if (!x) return "—"; return en() ? pad(x.getMonth() + 1) + "/" + pad(x.getDate()) + " " + pad(x.getHours()) + ":" + pad(x.getMinutes()) : pad(x.getDate()) + "/" + pad(x.getMonth() + 1) + " " + pad(x.getHours()) + ":" + pad(x.getMinutes()); }
+  function dia(x) { return en() ? pad(x.getMonth() + 1) + "/" + pad(x.getDate()) : pad(x.getDate()) + "/" + pad(x.getMonth() + 1); }
+  function hora(x) { return pad(x.getHours()) + ":" + pad(x.getMinutes()); }
+  function transcurrido(desde, hasta) {
+    var m = Math.max(0, Math.round((hasta - desde) / 60000));
+    if (m < 60) return "+" + m + " min";
+    var h = Math.floor(m / 60), r = m % 60;
+    if (h < 24) return "+" + h + " h" + (r ? " " + r + " min" : "");
+    var dd = Math.floor(h / 24), hh = h % 24;
+    return "+" + dd + " d" + (hh ? " " + hh + " h" : "");
+  }
+  function pill(mapa, k) { var v = mapa[k]; return v ? "<span class=\"pill " + v[2] + "\">" + esc(en() ? v[1] : v[0]) + "</span>" : esc(k); }
+  function quien(x) { return x === "srv" ? t("servicio") : (x || t("sistema")); }
+  function toast(msg) { var el = document.getElementById("toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { el.hidden = true; }, 2600); }
+  function solPorId(id) { for (var i = 0; i < SOL.length; i++) if (SOL[i].id === id) return SOL[i]; return null; }
+
+  // ------------------------------------------------------------------ navegación
+  function pintarNav() {
+    var items = [["h", t("areaTrabajo")], ["fil", t("navFil")], ["h", t("areaAud")], ["sol", t("navSol")], ["bit", t("navBit")]];
+    document.getElementById("nav").innerHTML = items.map(function (it) {
+      if (it[0] === "h") return "<h4>" + esc(it[1]) + "</h4>";
+      var on = estado.vista === it[0] || (it[0] === "sol" && estado.vista === "form");
+      return "<button data-v=\"" + it[0] + "\" class=\"" + (on ? "on" : "") + "\">" + esc(it[1]) + "</button>";
+    }).join("");
+  }
+
+  function barraDeComandos(botones, conEstado) {
+    var visibles = botones.filter(puedeVer).filter(function (b) {
+      if (!conEstado || !b.desde) return true;
+      var ids = Object.keys(estado.selFilas).filter(function (k) { return estado.selFilas[k]; });
+      if (!ids.length) return true;
+      return ids.some(function (k) { return b.desde.indexOf(estado.selFilas[k]) >= 0; });
+    });
+    if (!visibles.length) return "<div class=\"cmd\"><span class=\"none\">" + esc(t("sinBotones")) + "</span></div>";
+    return "<div class=\"cmd\">" + visibles.map(function (b) { return "<button data-cmd=\"" + esc(en() ? b.en : b.es) + "\">" + esc(en() ? b.en : b.es) + "</button>"; }).join("") + "</div>";
+  }
+
+  // ------------------------------------------------------------------ vistas
+  function vistaSolicitudes() {
+    var filas = SOL.slice().sort(function (a, b) { return b.rec - a.rec; }).map(function (s) {
+      return "<tr class=\"clic\" data-sol=\"" + s.id + "\"><td><a class=\"lnk\">" + esc(s.n) + "</a></td><td class=\"num\">" + fecha(s.rec) + "</td><td>" + esc(s.rem) + "</td><td>" + pill(ESTADO_SOL, s.est) +
+        "</td><td class=\"num\">" + (s.tot ? s.val : "—") + "</td><td class=\"num\">" + (s.tot ? s.rech : "—") + "</td><td class=\"num\">" + fecha(s.acuse) + "</td><td class=\"num\">" + fecha(s.resp) + "</td><td class=\"num\">" + fecha(s.cer) + "</td></tr>";
+    }).join("");
+    return "<h1>" + esc(t("vSol")) + "</h1><p class=\"sub\">" + esc(t("vSolSub")) + "</p>" + barraDeComandos(BOTONES_SOL, false) +
+      "<div class=\"tw\"><table><thead><tr><th>" + [t("cN"), t("cRec"), t("cRem"), t("cEst"), t("cVal"), t("cRech"), t("cAcu"), t("cResp"), t("cCer")].map(esc).join("</th><th>") + "</th></tr></thead><tbody>" + filas + "</tbody></table></div>";
+  }
+
+  function vistaBitacora() {
+    var todos = [];
+    SOL.forEach(function (s) { s.bit.forEach(function (b) { todos.push({ s: s, b: b }); }); });
+    todos.sort(function (a, b) { return d(b.b[0]) - d(a.b[0]); });
+    var filas = todos.map(function (x) {
+      var ev = EV[x.b[1]];
+      return "<tr><td class=\"num\">" + fecha(d(x.b[0])) + "</td><td><a class=\"lnk\" data-sol=\"" + x.s.id + "\">" + esc(x.s.n) + "</a></td><td><span class=\"c-" + ev[0] + "\">●</span> " + esc(en() ? ev[2] : ev[1]) +
+        "</td><td class=\"num\">" + (x.b[3] || "—") + "</td><td>" + esc(quien(x.b[4])) + "</td><td>" + esc(ORIGEN[x.b[2]][en() ? 1 : 0]) + "</td><td class=\"wrap\">" + esc(x.b[5]) + "</td></tr>";
+    }).join("");
+    return "<h1>" + esc(t("vBit")) + "</h1><p class=\"sub\">" + esc(t("vBitSub")) + "</p><div class=\"tw solo\"><table><thead><tr><th>" +
+      [t("cFecha"), t("cSol"), t("cEv"), t("cFila"), t("cQuien"), t("cOrig"), t("cDet")].map(esc).join("</th><th>") + "</th></tr></thead><tbody>" + filas + "</tbody></table></div>";
+  }
+
+  function vistaFilas() {
+    var todas = [];
+    SOL.forEach(function (s) { s.filas.forEach(function (f) { todas.push({ s: s, f: f }); }); });
+    var filas = todas.map(function (x) {
+      var k = x.s.id + "-" + x.f.n, sel = !!estado.selFilas[k];
+      return "<tr class=\"clic" + (sel ? " selrow" : "") + "\" data-selfila=\"" + k + "\" data-est=\"" + x.f.e + "\"><td><input type=\"checkbox\" id=\"chk-" + k + "\" aria-label=\"" + esc(x.s.n) + " " + x.f.n + "\"" + (sel ? " checked" : "") + "></td><td>" + esc(x.s.n) + "</td><td class=\"num\">" + x.f.n + "</td><td>" + esc(x.f.g) + "</td><td>" + esc(x.f.p) + "</td><td>" + esc(x.f.b) + "</td><td>" + pill(ESTADO_FILA, x.f.e) + "</td></tr>";
+    }).join("");
+    return "<h1>" + esc(t("vFil")) + "</h1><p class=\"sub\">" + esc(t("vFilSub")) + "</p>" + barraDeComandos(BOTONES_FILA, true) +
+      "<div class=\"tw\"><table><thead><tr><th></th><th>" + [t("cSol"), t("cN"), t("fG"), t("fP"), t("fB"), t("cEst")].map(esc).join("</th><th>") + "</th></tr></thead><tbody>" + filas + "</tbody></table></div>";
+  }
+
+  // ------------------------------------------------------------------ formulario de Auditoría
+  function fld(etq, val, cls) { return "<div class=\"fld\">" + esc(etq) + "<b class=\"" + (cls || "") + "\">" + (val === "" || val == null ? "—" : val) + "</b></div>"; }
+
+  function formulario(s) {
+    var top = "<div class=\"form-top\"><button class=\"back\" data-v=\"sol\">" + esc(t("volver")) + "</button><h1>" + esc(s.n) + "</h1>" + pill(ESTADO_SOL, s.est) +
+      "<div class=\"kv\">" + esc(t("fRecib")) + "<b class=\"num\">" + fecha(s.rec) + "</b></div><div class=\"kv\">" + esc(t("cCer")) + "<b class=\"num\">" + fecha(s.cer) + "</b></div></div>";
+
+    var s1 = "<section class=\"sec\"><h2>1<span>" + esc(t("s1")) + "</span></h2><div class=\"flds\">" +
+      fld(t("fRem"), esc(s.rem)) + fld(t("fAsu"), esc(s.asu)) + fld(t("fEml"), esc(s.n) + ".eml", "file") + fld(t("fXls"), s.tot ? esc(s.n) + ".xlsx" : "", "file") + "</div>" +
+      (s.mot ? "<div class=\"flds\">" + fld(t("fMot"), esc(s.mot)) + "</div>" : "") + "</section>";
+
+    var cont = function (etq, cuando, txt) {
+      return "<div class=\"sub-h\">" + esc(etq) + "</div><div class=\"flds\">" + fld(t("cFecha"), cuando ? "<span class=\"num\">" + fecha(cuando) + "</span>" : esc(t("noEnviado"))) + fld(t("cQuien"), cuando ? esc(t("servicio")) : "") + "</div>" +
+        (txt ? "<details class=\"txt\"><summary>" + esc(t("verCont")) + "</summary><pre>" + esc(txt) + "</pre></details>" : "");
+    };
+    var s4 = "<section class=\"sec\"><h2>4<span>" + esc(t("s4")) + "</span></h2>" + cont(t("acuse"), s.acuse, s.acuseTxt) + cont(t("respFinal"), s.resp, s.respTxt) + "</section>";
+
+    var reglas = s.reglas.map(function (r) {
+      var cl = r[2] === "Cumplida" ? "p-ok" : (r[2] === "Omitida" ? "p-info" : "p-bad");
+      return "<tr><td class=\"num\">" + r[0] + "</td><td>" + esc(r[1]) + "</td><td><span class=\"pill " + cl + "\">" + esc(r[2]) + "</span></td><td>" + esc(r[3]) + "</td><td class=\"wrap\">" + esc(r[4] || "—") + "</td></tr>";
+    }).join("");
+    var s2 = "<section class=\"sec\" style=\"margin-bottom:12px\"><h2>2<span>" + esc(t("s2")) + "</span></h2><div class=\"flds\">" +
+      fld(t("fValid"), "<span class=\"num\">" + fecha(s.validada) + "</span>") +
+      fld(t("fTot"), s.tot ? "<span class=\"num\">" + s.tot + " · " + s.val + " " + esc(t("validas")) + " · " + s.rech + " " + esc(t("rechazadas")) + "</span>" : "") +
+      fld(t("fRev"), esc(s.rev ? t("si") : t("no"))) + fld(t("fMotRev"), esc(s.motRev)) + "</div>" +
+      "<div class=\"sub-h\">" + esc(t("reglas")) + "</div><div class=\"tw solo\"><table><thead><tr><th>" + [t("rOrd"), t("rReg"), t("rRes"), t("rEf"), t("rRaz")].map(esc).join("</th><th>") + "</th></tr></thead><tbody>" + reglas + "</tbody></table></div></section>";
+
+    var filas = s.filas.map(function (f) {
+      return "<tr class=\"clic\" data-fila=\"" + f.n + "\"><td><a class=\"lnk\">" + f.n + "</a></td><td>" + esc(f.g) + "</td><td>" + esc(f.p) + "</td><td>" + esc(f.b) + "</td><td>" + pill(ESTADO_FILA, f.e) + "</td><td>" + esc(f.dig || "—") + "</td><td>" + esc(f.apr || "—") + "</td><td class=\"wrap\">" + esc(f.msg || "—") + "</td></tr>";
+    }).join("");
+    var s3 = "<section class=\"sec\" style=\"margin-bottom:12px\"><h2>3<span>" + esc(t("s3")) + "</span></h2>" +
+      (s.filas.length ? barraDeComandos(BOTONES_FILA, false) + "<div class=\"tw\"><table><thead><tr><th>" + [t("cN"), t("fG"), t("fP"), t("fB"), t("cEst"), t("fDig"), t("fApr"), t("fMsg")].map(esc).join("</th><th>") + "</th></tr></thead><tbody>" + filas + "</tbody></table></div>" : "<div class=\"empty\">—</div>") + "</section>";
+
+    var s5 = "<section class=\"sec\"><h2>5<span>" + esc(t("s5")) + "</span></h2><div id=\"tl\"></div></section>";
+    return top + "<div class=\"grid2\">" + s1 + s4 + "</div>" + s2 + s3 + s5;
+  }
+
+  // ------------------------------------------------------------------ el timeline (lo que va al web resource)
+  function timeline(s) {
+    var filtros = [["todo", t("todo")], ["sol", t("fSolic")], ["reg", t("fRegs")], ["inc", t("fInc")]];
+    var opcionesFila = "<option value=\"\">" + esc(t("todasFilas")) + "</option>" + s.filas.map(function (f) { return "<option value=\"" + f.n + "\"" + (String(f.n) === estado.fila ? " selected" : "") + ">" + esc(t("fichaFila")) + " " + f.n + " · " + esc(f.b) + "</option>"; }).join("");
+    var bar = "<div class=\"tl-bar\">" + filtros.map(function (f) { return "<button class=\"chip" + (estado.filtro === f[0] && !estado.fila ? " on" : "") + "\" data-filtro=\"" + f[0] + "\">" + esc(f[1]) + "</button>"; }).join("") +
+      (s.filas.length ? "<label class=\"sr\" for=\"selFila\" hidden>" + esc(t("unaFila")) + "</label><select id=\"selFila\" aria-label=\"" + esc(t("unaFila")) + "\">" + opcionesFila + "</select>" : "") +
+      "<button class=\"print\" id=\"btnPrint\">" + esc(t("imprimir")) + "</button></div>";
+
+    var evs = s.bit.map(function (b) { return { f: d(b[0]), ev: b[1], or: b[2], fila: b[3], q: b[4], det: b[5], ph: EV[b[1]][0] }; })
+      .sort(function (a, b) { return a.f - b.f; })
+      .filter(function (e) {
+        if (estado.fila) return e.fila === Number(estado.fila);
+        if (estado.filtro === "sol") return e.fila === 0 && e.ph !== "inc";
+        if (estado.filtro === "reg") return e.fila > 0;
+        if (estado.filtro === "inc") return e.ph === "inc";
+        return true;
+      });
+    if (!evs.length) return bar + "<div class=\"empty\">" + esc(t("sinEventos")) + "</div>";
+
+    var fallidas = s.reglas.filter(function (r) { return r[2] !== "Cumplida"; });
+    var rechazadas = s.filas.filter(function (f) { return f.e === "Rechazada"; });
+    var html = "", fase = null, diaAnt = null;
+    evs.forEach(function (e) {
+      if (e.ph !== fase && e.ph !== "inc") { fase = e.ph; html += "<li class=\"phase c-" + e.ph + "\">" + esc(t("ph")[e.ph]) + "</li>"; }
+      var nombre = en() ? EV[e.ev][2] : EV[e.ev][1];
+      var me = "<span>" + esc(quien(e.q)) + "</span><span>" + esc(ORIGEN[e.or][en() ? 1 : 0]) + "</span>" +
+        (e.fila ? "<button class=\"fchip\" data-fila=\"" + e.fila + "\" title=\"" + esc(t("abrirFila")) + "\">" + esc(t("fichaFila")) + " " + e.fila + "</button>" : "") +
+        (e.ph === "inc" ? "<span class=\"pill p-bad\">" + esc(t("ph").inc) + "</span>" : "");
+      var cuerpo = "";
+      if (e.det) {
+        cuerpo += e.det.length > 160 ? "<details><summary>" + esc(t("verTexto")) + "</summary><pre>" + esc(e.det) + "</pre></details>" : "<div class=\"why\">" + esc(e.det) + "</div>";
+      }
+      if (e.ev === "ValidacionTerminada" && (fallidas.length || rechazadas.length)) {
+        cuerpo += "<details><summary>" + esc(t("verReglas")) + "</summary><ul class=\"rules\">" +
+          fallidas.map(function (r) { return "<li><b>" + esc(r[1]) + "</b> · " + esc(r[3]) + " — " + esc(r[4]) + "</li>"; }).join("") +
+          rechazadas.map(function (f) { return "<li><b>" + esc(t("fichaFila")) + " " + f.n + "</b> — " + esc(f.msg) + "</li>"; }).join("") + "</ul></details>";
+      }
+      if (e.ev === "AcuseEnviado" && s.acuseTxt) cuerpo += "<details><summary>" + esc(t("verCont")) + "</summary><pre>" + esc(s.acuseTxt) + "</pre></details>";
+      if (e.ev === "RespuestaFinalEnviada" && s.respTxt) cuerpo += "<details><summary>" + esc(t("verCont")) + "</summary><pre>" + esc(s.respTxt) + "</pre></details>";
+      var nuevoDia = dia(e.f) !== diaAnt; diaAnt = dia(e.f);
+      html += "<li class=\"ev c-" + e.ph + "\"><div class=\"t num\"><b>" + (nuevoDia ? dia(e.f) + " " : "") + hora(e.f) + "</b><span>" + transcurrido(s.rec, e.f) + "</span></div><div class=\"dot\"></div>" +
+        "<div class=\"card\"><div class=\"ti\">" + esc(nombre) + "</div><div class=\"me\">" + me + "</div>" + cuerpo + "</div></li>";
+    });
+    return bar + "<ol class=\"tl\">" + html + "</ol>";
+  }
+
+  function pintarTimeline() { var el = document.getElementById("tl"); if (el) el.innerHTML = timeline(estado.sol); }
+
+  // ------------------------------------------------------------------ formulario de Auditoría de Fila (diálogo)
+  function abrirFila(n) {
+    var f = estado.sol.filas.filter(function (x) { return x.n === Number(n); })[0];
+    if (!f) return;
+    document.getElementById("dlgT").textContent = estado.sol.n + " · " + t("fichaFila") + " " + f.n;
+    document.getElementById("dlgB").innerHTML = "<div class=\"flds\">" +
+      fld(t("cEst"), pill(ESTADO_FILA, f.e)) + fld(t("fG"), esc(f.g)) + fld(t("fP"), esc(f.p)) + fld(t("fB"), esc(f.b)) +
+      fld(t("fTipoId"), esc(f.tid)) + fld(t("fNumId"), "<span class=\"num\">" + esc(f.nid) + "</span>") + fld(t("fCta"), "<span class=\"num\">" + esc(f.cta) + "</span>") +
+      fld(t("fBanco"), esc(f.banco)) + fld(t("fMon"), esc(f.mon)) + fld(t("fRefR"), esc(f.refr)) + fld(t("fRefV"), esc(f.refv)) +
+      fld(t("fDig"), esc(f.dig ? f.dig + " · " + fecha(f.fd) : "")) + fld(t("fApr"), esc(f.apr ? f.apr + " · " + fecha(f.fa) : "")) + "</div>" +
+      "<div class=\"flds\">" + fld(t("fMsg"), esc(f.msg)) + fld(t("fNota"), esc(f.nota)) + "</div>";
+    var dlg = document.getElementById("dlg");
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+  }
+
+  // ------------------------------------------------------------------ pintar todo
+  function pintar() {
+    document.documentElement.lang = en() ? "en" : "es";
+    document.getElementById("appSub").textContent = t("sub");
+    document.getElementById("lblRol").textContent = t("rol");
+    document.getElementById("lblIdioma").textContent = t("idioma");
+    document.getElementById("mockNote").textContent = t("mock");
+    document.getElementById("dlgX").setAttribute("aria-label", t("cerrar"));
+    document.getElementById("rol").value = estado.rol;
+    document.getElementById("idioma").value = estado.lcid;
+    pintarNav();
+    var main = document.getElementById("main");
+    if (estado.vista === "form" && estado.sol) { main.innerHTML = formulario(estado.sol); pintarTimeline(); }
+    else if (estado.vista === "bit") main.innerHTML = vistaBitacora();
+    else if (estado.vista === "fil") main.innerHTML = vistaFilas();
+    else main.innerHTML = vistaSolicitudes();
+  }
+
+  function abrirSolicitud(id) { estado.sol = solPorId(id); estado.vista = "form"; estado.filtro = "todo"; estado.fila = ""; pintar(); document.getElementById("main").scrollTop = 0; }
+
+  document.addEventListener("click", function (ev) {
+    var el = ev.target.closest("[data-v],[data-sol],[data-fila],[data-filtro],[data-cmd],[data-selfila],#btnPrint,#dlgX");
+    if (!el) return;
+    if (el.id === "dlgX") { document.getElementById("dlg").close(); return; }
+    if (el.id === "btnPrint") { toast(t("impToast")); return; }
+    if (el.dataset.v) { estado.vista = el.dataset.v; pintar(); return; }
+    if (el.dataset.sol) { abrirSolicitud(el.dataset.sol); return; }
+    if (el.dataset.fila) { abrirFila(el.dataset.fila); return; }
+    if (el.dataset.filtro) { estado.filtro = el.dataset.filtro; estado.fila = ""; pintarTimeline(); return; }
+    if (el.dataset.cmd) { toast(t("hecho") + el.dataset.cmd); return; }
+    if (el.dataset.selfila) {
+      var k = el.dataset.selfila;
+      if (estado.selFilas[k]) delete estado.selFilas[k]; else estado.selFilas[k] = el.dataset.est;
+      pintar();
+    }
+  });
+  document.addEventListener("change", function (ev) {
+    if (ev.target.id === "rol") { estado.rol = ev.target.value; guardar(); pintar(); }
+    if (ev.target.id === "idioma") { estado.lcid = ev.target.value; guardar(); pintar(); }
+    if (ev.target.id === "selFila") { estado.fila = ev.target.value; pintarTimeline(); }
+  });
+
+  // Abre directo en el formulario de la solicitud más completa: es lo que hay que aprobar.
+  estado.sol = SOL[0]; estado.vista = "form";
+  pintar();
+})();
+</script>

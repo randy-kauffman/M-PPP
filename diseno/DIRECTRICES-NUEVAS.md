@@ -1146,3 +1146,162 @@ refresca los grupos al iniciar sesión o cada 8 horas. Consecuencias:
 
 - Sincronizar los equipos de grupo de Entra con un flujo (`SyncGroupMembersToTeam`).
 - Cambiar los mensajes o la lógica de las transiciones.
+
+# DN-09 · Auditoría: rol, vista, formulario con timeline y botones por rol
+
+Recibida el **2026-11-27** del aprobador. Piden una vista de auditoría y un rol para auditores. La pregunta que tiene que
+contestar, lo más intuitivo posible (qué, quién, cuándo, cómo, por qué):
+
+1. Qué solicitud recibimos.
+2. Qué pasó con ella (si se validó o no, y por qué).
+3. Qué recibimos.
+4. Qué pasó con cada registro (quién hizo qué y por qué).
+5. Qué pasó con la solicitud.
+6. Si respondimos (cuándo y quién).
+
+**Estado: APROBADO el 2026-11-27 (Revisado queda solo para el Ejecutivo). Mockup en `diseno/mockups/auditoria.html`,
+pendiente de aprobación del aspecto antes de construir en Dev.**
+
+## Decisiones del aprobador (2026-11-27)
+
+| # | Decisión |
+|---|---|
+| 1 | Se arregla el hueco del "por qué" de las acciones sobre una fila (ver C) |
+| 2 | El auditor ve los números de cuenta y de identificación completos: no hay seguridad de columna |
+| 3 | El auditor puede ver **toda** la data. Lo nuevo es una vista y un formulario especializados para que le resulte fácil |
+| 4 | Va en un **área dentro de la app actual** (`sanic_mppp_mda_mantenimientoppp`), no en una app aparte |
+| 5 | El timeline es un **HTML visual** (web resource), no un subgrid |
+| 6 | Los botones de acción se **ocultan** a quien no le toca: cada uno lo ve solo el rol que lo puede usar. El auditor no ve ninguno |
+
+## Qué ya tenemos (sin datos nuevos)
+
+| Pregunta | Dónde está |
+|---|---|
+| 1. Qué recibimos | Solicitud: remitente, asunto, fecha recibido, `sanic_correocrudo` (.eml), `sanic_exceloriginal` |
+| 2. Qué pasó con ella | `sanic_estadoprocesamiento`, `sanic_motivoclasificacion`, `sanic_fechavalidada`, filas totales/válidas/rechazadas, y **Resultado de regla** (cada regla de Correo y Solicitud con resultado, razón y efecto de ese día) |
+| 3. Qué recibimos | Las Filas tal como llegaron |
+| 4. Cada registro | Fila: estado, `sanic_mensaje`, `sanic_notainterna`, `digitadapor`/`fechadigitada`, `aprobadapor`/`fechaaprobada`; y la **Bitácora** con quién y cuándo de cada transición |
+| 5. La solicitud | Fechas de procesada y cerrada, `sanic_requiererevision` + motivo, y la Bitácora |
+| 6. Respondimos | Fecha y contenido del acuse y de la respuesta final; en la Bitácora el actor es "Cuenta de servicio" (la respuesta es automática) |
+
+La Bitácora ya es **solo de alta** para los roles de MPPP (Ejecutivo y Supervisor la leen, el servicio de ingesta solo la
+crea): ningún rol de negocio puede editarla ni borrarla.
+
+## Diseño
+
+### A. Rol `SR - MPPP - Auditor`
+
+- **Solo lectura, alcance Global**, sobre: Solicitud, Fila, Bitácora, Resultado de regla, Regla, Parámetro, Cliente, Plan,
+  Autorizado, Autorización por plan y Autorización por cliente. Más los privilegios básicos que necesita cualquier usuario
+  de la app (los mismos del playbook de los otros roles), lectura de `systemuser` (para ver "digitó" y "aprobó") y acceso
+  a la app.
+- **Ningún** Create, Write, Delete, Append, AppendTo, Assign ni Share.
+- No es Ejecutivo, Supervisor ni RPA: el plugin no le autoriza ninguna transición (y no tiene `prvWrite` igual).
+- Se puede asignar directo o por equipo (DN-08 ya lo cubre del lado del servidor; del lado del cliente ver E).
+
+### B. Área "Auditoría" en la app actual
+
+Área nueva en el sitemap de `sanic_mppp_mda_mantenimientoppp`, con dos entradas: **Solicitudes** (abre la vista de
+auditoría) y **Bitácora**. Títulos en 1033 y 3082. Como todos los roles de MPPP leen Solicitud y Bitácora, el área la ven
+todos; el auditor además ve las demás áreas (decisión 3).
+
+### C. El "por qué" de cada acción sobre una fila (código, sin columnas nuevas)
+
+Hoy el step de post-transición de Fila escribe en la Bitácora quién y cuándo, pero deja `sanic_detalle` **vacío**. El
+motivo queda solo en la fila (`sanic_mensaje` / `sanic_notainterna`), y **la acción siguiente lo pisa** (una segunda
+devolución borra la primera nota; un rechazo en AS400 pisa el mensaje de validación).
+
+Cambio: la Bitácora de la transición guarda en `sanic_detalle` el texto que trajo esa acción:
+
+| Transición | `sanic_detalle` |
+|---|---|
+| Rechazada en AS400, Anulada | `Mensaje al cliente: <sanic_mensaje>`; si el RPA mandó además su texto crudo, una segunda línea `Nota interna: <sanic_notainterna>` |
+| Devuelta | `Nota interna: <sanic_notainterna>` |
+| Digitada, Aprobada | sin detalle (no piden texto) |
+
+Recortado a 10000 como hoy. Ensamblado nuevo. **No reconstruye lo anterior**: las filas ya trabajadas siguen sin el motivo
+en la Bitácora.
+
+### D. Vista y formularios
+
+**Vista "Solicitudes · Auditoría"** (Solicitud): N° · Recibida · Remitente · Estado · Filas válidas · Filas rechazadas ·
+Acuse enviado · Respuesta final enviada · Cerrada. Todas (activas e inactivas), más reciente primero.
+
+**Vista "Bitácora · Auditoría"** (Bitácora): Fecha · Solicitud · Evento · Fila · Quién · Origen · Detalle, más reciente
+primero. Sirve para la pregunta transversal ("todo lo que hizo tal persona", "todos los errores del mes").
+
+**Formulario principal "Auditoría" de Solicitud**, asignado **solo** al rol Auditor (los demás roles siguen con el de
+hoy). Una pestaña, todo de lectura:
+
+| Sección | Contenido |
+|---|---|
+| Encabezado | N° · Estado · Recibida · Cerrada |
+| 1 Qué recibimos | Remitente · Asunto · Correo (.eml) · Excel original · Motivo de clasificación |
+| 2 Qué pasó con la solicitud | Validada · Filas totales / válidas / rechazadas · Requiere revisión + motivo · subgrid Resultado de regla (Orden · Regla · Resultado · Efecto · Razón) |
+| 3 Qué pasó con cada registro | subgrid Filas (N° · Gestión · Plan · Beneficiario · Estado · Digitó · Aprobó · Mensaje al cliente) |
+| 4 Qué respondimos | Acuse: fecha + contenido · Respuesta final: fecha + contenido |
+| 5 Timeline | el web resource de F, a todo el ancho |
+
+**Formulario "Auditoría" de Fila**, asignado solo al Auditor: N° · Estado · Gestión · Plan · Beneficiario · Tipo y número
+de identificación · Cuenta · Banco · Moneda · Referencia recibida y vigente · Mensaje al cliente · Nota interna ·
+Digitó/cuándo · Aprobó/cuándo.
+
+### E. Botones según el rol (lo que `05` §5 ya decía y nunca se construyó)
+
+`05` §5 dice "visibles según rol y estado", pero hoy solo miran el **estado**. Se agrega el rol, en `recursos/js/comandos.js`,
+con la misma tabla del servidor (`TransicionesDeFila`) y de privilegios:
+
+| Botón | Lo ve |
+|---|---|
+| Digitada, Rechazada en AS400, Anular, Atendida, Descargar para digitar (Fila) | Ejecutivo |
+| Aprobar, Devolver (Fila) | Supervisor |
+| Atendido, Descartar, Revisado (Solicitud) | Ejecutivo (ver nota) |
+| Carga masiva, Activar/Desactivar masivo (catálogos) | Administrador de planes (ya está) |
+
+- **Quien tiene Ejecutivo y Supervisor a la vez no ve ninguno** de Fila ni Solicitud: el servidor lo bloquea igual (D-25).
+- Los roles salen de `Xrm.Utility.getGlobalContext().userSettings.roles`, que **incluye los roles heredados por equipo**
+  (Microsoft Learn, *getGlobalContext.userSettings*): queda alineado con DN-08. Se comparan por nombre (un rol existe una
+  vez por unidad de negocio con el mismo nombre).
+- **Ante la duda, se oculta** (si no se pueden leer los roles): ocultar no le quita nada a quien deba ver el botón,
+  porque la puerta real sigue siendo el servidor. La regla de estado de hoy se mantiene y se combina con esta (Y lógico).
+- **Nota sobre Revisado:** `05` §5 dice "Ejecutivo, Supervisor", pero el Supervisor **no tiene `prvWrite` sobre
+  Solicitud** (`playbooks/rol/sr_mppp_supervisor.md`), así que hoy el botón le falla siempre. Se muestra solo al
+  Ejecutivo, que es lo que el servidor permite. Si el negocio quiere que el Supervisor lo use, es otro cambio (darle
+  `prvWrite` sobre Solicitud, que la lista blanca ya limita a esas dos columnas).
+
+### F. El timeline: web resource `sanic_mppp_wr_html_auditoria`
+
+HTML embebido en la sección 5 del formulario de Solicitud. **Solo lee** (Xrm.WebApi del formulario padre): la Solicitud,
+su Bitácora, sus Filas y sus Resultados de regla. No escribe nada.
+
+- **Un eje vertical por tiempo**, agrupado en etapas con color propio: Recepción → Validación → Acuse → Trabajo sobre los
+  registros → Cierre y respuesta. Las incidencias (Error, Reintento, Requiere revisión, Revisión atendida, Vencida) se
+  marcan aparte, en color de alerta.
+- **Cada evento**: hora local del usuario, cuánto pasó desde que se recibió el correo, qué pasó, **quién** (o "Cuenta de
+  servicio"), y el **por qué** (`sanic_detalle`, expandible si es largo). Los eventos de una fila llevan su chip "Fila 3",
+  que abre la fila.
+- **Validación**: el evento muestra el resumen y despliega las reglas no cumplidas con su razón y su efecto.
+- **Acuse y respuesta final**: despliegan el contenido que se le mandó al cliente.
+- **Filtros** arriba: Todo · Solicitud · Registros · Incidencias, y un selector de fila que muestra el **recorrido de una
+  sola fila** (sale de `sanic_numerofila`: no hace falta el lookup de Bitácora a Fila).
+- **Imprimir** (evidencia para el auditor): versión limpia del timeline.
+- Textos en 1033 y 3082; respeta el tema y el tamaño de la sección; sin librerías externas.
+
+## Construcción (con orden del aprobador, después del mockup)
+
+1. **Mockup** del formulario de Auditoría con el timeline, 100% funcional con datos ficticios, para aprobar el aspecto.
+2. Código del plugin (C): pruebas del arquitecto (detalle por transición, recortes, RPA con los dos textos), implementa
+   Sonnet, revisa Sonnet. Ensamblado nuevo.
+3. `comandos.js` (E): reglas por rol + pruebas de la lógica pura. El web resource del timeline (F).
+4. Playbooks y construcción en Dev: rol, vistas, formularios (asignados al rol), sitemap, ribbon (las `EnableRule` nuevas)
+   y web resources.
+5. En vivo: un usuario solo con Auditor (directo y por equipo) ve el área, las vistas y el formulario, **no ve ningún
+   botón** y no puede escribir; un Ejecutivo y un Supervisor ven solo los suyos; una devolución y un rechazo nuevos dejan
+   su motivo en la Bitácora y en el timeline.
+6. Todo en el parche `sanic_mppp_sol_parche_1_3_1` (versión siguiente).
+
+## Fuera de alcance
+
+- Reconstruir el motivo de las acciones anteriores a C.
+- Una columna lookup de Bitácora a Fila (el timeline por fila sale del número).
+- La auditoría nativa de Dataverse (cambios de configuración y de parámetros): ya existe y retiene 365 días (D-53).
