@@ -1095,8 +1095,8 @@ equipos no exige privilegios nuevos a nadie). Dos funciones:
 
 Las tres tablas son **intersect entities**: sus columnas llegan como `Guid` crudo, no como `EntityReference` (D-59 y el
 defecto del 2026-09-23). Se lee con el mismo `IdDe` que acepta los dos tipos. Las listas `In` vacías no se mandan
-(Dataverse no admite un `In` sin valores). Sin paginación, igual que las cuatro consultas de hoy: los usuarios con roles de
-MPPP son decenas, no miles (corregido al escribir las firmas: el doble en memoria tampoco simula páginas).
+(Dataverse no admite un `In` sin valores).
+Pagina: lee todas las páginas (MoreRecords + PagingCookie). Un equipo de grupo de Entra con el rol puede tener miles de miembros (revisión de código, 2026-11-27). Por eso la carga masiva ya no falla por foto incompleta en roles: la foto queda completa.
 
 Firmas finales (`Datos/RolesDeMppp.cs`): `IdsPorNombre(servicio, nombres)` (todos los ids por nombre, una consulta),
 `RolesDelUsuario(servicio, usuarioId, roleIds)` y `UsuariosConElRol(servicio, roleIds, usuariosFiltro)`. El "rol no

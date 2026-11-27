@@ -13,13 +13,13 @@ namespace Sanic.Mppp.Plugins.Datos
     /// `FotoDeCatalogosDataverse` (carga masiva) y `PuertaDelRpa`, para que no vuelvan a divergir.
     ///
     /// Contrato (lo fijan las pruebas del arquitecto, `Dn08Aceptacion`):
-    ///  - número FIJO de consultas, nunca una por equipo ni por usuario (a lo sumo 1 en <see cref="IdsPorNombre"/> y 3 en
-    ///    cada una de las otras dos; páginas aparte);
+    ///  - número FIJO de consultas POR PÁGINA, nunca una por equipo ni por usuario (a lo sumo 1 en <see cref="IdsPorNombre"/> y 3 en
+    ///    cada una de las otras dos; cada consulta se repite solo para pedir su página siguiente);
     ///  - las tres tablas son intersect entities: sus columnas llegan como `Guid` crudo; se aceptan también como
     ///    `EntityReference`, por si el SDK cambia (mismo criterio que D-59);
     ///  - una lista `In` vacía no se manda (Dataverse no la admite): sin ids que buscar se devuelve vacío sin consultar;
-    ///  - no se pagina, igual que las cuatro consultas de antes: los usuarios con roles de MPPP son decenas, no miles;
-    ///  - no lanza por "no hay rol": decidir qué significa un rol no instalado es de cada llamador.
+    ///  - PAGINA: cada consulta lee todas las páginas (`MoreRecords` + `PagingCookie`), porque un equipo de grupo de Entra con el
+    ///    rol puede tener miles de miembros y truncar en silencio dejaría usuarios sin aviso ni permiso;
     /// </summary>
     public static class RolesDeMppp
     {
@@ -35,7 +35,7 @@ namespace Sanic.Mppp.Plugins.Datos
 
             var consulta = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet("name") };
             consulta.Criteria.AddCondition("name", ConditionOperator.In, nombres.Cast<object>().ToArray());
-            foreach (var rol in servicio.RetrieveMultiple(consulta).Entities)
+            foreach (var rol in LeerTodo(servicio, consulta))
             {
                 resultado[rol.Id] = rol.GetAttributeValue<string>("name");
             }
@@ -57,7 +57,7 @@ namespace Sanic.Mppp.Plugins.Datos
             var directas = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet("roleid") };
             directas.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, usuarioId);
             directas.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(pedidos));
-            foreach (var fila in servicio.RetrieveMultiple(directas).Entities)
+            foreach (var fila in LeerTodo(servicio, directas))
             {
                 var id = IdDe(fila, "roleid");
                 if (id.HasValue && pedidos.Contains(id.Value)) tiene.Add(id.Value);
@@ -67,7 +67,7 @@ namespace Sanic.Mppp.Plugins.Datos
             var membresias = new QueryExpression(TablasNativas.MiembroDeEquipo) { ColumnSet = new ColumnSet("teamid") };
             membresias.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, usuarioId);
             var equipos = new HashSet<Guid>();
-            foreach (var fila in servicio.RetrieveMultiple(membresias).Entities)
+            foreach (var fila in LeerTodo(servicio, membresias))
             {
                 var id = IdDe(fila, "teamid");
                 if (id.HasValue) equipos.Add(id.Value);
@@ -80,7 +80,7 @@ namespace Sanic.Mppp.Plugins.Datos
             var porEquipo = new QueryExpression(TablasNativas.RolDeEquipo) { ColumnSet = new ColumnSet("roleid", "teamid") };
             porEquipo.Criteria.AddCondition("teamid", ConditionOperator.In, Valores(equipos));
             porEquipo.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(pedidos));
-            foreach (var fila in servicio.RetrieveMultiple(porEquipo).Entities)
+            foreach (var fila in LeerTodo(servicio, porEquipo))
             {
                 var id = IdDe(fila, "roleid");
                 if (id.HasValue && pedidos.Contains(id.Value)) tiene.Add(id.Value);
@@ -107,7 +107,7 @@ namespace Sanic.Mppp.Plugins.Datos
             var directas = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet("systemuserid", "roleid") };
             directas.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(roles));
             if (filtro != null) directas.Criteria.AddCondition("systemuserid", ConditionOperator.In, Valores(filtro));
-            foreach (var fila in servicio.RetrieveMultiple(directas).Entities)
+            foreach (var fila in LeerTodo(servicio, directas))
             {
                 var id = IdDe(fila, "systemuserid");
                 if (id.HasValue && (filtro == null || filtro.Contains(id.Value))) usuarios.Add(id.Value);
@@ -117,7 +117,7 @@ namespace Sanic.Mppp.Plugins.Datos
             var porEquipo = new QueryExpression(TablasNativas.RolDeEquipo) { ColumnSet = new ColumnSet("teamid", "roleid") };
             porEquipo.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(roles));
             var equipos = new HashSet<Guid>();
-            foreach (var fila in servicio.RetrieveMultiple(porEquipo).Entities)
+            foreach (var fila in LeerTodo(servicio, porEquipo))
             {
                 var id = IdDe(fila, "teamid");
                 if (id.HasValue) equipos.Add(id.Value);
@@ -129,13 +129,36 @@ namespace Sanic.Mppp.Plugins.Datos
             var miembros = new QueryExpression(TablasNativas.MiembroDeEquipo) { ColumnSet = new ColumnSet("systemuserid", "teamid") };
             miembros.Criteria.AddCondition("teamid", ConditionOperator.In, Valores(equipos));
             if (filtro != null) miembros.Criteria.AddCondition("systemuserid", ConditionOperator.In, Valores(filtro));
-            foreach (var fila in servicio.RetrieveMultiple(miembros).Entities)
+            foreach (var fila in LeerTodo(servicio, miembros))
             {
                 var id = IdDe(fila, "systemuserid");
                 if (id.HasValue && (filtro == null || filtro.Contains(id.Value))) usuarios.Add(id.Value);
             }
 
             return usuarios;
+        }
+
+        private const int TamanoDePagina = 5000;
+
+        /// <summary>
+        /// Todas las filas de la consulta, página por página. La PRIMERA petición va sin tocar `PageInfo`; mientras la respuesta
+        /// diga `MoreRecords`, se pide la siguiente con su `PagingCookie`.
+        /// </summary>
+        private static List<Entity> LeerTodo(IOrganizationService servicio, QueryExpression consulta)
+        {
+            var filas = new List<Entity>();
+            var respuesta = servicio.RetrieveMultiple(consulta);
+            filas.AddRange(respuesta.Entities);
+            var pagina = 1;
+            while (respuesta.MoreRecords)
+            {
+                pagina++;
+                consulta.PageInfo = new PagingInfo { Count = TamanoDePagina, PageNumber = pagina, PagingCookie = respuesta.PagingCookie };
+                respuesta = servicio.RetrieveMultiple(consulta);
+                filas.AddRange(respuesta.Entities);
+            }
+
+            return filas;
         }
 
         private static object[] Valores(IEnumerable<Guid> ids) => ids.Cast<object>().ToArray();

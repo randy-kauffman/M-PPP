@@ -179,7 +179,7 @@ namespace Sanic.Mppp.Plugins.Datos
         /// </summary>
         private List<Guid> IdsDelRolEjecutivo()
         {
-            var roles = RolesDeMppp.IdsPorNombre(SinTruncar(), new[] { RolEjecutivo }).Keys.ToList();
+            var roles = RolesDeMppp.IdsPorNombre(_sistema, new[] { RolEjecutivo }).Keys.ToList();
             if (roles.Count == 0)
             {
                 throw new InvalidOperationException(
@@ -192,47 +192,11 @@ namespace Sanic.Mppp.Plugins.Datos
 
         /// <summary>
         /// Los usuarios de la lista que tienen alguno de esos roles, asignado directo o heredado por un equipo (DN-08):
-        /// lo resuelve <see cref="RolesDeMppp"/> (que acepta `Guid` crudo o `EntityReference` en las intersect entities).
+        /// lo resuelve <see cref="RolesDeMppp"/> (que lee todas las páginas y acepta `Guid` crudo o `EntityReference` en las intersect entities).
         /// </summary>
         private HashSet<Guid> IdsDeUsuariosConElRol(IReadOnlyCollection<Guid> usuariosIds, IReadOnlyCollection<Guid> roles)
         {
-            return new HashSet<Guid>(RolesDeMppp.UsuariosConElRol(SinTruncar(), roles, usuariosIds));
-        }
-
-        /// <summary>
-        /// `RolesDeMppp` no pagina (son decenas de usuarios), pero la carga masiva nunca trabaja con una foto incompleta: este
-        /// envoltorio hace que cualquier consulta de roles con más registros de los que cupieron en una página falle igual que
-        /// <see cref="LeerRegistros"/>, nombrando la tabla.
-        /// </summary>
-        private IOrganizationService SinTruncar() => new ServicioSinTruncar(_sistema);
-
-        private sealed class ServicioSinTruncar : IOrganizationService
-        {
-            private readonly IOrganizationService _real;
-
-            public ServicioSinTruncar(IOrganizationService real) { _real = real; }
-
-            public EntityCollection RetrieveMultiple(QueryBase consulta)
-            {
-                var respuesta = _real.RetrieveMultiple(consulta);
-                if (respuesta.MoreRecords)
-                {
-                    var tabla = (consulta as QueryExpression)?.EntityName;
-                    throw new InvalidOperationException(
-                        "La consulta sobre la tabla '" + tabla + "' tiene más registros de los que devolvió en una página. "
-                        + "No se trabaja con una foto incompleta: partí el archivo en uno más chico.");
-                }
-
-                return respuesta;
-            }
-
-            public Guid Create(Entity entity) => _real.Create(entity);
-            public void Update(Entity entity) => _real.Update(entity);
-            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _real.Retrieve(entityName, id, columnSet);
-            public void Delete(string entityName, Guid id) => _real.Delete(entityName, id);
-            public OrganizationResponse Execute(OrganizationRequest request) => _real.Execute(request);
-            public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Associate(entityName, entityId, relationship, relatedEntities);
-            public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Disassociate(entityName, entityId, relationship, relatedEntities);
+            return new HashSet<Guid>(RolesDeMppp.UsuariosConElRol(_sistema, roles, usuariosIds));
         }
 
         // ================================================================================================ piezas comunes
