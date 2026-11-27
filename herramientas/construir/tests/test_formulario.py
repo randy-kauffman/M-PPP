@@ -414,6 +414,93 @@ class ContraElEntorno(Base):
         self.assertFalse(cliente.hubo_escritura())
 
 
+ROL_ID = "053cb584-cbb5-f111-aaad-000d3a350099"
+
+
+class FormularioPorRol(Base):
+    """DN-09: un segundo formulario principal que solo ven unos roles, al lado del general de la tabla."""
+
+    def por_rol(self, **cambios):
+        return comp(nombre="Auditoria", roles=["SR - MPPP - Auditor"], **cambios)
+
+    def armar_roles(self, cliente, form=None, otros=(), filas_rol=None):
+        self.armar(cliente, form=form)
+        lista = ([form] if form else []) + list(otros)
+        cliente._reglas.insert(0, ("GET", lambda r: r.startswith("systemforms?"), (200, {"value": lista}, {})))
+        filas = [{"roleid": ROL_ID, "name": "SR - MPPP - Auditor"}] if filas_rol is None else filas_rol
+        cliente._reglas.insert(0, ("GET", lambda r: r.startswith("roles?"), (200, {"value": filas}, {})))
+        return cliente
+
+    def test_el_xml_lleva_las_display_conditions_despues_del_header(self):
+        x = fo.formxml(self.por_rol(), ETIQUETAS, {c: fo.CONTROL_POR_TIPO[TIPOS[c]] for c in TIPOS},
+                       {2: {"vista_id": "{" + VISTA_ID.upper() + "}", "relacion": "r"}}, [ROL_ID.upper()])
+        self.assertIn('</header><DisplayConditions Order="0"><Role Id="{' + ROL_ID + '}" /></DisplayConditions></form>', x)
+
+    def test_sin_roles_el_xml_queda_igual_que_antes(self):
+        self.assertNotIn("DisplayConditions", xml_de())
+
+    def test_roles_vacio_repetido_o_en_creacion_rapida_se_rechaza(self):
+        for malo in ([], [""], ["A", "A"], "SR - MPPP - Auditor"):
+            with self.subTest(roles=malo):
+                estado, _, _ = fo.construir(self.escribir(comp(roles=malo)), True, FabricaCentinela())
+                self.assertEqual("error", estado)
+        rapida = comp(clase="creacion_rapida", encabezado=[], roles=["X"],
+                      secciones=[{"titulo": "Motivo", "campos": ["sanic_mensaje"]}])
+        estado, _, detalle = fo.construir(self.escribir(rapida), True, FabricaCentinela())
+        self.assertEqual("error", estado)
+        self.assertIn("creación rápida", detalle)
+
+    def test_con_el_general_existente_crea_el_suyo_y_no_toca_el_general(self):
+        general = fila_form()   # se llama "Fila"
+        cliente = self.armar_roles(ClienteSimulado(), otros=[general])
+        creados = []
+
+        def alta(ruta, cuerpo, solucion):
+            creados.append(cuerpo)
+            nuevo = dict(fila_form(self.por_rol()), formid="aaaaaaaa-0000-0000-0000-000000000000", formxml=cuerpo["formxml"])
+            cliente._reglas.insert(0, ("GET", lambda r: r.startswith("systemforms?"), (200, {"value": [general, nuevo]}, {})))
+            return (204, {}, {})
+
+        cliente.responder("POST", lambda r: r == "systemforms", alta)
+        estado, _, detalle = fo.construir(self.escribir(self.por_rol()), False, lambda: cliente)
+        self.assertEqual("creado", estado, detalle)
+        self.assertEqual("Auditoria", creados[0]["name"])
+        self.assertIn('<Role Id="{' + ROL_ID + '}" />', creados[0]["formxml"])
+        self.assertFalse([l for l in cliente.llamadas if l["metodo"] == "PATCH"], "el general no se toca")
+        self.assertIn("solo para SR - MPPP - Auditor", detalle)
+
+    def test_solo_verificar_dice_que_falta_el_formulario_por_nombre(self):
+        cliente = self.armar_roles(ClienteSimulado(), otros=[fila_form()])
+        estado, _, detalle = fo.construir(self.escribir(self.por_rol()), True, lambda: cliente)
+        self.assertEqual("difiere", estado, detalle)
+        self.assertIn("'Auditoria'", detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_si_el_rol_no_existe_en_la_raiz_no_se_construye(self):
+        cliente = self.armar_roles(ClienteSimulado(), otros=[fila_form()], filas_rol=[])
+        estado, _, detalle = fo.construir(self.escribir(self.por_rol()), False, lambda: cliente)
+        self.assertEqual("bloqueado", estado, detalle)
+        self.assertIn("SR - MPPP - Auditor", detalle)
+        self.assertFalse(cliente.hubo_escritura())
+
+    def test_el_general_elige_el_suyo_por_nombre_cuando_hay_dos(self):
+        auditoria = fila_form(self.por_rol(), formid="aaaaaaaa-0000-0000-0000-000000000000")
+        cliente = self.armar(ClienteSimulado(), form=fila_form())
+        cliente._reglas.insert(0, ("GET", lambda r: r.startswith("systemforms?"),
+                                   (200, {"value": [auditoria, fila_form()]}, {})))
+        estado, _, detalle = fo.construir(self.escribir(), True, lambda: cliente)
+        self.assertEqual("ya_existia", estado, detalle)
+        self.assertIn(FORM_ID, detalle)
+
+    def test_el_general_con_dos_y_ninguno_con_su_nombre_es_error(self):
+        cliente = self.armar(ClienteSimulado(), form=fila_form())
+        otros = [fila_form(name="Otro"), fila_form(name="Auditoria")]
+        cliente._reglas.insert(0, ("GET", lambda r: r.startswith("systemforms?"), (200, {"value": otros}, {})))
+        estado, _, detalle = fo.construir(self.escribir(), True, lambda: cliente)
+        self.assertEqual("error", estado, detalle)
+        self.assertIn("el playbook deja de mandar", detalle)
+
+
 class Uso(Base):
     def test_una_bandera_desconocida_no_se_ignora_en_silencio(self):
         original, capturado = sys.argv, []

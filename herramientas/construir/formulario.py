@@ -109,7 +109,7 @@ CLAVES = {"tipo": str, "nombre": str, "tabla": str, "descripcion": str, "pestana
 
 # `clase` es OPCIONAL y por omisión vale "principal": así los ocho playbooks que ya
 # existían siguen valiendo sin tocarlos.
-CLAVES_OPCIONALES = {"clase": str}
+CLAVES_OPCIONALES = {"clase": str, "roles": list}
 CLASES = {"principal": FORMULARIO_PRINCIPAL, "creacion_rapida": FORMULARIO_CREACION_RAPIDA}
 CLASE_POR_DEFECTO = "principal"
 
@@ -127,6 +127,7 @@ C_WEBRESOURCE = "la consulta del web resource del formulario (GET webresourceset
 C_VISTA = "la consulta de la vista de la subgrilla (GET savedqueries)"
 C_RELACION = "la consulta de la relación de la subgrilla (GET OneToManyRelationships)"
 C_COMPONENTES = "la consulta de pertenencia a la solución (GET solutioncomponents)"
+C_ROL = "la consulta del rol del formulario (GET roles)"
 
 COMPONENTE_TABLA = 1
 INCLUYE_SUBCOMPONENTES = 0
@@ -187,6 +188,14 @@ def _validar_estructura(datos):
             if "campos" not in s:
                 raise ErrorPlaybook(
                     f"la sección {i} no es de campos; un formulario de creación rápida solo admite campos")
+
+    if "roles" in datos:
+        # DN-09: un formulario principal que solo ven esos roles (el resto sigue con el de siempre).
+        roles = exigir_forma(datos["roles"], [str], "el bloque del formulario", "roles", no_vacio=True)
+        if any(not r.strip() for r in roles) or len(set(roles)) != len(roles):
+            raise ErrorPlaybook("'roles' lleva nombres de rol no vacíos y sin repetir")
+        if clase == "creacion_rapida":
+            raise ErrorPlaybook("'roles' es solo para formularios principales: el de creación rápida no se asigna por rol")
 
     exigir_sin_tildes(datos["nombre"], "nombre")
     if len(datos["nombre"]) > LARGO_NOMBRE:
@@ -302,10 +311,12 @@ def _celda_webresource(datos, ruta, nombre_control, etiqueta, web_resource, alto
         "</parameters></control></cell>")
 
 
-def formxml(datos, etiquetas, controles, subgrillas):
+def formxml(datos, etiquetas, controles, subgrillas, roles_ids=None):
     """El `formxml` completo. `etiquetas` y `controles` vienen de la metadata;
     `subgrillas` trae, por sección, el id de vista y el nombre de relación ya
-    resueltos contra el entorno."""
+    resueltos contra el entorno. `roles_ids` (DN-09): los `roleid` de la unidad raíz
+    de los roles que ven el formulario; sin ellos no se escribe `<DisplayConditions>`
+    y el formulario es para todos, como hasta ahora."""
     solo_lectura = datos["solo_lectura"]
     partes = ['<form headerdensity="HighWithControls"><tabs>',
               f'<tab verticallayout="true" id="{guid(datos["nombre"], "tab")}" IsUserDefined="1" '
@@ -356,7 +367,16 @@ def formxml(datos, etiquetas, controles, subgrillas):
             partes.append(f'<cell id="{guid(datos["nombre"], f"hdr{k}")}" showlabel="false" '
                           f'labelid="{guid(datos["nombre"], f"hdr{k}", "label")}">'
                           '<labels><label description="" languagecode="1033" /></labels></cell>')
-    partes.append("</row></rows></header></form>")
+    partes.append("</row></rows></header>")
+    if roles_ids:
+        # Forma y lugar sacados de formularios REALES del entorno (contact "Portal Contact (Enhanced)",
+        # 2026-11-27): `<DisplayConditions Order="n"><Role Id="{guid}" />...</DisplayConditions>`, después
+        # del header (y del footer y la navegación, que este formulario no tiene). `Order="0"`: entre los
+        # formularios que la persona puede ver, este va primero. Sin `FallbackForm`: no es el de respaldo.
+        partes.append('<DisplayConditions Order="0">')
+        partes.extend(f'<Role Id="{{{r.lower()}}}" />' for r in roles_ids)
+        partes.append("</DisplayConditions>")
+    partes.append("</form>")
     return "".join(partes)
 
 
@@ -414,7 +434,14 @@ def _exigir_webresource(dv, nombre):
             f"{filas[0].get('webresourcetype')}): un control de formulario solo muestra HTML")
 
 
-def _leer_formulario(dv, tabla, tipo):
+def _leer_formulario(dv, tabla, tipo, nombre, por_nombre):
+    """El formulario de este playbook, o `None`.
+
+    - `por_nombre` (un formulario con `roles`, DN-09): convive con el formulario general de la tabla, así
+      que se busca SOLO por su nombre; si no existe se crea, y el general no se toca.
+    - sin `por_nombre`: si la tabla tiene un solo formulario de ese tipo, es el del playbook (como siempre,
+      aunque se llame distinto: así se corrige el nombre). Si tiene varios, es el que se llama como el
+      playbook; ninguno o más de uno con ese nombre es un error."""
     # El filtro por `type` es obligatorio: una tabla puede tener un formulario principal Y uno
     # de creación rápida, y leer el que no es haría que la herramienta crea que el suyo no
     # existe y lo duplique.
@@ -422,11 +449,30 @@ def _leer_formulario(dv, tabla, tipo):
             f"&$filter=objecttypecode eq '{tabla}' and type eq {tipo}")
     cuerpo = leer_entorno(dv, ruta, C_FORM)
     filas = exigir_forma(cuerpo.get("value"), [dict], C_FORM, "value")
-    if len(filas) > 1:
-        raise ErrorEntorno(
-            f"{C_FORM} devolvió {len(filas)} formularios principales de '{tabla}'; se esperaba uno solo. "
-            "Con dos Main compitiendo, la plataforma elige uno y el playbook deja de mandar")
+    con_nombre = [f for f in filas if f.get("name") == nombre]
+    if por_nombre or len(filas) > 1:
+        if len(con_nombre) > 1 or (not por_nombre and not con_nombre):
+            raise ErrorEntorno(
+                f"{C_FORM} devolvió {len(filas)} formularios principales de '{tabla}' y {len(con_nombre)} "
+                f"se llaman '{nombre}'; se esperaba uno solo con ese nombre. "
+                "Con dos Main compitiendo, la plataforma elige uno y el playbook deja de mandar")
+        return con_nombre[0] if con_nombre else None
     return filas[0] if filas else None
+
+
+def _ids_de_roles(dv, nombres):
+    """El `roleid` de cada rol en la unidad de negocio RAÍZ (`_parentroleid_value` nulo): un rol existe una vez
+    por unidad de negocio, y el formulario se asigna al de la raíz, que es el que viaja en la solución."""
+    ids = []
+    for nombre in nombres:
+        literal = nombre.replace("'", "''")
+        cuerpo = leer_entorno(dv, f"roles?$select=roleid,name&$filter=name eq '{literal}' and _parentroleid_value eq null", C_ROL)
+        filas = exigir_forma(cuerpo.get("value"), [dict], C_ROL, "value")
+        if len(filas) != 1:
+            raise Bloqueado(f"el rol '{nombre}' tiene {len(filas)} filas en la unidad de negocio raíz; se esperaba una. "
+                            "Hay que construir el rol antes que el formulario")
+        ids.append(exigir_forma(filas[0].get("roleid"), str, C_ROL, "roleid", no_vacio=True))
+    return ids
 
 
 def _normalizar_xml(texto):
@@ -501,21 +547,24 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
             # lo mira. Se comprueba antes.
             _exigir_webresource(dv, s["webresource"]["nombre"])
 
-    xml = formxml(datos, etiquetas, controles, subgrillas)
-    form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos))
+    por_nombre = "roles" in datos
+    roles_ids = _ids_de_roles(dv, datos["roles"]) if por_nombre else None
+    xml = formxml(datos, etiquetas, controles, subgrillas, roles_ids)
+    form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos), datos["nombre"], por_nombre)
     hubo_escritura = False
     hubo_alta = False
 
     if form is None:
         if solo_verificar:
-            return "difiere", componente, f"la tabla '{datos['tabla']}' no tiene formulario principal"
+            falta = f"el formulario '{datos['nombre']}'" if por_nombre else "formulario principal"
+            return "difiere", componente, f"la tabla '{datos['tabla']}' no tiene {falta}"
         cuerpo = {"name": datos["nombre"], "description": datos["descripcion"],
                   "objecttypecode": datos["tabla"], "type": tipo_de_formulario(datos),
                   "formxml": xml, "formactivationstate": ACTIVO}
         est, resp, _ = escribir_metadatos(dv, "POST", "systemforms", cuerpo, dormir=dormir, solucion=solucion)
         if est not in (200, 201, 204):
             return "error", componente, f"el alta devolvió HTTP {est} (se esperaba 204): {resp}"
-        form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos))
+        form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos), datos["nombre"], por_nombre)
         if form is None:
             return "error", componente, "el alta no dio error pero el formulario no aparece al releer"
         hubo_escritura = True
@@ -531,7 +580,7 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
             est, resp, _ = _publicar(dv, datos["tabla"], dormir)
             if est not in (200, 204):
                 return "error", componente, f"se corrigió pero la publicación devolvió HTTP {est}: {resp}"
-            form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos))
+            form = _leer_formulario(dv, datos["tabla"], tipo_de_formulario(datos), datos["nombre"], por_nombre)
             hubo_escritura = True
 
     id_form = exigir_forma(form.get("formid"), str, C_FORM, "formid", no_vacio=True)
@@ -553,7 +602,8 @@ def _contra_entorno(dv, datos, identidad, solo_verificar, completar, componente,
     return estado_de_escritura(hubo_alta, hubo_escritura), componente, (
         f"formid {id_form}, {len(datos['secciones'])} secciones, {cuantas} campos, "
         f"{len(subgrillas)} subgrillas, {len(datos['encabezado'])} en el encabezado"
-        f"{', todo de solo lectura' if datos['solo_lectura'] else ''}; viaja dentro de la tabla")
+        f"{', todo de solo lectura' if datos['solo_lectura'] else ''}"
+        f"{', solo para ' + ', '.join(datos['roles']) if por_nombre else ''}; viaja dentro de la tabla")
 
 
 def construir(ruta_playbook, solo_verificar, fabrica_cliente, completar=False, dormir=None):

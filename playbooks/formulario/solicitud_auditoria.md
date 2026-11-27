@@ -16,24 +16,10 @@ Cómo se traduce DN-09 §D a lo que `formulario.py` sabe armar (cada diferencia 
 
 Los títulos de sección van sin tildes (BP-PP-197; `exigir_sin_tildes` los revisa).
 
-## 0. NO CONSTRUIR TODAVÍA: `formulario.py` no puede con este playbook
-
-Este playbook declara lo que el aprobador pidió (DN-09 §D: un segundo formulario principal por tabla, visible **solo** para el rol `SR - MPPP - Auditor`). `herramientas/construir/formulario.py` hoy hace dos cosas que lo vuelven **peligroso** para este caso, verificadas leyendo el código el 2026-11-27:
-
-| # | Qué hace hoy la herramienta | Qué pasaría con este playbook |
-|---|---|---|
-| 1 | `_leer_formulario(dv, tabla, tipo)` busca el Main **solo por tabla y tipo**, sin nombre, y **ACTUALIZA el que existe** (su docstring, decisión 1: «ACTUALIZA el formulario principal que ya existe, no crea uno nuevo»). Si encuentra dos Main, lanza `ErrorEntorno` | Con el formulario `Solicitud` ya construido, el `PATCH` le **cambiaría el nombre a «Auditoria» y le reemplazaría el `formxml`**: el formulario de los demás roles desaparecería. Y en cuanto exista el segundo Main, **todo** `formulario.py` de esa tabla (incluida la corrida de `Solicitud`) falla con «se esperaba uno solo» |
-| 2 | No lee ni escribe **ninguna** asignación por rol: el esquema (`CLAVES`) no tiene `roles` y el `formxml` que arma no trae `<DisplayConditions>` | Un playbook con la clave `roles` es rechazado («sobran [roles]»). Sin la clave, el formulario nacería visible para todos |
-
-**Cambio mínimo propuesto a la herramienta** (lo decide quien dirige la construcción; este playbook no lo hace):
-
-1. Clave opcional `roles` (lista de nombres de rol). Cuando está presente, el formulario es **adicional**: `_leer_formulario` agrega `and name eq '<nombre>'` al filtro, de modo que se busca el formulario por su nombre y **se crea** (`POST`) si no existe, sin tocar al Main existente. La guarda «uno solo» pasa a ser «uno solo con ese nombre».
-2. Con `roles`, la herramienta resuelve cada nombre a su `roleid` en la unidad raíz (igual que `app.py::_rol`) y escribe en el `formxml` el bloque de visibilidad `<DisplayConditions FallbackForm="false" Order="…"><Role Id="{roleid}" /></DisplayConditions>`. **El XML exacto hay que sacarlo de una muestra real** (asignar el rol a mano a un formulario de prueba, exportar la solución y leerlo), como ya se hizo con los `classid`; no se escribe de memoria. El `roleid` cambia por entorno: se resuelve en cada corrida y la verificación lo compara.
-3. El formulario existente (`Solicitud`) tiene que quedar **«Everyone» y habilitado como fallback**, que es la estrategia «formulario genérico» de Microsoft Learn (*Manage model-driven app forms settings* → *Set the fallback form for a table*). Probablemente ya lo está (un Main sin condiciones se comporta así), pero hay que **comprobarlo en la muestra**, no suponerlo.
-4. **Orden de formularios** (*Form order*): el de Auditoría tiene que ir **primero** (de más exclusivo a menos exclusivo), o el auditor abre el formulario genérico por omisión. Es un dato de la tabla/solución, no del `formxml` de un formulario; la herramienta tampoco lo cubre hoy. Si no se automatiza, es un paso manual documentado (Solutions → tabla → Forms → Form settings → Form order).
-5. Verificación nueva: `roles` del playbook = roles del `formxml` del entorno; y el formulario existente sigue con su nombre y su `formid`.
-
-Mientras eso no exista, **no se corre `formulario.py` sobre este playbook**: la validación offline del bloque de la sección 2 sí pasa (se comprobó con la herramienta, sin entorno), pero la construcción dañaría el formulario `Solicitud`.
+> **Formulario por rol (DN-09).** Lleva `roles`: `formulario.py` lo busca por su nombre, lo crea al lado del
+> formulario general de la tabla (que no se toca) y le escribe `<DisplayConditions Order="0">` con el rol de la
+> unidad raíz. El rol tiene que existir antes (`playbooks/rol/sr_mppp_auditor.md`). Soporte agregado a la
+> herramienta el 2026-11-27.
 
 ## 1. Identidad
 
@@ -56,12 +42,13 @@ Mientras eso no exista, **no se corre `formulario.py` sobre este playbook**: la 
 
 ## 2. Qué se crea
 
-El bloque cumple el esquema **actual** de `formulario.py` (sin `roles`): la asignación al rol está en la sección 0 y en la sección 5, no en el JSON.
+La asignación al rol va en la clave `roles` del bloque: `formulario.py` la convierte en `<DisplayConditions>`.
 
 ```json
 {
   "tipo": "formulario",
   "nombre": "Auditoria",
+  "roles": ["SR - MPPP - Auditor"],
   "tabla": "sanic_mppp_tbl_solicitud",
   "solo_lectura": true,
   "descripcion": "Formulario principal de Auditoria para Solicitud. Solo lectura y solo para el rol Auditor: recorre la solicitud de lo que se recibio a lo que se respondio, con la linea de tiempo.",
@@ -141,7 +128,7 @@ El bloque cumple el esquema **actual** de `formulario.py` (sin `roles`): la asig
 
 ## 4. Cómo se construye
 
-Hoy: **no se construye** (sección 0). Con el cambio propuesto en la herramienta:
+Después del rol `SR - MPPP - Auditor` y del web resource del timeline:
 
 ```
 python3 herramientas/construir/formulario.py playbooks/formulario/solicitud_auditoria.md
