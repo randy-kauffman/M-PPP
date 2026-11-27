@@ -317,5 +317,26 @@ namespace Sanic.Mppp.Plugins.Dominio
         /// <summary>Una fila "abierta" todavía espera trabajo en AS400: Validada o Digitada.</summary>
         public static bool EstaAbierta(EstadoDeLaFila estado) =>
             estado == EstadoDeLaFila.Validada || estado == EstadoDeLaFila.Digitada;
+
+        /// <summary>DN-09 C: prefijo de la línea del texto que lee el cliente en el `sanic_detalle` de la Bitácora.</summary>
+        public const string PrefijoMensajeAlCliente = "Mensaje al cliente: ";
+
+        /// <summary>DN-09 C: prefijo de la línea de la nota interna en el `sanic_detalle` de la Bitácora.</summary>
+        public const string PrefijoNotaInterna = "Nota interna: ";
+
+        /// <summary>
+        /// DN-09 C (diseno/DIRECTRICES-NUEVAS.md): el "por qué" de una transición, para el `sanic_detalle` de su Bitácora. La fila
+        /// guarda el texto en `sanic_mensaje` / `sanic_notainterna`, y la acción siguiente lo pisa; la Bitácora es la que no se pisa.
+        ///  - hacia **Rechazada en AS400** o **Anulada**: <see cref="PrefijoMensajeAlCliente"/> + mensaje y, si vino (el RPA manda
+        ///    los dos), una segunda línea (`\n`) <see cref="PrefijoNotaInterna"/> + nota;
+        ///  - hacia **Validada** (la devolución): solo <see cref="PrefijoNotaInterna"/> + nota; un mensaje que viniera se ignora;
+        ///  - hacia **Digitada** o **Aprobada**: siempre `null` (no piden texto);
+        ///  - los textos se recortan de espacios; uno vacío o solo espacios no genera línea; sin ninguna línea → `null`.
+        /// Función pura. El largo lo recorta quien escribe la Bitácora (10000), no esta función.
+        /// </summary>
+        public static string DetalleDeBitacora(EstadoDeLaFila hacia, string mensaje, string notaInterna)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
