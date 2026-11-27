@@ -336,7 +336,24 @@ namespace Sanic.Mppp.Plugins.Dominio
         /// </summary>
         public static string DetalleDeBitacora(EstadoDeLaFila hacia, string mensaje, string notaInterna)
         {
-            throw new NotImplementedException();
+            var mensajeLimpio = (mensaje ?? string.Empty).Trim();
+            var notaLimpia = (notaInterna ?? string.Empty).Trim();
+
+            switch (hacia)
+            {
+                case EstadoDeLaFila.RechazadaEnAS400:
+                case EstadoDeLaFila.Anulada:
+                    var lineas = new System.Collections.Generic.List<string>();
+                    if (mensajeLimpio.Length > 0) lineas.Add(PrefijoMensajeAlCliente + mensajeLimpio);
+                    if (notaLimpia.Length > 0) lineas.Add(PrefijoNotaInterna + notaLimpia);
+                    return lineas.Count == 0 ? null : string.Join("\n", lineas);
+
+                case EstadoDeLaFila.Validada:
+                    return notaLimpia.Length == 0 ? null : PrefijoNotaInterna + notaLimpia;
+
+                default:
+                    return null;
+            }
         }
     }
 }

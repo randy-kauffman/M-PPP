@@ -442,7 +442,12 @@ namespace Sanic.Mppp.Plugins.Steps
 
             var solicitudes = new SolicitudesDataverse(servicio);
             var actorTexto = PlomeriaDeFila.NombreDeQuienActua(servicio, contexto.InitiatingUserId);
-            solicitudes.RegistrarEvento(solicitudId, PlomeriaDeFila.AhoraUtc(contexto), evento.Value, OrigenDelEvento.Plugin, numeroFila, actorTexto, null);
+            // DN-09 C: el "por qué" de esta acción (solo lo que trajo ESTE Update) queda en la Bitácora, porque la acción siguiente lo pisa en la fila.
+            var detalle = TransicionesDeFila.DetalleDeBitacora(
+                hacia,
+                target.GetAttributeValue<string>("sanic_mensaje"),
+                target.GetAttributeValue<string>("sanic_notainterna"));
+            solicitudes.RegistrarEvento(solicitudId, PlomeriaDeFila.AhoraUtc(contexto), evento.Value, OrigenDelEvento.Plugin, numeroFila, actorTexto, detalle);
 
             PlomeriaDeFila.TomarElBloqueoDeLaSolicitud(servicio, solicitudId, contexto);
 
