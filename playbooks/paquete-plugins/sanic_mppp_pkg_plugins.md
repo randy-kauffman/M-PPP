@@ -39,6 +39,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.28.0 (2026-11-24)**: DN-07: regla IDENTIFICACION_DEL_TIPO (CNA con fecha y Módulo 23, RUC, PAS y PEX). Mismos tipos, sin steps nuevos. Después del despliegue: `herramientas/despliegue/dn07_datos.py`.
 
+**1.0.29.0 (2026-11-27)**: DN-08: los roles de MPPP heredados por un equipo (de propietario o de grupo de Entra) valen igual que los asignados directo, en las cuatro consultas (transiciones de Fila, avisos, carga masiva y puerta del RPA), con el componente `RolesDeMppp`; la puerta del RPA toma todos los ids del rol (uno por unidad de negocio). Mismos tipos, sin steps nuevos. Sin datos que cargar.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
