@@ -15,6 +15,8 @@ en Dataverse**: llama UNA vez (no fila por fila) a la Custom API
 `sanic_mppp_capi_exportarparadigitar` con `Xrm.WebApi.online.execute` y baja el `.xlsx` que
 devuelve con `Xrm.Navigation.openFile`.
 
+**Para actualizar el contenido de un web resource que ya existe hay que correr la herramienta con `--completar`**: sin esa bandera dice `difiere` y no escribe (verificado en DN-09, 2026-11-27).
+
 ## 1. Identidad
 
 ```json

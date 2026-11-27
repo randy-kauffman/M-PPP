@@ -1159,8 +1159,7 @@ contestar, lo más intuitivo posible (qué, quién, cuándo, cómo, por qué):
 5. Qué pasó con la solicitud.
 6. Si respondimos (cuándo y quién).
 
-**Estado: APROBADO el 2026-11-27 (Revisado queda solo para el Ejecutivo). Mockup en `diseno/mockups/auditoria.html`,
-pendiente de aprobación del aspecto antes de construir en Dev.**
+**Estado: APROBADO el 2026-11-27 y construido en Dev (ensamblado 1.0.30.0). Viaja en el parche sanic_mppp_sol_parche_1_3_1 1.3.1.4. Pendiente: verificación visual de botones y área con un usuario solo-Auditor (la hace el aprobador).**
 
 ## Decisiones del aprobador (2026-11-27)
 
