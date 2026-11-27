@@ -272,6 +272,154 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.True(Consultas(svc) - antes <= 3, $"hizo {Consultas(svc) - antes} consultas; el contrato es a lo sumo 3");
         }
 
+        // ================================================================================================ paginación (revisión DN-08)
+
+        /// <summary>
+        /// Envuelve el doble y devuelve, para UNA tabla, los resultados en páginas de <c>tamano</c>, como Dataverse a partir de
+        /// 5000: `MoreRecords` + `PagingCookie`, y respeta `PageInfo.PageNumber` del pedido. El doble no simula páginas, así
+        /// que acá se le saca el `PageInfo` antes de delegar y se corta el resultado completo. La primera página es la que se
+        /// pide SIN `PageInfo` (o con `PageNumber` 0 o 1).
+        /// </summary>
+        private sealed class PaginadoEn : IOrganizationService
+        {
+            private readonly OrganizationServiceEnMemoria _real;
+            private readonly string _tabla;
+            private readonly int _tamano;
+
+            public PaginadoEn(OrganizationServiceEnMemoria real, string tabla, int tamano) { _real = real; _tabla = tabla; _tamano = tamano; }
+
+            public List<int> PaginasPedidas { get; } = new List<int>();
+
+            public EntityCollection RetrieveMultiple(QueryBase query)
+            {
+                var q = (QueryExpression)query;
+                if (q.EntityName != _tabla) return _real.RetrieveMultiple(q);
+
+                var pagina = Math.Max(1, q.PageInfo?.PageNumber ?? 1);
+                if (pagina > 1) Assert.False(string.IsNullOrEmpty(q.PageInfo.PagingCookie), "la página siguiente se pide con la cookie de la anterior");
+                PaginasPedidas.Add(pagina);
+
+                var sinPaginas = new QueryExpression(q.EntityName) { ColumnSet = q.ColumnSet, Criteria = q.Criteria };
+                var todo = _real.RetrieveMultiple(sinPaginas).Entities.ToList();
+                var trozo = todo.Skip((pagina - 1) * _tamano).Take(_tamano).ToList();
+                return new EntityCollection(trozo)
+                {
+                    EntityName = q.EntityName,
+                    MoreRecords = pagina * _tamano < todo.Count,
+                    PagingCookie = "<cookie page=\"" + pagina + "\" />",
+                };
+            }
+
+            public Guid Create(Entity entity) => _real.Create(entity);
+            public void Update(Entity entity) => _real.Update(entity);
+            public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _real.Retrieve(entityName, id, columnSet);
+            public void Delete(string entityName, Guid id) => _real.Delete(entityName, id);
+            public OrganizationResponse Execute(OrganizationRequest request) => _real.Execute(request);
+            public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Associate(entityName, entityId, relationship, relatedEntities);
+            public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => _real.Disassociate(entityName, entityId, relationship, relatedEntities);
+        }
+
+        [Theory]
+        [InlineData("teammembership")]
+        [InlineData("teamroles")]
+        [InlineData("systemuserroles")]
+        public void UsuariosConElRol_lee_todas_las_paginas(string tabla)
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var eje = Rol(svc, TablasNativas.RolEjecutivo);
+            var esperados = new List<Guid>();
+            for (var e = 0; e < 3; e++)
+            {
+                var equipo = Equipo(svc, eje);
+                for (var u = 0; u < 3; u++)
+                {
+                    var id = Usuario(svc, $"Equipo{e}-{u}");
+                    Miembro(svc, id, equipo);
+                    esperados.Add(id);
+                }
+            }
+
+            for (var d = 0; d < 5; d++)
+            {
+                var id = Usuario(svc, $"Directo{d}");
+                Directo(svc, id, eje);
+                esperados.Add(id);
+            }
+
+            var paginado = new PaginadoEn(svc, tabla, tamano: 2);
+
+            var usuarios = RolesDeMppp.UsuariosConElRol(paginado, new[] { eje });
+
+            Assert.Equal(esperados.OrderBy(g => g), usuarios.OrderBy(g => g));
+            Assert.True(paginado.PaginasPedidas.Count > 1, "con páginas de 2 tuvo que pedir más de una");
+            Assert.Equal(Enumerable.Range(1, paginado.PaginasPedidas.Count), paginado.PaginasPedidas);
+        }
+
+        [Theory]
+        [InlineData("teammembership")]
+        [InlineData("teamroles")]
+        public void RolesDelUsuario_lee_todas_las_paginas(string tabla)
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var eje = Rol(svc, TablasNativas.RolEjecutivo);
+            var ana = Usuario(svc, "Ana");
+            // Ana está en 5 equipos; solo el ÚLTIMO tiene el rol (y los otros cuatro tienen otros roles pedidos que no son Ejecutivo).
+            var otros = Enumerable.Range(0, 4).Select(i => Rol(svc, "Otro " + i)).ToList();
+            foreach (var otro in otros) Miembro(svc, ana, Equipo(svc, otro));
+            Miembro(svc, ana, Equipo(svc, eje));
+            var pedidos = otros.Concat(new[] { eje }).ToList();
+
+            var roles = RolesDeMppp.RolesDelUsuario(new PaginadoEn(svc, tabla, tamano: 1), ana, pedidos);
+
+            Assert.Equal(pedidos.OrderBy(g => g), roles.OrderBy(g => g));
+        }
+
+        [Fact]
+        public void IdsPorNombre_lee_todas_las_paginas()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var ids = Enumerable.Range(0, 5).Select(_ => Rol(svc, TablasNativas.RolEjecutivo)).ToList();
+
+            var leidos = RolesDeMppp.IdsPorNombre(new PaginadoEn(svc, TablasNativas.Rol, tamano: 2), new[] { TablasNativas.RolEjecutivo });
+
+            Assert.Equal(ids.OrderBy(g => g), leidos.Keys.OrderBy(g => g));
+        }
+
+        [Fact]
+        public void El_aviso_llega_a_todos_los_miembros_aunque_el_equipo_ocupe_varias_paginas()
+        {
+            var svc = new OrganizationServiceEnMemoria();
+            var eje = Rol(svc, TablasNativas.RolEjecutivo);
+            var equipo = Equipo(svc, eje);
+            var miembros = Enumerable.Range(0, 7).Select(i => Usuario(svc, "M" + i)).ToList();
+            foreach (var m in miembros) Miembro(svc, m, equipo);
+
+            new AvisosDataverse(new PaginadoEn(svc, TablasNativas.MiembroDeEquipo, tamano: 3))
+                .AvisarAEjecutivos(Guid.NewGuid(), "Correo sin procesar", "Motivo: es una respuesta.");
+
+            var duenos = svc.Registros(TablasNativas.Notificacion).Select(n => n.GetAttributeValue<EntityReference>("ownerid").Id);
+            Assert.Equal(miembros.OrderBy(g => g), duenos.OrderBy(g => g));
+        }
+
+        [Fact]
+        public void En_la_carga_masiva_los_roles_en_varias_paginas_no_fallan_y_la_foto_queda_completa()
+        {
+            // La consulta de asignaciones va filtrada por los usuarios de la carga: para que ocupe varias páginas, Ana tiene el
+            // rol en tres unidades de negocio (tres ids con el mismo nombre) y páginas de 1.
+            var sistema = new OrganizationServiceEnMemoria();
+            var ana = Usuario(sistema, "Ana", correo: "ana@banco.com");
+            for (var i = 0; i < 3; i++) Directo(sistema, ana, Rol(sistema, TablasNativas.RolEjecutivo));
+
+            var filas = new[]
+            {
+                new FilaPlantilla { NumeroFilaExcel = 2, NumeroOrden = 1, Valores = new Dictionary<string, string>(StringComparer.Ordinal) { ["D"] = "ana@banco.com" } },
+            };
+            var foto = new FotoDeCatalogosDataverse(new OrganizationServiceEnMemoria(), new PaginadoEn(sistema, TablasNativas.UsuarioRol, tamano: 1))
+                .ParaCarga(ClavesDeCarga.Extraer(filas));
+
+            Assert.True(foto.Usuarios.Single(u => u.Id == ana).EsEjecutivo);
+        }
+
         // ================================================================================================ transiciones de Fila
 
         /// <summary>Lo mínimo para correr <see cref="TransicionDeFilaStep"/> como en <c>StepsDeFilaAceptacion</c>, pero con

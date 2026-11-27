@@ -196,10 +196,11 @@ namespace Sanic.Mppp.Plugins.Tests.Unitarias.Datos
             Assert.Contains(tabla, ex.Message);
         }
 
+        // DN-08: `role` y `systemuserroles` ya no se prueban acá. Las lee `RolesDeMppp`, que PAGINA (lee todas las páginas) en
+        // vez de fallar: la foto queda completa igual, que es lo que esta prueba protegía. Lo fija `Dn08Aceptacion`
+        // (`..._lee_todas_las_paginas`). `systemuser` sigue siendo de esta clase y sigue fallando.
         [Theory]
         [InlineData("systemuser")]
-        [InlineData("role")]
-        [InlineData("systemuserroles")]
         public void Si_una_consulta_de_usuarios_o_roles_trae_mas_registros_falla_nombrando_la_tabla(string tabla)
         {
             var truncado = new TruncadoEn(SistemaConEjecutiva(), tabla);
