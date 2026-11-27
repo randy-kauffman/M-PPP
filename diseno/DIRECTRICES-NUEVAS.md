@@ -1047,7 +1047,7 @@ el rol **solo en `systemuserroles`**, que guarda la asignación directa usuario 
 
 Mientras tanto el aprobador asignó el rol directo a la persona (alternativa B). Esta directriz es el arreglo de fondo.
 
-**Estado: APROBADO el 2026-11-27 tal como está. En construcción.**
+**Estado: APROBADO el 2026-11-27 y construido. Desplegado en Dev (ensamblado 1.0.29.0), probado en vivo con un usuario que tiene el rol Ejecutivo solo por el equipo ZZ-DN08. Viaja en el parche sanic_mppp_sol_parche_1_3_1 1.3.1.3 (solution/sanic_mppp_sol_parche_1_3_1_3_unmanaged.zip).**
 
 ## Dónde está el defecto (las cuatro consultas)
 
