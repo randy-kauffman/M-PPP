@@ -34,16 +34,16 @@ namespace Sanic.Mppp.Plugins.Steps
         }
 
         /// <summary>
-        /// Los roles de negocio del actor (Ejecutivo, Supervisor, RPA), con dos consultas fijas: los tres roles por
-        /// `name`, y las asignaciones de ESE usuario entre esos tres (diseno/04 §2 y §3; orden del constructor).
+        /// Los roles de negocio del actor (Ejecutivo, Supervisor, RPA), con un número FIJO de consultas (diseno/04 §2 y §3;
+        /// DN-08): los tres roles por `name` y, vía <see cref="RolesDeMppp"/>, los que el actor tiene asignados directo o por
+        /// un equipo (de propietario o de grupo de Entra). Las banderas de todas las fuentes se unen: Ejecutivo directo +
+        /// Supervisor por un grupo es "los dos roles" (D-25).
         /// </summary>
         internal static RolDeActor DeterminarRoles(IOrganizationService servicio, Guid actorId)
         {
-            var consultaRoles = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet("name") };
-            consultaRoles.Criteria.AddCondition(
-                "name", ConditionOperator.In, TablasNativas.RolEjecutivo, TablasNativas.RolSupervisor, TablasNativas.RolRpa);
-            var roles = servicio.RetrieveMultiple(consultaRoles).Entities;
-            if (roles.Count == 0)
+            var nombrePorRoleId = RolesDeMppp.IdsPorNombre(
+                servicio, new[] { TablasNativas.RolEjecutivo, TablasNativas.RolSupervisor, TablasNativas.RolRpa });
+            if (nombrePorRoleId.Count == 0)
             {
                 // Que NINGUNO de los tres roles exista en el entorno no es "este usuario no tiene rol":
                 // es la solución mal instalada, y lo arregla un administrador en minutos. Se dice, en vez
@@ -55,53 +55,16 @@ namespace Sanic.Mppp.Plugins.Steps
                     + "Sin ellos no se puede autorizar ninguna transición. Avisá al administrador del entorno.");
             }
 
-            var nombrePorRoleId = roles.ToDictionary(r => r.Id, r => r.GetAttributeValue<string>("name"));
-
-            var consultaAsignaciones = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet("roleid") };
-            consultaAsignaciones.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, actorId);
-            consultaAsignaciones.Criteria.AddCondition("roleid", ConditionOperator.In, nombrePorRoleId.Keys.Cast<object>().ToArray());
-            var asignaciones = servicio.RetrieveMultiple(consultaAsignaciones).Entities;
-
             var resultado = RolDeActor.Ninguno;
-            foreach (var asignacion in asignaciones)
+            foreach (var roleId in RolesDeMppp.RolesDelUsuario(servicio, actorId, nombrePorRoleId.Keys.ToList()))
             {
-                var roleId = IdDeLaAsignacion(asignacion);
-                if (roleId.HasValue && nombrePorRoleId.TryGetValue(roleId.Value, out var nombre))
+                if (nombrePorRoleId.TryGetValue(roleId, out var nombre))
                 {
                     resultado |= NombreARol(nombre);
                 }
             }
 
             return resultado;
-        }
-
-        /// <summary>
-        /// El `roleid` de una fila de `systemuserroles`, venga como venga.
-        ///
-        /// `systemuserroles` es una **intersect entity** (la N:N entre usuario y rol), y en Dataverse
-        /// real sus columnas son `Uniqueidentifier` crudos, NO lookups: leerlas como
-        /// `EntityReference` revienta con "Unable to cast object of type 'System.Guid'". Hasta el
-        /// 2026-09-23 se leían como `EntityReference` y las pruebas pasaban porque el doble en
-        /// memoria las sembraba así. El bug estuvo tapado por el `return` temprano de arriba: hasta
-        /// que los nombres de rol no coincidieron, esta línea nunca llegó a ejecutarse en el entorno.
-        ///
-        /// Se aceptan los dos tipos a propósito: según cómo se consulte la relación, el SDK puede
-        /// devolver una cosa u otra, y acá el costo de equivocarse es que nadie pueda trabajar.
-        /// </summary>
-        private static Guid? IdDeLaAsignacion(Entity asignacion)
-        {
-            if (!asignacion.Contains("roleid"))
-            {
-                return null;
-            }
-
-            var crudo = asignacion["roleid"];
-            if (crudo is Guid id)
-            {
-                return id;
-            }
-
-            return (crudo as EntityReference)?.Id;
         }
 
         private static RolDeActor NombreARol(string nombre)

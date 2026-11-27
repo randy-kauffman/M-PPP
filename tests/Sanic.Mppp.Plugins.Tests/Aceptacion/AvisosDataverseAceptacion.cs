@@ -140,7 +140,7 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             Assert.All(avisos, a => Assert.Equal("Correo sin procesar: solicitud MPPP-00000123", a["title"]));
             Assert.All(avisos, a => Assert.Equal("Motivo: es una respuesta.", a["body"]));
             var consultas = m.Svc.Llamadas.Count(l => l.Operacion == "RetrieveMultiple");
-            Assert.InRange(consultas, 1, 3);
+            Assert.InRange(consultas, 1, 5); // DN-08: rol, directas, equipos con el rol, miembros, habilitados
         }
 
         [Theory]

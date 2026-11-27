@@ -19,7 +19,7 @@ namespace Sanic.Mppp.Plugins.Steps
     /// **Dos condiciones, las dos obligatorias** (falla cerrado):
     ///  1. quien llama es una **identidad de aplicación** (`systemuser.applicationid` con valor). Una persona no tiene
     ///     esa columna, nunca, así que ningún humano pasa — ni con el rol asignado por error;
-    ///  2. quien llama tiene el rol **`SR - MPPP - RPA`**, resuelto por `name` (el nombre viaja con la solución; el
+    ///  2. quien llama tiene el rol **`SR - MPPP - RPA`** (directo o por un equipo, DN-08), resuelto por `name` (el nombre viaja con la solución; el
     ///     `roleid` es de cada entorno).
     ///
     /// **Y una comprobación previa que no es cosmética**: si el rol NO EXISTE en el entorno, el error lo dice
@@ -50,10 +50,9 @@ namespace Sanic.Mppp.Plugins.Steps
             // Primero el rol: si no existe en el entorno nadie puede pasar, y el motivo tiene que decir
             // eso (MPPP-RPA-007), no "no autorizado" (D-44). La comparación por `name` no distingue caja
             // porque Dataverse no la distingue en un Equal de texto (Microsoft Learn).
-            var consultaRol = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet() };
-            consultaRol.Criteria.AddCondition("name", ConditionOperator.Equal, Rol);
-            var rol = servicio.RetrieveMultiple(consultaRol).Entities.FirstOrDefault();
-            if (rol == null)
+            // DN-08: un rol existe una vez POR UNIDAD DE NEGOCIO con el mismo nombre: se toman TODOS los ids.
+            var rolesRpa = RolesDeMppp.IdsPorNombre(servicio, new[] { Rol }).Keys.ToList();
+            if (rolesRpa.Count == 0)
             {
                 throw new InvalidPluginExecutionException(MensajeRolNoInstalado);
             }
@@ -80,10 +79,8 @@ namespace Sanic.Mppp.Plugins.Steps
                 throw new InvalidPluginExecutionException(MensajeNoAutorizado);
             }
 
-            var consultaAsignacion = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet() };
-            consultaAsignacion.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, contexto.InitiatingUserId);
-            consultaAsignacion.Criteria.AddCondition("roleid", ConditionOperator.Equal, rol.Id);
-            var tieneElRol = servicio.RetrieveMultiple(consultaAsignacion).Entities.Count > 0;
+            // DN-08: el rol vale asignado directo o heredado por un equipo (de propietario o de grupo de Entra).
+            var tieneElRol = RolesDeMppp.RolesDelUsuario(servicio, contexto.InitiatingUserId, rolesRpa).Count > 0;
             if (!tieneElRol)
             {
                 throw new InvalidPluginExecutionException(MensajeNoAutorizado);

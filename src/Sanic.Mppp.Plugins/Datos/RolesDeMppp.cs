@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace Sanic.Mppp.Plugins.Datos
 {
@@ -27,7 +29,18 @@ namespace Sanic.Mppp.Plugins.Datos
         /// </summary>
         public static IReadOnlyDictionary<Guid, string> IdsPorNombre(IOrganizationService servicio, IReadOnlyCollection<string> nombres)
         {
-            throw new NotImplementedException();
+            if (servicio == null) throw new ArgumentNullException(nameof(servicio));
+            var resultado = new Dictionary<Guid, string>();
+            if (nombres == null || nombres.Count == 0) return resultado;
+
+            var consulta = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet("name") };
+            consulta.Criteria.AddCondition("name", ConditionOperator.In, nombres.Cast<object>().ToArray());
+            foreach (var rol in servicio.RetrieveMultiple(consulta).Entities)
+            {
+                resultado[rol.Id] = rol.GetAttributeValue<string>("name");
+            }
+
+            return resultado;
         }
 
         /// <summary>
@@ -35,7 +48,45 @@ namespace Sanic.Mppp.Plugins.Datos
         /// </summary>
         public static ISet<Guid> RolesDelUsuario(IOrganizationService servicio, Guid usuarioId, IReadOnlyCollection<Guid> roleIds)
         {
-            throw new NotImplementedException();
+            if (servicio == null) throw new ArgumentNullException(nameof(servicio));
+            var tiene = new HashSet<Guid>();
+            if (roleIds == null || roleIds.Count == 0) return tiene;
+            var pedidos = new HashSet<Guid>(roleIds);
+
+            // Consulta 1: asignaciones directas.
+            var directas = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet("roleid") };
+            directas.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, usuarioId);
+            directas.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(pedidos));
+            foreach (var fila in servicio.RetrieveMultiple(directas).Entities)
+            {
+                var id = IdDe(fila, "roleid");
+                if (id.HasValue && pedidos.Contains(id.Value)) tiene.Add(id.Value);
+            }
+
+            // Consulta 2: los equipos del usuario.
+            var membresias = new QueryExpression(TablasNativas.MiembroDeEquipo) { ColumnSet = new ColumnSet("teamid") };
+            membresias.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, usuarioId);
+            var equipos = new HashSet<Guid>();
+            foreach (var fila in servicio.RetrieveMultiple(membresias).Entities)
+            {
+                var id = IdDe(fila, "teamid");
+                if (id.HasValue) equipos.Add(id.Value);
+            }
+
+            // Sin equipos no hay nada que mirar (y un `In` vacío no se manda).
+            if (equipos.Count == 0) return tiene;
+
+            // Consulta 3: los roles de esos equipos.
+            var porEquipo = new QueryExpression(TablasNativas.RolDeEquipo) { ColumnSet = new ColumnSet("roleid", "teamid") };
+            porEquipo.Criteria.AddCondition("teamid", ConditionOperator.In, Valores(equipos));
+            porEquipo.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(pedidos));
+            foreach (var fila in servicio.RetrieveMultiple(porEquipo).Entities)
+            {
+                var id = IdDe(fila, "roleid");
+                if (id.HasValue && pedidos.Contains(id.Value)) tiene.Add(id.Value);
+            }
+
+            return tiene;
         }
 
         /// <summary>
@@ -45,7 +96,57 @@ namespace Sanic.Mppp.Plugins.Datos
         /// </summary>
         public static ISet<Guid> UsuariosConElRol(IOrganizationService servicio, IReadOnlyCollection<Guid> roleIds, IReadOnlyCollection<Guid> usuariosFiltro = null)
         {
-            throw new NotImplementedException();
+            if (servicio == null) throw new ArgumentNullException(nameof(servicio));
+            var usuarios = new HashSet<Guid>();
+            if (roleIds == null || roleIds.Count == 0) return usuarios;
+            if (usuariosFiltro != null && usuariosFiltro.Count == 0) return usuarios;
+            var filtro = usuariosFiltro == null ? null : new HashSet<Guid>(usuariosFiltro);
+            var roles = new HashSet<Guid>(roleIds);
+
+            // Consulta 1: asignaciones directas.
+            var directas = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet("systemuserid", "roleid") };
+            directas.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(roles));
+            if (filtro != null) directas.Criteria.AddCondition("systemuserid", ConditionOperator.In, Valores(filtro));
+            foreach (var fila in servicio.RetrieveMultiple(directas).Entities)
+            {
+                var id = IdDe(fila, "systemuserid");
+                if (id.HasValue && (filtro == null || filtro.Contains(id.Value))) usuarios.Add(id.Value);
+            }
+
+            // Consulta 2: los equipos que tienen alguno de los roles.
+            var porEquipo = new QueryExpression(TablasNativas.RolDeEquipo) { ColumnSet = new ColumnSet("teamid", "roleid") };
+            porEquipo.Criteria.AddCondition("roleid", ConditionOperator.In, Valores(roles));
+            var equipos = new HashSet<Guid>();
+            foreach (var fila in servicio.RetrieveMultiple(porEquipo).Entities)
+            {
+                var id = IdDe(fila, "teamid");
+                if (id.HasValue) equipos.Add(id.Value);
+            }
+
+            if (equipos.Count == 0) return usuarios;
+
+            // Consulta 3: los miembros de esos equipos.
+            var miembros = new QueryExpression(TablasNativas.MiembroDeEquipo) { ColumnSet = new ColumnSet("systemuserid", "teamid") };
+            miembros.Criteria.AddCondition("teamid", ConditionOperator.In, Valores(equipos));
+            if (filtro != null) miembros.Criteria.AddCondition("systemuserid", ConditionOperator.In, Valores(filtro));
+            foreach (var fila in servicio.RetrieveMultiple(miembros).Entities)
+            {
+                var id = IdDe(fila, "systemuserid");
+                if (id.HasValue && (filtro == null || filtro.Contains(id.Value))) usuarios.Add(id.Value);
+            }
+
+            return usuarios;
+        }
+
+        private static object[] Valores(IEnumerable<Guid> ids) => ids.Cast<object>().ToArray();
+
+        /// <summary>El id de una columna de intersect entity, venga como `Guid` crudo o como `EntityReference`.</summary>
+        private static Guid? IdDe(Entity fila, string columna)
+        {
+            if (!fila.Contains(columna)) return null;
+            var crudo = fila[columna];
+            if (crudo is Guid id) return id;
+            return (crudo as EntityReference)?.Id;
         }
     }
 }

@@ -149,38 +149,27 @@ namespace Sanic.Mppp.Plugins.Datos
         }
 
         /// <summary>Lo común a <see cref="AvisarAEjecutivos"/> y <see cref="AvisarFilasPorAprobar"/>: todos los usuarios
-        /// HABILITADOS con ese rol (por `name`), con un número FIJO de consultas (a lo sumo tres).</summary>
+        /// HABILITADOS con ese rol (por `name`), asignado directo o heredado por un equipo (DN-08), con un número FIJO de
+        /// consultas (a lo sumo cinco: rol, asignaciones directas, equipos con el rol, miembros de esos equipos, habilitados).</summary>
         private void AvisarATodosConElRol(string nombreDelRol, string titulo, string cuerpo)
         {
             // Consulta 1: el rol. Si no existe, nadie tiene que enterarse (DA-08): que nadie tenga el rol
             // no puede tumbar la clasificación de un correo ni la validación de una solicitud.
-            var consultaRol = new QueryExpression(TablasNativas.Rol) { ColumnSet = new ColumnSet(false) };
-            consultaRol.Criteria.AddCondition("name", ConditionOperator.Equal, nombreDelRol);
-            var roles = _servicio.RetrieveMultiple(consultaRol).Entities.Select(e => e.Id).ToList();
+            var roles = RolesDeMppp.IdsPorNombre(_servicio, new[] { nombreDelRol });
             if (roles.Count == 0)
             {
                 return;
             }
 
-            // Consulta 2: quiénes tienen ese rol asignado (repetido o no).
-            var consultaAsignaciones = new QueryExpression(TablasNativas.UsuarioRol) { ColumnSet = new ColumnSet(ColumnaIdUsuario) };
-            consultaAsignaciones.Criteria.AddCondition("roleid", ConditionOperator.In, roles.Cast<object>().ToArray());
-            // `systemuserroles` es una intersect entity: en Dataverse real sus columnas son `Uniqueidentifier`
-            // crudos, no lookups. Leerla como `EntityReference` revienta con
-            // "Unable to cast object of type 'System.Guid' to type 'Microsoft.Xrm.Sdk.EntityReference'" SIEMPRE
-            // que exista al menos un destinatario (D-59, confirmado en el `plugintracelog` de Dev: el correo real
-            // trae la fila con `systemuserid` como `Guid`, nunca como `EntityReference`). Mismo defecto y misma
-            // corrección que `StepsDeFila.IdDeLaAsignacion` para `roleid` (2026-09-23).
-            var usuariosConRol = _servicio.RetrieveMultiple(consultaAsignaciones).Entities
-                .Select(e => e.GetAttributeValue<Guid>(ColumnaIdUsuario))
-                .Distinct()
-                .ToList();
+            // Consultas 2 a 4: quiénes tienen ese rol, directo o por equipo (sin repetidos). Las tres tablas son
+            // intersect entities (columnas `Guid` crudas, D-59): `RolesDeMppp` ya lo resuelve.
+            var usuariosConRol = RolesDeMppp.UsuariosConElRol(_servicio, roles.Keys.ToList()).ToList();
             if (usuariosConRol.Count == 0)
             {
                 return;
             }
 
-            // Consulta 3: de esos, quiénes están habilitados hoy.
+            // Consulta 5: de esos, quiénes están habilitados hoy.
             var consultaUsuarios = new QueryExpression(TablasNativas.Usuario) { ColumnSet = new ColumnSet(false) };
             consultaUsuarios.Criteria.AddCondition(ColumnaIdUsuario, ConditionOperator.In, usuariosConRol.Cast<object>().ToArray());
             consultaUsuarios.Criteria.AddCondition("isdisabled", ConditionOperator.Equal, false);
