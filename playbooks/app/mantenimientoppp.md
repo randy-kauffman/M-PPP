@@ -46,7 +46,8 @@ la plataforma NO sustituye.
     "SR - MPPP - Ejecutivo",
     "SR - MPPP - Supervisor",
     "SR - MPPP - Administrador de planes",
-    "SR - MPPP - Administrador tecnico"
+    "SR - MPPP - Administrador tecnico",
+    "SR - MPPP - Auditor"
   ],
   "tablas": [
     "sanic_mppp_tbl_fila",
@@ -177,6 +178,42 @@ la plataforma NO sustituye.
     },
     {
       "titulo": {
+        "1033": "Audit",
+        "3082": "Auditoria"
+      },
+      "grupos": [
+        {
+          "titulo": {
+            "1033": "Audit",
+            "3082": "Auditoria"
+          },
+          "entradas": [
+            {
+              "id": "subarea_auditoriasolicitudes",
+              "titulo": {
+                "1033": "Requests",
+                "3082": "Solicitudes"
+              },
+              "tabla": "sanic_mppp_tbl_solicitud",
+              "icono": "sanic_mppp_wr_svg_solicitudes",
+              "vista": "Solicitudes - Auditoria"
+            },
+            {
+              "id": "subarea_auditoriabitacora",
+              "titulo": {
+                "1033": "Log",
+                "3082": "Bitacora"
+              },
+              "tabla": "sanic_mppp_tbl_bitacora",
+              "icono": "sanic_mppp_wr_svg_filas",
+              "vista": "Bitacora - Auditoria"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "titulo": {
         "1033": "Catalogos",
         "3082": "Catalogos"
       },
@@ -290,3 +327,38 @@ la plataforma NO sustituye.
   no una decisión —, a diferencia de su hermana "Para revisar" que sí la tenía. Se agrega DESPUÉS de
   `subarea_poraprobar` y ANTES de `subarea_porclasificar`: las entradas de Fila van juntas, las de
   Solicitud después.
+
+- **Área «Auditoría» agregada el 2026-11-27 (DN-09, aprobador).** Va entre Consulta y Catálogos y
+  tiene dos entradas, ambas sobre su **vista propia** (no la por defecto de la tabla, por la misma
+  razón que Trabajo y Consulta: con `Entity=` se abriría la vista de operación):
+  `subarea_auditoriasolicitudes` → Solicitud, vista «Solicitudes - Auditoria»
+  (`playbooks/vista/solicitudes_auditoria.md`), y `subarea_auditoriabitacora` → Bitácora, vista
+  «Bitacora - Auditoria» (`playbooks/vista/bitacora_auditoria.md`). Los títulos del área y del
+  grupo son «Audit» (1033) y «Auditoria» (3082); los de las entradas, «Requests»/«Solicitudes» y
+  «Log»/«Bitacora». **Ojo:** las demás entradas del sitemap llevan el mismo texto en español en
+  los dos idiomas; aquí el 1033 va traducido porque así lo pidió la tarea (área «Audit»). Si el
+  aprobador prefiere la regla de las demás entradas, se cambia el texto 1033 de las dos entradas.
+  La app **no cambia de tablas**: Solicitud y Bitácora ya estaban en la lista.
+- **Íconos:** sin web resource nuevo. `subarea_auditoriasolicitudes` reúsa
+  `sanic_mppp_wr_svg_solicitudes` (la misma idea de negocio que la entrada de Consulta) y
+  `subarea_auditoriabitacora` reúsa `sanic_mppp_wr_svg_filas`, el ícono de «lista de registros»;
+  no hay uno propio de bitácora y la lista de íconos está cerrada (12.1). Si el aprobador quiere uno
+  propio, es un web resource nuevo y no es de este cambio.
+- **Rol nuevo `SR - MPPP - Auditor`** (6.9, `playbooks/rol/sr_mppp_auditor.md`) en la lista `roles`:
+  `app.py` lo asocia a la app (`appmoduleroles_association`). Tiene que existir **antes** de
+  correr la app, o `app.py` se detiene. Como el sitemap es uno solo, el auditor ve **todas** las
+  áreas (decisión 3 de DN-09) y los demás roles ven también «Auditoría» (Solicitud y Bitácora las
+  leen todos), solo que **con** los formularios de siempre.
+- **Formularios y vistas como componentes:** este playbook no los lista. `app.py` agrega a la app
+  **las tablas** (`appmodulecomponent` tipo 1), no formularios ni vistas sueltos, y las vistas
+  entran al sitemap por su `viewid`. Los formularios nuevos «Auditoria» (Solicitud y Fila,
+  `playbooks/formulario/`) y el web resource `sanic_mppp_wr_html_auditoria` **no necesitan línea
+  aquí**. Se comprueba en vivo (no se supone) que la app los ofrece: si al construir la app se
+  hubiera marcado «solo estos formularios», habría que agregarlos; es la verificación 5 y 6 de los
+  playbooks de formulario.
+- **Orden de construcción:** rol → vistas (las tres) → web resource → formularios → esta app
+  (`app.py` vuelve a calcular el sitemap y, como ya existe, lo actualiza; las vistas del sitemap se
+  resuelven por nombre y tienen que existir).
+- Conteos de arriba, al 2026-11-27: **+1 rol (5)**, **+3 vistas (23)** (`Solicitudes - Auditoria`,
+  `Bitacora - Auditoria`, `Filas - Auditoria`; esta última es de la subgrilla, no del sitemap) y
+  **+2 formularios (11)**; íconos sin cambio.
