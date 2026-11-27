@@ -1036,3 +1036,113 @@ Ningún mensaje repite el número (dato sensible, DD-08). Sin marcadores: el cat
 - El municipio contra el catálogo del CSE (se puede sumar después como parámetro).
 - El formato de CRE (cuando el negocio lo tenga).
 - Normalizar a mayúscula el valor guardado.
+
+# DN-08 · Roles de MPPP heredados por un equipo o un grupo de Entra
+
+Recibida el **2026-11-27** del aprobador. Un usuario que tiene `SR - MPPP - Ejecutivo` **por un grupo** (un equipo de
+Dataverse con ese rol) no puede digitar: el plugin lo rechaza con *"El rol de quien llama no puede hacer esta
+transición."* Dataverse sí le da los privilegios del rol (ve la Fila, la puede escribir, ve el botón), pero el código busca
+el rol **solo en `systemuserroles`**, que guarda la asignación directa usuario → rol. El camino por equipo
+(usuario → `teammembership` → equipo → `teamroles` → rol) no se mira.
+
+Mientras tanto el aprobador asignó el rol directo a la persona (alternativa B). Esta directriz es el arreglo de fondo.
+
+**Estado: APROBADO el 2026-11-27 tal como está. En construcción.**
+
+## Dónde está el defecto (las cuatro consultas)
+
+| Dónde | Qué decide | Qué pasa hoy con el rol por grupo |
+|---|---|---|
+| `Steps/StepsDeFila.cs` `PlomeriaDeFila.DeterminarRoles` | quién puede hacer cada transición de Fila (digitar, aprobar, devolver, anular, rechazar en AS400) y D-25 | se trata como "sin rol": se rechaza todo |
+| `Datos/Avisos.cs` `AvisarATodosConElRol` | a quién le llegan los avisos de la app (Por clasificar, filas por aprobar) | no le llegan |
+| `Datos/CatalogosMasivos.cs` `IdsDeUsuariosConElRol` | si el ejecutivo de una carga masiva (DN-04) es ejecutivo | la fila se rechaza por "no es ejecutivo" |
+| `Steps/PuertaDelRpa.cs` `Exigir` | si quien llama a las Custom API de fase 2 es el RPA | se rechaza (MPPP-RPA-006) |
+
+Además, `PuertaDelRpa` toma **un solo** rol (`FirstOrDefault`), pero en Dataverse un rol existe una vez **por unidad de
+negocio** con el mismo nombre: un usuario de aplicación en otra unidad de negocio queda afuera aunque tenga el rol directo.
+Las otras tres ya buscan todos los ids por nombre.
+
+## Decisiones propuestas
+
+| # | Decisión |
+|---|---|
+| 1 | Un usuario **tiene** un rol de MPPP si lo tiene **asignado directo** o si es **miembro de un equipo** que lo tiene: equipo de propietario, equipo de grupo de seguridad de Entra o de grupo de Microsoft 365. Los equipos de acceso no tienen roles, así que no cambian nada |
+| 2 | Vale para **las cuatro** consultas, la del RPA incluida. Un solo componente que las cuatro usan, para que no vuelvan a divergir |
+| 3 | **D-25 cuenta todas las fuentes juntas**: Ejecutivo directo + Supervisor por un grupo (o al revés, o los dos por grupos) es "los dos roles" y bloquea todas las transiciones, igual que hoy con los dos directos |
+| 4 | Para el código del plugin **solo importa que el usuario tenga el rol**, no la herencia de privilegios del rol del equipo ("member's privilege inheritance"). Eso es de la plataforma y no cambia |
+| 5 | `PuertaDelRpa` busca **todos** los ids del rol por nombre (una vez por unidad de negocio), igual que las otras tres |
+| 6 | Los mensajes al usuario **no cambian** |
+
+## Diseño
+
+### Un componente: `Datos/RolesDeMppp`
+
+Clase estática en la capa de datos, con el servicio que ya usa cada llamador (en los cuatro casos es SYSTEM, así que leer
+equipos no exige privilegios nuevos a nadie). Dos funciones:
+
+- **`NombresDelUsuario(servicio, usuarioId, nombres)`** → los nombres de rol (de la lista pedida) que el usuario tiene.
+  Consultas, número **fijo** (nunca una por equipo):
+  1. `role` por `name` In la lista → ids y nombre (hoy ya se hace). Ninguno → el llamador decide (hoy cada uno ya tiene su
+     mensaje de "rol no instalado": se conserva);
+  2. `systemuserroles` (`systemuserid` = el usuario, `roleid` In) → asignaciones directas;
+  3. `teammembership` (`systemuserid` = el usuario) → los equipos del usuario;
+  4. `teamroles` (`teamid` In esos equipos, `roleid` In) → asignaciones por equipo. Se salta si el usuario no está en
+     ningún equipo.
+- **`UsuariosConElRol(servicio, roleIds, usuariosFiltro = null)`** → los ids de usuario que tienen alguno de esos roles,
+  directo o por equipo, opcionalmente restringido a una lista de usuarios (para la carga masiva). Consultas fijas:
+  `systemuserroles` (`roleid` In) + `teamroles` (`roleid` In) → equipos + `teammembership` (`teamid` In) → usuarios.
+  Unión, sin repetidos.
+
+Las tres tablas son **intersect entities**: sus columnas llegan como `Guid` crudo, no como `EntityReference` (D-59 y el
+defecto del 2026-09-23). Se lee con el mismo `IdDe` que acepta los dos tipos. Las listas `In` vacías no se mandan
+(Dataverse no admite un `In` sin valores). Sin paginación, igual que las cuatro consultas de hoy: los usuarios con roles de
+MPPP son decenas, no miles (corregido al escribir las firmas: el doble en memoria tampoco simula páginas).
+
+Firmas finales (`Datos/RolesDeMppp.cs`): `IdsPorNombre(servicio, nombres)` (todos los ids por nombre, una consulta),
+`RolesDelUsuario(servicio, usuarioId, roleIds)` y `UsuariosConElRol(servicio, roleIds, usuariosFiltro)`. El "rol no
+instalado" lo sigue decidiendo cada llamador con su mensaje de hoy.
+
+### Cómo queda cada llamador
+
+| Llamador | Cambio |
+|---|---|
+| `DeterminarRoles` | arma `RolDeActor` con `NombresDelUsuario` (directo + equipos). D-25 sale solo, porque se unen las banderas |
+| `Avisos.AvisarATodosConElRol` | los destinatarios salen de `UsuariosConElRol`; después sigue el filtro de habilitados de hoy. El contrato "número fijo de consultas" pasa de 3 a **5** |
+| `CatalogosMasivos.IdsDeUsuariosConElRol` | `UsuariosConElRol` con el filtro de los usuarios de la carga |
+| `PuertaDelRpa.Exigir` | todos los ids del rol (decisión 5) y `NombresDelUsuario`. La comprobación de identidad de aplicación va igual, primero |
+
+### Limitación de la plataforma (no se arregla en código, se documenta)
+
+En los equipos de **grupo de Entra**, Dataverse anota al usuario como miembro del equipo (`teammembership`) **cuando el
+usuario entra al ambiente** (Microsoft Learn, *Manage group teams* y *Work with Microsoft Entra ID group teams*), y le
+refresca los grupos al iniciar sesión o cada 8 horas. Consecuencias:
+
+- **Para las transiciones no importa**: quien hace clic ya entró, así que ya es miembro.
+- **Para los avisos sí**: alguien del grupo que todavía no entró nunca al ambiente no figura en el equipo y no recibe el
+  aviso. Y a quien sacaron del grupo le siguen llegando avisos hasta que vuelva a entrar.
+- Si el negocio necesita que la membresía esté al día sin esperar el inicio de sesión, la plataforma tiene la acción
+  `SyncGroupMembersToTeam` para correr desde un flujo programado. **Fuera de alcance** de esta directriz.
+
+## Construcción
+
+- **Pruebas de aceptación** (las escribe el arquitecto), para cada uno de los cuatro llamadores:
+  - rol solo directo (lo de hoy: no cambia nada);
+  - rol solo por equipo (de propietario y de grupo de Entra) → pasa / recibe el aviso / cuenta como ejecutivo;
+  - rol por equipo en un equipo **sin** ese rol → no pasa;
+  - Ejecutivo directo + Supervisor por equipo → D-25;
+  - el usuario en varios equipos, el rol en dos de ellos → un solo aviso, sin repetidos;
+  - usuario deshabilitado con el rol por equipo → sin aviso;
+  - `PuertaDelRpa` con el rol de otra unidad de negocio → pasa; persona (sin `applicationid`) en un equipo con el rol RPA
+    → sigue sin pasar;
+  - número fijo de consultas (ninguna por equipo ni por usuario).
+- Implementación de Sonnet; revisión de Sonnet. Ensamblado **1.0.29.0**.
+- **Sin datos**: no hay reglas ni parámetros nuevos.
+- **Parche**: el ensamblado, versión de la solución **1.3.1.3**.
+- **En vivo (Dev)**: un equipo de propietario `ZZ-DN08` con el rol `SR - MPPP - Ejecutivo`, un usuario de prueba **sin**
+  el rol directo como miembro, y con él: digitar una fila Validada (pasa), recibir el aviso de Por clasificar, y una carga
+  masiva con ese usuario como ejecutivo. Al terminar se borra el equipo y se le devuelven al usuario sus roles de antes.
+
+## Fuera de alcance
+
+- Sincronizar los equipos de grupo de Entra con un flujo (`SyncGroupMembersToTeam`).
+- Cambiar los mensajes o la lógica de las transiciones.
