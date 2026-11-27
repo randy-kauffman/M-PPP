@@ -438,6 +438,19 @@ class FormularioPorRol(Base):
 
     def test_sin_roles_el_xml_queda_igual_que_antes(self):
         self.assertNotIn("DisplayConditions", xml_de())
+        self.assertEqual("Fila", fo.semilla_de(COMPONENTE), "los formularios generales conservan sus id")
+
+    def test_el_mismo_nombre_por_rol_en_dos_tablas_no_repite_ningun_id(self):
+        # Visto en Dev el 2026-11-27: "Auditoria" en Solicitud y en Fila salieron con los mismos id, y la plataforma le
+        # puso al de Fila las etiquetas del de Solicitud.
+        import re
+        controles = {c: fo.CONTROL_POR_TIPO[TIPOS[c]] for c in TIPOS}
+        sg = {2: {"vista_id": "{" + VISTA_ID.upper() + "}", "relacion": "r"}}
+        uno = fo.formxml(self.por_rol(), ETIQUETAS, controles, sg, [ROL_ID])
+        otro = fo.formxml(self.por_rol(tabla="sanic_mppp_tbl_solicitud"), ETIQUETAS, controles, sg, [ROL_ID])
+        ids = lambda x: set(re.findall(r'(?<![a-z])(?:id|labelid)="(\{[0-9A-F-]+\})"', x))
+        self.assertTrue(ids(uno))
+        self.assertFalse(ids(uno) & ids(otro))
 
     def test_roles_vacio_repetido_o_en_creacion_rapida_se_rechaza(self):
         for malo in ([], [""], ["A", "A"], "SR - MPPP - Auditor"):

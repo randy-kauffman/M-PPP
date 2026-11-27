@@ -139,6 +139,17 @@ def guid(*partes):
     return "{" + str(uuid.uuid5(SEMILLA, "|".join(str(p) for p in partes))).upper() + "}"
 
 
+def semilla_de(datos):
+    """La primera parte de la semilla de los GUID del XML.
+
+    El nombre del formulario, como siempre, para los formularios generales: así su XML no cambia. Un formulario
+    asignado a roles (DN-09) suma la TABLA, porque dos tablas pueden tener un formulario con el mismo nombre
+    ("Auditoria" en Solicitud y en Fila): con la misma semilla los dos tienen los mismos id de sección, celda y
+    etiqueta, y la plataforma, que guarda las etiquetas por id, le pone a uno las del otro (visto en Dev el
+    2026-11-27: el formulario de Fila salió con las etiquetas del de Solicitud)."""
+    return f"{datos['tabla']}|{datos['nombre']}" if "roles" in datos else datos["nombre"]
+
+
 # ---------------------------------------------------------------------------
 # Validación sin red
 # ---------------------------------------------------------------------------
@@ -274,8 +285,8 @@ def _celda(datos, ruta, columna, etiqueta, classid, deshabilitado, expandir=None
     importmap, kbarticletemplate, leídos en Dev el 2026-11-24). Sin `expandir`, la celda es la de siempre."""
     alto = f'rowspan="{expandir}" auto="true"' if expandir else 'rowspan="1"'
     return (
-        f'<cell id="{guid(datos["nombre"], ruta, "cell")}" locklevel="0" colspan="1" {alto} '
-        f'labelid="{guid(datos["nombre"], ruta, "label")}">'
+        f'<cell id="{guid(semilla_de(datos), ruta, "cell")}" locklevel="0" colspan="1" {alto} '
+        f'labelid="{guid(semilla_de(datos), ruta, "label")}">'
         f'<labels><label description={quoteattr(etiqueta)} languagecode="1033" /></labels>'
         f'<control id={quoteattr(columna)} classid="{classid}" datafieldname={quoteattr(columna)} '
         f'disabled="{str(bool(deshabilitado)).lower()}" /></cell>')
@@ -283,8 +294,8 @@ def _celda(datos, ruta, columna, etiqueta, classid, deshabilitado, expandir=None
 
 def _celda_subgrilla(datos, ruta, nombre, etiqueta, tabla_destino, vista_id, relacion):
     return (
-        f'<cell id="{guid(datos["nombre"], ruta, "cell")}" locklevel="0" colspan="1" rowspan="6" auto="false" '
-        f'labelid="{guid(datos["nombre"], ruta, "label")}">'
+        f'<cell id="{guid(semilla_de(datos), ruta, "cell")}" locklevel="0" colspan="1" rowspan="6" auto="false" '
+        f'labelid="{guid(semilla_de(datos), ruta, "label")}">'
         f'<labels><label description={quoteattr(etiqueta)} languagecode="1033" /></labels>'
         f'<control indicationOfSubgrid="true" id={quoteattr(nombre)} classid="{CONTROL_SUBGRILLA}"><parameters>'
         "<RecordsPerPage>10</RecordsPerPage><AutoExpand>Fixed</AutoExpand>"
@@ -301,8 +312,8 @@ def _celda_webresource(datos, ruta, nombre_control, etiqueta, web_resource, alto
     la página reciba `id` y `typename` del registro en la cadena de consulta:
     sin eso no sabe qué Solicitud mostrar."""
     return (
-        f'<cell id="{guid(datos["nombre"], ruta, "cell")}" locklevel="0" colspan="1" rowspan="{alto}" '
-        f'auto="false" showlabel="false" labelid="{guid(datos["nombre"], ruta, "label")}">'
+        f'<cell id="{guid(semilla_de(datos), ruta, "cell")}" locklevel="0" colspan="1" rowspan="{alto}" '
+        f'auto="false" showlabel="false" labelid="{guid(semilla_de(datos), ruta, "label")}">'
         f'<labels><label description={quoteattr(etiqueta)} languagecode="1033" /></labels>'
         f'<control id={quoteattr(nombre_control)} classid="{CONTROL_WEBRESOURCE}"><parameters>'
         f"<Url>{web_resource}</Url>"
@@ -319,8 +330,8 @@ def formxml(datos, etiquetas, controles, subgrillas, roles_ids=None):
     y el formulario es para todos, como hasta ahora."""
     solo_lectura = datos["solo_lectura"]
     partes = ['<form headerdensity="HighWithControls"><tabs>',
-              f'<tab verticallayout="true" id="{guid(datos["nombre"], "tab")}" IsUserDefined="1" '
-              f'labelid="{guid(datos["nombre"], "tab", "label")}">',
+              f'<tab verticallayout="true" id="{guid(semilla_de(datos), "tab")}" IsUserDefined="1" '
+              f'labelid="{guid(semilla_de(datos), "tab", "label")}">',
               f'<labels><label description={quoteattr(datos["pestana"])} languagecode="1033" /></labels>',
               '<columns><column width="100%"><sections>']
 
@@ -328,7 +339,7 @@ def formxml(datos, etiquetas, controles, subgrillas, roles_ids=None):
         ruta_sec = f"sec{i}"
         partes.append(
             f'<section showlabel="true" showbar="false" IsUserDefined="0" '
-            f'id="{guid(datos["nombre"], ruta_sec)}" labelid="{guid(datos["nombre"], ruta_sec, "label")}" '
+            f'id="{guid(semilla_de(datos), ruta_sec)}" labelid="{guid(semilla_de(datos), ruta_sec, "label")}" '
             f'columns="1" labelwidth="115" celllabelalignment="Left" celllabelposition="Left">'
             f'<labels><label description={quoteattr(s["titulo"])} languagecode="1033" /></labels><rows>')
         if "campos" in s:
@@ -357,15 +368,15 @@ def formxml(datos, etiquetas, controles, subgrillas, roles_ids=None):
         return "".join(partes)
 
     # El header tiene exactamente tres huecos; los que no se usan van vacíos.
-    partes.append(f'<header id="{guid(datos["nombre"], "header")}" celllabelposition="Top" columns="111" '
+    partes.append(f'<header id="{guid(semilla_de(datos), "header")}" celllabelposition="Top" columns="111" '
                   'labelwidth="115" celllabelalignment="Left"><rows><row>')
     for k in range(3):
         if k < len(datos["encabezado"]):
             columna = datos["encabezado"][k]
             partes.append(_celda(datos, f"hdr{k}", columna, etiquetas[columna], controles[columna], solo_lectura))
         else:
-            partes.append(f'<cell id="{guid(datos["nombre"], f"hdr{k}")}" showlabel="false" '
-                          f'labelid="{guid(datos["nombre"], f"hdr{k}", "label")}">'
+            partes.append(f'<cell id="{guid(semilla_de(datos), f"hdr{k}")}" showlabel="false" '
+                          f'labelid="{guid(semilla_de(datos), f"hdr{k}", "label")}">'
                           '<labels><label description="" languagecode="1033" /></labels></cell>')
     partes.append("</row></rows></header>")
     if roles_ids:
