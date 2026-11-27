@@ -993,7 +993,8 @@ Sanic.Mppp.Comandos = (function () {
         puedeRechazadaAs400: function (control) { return tieneElRol(ROL_EJECUTIVO) && algunaAdmite("rechazadaas400", control); },
         puedeAnular: function (control) { return tieneElRol(ROL_EJECUTIVO) && algunaAdmite("anular", control); },
         puedeAtendida: function (control) { return tieneElRol(ROL_EJECUTIVO); },
-        puedeDescargarParaDigitar: function (control) { return tieneElRol(ROL_EJECUTIVO); },
+        // DN-02 (2026-09-26): lo usan el Ejecutivo y el Supervisor; con los dos roles a la vez, ninguno (D-25).
+        puedeDescargarParaDigitar: function (control) { return tieneElRol(ROL_EJECUTIVO) || tieneElRol(ROL_SUPERVISOR); },
         puedeAtendido: function (control) { return tieneElRol(ROL_EJECUTIVO); },
         puedeDescartar: function (control) { return tieneElRol(ROL_EJECUTIVO); },
         puedeRevisado: function (control) { return tieneElRol(ROL_EJECUTIVO); }

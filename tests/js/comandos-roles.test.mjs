@@ -45,10 +45,11 @@ function grilla(...estados) {
   return { getGrid: () => ({ getSelectedRows: () => ({ getAll: () => filas, getLength: () => filas.length, get: (i) => filas[i] }) }) };
 }
 
-const DE_FILA_EJECUTIVO = ["puedeDigitada", "puedeRechazadaAs400", "puedeAnular", "puedeAtendida", "puedeDescargarParaDigitar"];
+const DE_FILA_EJECUTIVO = ["puedeDigitada", "puedeRechazadaAs400", "puedeAnular", "puedeAtendida"];
 const DE_FILA_SUPERVISOR = ["puedeAprobar", "puedeDevolver"];
 const DE_SOLICITUD = ["puedeAtendido", "puedeDescartar", "puedeRevisado"];
-const TODAS = [...DE_FILA_EJECUTIVO, ...DE_FILA_SUPERVISOR, ...DE_SOLICITUD];
+const DE_EJECUTIVO_O_SUPERVISOR = ["puedeDescargarParaDigitar"];  // DN-02 (2026-09-26): los dos lo usan
+const TODAS = [...DE_FILA_EJECUTIVO, ...DE_FILA_SUPERVISOR, ...DE_SOLICITUD, ...DE_EJECUTIVO_O_SUPERVISOR];
 
 test("existen las reglas nuevas de DN-09", () => {
   const C = cargar([EJECUTIVO]);
@@ -78,6 +79,13 @@ test("el Supervisor ve Aprobar y Devolver y nada mas", () => {
   const g = grilla(DIGITADA);
   for (const r of DE_FILA_SUPERVISOR) assert.equal(C[r](g), true, r);
   for (const r of [...DE_FILA_EJECUTIVO, ...DE_SOLICITUD]) assert.equal(C[r](grilla(VALIDADA)), false, r);
+});
+
+test("Descargar para digitar lo ven el Ejecutivo y el Supervisor (DN-02), nadie mas", () => {
+  assert.equal(cargar([EJECUTIVO]).puedeDescargarParaDigitar(grilla(VALIDADA)), true);
+  assert.equal(cargar([SUPERVISOR]).puedeDescargarParaDigitar(grilla(DIGITADA)), true);
+  assert.equal(cargar([EJECUTIVO, SUPERVISOR]).puedeDescargarParaDigitar(grilla(VALIDADA)), false, "D-25");
+  assert.equal(cargar([AUDITOR]).puedeDescargarParaDigitar(grilla(VALIDADA)), false);
 });
 
 test("Revisado es solo del Ejecutivo (el Supervisor no tiene escritura sobre Solicitud)", () => {

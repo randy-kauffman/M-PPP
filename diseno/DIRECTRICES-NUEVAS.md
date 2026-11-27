@@ -1195,8 +1195,12 @@ crea): ningún rol de negocio puede editarla ni borrarla.
   Autorizado, Autorización por plan y Autorización por cliente. Más los privilegios básicos que necesita cualquier usuario
   de la app (los mismos del playbook de los otros roles), lectura de `systemuser` (para ver "digitó" y "aprobó") y acceso
   a la app.
-- **Ningún** Create, Write, Delete, Append, AppendTo, Assign ni Share.
+- **Ningún** Create, Write, Delete, Append, AppendTo, Assign ni Share **sobre las tablas de MPPP** (la base App Opener trae
+  los privilegios de tablas de sistema que necesita cualquier usuario de la app).
 - No es Ejecutivo, Supervisor ni RPA: el plugin no le autoriza ninguna transición (y no tiene `prvWrite` igual).
+- **Cuenta e identificación completas (decisión 2):** esas dos columnas están bajo el perfil de seguridad de columnas
+  `CSP - MPPP - Datos sensibles`, cuyos miembros son equipos de grupo de Entra (tarea de administración 13.7). El rol
+  solo no alcanza: **el equipo de los auditores tiene que ser miembro de ese perfil** en cada ambiente.
 - Se puede asignar directo o por equipo (DN-08 ya lo cubre del lado del servidor; del lado del cliente ver E).
 
 ### B. Área "Auditoría" en la app actual
@@ -1219,7 +1223,8 @@ Cambio: la Bitácora de la transición guarda en `sanic_detalle` el texto que tr
 | Devuelta | `Nota interna: <sanic_notainterna>` |
 | Digitada, Aprobada | sin detalle (no piden texto) |
 
-Recortado a 10000 como hoy. Ensamblado nuevo. **No reconstruye lo anterior**: las filas ya trabajadas siguen sin el motivo
+Recortado a 10000 como hoy. La Bitácora la leen Ejecutivo, Supervisor y Auditor; el mensaje al cliente y la nota
+pueden nombrar datos del registro, igual que hoy en la fila (aceptado: es lo que pide la decisión 1). Ensamblado nuevo. **No reconstruye lo anterior**: las filas ya trabajadas siguen sin el motivo
 en la Bitácora.
 
 ### D. Vista y formularios
@@ -1253,7 +1258,8 @@ con la misma tabla del servidor (`TransicionesDeFila`) y de privilegios:
 
 | Botón | Lo ve |
 |---|---|
-| Digitada, Rechazada en AS400, Anular, Atendida, Descargar para digitar (Fila) | Ejecutivo |
+| Digitada, Rechazada en AS400, Anular, Atendida (Fila) | Ejecutivo |
+| Descargar para digitar (Fila) | Ejecutivo y Supervisor (DN-02; corregido en la revisión del 2026-11-27, la tabla aprobada decía solo Ejecutivo) |
 | Aprobar, Devolver (Fila) | Supervisor |
 | Atendido, Descartar, Revisado (Solicitud) | Ejecutivo (ver nota) |
 | Carga masiva, Activar/Desactivar masivo (catálogos) | Administrador de planes (ya está) |

@@ -14,7 +14,7 @@ respuesta final desplegables, chip "Fila N" que abre la fila e impresion limpia.
 **Solo lee.** `Xrm.WebApi.retrieveRecord` / `retrieveMultipleRecords` del formulario padre
 (`window.parent.Xrm`): la Solicitud, su Bitacora (por fecha del evento ascendente), sus Filas y sus
 Resultados de regla. Nunca escribe. El id de la Solicitud llega por la cadena de consulta, igual que
-en `sanic_mppp_wr_html_auditoria`.
+en `sanic_mppp_wr_html_comunicacion`.
 
 **Idioma y tema.** Textos en 1033 y 3082, segun `userSettings.languageId`. Claro u oscuro segun
 `prefers-color-scheme`. Fechas en la hora local del usuario. Sin librerias externas.
