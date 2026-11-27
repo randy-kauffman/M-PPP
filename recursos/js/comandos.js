@@ -604,6 +604,9 @@ Sanic.Mppp.Comandos = (function () {
      * refresca. La logica de negocio vive en el plugin (DA-07).
      */
     var ROL_ADMINISTRADOR_DE_PLANES = "SR - MPPP - Administrador de planes";
+    // DN-09 E: los roles que deciden quien ve los botones de Fila y Solicitud.
+    var ROL_EJECUTIVO = "SR - MPPP - Ejecutivo";
+    var ROL_SUPERVISOR = "SR - MPPP - Supervisor";
 
     var CATALOGOS = {
         carga: {
@@ -857,6 +860,33 @@ Sanic.Mppp.Comandos = (function () {
         }
     }
 
+    /*
+     * DN-09 E: `true` si el usuario tiene el rol pedido Y NO tiene a la vez Ejecutivo y Supervisor.
+     *
+     * Los nombres se comparan sin distinguir mayusculas, como el servidor (un rol existe una vez por
+     * unidad de negocio con el mismo nombre). `userSettings.roles` incluye los roles heredados por
+     * equipo (DN-08). Quien tiene Ejecutivo y Supervisor a la vez no ve ningun boton: el servidor
+     * lo bloquea igual (D-25), asi que mostrarselos solo traeria un rechazo.
+     *
+     * ANTE LA DUDA, `false` (como `esAdministradorDePlanes`): ocultar no le quita nada a quien deba
+     * verlo, porque la puerta real sigue siendo el servidor.
+     */
+    function tieneElRol(rolPedido) {
+        try {
+            var roles = rolesDelUsuario();
+            var tieneEjecutivo = false, tieneSupervisor = false;
+            for (var i = 0; i < roles.length; i++) {
+                var nombre = roles[i] && typeof roles[i].name === "string" ? roles[i].name.toLowerCase() : "";
+                if (nombre === ROL_EJECUTIVO.toLowerCase()) { tieneEjecutivo = true; }
+                if (nombre === ROL_SUPERVISOR.toLowerCase()) { tieneSupervisor = true; }
+            }
+            if (tieneEjecutivo && tieneSupervisor) { return false; }
+            return rolPedido === ROL_EJECUTIVO ? tieneEjecutivo : tieneSupervisor;
+        } catch (e) {
+            return false;
+        }
+    }
+
     return {
         digitada: function (ids, control) {
             return ejecutar("Digitada", FILA.tabla, cambioDe(FILA, FILA.DIGITADA), ids, control);
@@ -948,14 +978,24 @@ Sanic.Mppp.Comandos = (function () {
          * ribbon enable rules": "commands that are disabled are hidden"), asi que
          * devolver `false` aca es lo que hace desaparecer el boton.
          *
-         * Las cuatro acciones sobre la Solicitud (atendido, descartar, revisado) no
-         * llevan regla: su estado no esta en las mismas grillas y hoy no hay un caso
-         * reportado. Cuando lo haya, se agregan igual que estas.
+         * DN-09 E: cada regla combina (Y logico) el ROL con el ESTADO de la seleccion.
+         *   - Rol: Ejecutivo para Digitada, Rechazada en AS400, Anular, Atendida y Descargar para
+         *     digitar (Fila) y para Atendido, Descartar y Revisado (Solicitud); Supervisor para
+         *     Aprobar y Devolver. Ejecutivo + Supervisor a la vez, o cualquier otro rol (el Auditor
+         *     incluido), no ve ninguno. Si no se pueden leer los roles, se oculta.
+         *   - Estado: `algunaAdmite`, que ante la duda de leer la grilla muestra. Las acciones de
+         *     Solicitud y Atendida / Descargar para digitar no miran estado: solo rol.
+         * Todo esto solo OCULTA: la autoridad sigue siendo el servidor.
          */
-        puedeDigitada: function (control) { return algunaAdmite("digitada", control); },
-        puedeAprobar: function (control) { return algunaAdmite("aprobar", control); },
-        puedeDevolver: function (control) { return algunaAdmite("devolver", control); },
-        puedeRechazadaAs400: function (control) { return algunaAdmite("rechazadaas400", control); },
-        puedeAnular: function (control) { return algunaAdmite("anular", control); }
+        puedeDigitada: function (control) { return tieneElRol(ROL_EJECUTIVO) && algunaAdmite("digitada", control); },
+        puedeAprobar: function (control) { return tieneElRol(ROL_SUPERVISOR) && algunaAdmite("aprobar", control); },
+        puedeDevolver: function (control) { return tieneElRol(ROL_SUPERVISOR) && algunaAdmite("devolver", control); },
+        puedeRechazadaAs400: function (control) { return tieneElRol(ROL_EJECUTIVO) && algunaAdmite("rechazadaas400", control); },
+        puedeAnular: function (control) { return tieneElRol(ROL_EJECUTIVO) && algunaAdmite("anular", control); },
+        puedeAtendida: function (control) { return tieneElRol(ROL_EJECUTIVO); },
+        puedeDescargarParaDigitar: function (control) { return tieneElRol(ROL_EJECUTIVO); },
+        puedeAtendido: function (control) { return tieneElRol(ROL_EJECUTIVO); },
+        puedeDescartar: function (control) { return tieneElRol(ROL_EJECUTIVO); },
+        puedeRevisado: function (control) { return tieneElRol(ROL_EJECUTIVO); }
     };
 })();

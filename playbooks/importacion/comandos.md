@@ -198,6 +198,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
         },
         {
           "id": "atendida",
+          "regla": "Sanic.Mppp.Comandos.puedeAtendida",
           "funcion": "Sanic.Mppp.Comandos.atendida",
           "icono": "sanic_mppp_wr_svg_cmdatendida",
           "etiqueta": {
@@ -216,6 +217,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
         },
         {
           "id": "descargarparadigitar",
+          "regla": "Sanic.Mppp.Comandos.puedeDescargarParaDigitar",
           "funcion": "Sanic.Mppp.Comandos.descargarParaDigitar",
           "icono": "sanic_mppp_wr_svg_cmddescargarparadigitar",
           "etiqueta": {
@@ -330,6 +332,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
       "botones": [
         {
           "id": "atendido",
+          "regla": "Sanic.Mppp.Comandos.puedeAtendido",
           "funcion": "Sanic.Mppp.Comandos.atendido",
           "icono": "sanic_mppp_wr_svg_cmdatendido",
           "etiqueta": {
@@ -347,6 +350,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
         },
         {
           "id": "descartar",
+          "regla": "Sanic.Mppp.Comandos.puedeDescartar",
           "funcion": "Sanic.Mppp.Comandos.descartar",
           "icono": "sanic_mppp_wr_svg_cmddescartar",
           "etiqueta": {
@@ -364,6 +368,7 @@ en `TABLAS_A02` (`pruebas/gui/selectores.mjs`).
         },
         {
           "id": "revisado",
+          "regla": "Sanic.Mppp.Comandos.puedeRevisado",
           "funcion": "Sanic.Mppp.Comandos.revisado",
           "icono": "sanic_mppp_wr_svg_cmdrevisado",
           "etiqueta": {
