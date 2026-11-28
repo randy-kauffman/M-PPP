@@ -45,6 +45,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.31.0 (2026-11-28)**: DN-10: en una Inclusión de formato 06 con la referencia vacía, `sanic_referencia` toma el número de cuenta recibido (sin espacios a los lados y sin rellenar); si el cliente escribió una referencia se respeta; Exclusión, Modificación y formatos 10 y 11 no cambian. `sanic_referenciarecibida` sigue guardando lo que vino. Mismos tipos, sin steps nuevos. No recalcula las filas ya validadas. Sin datos que cargar.
 
+**1.0.32.0 (2026-11-28)**: corrige DN-10. La 1.0.31.0 puso la cuenta como referencia en el formato 06 por error (el dato correcto es la identificación). Ahora, en una Inclusión con la referencia vacía: formato 06 → `sanic_referencia` = número de identificación recibido; formato 10 con clasificación BAC → número de cuenta recibido (sin espacios a los lados, sin rellenar, sin mayúsculas); formato 10 con CK y formato 11 no cambian. Si el cliente escribió una referencia, se respeta. Mismos tipos, sin steps nuevos. No recalcula las filas ya validadas. Sin datos que cargar.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
