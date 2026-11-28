@@ -1297,7 +1297,34 @@ def r42(ctx):
     return c
 
 
+# ===========================================================================
+# DN-10 (aprobador, 2026-11-27): formato 06, la cuenta como referencia cuando la Inclusión no la trae.
+# ===========================================================================
+def r43(ctx):
+    c = pc.Caso("R-43", "DN-10: formato 06 — en la Inclusión sin referencia rige la cuenta; si viene, se respeta; la Exclusión sigue exigiéndola")
+    sid, filas = _enviar(ctx, "Prueba R-43", "ZZ-R43-formato06-cuenta-como-referencia.xlsx", [
+        # 1: Inclusión sin referencia: rige la cuenta, tal cual
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Seis Sin Referencia", referencia="", cuenta="123456789"),
+        # 2: Inclusión con referencia: se respeta
+        genexcel.fila(plan="PR06", clasificacion="BAC", nombre="Seis Con Referencia", referencia="REF9", cuenta="987654321"),
+        # 3: Exclusión sin referencia: la referencia es obligatoria, no se rechaza distinto que hoy
+        genexcel.fila(gestion="Exclusion", plan="PR06", clasificacion="", nombre="", tipoid="", numeroid="",
+                      referencia="", cuenta="10203040506070", moneda="", banco=""),
+    ])
+    por_n = {f["sanic_numerofila"]: f for f in filas}
+    c.check("3 filas leídas", len(filas) == 3, _resumen(filas))
+    f1, f2, f3 = por_n.get(1, {}), por_n.get(2, {}), por_n.get(3, {})
+    c.check("fila 1 Validada", f1.get("sanic_estado") == FILA_VALIDADA, _resumen(filas))
+    c.check("fila 1: sanic_referencia = 123456789 (la cuenta)", f1.get("sanic_referencia") == "123456789", f"obtenida {f1.get('sanic_referencia')!r}")
+    c.check("fila 1: sanic_referenciarecibida vacía", not f1.get("sanic_referenciarecibida"), f"obtenida {f1.get('sanic_referenciarecibida')!r}")
+    c.check("fila 2 Validada", f2.get("sanic_estado") == FILA_VALIDADA, _resumen(filas))
+    c.check("fila 2: sanic_referencia = REF9", f2.get("sanic_referencia") == "REF9", f"obtenida {f2.get('sanic_referencia')!r}")
+    c.check("fila 3 (Exclusión sin referencia) Rechazada en validación",
+            f3.get("sanic_estado") == FILA_RECH_VAL, _resumen(filas))
+    return c
+
+
 CASOS = [r01, r02, r03, r04, r05, r06, r07, r08, r09, r10, r11, r12, r13, r14, r15, r16, r17, r18,
          r19, r20, r21, r22, r23, r24, r25, r26, r27, r28,
          r29, r30, r31, r32, r33, r34, r35, r36, r37, r38,
-         r39, r40, r41, r42]
+         r39, r40, r41, r42, r43]
