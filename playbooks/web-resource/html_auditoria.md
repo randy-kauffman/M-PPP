@@ -7,17 +7,26 @@ El aspecto esta aprobado en `diseno/mockups/auditoria.html` (seccion 5, el timel
 **Para que existe.** Es la seccion 5 del formulario "Auditoria" de Solicitud: un eje vertical por
 tiempo con todo lo que le paso a UNA solicitud, para que el auditor conteste de un vistazo que paso,
 quien lo hizo, cuando y por que. Etapas con color (Recepcion, Validacion, Acuse, Trabajo sobre los
-registros, Cierre y respuesta), incidencias marcadas aparte, filtros (Todo, Solicitud, Registros,
-Incidencias), recorrido de una sola fila, reglas no cumplidas y contenido del acuse y de la
-respuesta final desplegables, chip "Fila N" que abre la fila e impresion limpia.
+registros, Cierre y respuesta), recorrido de una sola fila, reglas no cumplidas y contenido del acuse y de la
+respuesta final desplegables, chip "Fila N" que abre la fila e impresion limpia. Filtros: Todo,
+Solicitud, Registros (sin el filtro Incidencias ni eventos de incidencia: ver nota del aprobador).
 
 **Solo lee.** `Xrm.WebApi.retrieveRecord` / `retrieveMultipleRecords` del formulario padre
 (`window.parent.Xrm`): la Solicitud, su Bitacora (por fecha del evento ascendente), sus Filas y sus
 Resultados de regla. Nunca escribe. El id de la Solicitud llega por la cadena de consulta, igual que
 en `sanic_mppp_wr_html_comunicacion`.
 
-**Idioma y tema.** Textos en 1033 y 3082, segun `userSettings.languageId`. Claro u oscuro segun
-`prefers-color-scheme`. Fechas en la hora local del usuario. Sin librerias externas.
+**Idioma y tema.** Solo espanol (sin seleccion por `userSettings.languageId`) y solo tema claro,
+estilo Fluent (botones de 4 px de radio, estados hover). Fechas en la hora local del usuario, dia/mes.
+Sin librerias externas.
+
+**Cambio manual del aprobador 2026-11-27 (ya en Dev, ya en el archivo del repositorio).** El
+aprobador edito el web resource en Dev: quito el ingles (1033) y la seleccion de idioma, quito el
+modo oscuro, quito el filtro Incidencias y los eventos de incidencia (Vencida, Reintento, Requiere
+revision, Revision atendida, Error) y la etapa/pildora "Incidencia", y reestilo con apariencia
+Fluent. Nota: un evento de bitacora que no este en la tabla de eventos ya no se marca como
+incidencia. Esto contradice la regla de multiidioma del proyecto (etiquetas en 1033 + idioma del
+cliente); queda como decision del aprobador.
 
 **Seguridad.** Todo texto que viene de los datos se escapa; el contenido HTML del acuse y de la
 respuesta final se muestra como texto, nunca se interpreta.

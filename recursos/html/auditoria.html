@@ -5,72 +5,142 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Timeline de auditoría</title>
-<!--
-  WR - MPPP - HTML - Auditoria
-
-  El timeline de la sección 5 del formulario "Auditoría" de Solicitud (DN-09 F,
-  diseno/DIRECTRICES-NUEVAS.md; aspecto aprobado en diseno/mockups/auditoria.html).
-
-  Un eje vertical por tiempo con lo que le pasó a UNA solicitud: la Bitácora, agrupada
-  en etapas con color propio, con quién, cuándo, cuánto pasó desde que se recibió el
-  correo y el por qué (`sanic_detalle`). Las incidencias van marcadas aparte.
-
-  SOLO LEE. Toda la data sale de `Xrm.WebApi.retrieveRecord` / `retrieveMultipleRecords`
-  del formulario padre; no escribe nada. El id de la Solicitud llega como en
-  `comunicacion.html` (cadena de consulta, `data` o `id`).
-
-  Idioma: 1033 o 3082 según `userSettings.languageId` (cualquier otro cae a 1033).
-  Fechas en la hora local del usuario. Todo texto que viene de los datos se escapa.
-  Sin librerías externas.
--->
 <style>
 :root{
-  --bg:#ffffff;--surface:#ffffff;--surface2:#eef1f5;--line:#dce1e7;--text:#1a1f25;--muted:#5a6572;
-  --brand:#0f6cbd;--brandink:#ffffff;
-  --ok:#0e700e;--okbg:#e3f3e3;--warn:#8a6100;--warnbg:#fbf0d5;--bad:#b3263e;--badbg:#fbe4e8;--info:#0f6cbd;--infobg:#e3f0fb;
-  --ph-rec:#5b5fc7;--ph-val:#0f6cbd;--ph-acu:#0b7a75;--ph-reg:#8a5a00;--ph-cie:#0e700e;--ph-inc:#b3263e;
+  --bg:#ffffff;
+  --surface:#ffffff;
+  --surface2:#faf9f8;
+  --hover:#f3f2f1;
+  --line:#e0e0e0;
+  --text:#242424;
+  --muted:#616161;
+  --brand:#0f6cbd;
+  --brand-hover:#115ea3;
+  --brandink:#ffffff;
+  --bad:#c50f1f;
+  --ph-rec:#5b5fc7;
+  --ph-val:#0f6cbd;
+  --ph-acu:#0b7a75;
+  --ph-reg:#8a5a00;
+  --ph-cie:#0e700e;
   --f-ui:"Segoe UI","Segoe UI Web (West European)",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:#1b2026;--surface:#1b2026;--surface2:#232a32;--line:#343d48;--text:#e7eaee;--muted:#9ba6b3;--brand:#58aaf0;--brandink:#06121d;
-  --ok:#6fd06f;--okbg:#173317;--warn:#e6bb4f;--warnbg:#3a2f12;--bad:#f47c8a;--badbg:#3d1a20;--info:#58aaf0;--infobg:#15324d;
-  --ph-rec:#9a9dff;--ph-val:#58aaf0;--ph-acu:#4fc7c0;--ph-reg:#e6bb4f;--ph-cie:#6fd06f;--ph-inc:#f47c8a;
-  color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font:14px/1.45 var(--f-ui);padding-block:8px 16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font:14px/1.45 var(--f-ui);
+  padding-block:8px 16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
 button,select{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--brand);outline-offset:1px}
 .num{font-variant-numeric:tabular-nums}
-.cab{color:var(--muted);font-size:12.5px;margin:0 0 8px}
-.cab b{color:var(--text)}
-.tl-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:3px 11px;font-size:12.5px}
+.cab{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.cab b{color:var(--text);font-weight:600}
+.tl-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.chip{
+  border:1px solid var(--line);
+  background:var(--surface);
+  color:var(--text);
+  border-radius:4px;
+  padding:4px 12px;
+  font-size:12.5px;
+  font-weight:500;
+}
+.chip:hover{background:var(--hover)}
 .chip.on{background:var(--brand);color:var(--brandink);border-color:var(--brand)}
-.tl-bar select{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:3px 9px;font-size:12.5px;max-width:100%}
-.tl-bar .print{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px 10px;font-size:12.5px}
+.chip.on:hover{background:var(--brand-hover);border-color:var(--brand-hover)}
+.tl-bar select{
+  border:1px solid var(--line);
+  background:var(--surface);
+  color:var(--text);
+  border-radius:4px;
+  padding:4px 10px;
+  font-size:12.5px;
+  max-width:100%;
+}
+.tl-bar select:hover{background:var(--hover)}
+.tl-bar .print{
+  margin-left:auto;
+  border:1px solid var(--line);
+  background:var(--surface);
+  color:var(--text);
+  border-radius:4px;
+  padding:4px 12px;
+  font-size:12.5px;
+  font-weight:500;
+}
+.tl-bar .print:hover{background:var(--hover)}
 .tl{position:relative;margin:0;padding:0;list-style:none}
 .tl:before{content:"";position:absolute;left:96px;top:4px;bottom:4px;width:2px;background:var(--line)}
-.phase{margin:14px 0 6px 112px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.phase{margin:14px 0 6px 112px;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
 .ev{display:grid;grid-template-columns:86px 20px 1fr;gap:0 6px;align-items:start;padding:4px 0;break-inside:avoid}
 .ev .t{text-align:right;font-size:12px;line-height:1.3}
-.ev .t b{display:block;font-weight:600;font-size:12.5px}
+.ev .t b{display:block;font-weight:600;font-size:12.5px;color:var(--text)}
 .ev .t span{color:var(--muted)}
-.dot{width:12px;height:12px;border-radius:50%;margin:3px 0 0 4px;border:2px solid var(--surface);box-shadow:0 0 0 2px currentColor;background:currentColor;position:relative;z-index:1}
-.card{background:var(--surface2);border:1px solid var(--line);border-left:3px solid currentColor;border-radius:4px;padding:6px 10px;min-width:0}
+.dot{
+  width:10px;height:10px;border-radius:50%;
+  margin:4px 0 0 5px;
+  border:2px solid var(--surface);
+  box-shadow:0 0 0 2px currentColor;
+  background:currentColor;
+  position:relative;z-index:1;
+}
+.card{
+  background:var(--surface2);
+  border:1px solid var(--line);
+  border-left:3px solid currentColor;
+  border-radius:4px;
+  padding:8px 12px;
+  min-width:0;
+}
 .card .ti{font-weight:600;color:var(--text)}
-.card .me{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:1px;align-items:center}
-.card .why{margin-top:5px;font-size:13px;color:var(--text);background:var(--surface);border-radius:3px;padding:5px 8px;white-space:pre-wrap;overflow-wrap:anywhere}
-.card details{margin-top:5px;color:var(--text)}
-.card details summary{cursor:pointer;font-size:12.5px;color:var(--brand)}
-.card details pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.5 var(--f-ui);margin:5px 0 0}
-.fchip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 7px;font-size:11.5px;font-weight:600;color:var(--brand)}
-.pill{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600}
-.p-bad{background:var(--badbg);color:var(--bad)}
-.c-rec{color:var(--ph-rec)}.c-val{color:var(--ph-val)}.c-acu{color:var(--ph-acu)}.c-reg{color:var(--ph-reg)}.c-cie{color:var(--ph-cie)}.c-inc{color:var(--ph-inc)}
+.card .me{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:2px;align-items:center}
+.card .why{
+  margin-top:6px;
+  font-size:13px;
+  color:var(--text);
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:6px 10px;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.card details{margin-top:6px;color:var(--text)}
+.card details summary{cursor:pointer;font-size:12.5px;color:var(--brand);font-weight:500}
+.card details summary:hover{text-decoration:underline}
+.card details pre{
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  font:12.5px/1.5 var(--f-ui);
+  margin:6px 0 0;
+  padding:8px 10px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:4px;
+}
+.fchip{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:4px;
+  padding:1px 8px;
+  font-size:11.5px;
+  font-weight:600;
+  color:var(--brand);
+}
+.fchip:hover{background:var(--hover)}
+.c-rec{color:var(--ph-rec)}
+.c-val{color:var(--ph-val)}
+.c-acu{color:var(--ph-acu)}
+.c-reg{color:var(--ph-reg)}
+.c-cie{color:var(--ph-cie)}
 .rules{margin:6px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--text)}
-.rules li{padding:3px 0;border-top:1px dashed var(--line);overflow-wrap:anywhere}
+.rules li{padding:4px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
 .aviso{color:var(--muted);font-size:13px;padding:10px 0}
 .aviso.mal{color:var(--bad)}
 @media (max-width:720px){
@@ -79,16 +149,15 @@ button,select{font:inherit;color:inherit;cursor:pointer}
 }
 @media print{
   :root{--bg:#fff;--surface:#fff;--surface2:#fff;--line:#bbb;--text:#000;--muted:#333;--brand:#000;
-    --ph-rec:#333;--ph-val:#333;--ph-acu:#333;--ph-reg:#333;--ph-cie:#333;--ph-inc:#000;--bad:#000;--badbg:#fff}
+    --ph-rec:#333;--ph-val:#333;--ph-acu:#333;--ph-reg:#333;--ph-cie:#333;--bad:#000}
   body{padding:0;font-size:11pt}
   .tl-bar{display:none}
   .card{border-color:#999;border-left:3px solid #333;background:#fff}
   .card details summary{display:none}
-  .card .why{background:#fff;border:1px solid #ddd}
-  .pill{border:1px solid #000}
+  .card .why,.card details pre{background:#fff;border:1px solid #ddd}
   .fchip{border:1px solid #666;color:#000}
 }
-@media (prefers-reduced-motion:no-preference){.card{transition:background .15s}}
+@media (prefers-reduced-motion:no-preference){.card,.chip,.print{transition:background .15s,border-color .15s}}
 </style>
 </head>
 <body>
@@ -104,102 +173,87 @@ button,select{font:inherit;color:inherit;cursor:pointer}
   var RESULTADO = "sanic_mppp_tbl_resultadoregla";
   var PAGINA = 5000;
 
-  // ---------------------------------------------------------------- textos
+  // ---------------------------------------------------------------- textos (solo español)
   var T = {
-    3082: {
-      titulo: "Timeline de auditoría", recibida: "Recibida", desde: "desde recibida",
-      todo: "Todo", solicitud: "Solicitud", registros: "Registros", incidencias: "Incidencias",
-      unaFila: "Recorrido de una fila", todasFilas: "Todas las filas", fila: "Fila",
-      imprimir: "Imprimir", abrirFila: "Abrir la fila",
-      verTexto: "Ver texto completo", verReglas: "Ver reglas no cumplidas", verContenido: "Ver lo que se le mandó al cliente",
-      servicio: "Cuenta de servicio", sistema: "Sistema",
-      sinEventos: "No hay eventos con este filtro.", sinBitacora: "Esta solicitud todavía no tiene eventos en la bitácora.",
-      cargando: "Cargando…",
-      sinId: "Guardá la solicitud primero: todavía no tiene identificador.",
-      sinXrm: "No se pudo acceder a los datos del formulario.",
-      errorLeer: "No se pudo leer la información de la solicitud.",
-      noEncontrada: "No se encontró la solicitud.",
-      incidencia: "Incidencia",
-      orden: "Orden", razon: "Razón"
-    },
-    1033: {
-      titulo: "Audit timeline", recibida: "Received", desde: "since received",
-      todo: "All", solicitud: "Request", registros: "Rows", incidencias: "Incidents",
-      unaFila: "One row's trail", todasFilas: "All rows", fila: "Row",
-      imprimir: "Print", abrirFila: "Open the row",
-      verTexto: "See full text", verReglas: "See rules not met", verContenido: "See what the customer received",
-      servicio: "Service account", sistema: "System",
-      sinEventos: "No events match this filter.", sinBitacora: "This request has no events in the log yet.",
-      cargando: "Loading…",
-      sinId: "Save the request first: it does not have an identifier yet.",
-      sinXrm: "The form data could not be reached.",
-      errorLeer: "The request information could not be read.",
-      noEncontrada: "The request was not found.",
-      incidencia: "Incident",
-      orden: "Order", razon: "Reason"
-    }
-  };
-  var FASES = {
-    3082: { rec: "Recepción", val: "Validación", acu: "Acuse", reg: "Trabajo sobre los registros", cie: "Cierre y respuesta", inc: "Incidencia" },
-    1033: { rec: "Intake", val: "Validation", acu: "Receipt", reg: "Work on the rows", cie: "Closing and reply", inc: "Incident" }
+    titulo: "Timeline de auditoría",
+    recibida: "Recibida",
+    todo: "Todo",
+    solicitud: "Solicitud",
+    registros: "Registros",
+    unaFila: "Recorrido de una fila",
+    todasFilas: "Todas las filas",
+    fila: "Fila",
+    imprimir: "Imprimir",
+    abrirFila: "Abrir la fila",
+    verTexto: "Ver texto completo",
+    verReglas: "Ver reglas no cumplidas",
+    verContenido: "Ver lo que se le mandó al cliente",
+    servicio: "Cuenta de servicio",
+    sistema: "Sistema",
+    sinEventos: "No hay eventos con este filtro.",
+    sinBitacora: "Esta solicitud todavía no tiene eventos en la bitácora.",
+    cargando: "Cargando…",
+    sinId: "Guarda la solicitud primero: todavía no tiene identificador.",
+    sinXrm: "No se pudo acceder a los datos del formulario.",
+    errorLeer: "No se pudo leer la información de la solicitud.",
+    noEncontrada: "No se encontró la solicitud."
   };
 
-  // Valores del choice global sanic_mppp_ch_eventobitacora (Dominio/Choices.g.cs, EventoDeBitacora)
-  // -> [etapa, texto 3082, texto 1033].
+  var FASES = {
+    rec: "Recepción",
+    val: "Validación",
+    acu: "Acuse",
+    reg: "Trabajo sobre los registros",
+    cie: "Cierre y respuesta"
+  };
+
+  // Valores del choice global sanic_mppp_ch_eventobitacora (sin eventos de incidencia)
   var EVENTOS = {
-    159460001: ["rec", "Ingresada", "Received"],
-    159460019: ["rec", "Correo clasificado", "Email classified"],
-    159460002: ["val", "Validación terminada", "Validation finished"],
-    159460003: ["acu", "Acuse iniciado", "Receipt started"],
-    159460004: ["acu", "Acuse enviado", "Receipt sent"],
-    159460005: ["reg", "Fila digitada", "Row keyed"],
-    159460006: ["reg", "Fila aprobada", "Row approved"],
-    159460007: ["reg", "Fila devuelta", "Row returned"],
-    159460008: ["reg", "Fila rechazada en AS400", "Row rejected in AS400"],
-    159460018: ["reg", "Fila anulada", "Row voided"],
-    159460009: ["cie", "Procesada", "Processed"],
-    159460010: ["cie", "Respuesta final iniciada", "Final reply started"],
-    159460011: ["cie", "Respuesta final enviada", "Final reply sent"],
-    159460012: ["cie", "Cerrada", "Closed"],
-    159460013: ["cie", "No reconocida atendida", "Unrecognized handled"],
-    159460014: ["cie", "Descartada", "Discarded"],
-    159460020: ["inc", "Vencida", "Expired"],
-    159460015: ["inc", "Reintento", "Retry"],
-    159460016: ["inc", "Requiere revisión", "Needs review"],
-    159460021: ["inc", "Revisión atendida", "Review handled"],
-    159460017: ["inc", "Error", "Error"]
+    159460001: ["rec", "Ingresada"],
+    159460019: ["rec", "Correo clasificado"],
+    159460002: ["val", "Validación terminada"],
+    159460003: ["acu", "Acuse iniciado"],
+    159460004: ["acu", "Acuse enviado"],
+    159460005: ["reg", "Fila digitada"],
+    159460006: ["reg", "Fila aprobada"],
+    159460007: ["reg", "Fila devuelta"],
+    159460008: ["reg", "Fila rechazada en AS400"],
+    159460018: ["reg", "Fila anulada"],
+    159460009: ["cie", "Procesada"],
+    159460010: ["cie", "Respuesta final iniciada"],
+    159460011: ["cie", "Respuesta final enviada"],
+    159460012: ["cie", "Cerrada"],
+    159460013: ["cie", "No reconocida atendida"],
+    159460014: ["cie", "Descartada"]
   };
   var EV_ACUSE_ENVIADO = 159460004, EV_VALIDACION = 159460002, EV_RESPUESTA_ENVIADA = 159460011;
 
-  // sanic_mppp_ch_origenevento (OrigenDelEvento)
+  // sanic_mppp_ch_origenevento
   var ORIGENES = {
     159460001: "MPPP-REC", 159460002: "MPPP-ING", 159460003: "MPPP-COM", 159460004: "MPPP-ENV",
     159460005: "MPPP-VIG", 159460006: "Custom API", 159460007: "Plugin", 159460008: "App"
   };
   var ORIGEN_PLUGIN = 159460007, ORIGEN_APP = 159460008;
 
-  // sanic_mppp_ch_estadofila (EstadoDeLaFila) rechazadas por la validación
+  // sanic_mppp_ch_estadofila rechazadas por la validación
   var FILA_RECHAZADA_VALIDACION = 159460001, FILA_SIN_AUTORIZACION = 159460002;
-  // sanic_mppp_ch_resultadoregla (ResultadoDeLaRegla)
+  // sanic_mppp_ch_resultadoregla
   var REGLA_NO_CUMPLIDA = 159460002;
-  // sanic_mppp_ch_efectoregla (EfectoDeLaRegla)
-  var EFECTOS = { 159460001: ["Rechaza", "Rejects"], 159460002: ["Envía a revisión", "Sends to review"], 159460003: ["Advierte", "Warns"] };
+  // sanic_mppp_ch_efectoregla
+  var EFECTOS = { 159460001: "Rechaza", 159460002: "Envía a revisión", 159460003: "Advierte" };
 
   // ---------------------------------------------------------------- estado
-  var lcid = 1033;
   var estado = { filtro: "todo", fila: "" };
-  var datos = null; // { sol, eventos, filas, reglas, filaPorNumero }
+  var datos = null;
   var raiz = document.getElementById("raiz");
 
-  function t(k) { return T[lcid][k]; }
-  function en() { return lcid === 1033; }
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c];
     });
   }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
-  function dia(x) { return en() ? pad(x.getMonth() + 1) + "/" + pad(x.getDate()) : pad(x.getDate()) + "/" + pad(x.getMonth() + 1); }
+  function dia(x) { return pad(x.getDate()) + "/" + pad(x.getMonth() + 1); }
   function hora(x) { return pad(x.getHours()) + ":" + pad(x.getMinutes()); }
   function aFecha(v) { if (!v) return null; var d = new Date(v); return isNaN(d.getTime()) ? null : d; }
   function transcurrido(desde, hasta) {
@@ -211,7 +265,7 @@ button,select{font:inherit;color:inherit;cursor:pointer}
     return "+" + dd + " d" + (hh ? " " + hh + " h" : "");
   }
 
-  // ---------------------------------------------------------------- contexto (igual que comunicacion.html)
+  // ---------------------------------------------------------------- contexto
   function idDelRegistro() {
     var busqueda = window.location.search || "";
     var partes = busqueda.replace("?", "").split("&");
@@ -237,19 +291,11 @@ button,select{font:inherit;color:inherit;cursor:pointer}
     return null;
   }
 
-  function idioma(api) {
-    try {
-      var l = Number(api.Utility.getGlobalContext().userSettings.languageId);
-      return l === 3082 ? 3082 : 1033;
-    } catch (e) { return 1033; }
-  }
-
   function aviso(texto, malo) {
     raiz.innerHTML = "<div class=\"aviso" + (malo ? " mal" : "") + "\">" + esc(texto) + "</div>";
   }
 
   // ---------------------------------------------------------------- lectura (SOLO LEE)
-  // Todas las paginas de una consulta: `nextLink` trae el resto de la cadena de consulta.
   function leerTodas(api, tabla, opciones) {
     var acumulado = [];
     function pagina(opc) {
@@ -288,76 +334,80 @@ button,select{font:inherit;color:inherit;cursor:pointer}
   function quien(e) {
     if (e.sanic_actortexto) return e.sanic_actortexto;
     var o = e.sanic_origen;
-    return (o === ORIGEN_PLUGIN || o === ORIGEN_APP) ? t("sistema") : t("servicio");
+    return (o === ORIGEN_PLUGIN || o === ORIGEN_APP) ? T.sistema : T.servicio;
   }
 
   function pintar() {
     var d = datos, sol = d.sol, recibida = aFecha(sol.sanic_fecharecibido);
-    var f = FASES[lcid];
 
-    var filtros = [["todo", t("todo")], ["sol", t("solicitud")], ["reg", t("registros")], ["inc", t("incidencias")]];
-    var opcionesFila = "<option value=\"\">" + esc(t("todasFilas")) + "</option>" + d.filas.map(function (x) {
+    var filtros = [["todo", T.todo], ["sol", T.solicitud], ["reg", T.registros]];
+    var opcionesFila = "<option value=\"\">" + esc(T.todasFilas) + "</option>" + d.filas.map(function (x) {
       var n = x.sanic_numerofila;
       return "<option value=\"" + esc(n) + "\"" + (String(n) === estado.fila ? " selected" : "") + ">" +
-        esc(t("fila")) + " " + esc(n) + " · " + esc(x.sanic_nombrebeneficiario) + "</option>";
+        esc(T.fila) + " " + esc(n) + " · " + esc(x.sanic_nombrebeneficiario) + "</option>";
     }).join("");
     var barra = "<div class=\"tl-bar\">" + filtros.map(function (x) {
       return "<button type=\"button\" class=\"chip" + (estado.filtro === x[0] && !estado.fila ? " on" : "") + "\" data-filtro=\"" + x[0] + "\">" + esc(x[1]) + "</button>";
     }).join("") +
-      (d.filas.length ? "<select id=\"selFila\" aria-label=\"" + esc(t("unaFila")) + "\">" + opcionesFila + "</select>" : "") +
-      "<button type=\"button\" class=\"print\" id=\"btnPrint\">" + esc(t("imprimir")) + "</button></div>";
+      (d.filas.length ? "<select id=\"selFila\" aria-label=\"" + esc(T.unaFila) + "\">" + opcionesFila + "</select>" : "") +
+      "<button type=\"button\" class=\"print\" id=\"btnPrint\">" + esc(T.imprimir) + "</button></div>";
 
     var cab = "<p class=\"cab\"><b>" + esc(sol.sanic_nombre) + "</b>" +
-      (recibida ? " · " + esc(t("recibida")) + " " + esc(dia(recibida)) + " " + esc(hora(recibida)) : "") + "</p>";
+      (recibida ? " · " + esc(T.recibida) + " " + esc(dia(recibida)) + " " + esc(hora(recibida)) : "") + "</p>";
 
-    if (!d.eventos.length) { raiz.innerHTML = cab + barra + "<div class=\"aviso\">" + esc(t("sinBitacora")) + "</div>"; return; }
+    var evsTodos = d.eventos.filter(function (b) {
+      return Boolean(EVENTOS[b.sanic_evento]);
+    }).map(function (b) {
+      var info = EVENTOS[b.sanic_evento];
+      return { b: b, f: aFecha(b.sanic_fechaevento), fase: info[0], nombre: info[1], fila: Number(b.sanic_numerofila) || 0 };
+    });
 
-    var evs = d.eventos.map(function (b) {
-      var info = EVENTOS[b.sanic_evento] || ["inc", String(b.sanic_evento), String(b.sanic_evento)];
-      return { b: b, f: aFecha(b.sanic_fechaevento), fase: info[0], nombre: en() ? info[2] : info[1], fila: Number(b.sanic_numerofila) || 0 };
-    }).filter(function (e) {
+    if (!evsTodos.length) { raiz.innerHTML = cab + barra + "<div class=\"aviso\">" + esc(T.sinBitacora) + "</div>"; return; }
+
+    var evs = evsTodos.filter(function (e) {
       if (estado.fila) return e.fila === Number(estado.fila);
-      if (estado.filtro === "sol") return e.fila === 0 && e.fase !== "inc";
+      if (estado.filtro === "sol") return e.fila === 0;
       if (estado.filtro === "reg") return e.fila > 0;
-      if (estado.filtro === "inc") return e.fase === "inc";
       return true;
     });
-    if (!evs.length) { raiz.innerHTML = cab + barra + "<div class=\"aviso\">" + esc(t("sinEventos")) + "</div>"; return; }
+    if (!evs.length) { raiz.innerHTML = cab + barra + "<div class=\"aviso\">" + esc(T.sinEventos) + "</div>"; return; }
 
     var fallidas = d.reglas.filter(function (r) { return r.sanic_resultado === REGLA_NO_CUMPLIDA; });
     var rechazadas = d.filas.filter(function (x) { return x.sanic_estado === FILA_RECHAZADA_VALIDACION || x.sanic_estado === FILA_SIN_AUTORIZACION; });
 
     var html = "", fase = null, diaAnt = null;
     evs.forEach(function (e) {
-      if (e.fase !== fase && e.fase !== "inc") { fase = e.fase; html += "<li class=\"phase c-" + e.fase + "\">" + esc(f[e.fase]) + "</li>"; }
+      if (e.fase !== fase) {
+        fase = e.fase;
+        html += "<li class=\"phase c-" + e.fase + "\">" + esc(FASES[e.fase]) + "</li>";
+      }
       var origen = ORIGENES[e.b.sanic_origen] || "";
       var me = "<span>" + esc(quien(e.b)) + "</span>" + (origen ? "<span>" + esc(origen) + "</span>" : "") +
-        (e.fila && d.filaPorNumero[e.fila] ? "<button type=\"button\" class=\"fchip\" data-fila=\"" + esc(e.fila) + "\" title=\"" + esc(t("abrirFila")) + "\">" + esc(t("fila")) + " " + esc(e.fila) + "</button>"
-          : (e.fila ? "<span class=\"fchip\">" + esc(t("fila")) + " " + esc(e.fila) + "</span>" : "")) +
-        (e.fase === "inc" ? "<span class=\"pill p-bad\">" + esc(f.inc) + "</span>" : "");
+        (e.fila && d.filaPorNumero[e.fila] ? "<button type=\"button\" class=\"fchip\" data-fila=\"" + esc(e.fila) + "\" title=\"" + esc(T.abrirFila) + "\">" + esc(T.fila) + " " + esc(e.fila) + "</button>"
+          : (e.fila ? "<span class=\"fchip\">" + esc(T.fila) + " " + esc(e.fila) + "</span>" : ""));
       var cuerpo = "";
       var det = e.b.sanic_detalle;
       if (det) {
         cuerpo += det.length > 160
-          ? "<details><summary>" + esc(t("verTexto")) + "</summary><pre>" + esc(det) + "</pre></details>"
+          ? "<details><summary>" + esc(T.verTexto) + "</summary><pre>" + esc(det) + "</pre></details>"
           : "<div class=\"why\">" + esc(det) + "</div>";
       }
       if (e.b.sanic_evento === EV_VALIDACION && (fallidas.length || rechazadas.length)) {
-        cuerpo += "<details><summary>" + esc(t("verReglas")) + "</summary><ul class=\"rules\">" +
+        cuerpo += "<details><summary>" + esc(T.verReglas) + "</summary><ul class=\"rules\">" +
           fallidas.map(function (r) {
             var ef = EFECTOS[r.sanic_efectoaplicado];
-            return "<li><b>" + esc(r.sanic_reglacodigo) + "</b>" + (ef ? " · " + esc(en() ? ef[1] : ef[0]) : "") +
+            return "<li><b>" + esc(r.sanic_reglacodigo) + "</b>" + (ef ? " · " + esc(ef) : "") +
               (r.sanic_razon ? " — " + esc(r.sanic_razon) : "") + "</li>";
           }).join("") +
           rechazadas.map(function (x) {
-            return "<li><b>" + esc(t("fila")) + " " + esc(x.sanic_numerofila) + "</b>" + (x.sanic_mensaje ? " — " + esc(x.sanic_mensaje) : "") + "</li>";
+            return "<li><b>" + esc(T.fila) + " " + esc(x.sanic_numerofila) + "</b>" + (x.sanic_mensaje ? " — " + esc(x.sanic_mensaje) : "") + "</li>";
           }).join("") + "</ul></details>";
       }
       if (e.b.sanic_evento === EV_ACUSE_ENVIADO && sol.sanic_acusecontenido) {
-        cuerpo += "<details><summary>" + esc(t("verContenido")) + "</summary><pre>" + esc(textoPlano(sol.sanic_acusecontenido)) + "</pre></details>";
+        cuerpo += "<details><summary>" + esc(T.verContenido) + "</summary><pre>" + esc(textoPlano(sol.sanic_acusecontenido)) + "</pre></details>";
       }
       if (e.b.sanic_evento === EV_RESPUESTA_ENVIADA && sol.sanic_respuestafinalcontenido) {
-        cuerpo += "<details><summary>" + esc(t("verContenido")) + "</summary><pre>" + esc(textoPlano(sol.sanic_respuestafinalcontenido)) + "</pre></details>";
+        cuerpo += "<details><summary>" + esc(T.verContenido) + "</summary><pre>" + esc(textoPlano(sol.sanic_respuestafinalcontenido)) + "</pre></details>";
       }
       var cuando = e.f ? (dia(e.f) !== diaAnt ? dia(e.f) + " " : "") + hora(e.f) : "—";
       if (e.f) diaAnt = dia(e.f);
@@ -368,8 +418,6 @@ button,select{font:inherit;color:inherit;cursor:pointer}
     raiz.innerHTML = cab + barra + "<ol class=\"tl\">" + html + "</ol>";
   }
 
-  // El acuse y la respuesta final son documentos HTML completos: acá se muestran como TEXTO
-  // (sin interpretarlos), sacando las etiquetas, para leerlos dentro de la tarjeta.
   function textoPlano(html) {
     var doc;
     try { doc = new DOMParser().parseFromString(String(html), "text/html"); } catch (e) { return String(html); }
@@ -398,7 +446,6 @@ button,select{font:inherit;color:inherit;cursor:pointer}
     if (ev.target && ev.target.id === "selFila") { estado.fila = ev.target.value; pintar(); }
   });
 
-  // Para imprimir se despliegan los detalles y se restauran despues.
   var abiertos = [];
   window.addEventListener("beforeprint", function () {
     abiertos = [];
@@ -413,19 +460,17 @@ button,select{font:inherit;color:inherit;cursor:pointer}
   // ---------------------------------------------------------------- arranque
   function arrancar() {
     var api = xrm();
-    lcid = api ? idioma(api) : 1033;
-    document.documentElement.lang = en() ? "en" : "es";
-    document.title = t("titulo");
+    document.title = T.titulo;
     var id = idDelRegistro();
-    if (!id) { aviso(t("sinId"), false); return; }
-    if (!api || !api.WebApi) { aviso(t("sinXrm"), true); return; }
-    aviso(t("cargando"), false);
+    if (!id) { aviso(T.sinId, false); return; }
+    if (!api || !api.WebApi) { aviso(T.sinXrm, true); return; }
+    aviso(T.cargando, false);
     cargar(api, id).then(function (r) {
       datos = r;
       pintar();
     }, function (err) {
       var m = err && err.message ? String(err.message) : "";
-      aviso(/does not exist|not found|0x80040217/i.test(m) ? t("noEncontrada") : t("errorLeer"), true);
+      aviso(/does not exist|not found|0x80040217/i.test(m) ? T.noEncontrada : T.errorLeer, true);
     });
   }
   arrancar();
