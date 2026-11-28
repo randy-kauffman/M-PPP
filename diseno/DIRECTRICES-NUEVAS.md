@@ -1311,29 +1311,34 @@ su Bitácora, sus Filas y sus Resultados de regla. No escribe nada.
 - Una columna lookup de Bitácora a Fila (el timeline por fila sale del número).
 - La auditoría nativa de Dataverse (cambios de configuración y de parámetros): ya existe y retiene 365 días (D-53).
 
-# DN-10 · Formato 06: la cuenta como referencia cuando no viene
+# DN-10 · La referencia cuando no viene: identificación en formato 06, cuenta en formato 10 BAC
 
-Recibida el **2026-11-27** del aprobador: en los planes de formato 06 (BAC), la referencia que rige tiene que ser el
-número de cuenta. Hasta hoy, en formato 06 regía la referencia que mandaba el cliente, y si venía vacía quedaba vacía.
+Recibida el **2026-11-27** del aprobador y **corregida el 2026-11-28**. La primera versión (construida el 2026-11-27,
+ensamblado 1.0.31.0, parche 1.3.1.5) ponía la cuenta en el formato 06: el aprobador se había equivocado de dato. Lo
+correcto es la identificación en el 06, y la cuenta en el 10 con clasificación BAC.
 
-**Estado: APROBADO el 2026-11-27 y construido. Desplegado en Dev (ensamblado 1.0.31.0) y probado en vivo (set R, R-43). Viaja en el parche sanic_mppp_sol_parche_1_3_1 1.3.1.5.**
+**Estado: APROBADO el 2026-11-28 (decisiones del aprobador en la conversación). En construcción (corrección).**
 
-## Decisiones del aprobador (2026-11-27)
+## Decisiones del aprobador
 
 | # | Decisión |
 |---|---|
 | 1 | Solo en la **Inclusión**. En Exclusión y Modificación la referencia identifica una que ya existe en AS400: rige la que manda el cliente, como hoy |
-| 2 | Solo **formato 06**. El 10 no cambia; el 11 sigue armando la suya (banco + cuenta rellena a 20) |
-| 3 | La cuenta **tal cual vino**, sin espacios a los lados y **sin rellenar** con ceros (la cuenta ya solo admite dígitos: si trae otra cosa, la fila se rechaza) |
-| 4 | Si el cliente **escribió** una referencia, **se respeta** (la validan las reglas de siempre: largo, caracteres). La cuenta rige solo cuando la referencia viene vacía |
+| 2 | **Formato 06**: rige el **número de identificación**, tal cual vino, sin espacios a los lados y **sin pasar a mayúsculas** |
+| 3 | **Formato 10 con clasificación BAC**: rige el **número de cuenta**, tal cual vino, sin espacios a los lados y **sin rellenar**. Con clasificación CK, como hoy |
+| 4 | Si el cliente **escribió** una referencia, **se respeta** (la validan las reglas de siempre). El dato rige solo cuando la referencia viene vacía |
+| 5 | El formato 11 no cambia: sigue armando la suya (banco + cuenta rellena a 20) |
 
 ## Diseño
 
-- Código, en `FilaEnValidacion.ReferenciaQueRige`: formato 06 + Inclusión + referencia vacía (o solo espacios) → la
-  cuenta recibida sin espacios a los lados. Todo lo demás, igual que hoy.
-- `sanic_referenciarecibida` no cambia: sigue guardando lo que vino (vacío si vino vacío).
-- **Sin cambios de parámetros**: en las dos matrices (`plantilla.obligatoriedad` v3 y `.conectividad` v1) la referencia
-  es opcional en la Inclusión y la cuenta obligatoria, así que una referencia vacía no se rechaza y llega a este paso.
-- Lo ven el ejecutivo (columna Referencia), el Excel de "Descargar para digitar" y el RPA, que leen `sanic_referencia`.
-- Pruebas del arquitecto en `Dn05Aceptacion.cs` (sección DN-10). Ensamblado **1.0.31.0**, parche 1.3.1.5.
-- Rige para las solicitudes que se validen desde el despliegue: las filas ya validadas no se recalculan.
+- Código, en `FilaEnValidacion.ReferenciaQueRige`, con la referencia recibida vacía (o solo espacios) y gestión
+  Inclusión: formato 06 → `Recibido(numeroIdentificacion)`; formato 10 con `ClasificacionEfectiva` BAC →
+  `Recibido(numeroCuenta)`. Todo lo demás, igual que hoy.
+- `sanic_referenciarecibida` no cambia: sigue guardando lo que vino.
+- **Sin cambios de parámetros**: en las dos matrices la referencia es opcional en la Inclusión, y la identificación (06)
+  y la cuenta (10) son obligatorias, así que una referencia vacía no se rechaza y llega a este paso.
+- Lo ven el ejecutivo, el Excel de "Descargar para digitar" y el RPA, que leen `sanic_referencia`.
+- Pruebas del arquitecto en `Dn05Aceptacion.cs` (sección DN-10). Ensamblado **1.0.32.0**, parche 1.3.1.6. Caso en vivo R-43
+  corregido.
+- Rige para las solicitudes que se validen desde el despliegue: las filas ya validadas no se recalculan. Las filas de
+  formato 06 validadas entre el 2026-11-27 y la corrección pueden tener la cuenta como referencia.

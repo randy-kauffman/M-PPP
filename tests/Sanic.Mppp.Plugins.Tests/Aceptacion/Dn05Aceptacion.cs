@@ -735,42 +735,61 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             }
         }
 
-        // ================================================================== DN-10: formato 06, la cuenta como referencia
-        // (aprobador, 2026-11-27): en una Inclusión de formato 06, si la referencia viene vacía rige la CUENTA, tal cual vino y
-        // sin espacios a los lados, sin rellenar. Si el cliente escribió una referencia, se respeta (la validan las reglas de
-        // siempre). Solo formato 06 y solo Inclusión: el resto no cambia.
+        // ================================================================== DN-10: la referencia cuando no viene
+        // (aprobador, 2026-11-27, corregido el 2026-11-28): si la referencia viene vacía, en una Inclusión
+        //  - de formato 06 rige el NÚMERO DE IDENTIFICACIÓN, tal cual vino, sin espacios a los lados (sin pasar a mayúsculas);
+        //  - de formato 10 con clasificación BAC rige el NÚMERO DE CUENTA, tal cual vino, sin espacios a los lados ni relleno.
+        // Si el cliente escribió una referencia, se respeta. El resto (Exclusión, Modificación, formato 10 CK, formato 11) no cambia.
         [Theory]
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]
-        public void En_una_inclusion_de_formato_06_sin_referencia_rige_la_cuenta(string referencia)
+        public void En_una_inclusion_de_formato_06_sin_referencia_rige_la_identificacion(string referencia)
         {
-            var fila = Fila("6", ("referencia", referencia), ("numeroCuenta", "  123456789 "));
-            Assert.Equal("123456789", fila.ReferenciaQueRige);
+            var fila = Fila("6", ("referencia", referencia), ("numeroIdentificacion", "  0011234567890a "), ("numeroCuenta", "123456789"));
+            Assert.Equal("0011234567890a", fila.ReferenciaQueRige);
             Assert.Equal(referencia, fila.ReferenciaRecibida);
-            Assert.Null(fila.ReferenciaConstruida); // no es la construida del formato 11: es la cuenta, sin rellenar
-        }
-
-        [Fact]
-        public void En_una_inclusion_de_formato_06_la_referencia_que_escribio_el_cliente_se_respeta()
-        {
-            Assert.Equal("REF9", Fila("6", ("referencia", "  REF9 ")).ReferenciaQueRige);
-        }
-
-        [Fact]
-        public void En_una_inclusion_de_formato_06_sin_referencia_ni_cuenta_rige_vacia()
-        {
-            Assert.Equal(string.Empty, Fila("6", ("referencia", ""), ("numeroCuenta", "")).ReferenciaQueRige);
+            Assert.Null(fila.ReferenciaConstruida);
         }
 
         [Theory]
-        [InlineData("6", "Exclusion")]
-        [InlineData("6", "Modificacion")]
-        [InlineData("6", "")]
-        [InlineData("10", "Inclusion")]
-        public void Fuera_de_la_inclusion_de_formato_06_la_referencia_vacia_sigue_vacia(string plan, string gestion)
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void En_una_inclusion_de_formato_10_BAC_sin_referencia_rige_la_cuenta(string referencia)
         {
-            Assert.Equal(string.Empty, Fila(plan, ("gestion", gestion), ("referencia", "")).ReferenciaQueRige);
+            var fila = Fila("10", ("clasificacion", "BAC"), ("referencia", referencia), ("numeroCuenta", "  123456789 "));
+            Assert.Equal("123456789", fila.ReferenciaQueRige);
+            Assert.Equal(referencia, fila.ReferenciaRecibida);
+            Assert.Null(fila.ReferenciaConstruida);
+        }
+
+        [Theory]
+        [InlineData("6", "BAC")]
+        [InlineData("10", "BAC")]
+        public void La_referencia_que_escribio_el_cliente_se_respeta(string plan, string clasificacion)
+        {
+            Assert.Equal("REF9", Fila(plan, ("clasificacion", clasificacion), ("referencia", "  REF9 ")).ReferenciaQueRige);
+        }
+
+        [Fact]
+        public void Sin_referencia_y_sin_el_dato_que_la_reemplaza_rige_vacia()
+        {
+            Assert.Equal(string.Empty, Fila("6", ("referencia", ""), ("numeroIdentificacion", "")).ReferenciaQueRige);
+            Assert.Equal(string.Empty, Fila("10", ("clasificacion", "BAC"), ("referencia", ""), ("numeroCuenta", "")).ReferenciaQueRige);
+        }
+
+        [Theory]
+        [InlineData("6", "Exclusion", "BAC")]
+        [InlineData("6", "Modificacion", "BAC")]
+        [InlineData("6", "", "BAC")]
+        [InlineData("10", "Inclusion", "CK")]
+        [InlineData("10", "Inclusion", "")]
+        [InlineData("10", "Exclusion", "BAC")]
+        [InlineData("10", "Modificacion", "BAC")]
+        public void Fuera_de_esos_dos_casos_la_referencia_vacia_sigue_vacia(string plan, string gestion, string clasificacion)
+        {
+            Assert.Equal(string.Empty, Fila(plan, ("gestion", gestion), ("clasificacion", clasificacion), ("referencia", "")).ReferenciaQueRige);
         }
 
         // ================================================================== el catálogo destino, por el motor
