@@ -42,36 +42,38 @@ desde las columnas, el orden y el filtro.
       "ancho": 130
     },
     {
-      "nombre": "sanic_numerofila",
-      "ancho": 70
-    },
-    {
-      "nombre": "sanic_requiereatencionmanual",
-      "ancho": 60
-    },
-    {
-      "nombre": "sanic_estado",
-      "ancho": 130
-    },
-    {
       "nombre": "sanic_gestion",
       "ancho": 110
     },
     {
-      "nombre": "sanic_clasificacion",
-      "ancho": 100
+      "nombre": "sanic_nombre",
+      "ancho": 180,
+      "enlace": "cliente"
     },
     {
       "nombre": "sanic_planid",
       "ancho": 90
     },
     {
-      "nombre": "sanic_referencia",
-      "ancho": 170
+      "nombre": "sanic_numeroplan",
+      "ancho": 131
+    },
+    {
+      "nombre": "sanic_tipoformato",
+      "ancho": 169,
+      "enlace": "a_2bac4e7b833b4f99a5af50f1ba99ebc8"
+    },
+    {
+      "nombre": "sanic_clasificacion",
+      "ancho": 100
     },
     {
       "nombre": "sanic_nombrebeneficiario",
       "ancho": 200
+    },
+    {
+      "nombre": "sanic_referencia",
+      "ancho": 170
     },
     {
       "nombre": "sanic_tipoidentificacion",
@@ -96,20 +98,11 @@ desde las columnas, el orden y el filtro.
     {
       "nombre": "sanic_fechavalidada",
       "ancho": 130
-    },
-    {
-      "nombre": "sanic_nombre",
-      "ancho": 180,
-      "enlace": "cliente"
     }
   ],
   "orden": [
     {
       "columna": "sanic_solicitudid",
-      "sentido": "asc"
-    },
-    {
-      "columna": "sanic_numerofila",
       "sentido": "asc"
     }
   ],
@@ -145,6 +138,12 @@ desde las columnas, el orden y el filtro.
             "alias": "cliente"
           }
         ]
+      },
+      {
+        "tabla": "sanic_mppp_tbl_plan",
+        "de": "sanic_mppp_tbl_planid",
+        "a": "sanic_planid",
+        "alias": "a_2bac4e7b833b4f99a5af50f1ba99ebc8"
       }
     ]
   }
@@ -157,3 +156,22 @@ desde las columnas, el orden y el filtro.
 - **Columna `sanic_requiereatencionmanual` agregada el 2026-09-27** (hallazgo del aprobador), misma
   posicion y mismo motivo que en "Mis clientes - por digitar": segunda columna, pegada a
   `sanic_numerofila` y ANTES de `sanic_estado`, ancho chico (60) por ser un Si/No.
+
+## Cambio manual del aprobador 2026-11-27 que la herramienta no genera
+
+Hecho en Dev con el diseñador de vistas; el playbook se alineó con lo que Dev tiene (esto reemplaza la
+columna `sanic_requiereatencionmanual` de la nota anterior: el aprobador la quitó de ESTA vista; sigue en
+"Mis clientes - por digitar").
+
+- Se quitaron las columnas Número de fila (`sanic_numerofila`), Requiere atención manual y Estado (`sanic_estado`; el filtro por estado sigue).
+- Se quitó el segundo criterio de orden (`sanic_numerofila`); queda solo `sanic_solicitudid` ascendente.
+- Cliente (`cliente.sanic_nombre`) pasó a ser la tercera columna, después de Gestión.
+- Se agregaron `sanic_numeroplan` (ancho 131) después de Plan y el Tipo de formato del plan (`sanic_tipoformato`, ancho 169).
+
+Lo que la herramienta NO puede generar y por eso `--solo-verificar` seguirá diciendo `difiere`: en Dev el
+Tipo de formato viene de un `link-entity` a `sanic_mppp_tbl_plan` con alias `a_2bac4e7b833b4f99a5af50f1ba99ebc8`,
+`link-type="outer"` y `visible="false"`; la herramienta solo escribe `inner` (aquí es equivalente en
+resultado porque ya hay un enlace interno a Plan, pero no es el mismo XML), y además Dev guarda
+`<attribute name="sanic_numeroplan"/>` y ese enlace DESPUÉS de los enlaces existentes, mientras que la
+herramienta pone todos los atributos propios antes. Un `--completar` reescribiría la vista con la forma
+de la herramienta (mismas columnas y filas, sin `outer`/`visible`).

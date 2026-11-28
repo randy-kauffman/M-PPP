@@ -114,3 +114,22 @@ ni classid: la herramienta los resuelve contra la metadata de la tabla.
 - El web resource `sanic_mppp_wr_html_comunicacion` existe (12.9): muestra el correo enviado al cliente **tal cual**, dentro de un `iframe` con sandbox.
 
 - La tabla, sus columnas y las vistas de las subgrillas existen.
+
+## Cambio manual del aprobador 2026-11-27 que la herramienta no genera
+
+El aprobador cambió en Dev el formulario «Solicitud» con el diseñador. El playbook NO lo puede expresar
+(`formulario.py` arma una sola pestaña y un encabezado de 3 celdas), así que se deja el JSON tal cual y
+`--solo-verificar` dice `difiere`. Lo que Dev tiene de más que el playbook:
+
+1. **Pestaña «Esencial», primera, antes de «General»** (`tab_2`, `IsUserDefined="0"`):
+   - sección «Correo»: Asunto, Correo original y Excel original (editables, `disabled="false"`);
+   - sección «Filas»: subgrilla de `sanic_mppp_tbl_fila` (relación `sanic_mppp_solicitud_fila`), 4 filas por página,
+     con selector de vista apagado, vista inicial «Active Filas» (`ed029da0-cc6c-4351-8d4f-b4b96757c817`, que el aprobador
+     también cambió: ver `playbooks/vista/muestras/sanic_mppp_tbl_fila.active_filas.vista.xml`) y vistas disponibles
+     «Mis clientes - por digitar», «Filas» y «Active Filas».
+2. **Cuarta celda en el encabezado**: «Recibido el» (`sanic_fecharecibido`, editable). La herramienta admite 3.
+3. `<footer>` con tres celdas vacías y `<DisplayConditions Order="0" FallbackForm="true"><Everyone/>` (los agrega el
+   diseñador; la herramienta no los escribe).
+
+**Riesgo:** un `--completar` sobre este playbook borraría la pestaña «Esencial» y la cuarta celda del encabezado.
+No correrlo sobre este formulario sin antes decidir si se amplía la herramienta o se acepta el cambio manual.

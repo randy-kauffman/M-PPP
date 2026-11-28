@@ -12,6 +12,7 @@ Cómo se traduce DN-09 §D a lo que `formulario.py` sabe armar (cada diferencia 
 | Sección 2 con campos **y** subgrilla Resultado de regla | dos secciones: «2 Que paso con la solicitud» (campos) y «2 Reglas evaluadas» (subgrilla) | Una sección lleva `campos`, `subgrilla` **o** `webresource`, exactamente uno |
 | Subgrilla Resultado de regla: Orden · Regla · Resultado · Efecto · Razón | vista existente «Reglas evaluadas» | Ya trae esas cinco columnas y además la fecha de evaluación; no hace falta una vista nueva |
 | Subgrilla Filas: N° · Gestión · Plan · Beneficiario · Estado · Digitó · Aprobó · Mensaje | vista **nueva** «Filas - Auditoria» (`playbooks/vista/filas_auditoria.md`) | «Filas», la de la subgrilla de hoy, no trae Digitó ni Aprobó |
+| Sección 4 «Qué respondimos»: campos de acuse y respuesta final | `webresource` `sanic_mppp_wr_html_comunicacion`, `alto` 6 | **Cambio manual del aprobador 2026-11-27, ya en Dev.** Reemplazó los cuatro campos (acuse enviado el, contenido del acuse, respuesta final enviada el, contenido de la respuesta final) por el mismo visor «Comunicación enviada» del formulario «Solicitud» |
 | Sección 5: web resource a todo el ancho | `webresource` `sanic_mppp_wr_html_auditoria`, `alto` 20 (el máximo que admite la herramienta) | Se embebe igual que `sanic_mppp_wr_html_comunicacion` en «Solicitud»: control con `PassParameters = true`, que le pasa `id` y `typename` del registro en la cadena de consulta. La herramienta no tiene opción de ancho: el control ocupa la fila de la sección |
 
 Los títulos de sección van sin tildes (BP-PP-197; `exigir_sin_tildes` los revisa).
@@ -20,6 +21,17 @@ Los títulos de sección van sin tildes (BP-PP-197; `exigir_sin_tildes` los revi
 > formulario general de la tabla (que no se toca) y le escribe `<DisplayConditions Order="0">` con el rol de la
 > unidad raíz. El rol tiene que existir antes (`playbooks/rol/sr_mppp_auditor.md`). Soporte agregado a la
 > herramienta el 2026-11-27.
+
+> **Cambio manual del aprobador 2026-11-27 que la herramienta no genera (alineado con Dev el 2026-11-27).**
+> La sección 4 ya es el web resource de comunicación (ver tabla). El playbook lo expresa, pero el formxml que
+> Dev guarda NO es byte a byte el que genera `formulario.py`, así que `--solo-verificar` seguirá diciendo
+> `difiere` aunque el contenido funcional sea el mismo. Lo que el diseñador de formularios agregó y la
+> herramienta no escribe: (1) un `<footer>` con tres celdas vacías; (2) `FallbackForm="false"` en
+> `<DisplayConditions>` y el id del rol en mayúsculas; (3) en el control del web resource: id
+> `WebResource_new_1`, etiqueta con el nombre de pantalla del recurso («WR - MPPP - HTML - Comunicacion
+> enviada»), `WebResourceId`, `ShowOnMobileClient=false` y un `<events>` vacío; (4) ids de celda al azar en
+> vez de los deterministas. **Riesgo:** un `--completar` reescribiría el formulario con el formxml de la
+> herramienta (perdería esos agregados del diseñador; lo funcional quedaría igual).
 
 ## 1. Identidad
 
@@ -99,12 +111,10 @@ La asignación al rol va en la clave `roles` del bloque: `formulario.py` la conv
     },
     {
       "titulo": "4 Que respondimos",
-      "campos": [
-        "sanic_fechaacuseenviado",
-        "sanic_acusecontenido",
-        "sanic_fecharespuestafinalenviada",
-        "sanic_respuestafinalcontenido"
-      ]
+      "webresource": {
+        "nombre": "sanic_mppp_wr_html_comunicacion",
+        "alto": 6
+      }
     },
     {
       "titulo": "5 Linea de tiempo",

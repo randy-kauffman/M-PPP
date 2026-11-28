@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Muestra real, leida de Dev el 2026-11-27: vista de sistema "Active Filas" (savedqueryid ed029da0-cc6c-4351-8d4f-b4b96757c817)
+     de sanic_mppp_tbl_fila, tal como la dejo el aprobador (modifiedon 2026-11-28T00:08:53Z). Original de la plataforma: columnas
+     sanic_nombre y createdon, orden por sanic_nombre, filtro statecode=0, isdefault=1. Sin playbook: vista de sistema. -->
+<savedquery name="Active Filas" savedqueryid="ed029da0-cc6c-4351-8d4f-b4b96757c817" querytype="0" isdefault="false">
+<fetchxml>
+<fetch version="1.0" mapping="logical" savedqueryid="ed029da0-cc6c-4351-8d4f-b4b96757c817"><entity name="sanic_mppp_tbl_fila"><attribute name="sanic_mppp_tbl_filaid"/><filter type="and"><condition attribute="statecode" operator="eq" value="0"/><condition attribute="sanic_clasificacion" operator="eq" value="159460001"/></filter><attribute name="sanic_gestion"/><attribute name="sanic_clasificacion"/><attribute name="sanic_numeroplan"/><attribute name="sanic_nombrebeneficiario"/><attribute name="sanic_tipoidentificacion"/><attribute name="sanic_numeroidentificacion"/><attribute name="sanic_referencia"/><attribute name="sanic_numerocuenta"/><attribute name="sanic_moneda"/><attribute name="sanic_banco"/></entity></fetch>
+</fetchxml>
+<layoutxml>
+<grid name="resultset" jump="sanic_nombre" select="1" icon="1" preview="1" object="11135"><row name="result" id="sanic_mppp_tbl_filaid"><cell name="sanic_gestion" width="100"/><cell name="sanic_clasificacion" width="114"/><cell name="sanic_numeroplan" width="131"/><cell name="sanic_nombrebeneficiario" width="177"/><cell name="sanic_tipoidentificacion" width="164"/><cell name="sanic_numeroidentificacion" width="184"/><cell name="sanic_referencia" width="200"/><cell name="sanic_numerocuenta" width="143"/><cell name="sanic_moneda" width="100"/><cell name="sanic_banco" width="100"/></row></grid>
+</layoutxml>
+</savedquery>
