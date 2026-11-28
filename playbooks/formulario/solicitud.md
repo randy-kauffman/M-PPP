@@ -122,12 +122,14 @@ El aprobador cambió en Dev el formulario «Solicitud» con el diseñador. El pl
 `--solo-verificar` dice `difiere`. Lo que Dev tiene de más que el playbook:
 
 1. **Pestaña «Esencial», primera, antes de «General»** (`tab_2`, `IsUserDefined="0"`):
-   - sección «Correo»: Asunto, Correo original y Excel original (editables, `disabled="false"`);
+   - sección «Correo»: Asunto, Correo original y Excel original, de solo lectura (`disabled="true"`; el aprobador los
+     dejó editables y se corrigieron el 2026-11-27 a pedido suyo: la lista blanca rechaza que una persona los escriba);
    - sección «Filas»: subgrilla de `sanic_mppp_tbl_fila` (relación `sanic_mppp_solicitud_fila`), 4 filas por página,
      con selector de vista apagado, vista inicial «Active Filas» (`ed029da0-cc6c-4351-8d4f-b4b96757c817`, que el aprobador
      también cambió: ver `playbooks/vista/muestras/sanic_mppp_tbl_fila.active_filas.vista.xml`) y vistas disponibles
      «Mis clientes - por digitar», «Filas» y «Active Filas».
-2. **Cuarta celda en el encabezado**: «Recibido el» (`sanic_fecharecibido`, editable). La herramienta admite 3.
+2. **Cuarta celda en el encabezado**: «Recibido el» (`sanic_fecharecibido`, de solo lectura desde el 2026-11-27). La
+   herramienta admite 3.
 3. `<footer>` con tres celdas vacías y `<DisplayConditions Order="0" FallbackForm="true"><Everyone/>` (los agrega el
    diseñador; la herramienta no los escribe).
 
