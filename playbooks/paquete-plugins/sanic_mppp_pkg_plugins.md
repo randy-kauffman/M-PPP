@@ -43,6 +43,8 @@ también en la solución parche `sanic_mppp_sol_parche_1_3_1` junto con D-79 (`M
 
 **1.0.30.0 (2026-11-27)**: DN-09 C: la Bitácora de cada transición de Fila guarda en `sanic_detalle` el "por qué" que trajo esa acción (Rechazada en AS400 y Anulada: `Mensaje al cliente: ...` y, si el RPA mandó su texto crudo, una segunda línea `Nota interna: ...`; Devuelta: `Nota interna: ...`; Digitada y Aprobada: sin detalle), con `TransicionesDeFila.DetalleDeBitacora`. Mismos tipos, sin steps nuevos. No reconstruye las filas ya trabajadas. Sin datos que cargar.
 
+**1.0.31.0 (2026-11-28)**: DN-10: en una Inclusión de formato 06 con la referencia vacía, `sanic_referencia` toma el número de cuenta recibido (sin espacios a los lados y sin rellenar); si el cliente escribió una referencia se respeta; Exclusión, Modificación y formatos 10 y 11 no cambian. `sanic_referenciarecibida` sigue guardando lo que vino. Mismos tipos, sin steps nuevos. No recalcula las filas ya validadas. Sin datos que cargar.
+
 Antes de correr la herramienta hay que armar el .nupkg, **borrando antes `bin/` y `obj/` de los DOS proyectos**
 (receta `references/dataverse/alm.md` línea 118: `dotnet clean` no alcanza). Sin eso, `dotnet pack` sale con código 0
 y **no regenera el .nupkg**: queda el viejo, sin los tipos nuevos (pasó el 2026-10-01 con DN-04; lo detectó el
