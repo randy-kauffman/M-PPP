@@ -561,8 +561,9 @@ namespace Sanic.Mppp.Plugins.Validacion
 
         /// <summary>
         /// `sanic_referencia`, la que rige. DN-05: formato 11 en Inclusión, la construida, sin mirar la recibida (DD-10); en
-        /// cualquier otro caso (Exclusión, Modificación, formatos 06 y 10), la recibida sin espacios a los lados, aunque quede
-        /// vacía (DD-15). Sin plan: nulo.
+        /// cualquier otro caso (Exclusión, Modificación, formato 10), la recibida sin espacios a los lados, aunque quede
+        /// vacía (DD-15). DN-10: formato 06 en Inclusión con la referencia vacía (o solo espacios), rige la cuenta recibida
+        /// sin espacios a los lados y sin rellenar; si el cliente escribió una referencia, se respeta. Sin plan: nulo.
         /// </summary>
         public string ReferenciaQueRige
         {
@@ -574,7 +575,18 @@ namespace Sanic.Mppp.Plugins.Validacion
                     return null;
                 }
 
-                return ArmaLaReferencia ? ReferenciaConstruida : Recibido(CamposDeFila.Referencia);
+                if (ArmaLaReferencia)
+                {
+                    return ReferenciaConstruida;
+                }
+
+                var recibida = Recibido(CamposDeFila.Referencia);
+                if (plan.TipoFormato == TipoDeFormatoDelPlan._06 && Gestion == Dominio.Gestion.Inclusion && recibida.Length == 0)
+                {
+                    return Recibido(CamposDeFila.NumeroCuenta);
+                }
+
+                return recibida;
             }
         }
 
