@@ -735,6 +735,44 @@ namespace Sanic.Mppp.Plugins.Tests.Aceptacion
             }
         }
 
+        // ================================================================== DN-10: formato 06, la cuenta como referencia
+        // (aprobador, 2026-11-27): en una Inclusión de formato 06, si la referencia viene vacía rige la CUENTA, tal cual vino y
+        // sin espacios a los lados, sin rellenar. Si el cliente escribió una referencia, se respeta (la validan las reglas de
+        // siempre). Solo formato 06 y solo Inclusión: el resto no cambia.
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void En_una_inclusion_de_formato_06_sin_referencia_rige_la_cuenta(string referencia)
+        {
+            var fila = Fila("6", ("referencia", referencia), ("numeroCuenta", "  123456789 "));
+            Assert.Equal("123456789", fila.ReferenciaQueRige);
+            Assert.Equal(referencia, fila.ReferenciaRecibida);
+            Assert.Null(fila.ReferenciaConstruida); // no es la construida del formato 11: es la cuenta, sin rellenar
+        }
+
+        [Fact]
+        public void En_una_inclusion_de_formato_06_la_referencia_que_escribio_el_cliente_se_respeta()
+        {
+            Assert.Equal("REF9", Fila("6", ("referencia", "  REF9 ")).ReferenciaQueRige);
+        }
+
+        [Fact]
+        public void En_una_inclusion_de_formato_06_sin_referencia_ni_cuenta_rige_vacia()
+        {
+            Assert.Equal(string.Empty, Fila("6", ("referencia", ""), ("numeroCuenta", "")).ReferenciaQueRige);
+        }
+
+        [Theory]
+        [InlineData("6", "Exclusion")]
+        [InlineData("6", "Modificacion")]
+        [InlineData("6", "")]
+        [InlineData("10", "Inclusion")]
+        public void Fuera_de_la_inclusion_de_formato_06_la_referencia_vacia_sigue_vacia(string plan, string gestion)
+        {
+            Assert.Equal(string.Empty, Fila(plan, ("gestion", gestion), ("referencia", "")).ReferenciaQueRige);
+        }
+
         // ================================================================== el catálogo destino, por el motor
         [Theory]
         [InlineData("6")]
