@@ -1317,7 +1317,7 @@ Recibida el **2026-11-27** del aprobador y **corregida el 2026-11-28**. La prime
 ensamblado 1.0.31.0, parche 1.3.1.5) ponía la cuenta en el formato 06: el aprobador se había equivocado de dato. Lo
 correcto es la identificación en el 06, y la cuenta en el 10 con clasificación BAC.
 
-**Estado: APROBADO el 2026-11-28 (decisiones del aprobador en la conversación). En construcción (corrección).**
+**Estado: APROBADO el 2026-11-28 y construido. Desplegado en Dev (ensamblado 1.0.32.0) y probado en vivo. Viaja en el parche sanic_mppp_sol_parche_1_3_1 1.3.1.6.**
 
 ## Decisiones del aprobador
 
