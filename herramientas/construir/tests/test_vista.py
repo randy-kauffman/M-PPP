@@ -448,6 +448,31 @@ class ContraElEntorno(Base):
         self.assertIn("HTTP 400", detalle)
 
 
+class ComparacionDeXml(unittest.TestCase):
+    """El 2026-11-27 la plataforma pasó `object` al final de `<grid>` en las 28 vistas: no es un cambio."""
+
+    def test_el_orden_de_los_atributos_no_cuenta(self):
+        a = '<grid name="resultset" object="10432" jump="sanic_nombre" select="1" icon="1" preview="1"><row name="result" id="x"/></grid>'
+        b = '<grid name="resultset" jump="sanic_nombre" select="1" icon="1" preview="1" object="10432"><row id="x" name="result"/></grid>'
+        self.assertEqual(vi._normalizar_xml(a), vi._normalizar_xml(b))
+
+    def test_el_orden_de_las_columnas_si_cuenta(self):
+        a = '<row><cell name="a" width="100"/><cell name="b" width="100"/></row>'
+        b = '<row><cell name="b" width="100"/><cell name="a" width="100"/></row>'
+        self.assertNotEqual(vi._normalizar_xml(a), vi._normalizar_xml(b))
+
+    def test_un_valor_distinto_si_cuenta(self):
+        self.assertNotEqual(vi._normalizar_xml('<cell name="a" width="100"/>'), vi._normalizar_xml('<cell name="a" width="150"/>'))
+
+    def test_el_savedqueryid_de_la_raiz_no_cuenta_y_los_espacios_tampoco(self):
+        a = '<fetch version="1.0"><entity name="x"/></fetch>'
+        b = '<fetch savedqueryid="{1}"  version="1.0">\n  <entity name="x" />\n</fetch>'
+        self.assertEqual(vi._normalizar_xml(a), vi._normalizar_xml(b))
+
+    def test_un_texto_que_no_es_xml_se_compara_como_texto(self):
+        self.assertEqual(vi._normalizar_xml("no es < xml"), vi._normalizar_xml("no  es <  xml"))
+
+
 class Uso(Base):
     def test_una_bandera_desconocida_no_se_ignora_en_silencio(self):
         original, capturado = sys.argv, []

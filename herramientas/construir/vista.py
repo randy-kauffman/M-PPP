@@ -306,20 +306,28 @@ def _leer_vista(dv, nombre, tabla):
 
 
 def _normalizar_xml(texto):
-    """Compara XML sin que cuenten como diferencia ni los espacios ni el
-    `savedqueryid` que la plataforma INYECTA en el `fetchxml` al guardarlo
-    (verificado en Dev el 2026-09-22): ese atributo no lo escribimos nosotros y
-    no puede estar en el XML generado, así que compararlo daría "difiere"
-    siempre."""
-    apretado = "".join((texto or "").split())
-    while True:
-        i = apretado.find('savedqueryid="')
-        if i < 0:
-            return apretado
-        fin = apretado.find('"', i + len('savedqueryid="'))
-        if fin < 0:
-            return apretado
-        apretado = apretado[:i] + apretado[fin + 1:]
+    """Compara XML por su CONTENIDO, no por su texto: no cuentan los espacios, ni el ORDEN DE LOS ATRIBUTOS, ni el
+    `savedqueryid` que la plataforma INYECTA en el `fetchxml` al guardarlo (verificado en Dev el 2026-09-22): ese
+    atributo no lo escribimos nosotros y compararlo daría "difiere" siempre.
+
+    El orden de los atributos dejó de contar el 2026-11-27: ese día la plataforma reescribió el `layoutxml` de las 28
+    vistas pasando `object` al final de `<grid>`, y la comparación por texto las marcó a todas como "difiere" sin que
+    hubiera cambiado nada. El orden de los ELEMENTOS sí cuenta (es el orden de las columnas y de los criterios).
+    Si el texto no es XML válido, se compara como antes: texto sin espacios."""
+    import xml.etree.ElementTree as ET
+    try:
+        raiz = ET.fromstring(texto or "")
+    except ET.ParseError:
+        return "".join((texto or "").split())
+
+    def canonico(nodo, es_raiz=False):
+        atributos = {k: v for k, v in nodo.attrib.items() if not (es_raiz and nodo.tag == "fetch" and k == "savedqueryid")}
+        texto_nodo = (nodo.text or "").strip()
+        hijos = "".join(canonico(h) for h in nodo)
+        cola = (nodo.tail or "").strip()
+        return f"<{nodo.tag}{sorted(atributos.items())}>{texto_nodo}{hijos}</{nodo.tag}>{cola}"
+
+    return canonico(raiz, es_raiz=True)
 
 
 def _diferencias(datos, vista, fetch, layout):
