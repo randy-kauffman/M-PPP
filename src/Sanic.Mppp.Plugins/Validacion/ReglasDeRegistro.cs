@@ -562,8 +562,10 @@ namespace Sanic.Mppp.Plugins.Validacion
         /// <summary>
         /// `sanic_referencia`, la que rige. DN-05: formato 11 en Inclusión, la construida, sin mirar la recibida (DD-10); en
         /// cualquier otro caso (Exclusión, Modificación, formato 10), la recibida sin espacios a los lados, aunque quede
-        /// vacía (DD-15). DN-10: formato 06 en Inclusión con la referencia vacía (o solo espacios), rige la cuenta recibida
-        /// sin espacios a los lados y sin rellenar; si el cliente escribió una referencia, se respeta. Sin plan: nulo.
+        /// vacía (DD-15). DN-10 (corregida): en Inclusión con la referencia vacía (o solo espacios), formato 06 → rige el número
+        /// de identificación recibido; formato 10 con clasificación efectiva BAC → rige el número de cuenta recibido; en los dos
+        /// casos sin espacios a los lados, sin rellenar y sin pasar a mayúsculas. Si el cliente escribió una referencia, se
+        /// respeta. Formato 10 con CK: la recibida (vacía). Sin plan: nulo.
         /// </summary>
         public string ReferenciaQueRige
         {
@@ -581,9 +583,17 @@ namespace Sanic.Mppp.Plugins.Validacion
                 }
 
                 var recibida = Recibido(CamposDeFila.Referencia);
-                if (plan.TipoFormato == TipoDeFormatoDelPlan._06 && Gestion == Dominio.Gestion.Inclusion && recibida.Length == 0)
+                if (Gestion == Dominio.Gestion.Inclusion && recibida.Length == 0)
                 {
-                    return Recibido(CamposDeFila.NumeroCuenta);
+                    if (plan.TipoFormato == TipoDeFormatoDelPlan._06)
+                    {
+                        return Recibido(CamposDeFila.NumeroIdentificacion);
+                    }
+
+                    if (plan.TipoFormato == TipoDeFormatoDelPlan._10 && ClasificacionEfectiva == Dominio.Clasificacion.BAC)
+                    {
+                        return Recibido(CamposDeFila.NumeroCuenta);
+                    }
                 }
 
                 return recibida;
