@@ -1316,7 +1316,7 @@ su Bitácora, sus Filas y sus Resultados de regla. No escribe nada.
 Recibida el **2026-11-27** del aprobador: en los planes de formato 06 (BAC), la referencia que rige tiene que ser el
 número de cuenta. Hasta hoy, en formato 06 regía la referencia que mandaba el cliente, y si venía vacía quedaba vacía.
 
-**Estado: APROBADO el 2026-11-27 (decisiones del aprobador en la conversación). En construcción.**
+**Estado: APROBADO el 2026-11-27 y construido. Desplegado en Dev (ensamblado 1.0.31.0) y probado en vivo (set R, R-43). Viaja en el parche sanic_mppp_sol_parche_1_3_1 1.3.1.5.**
 
 ## Decisiones del aprobador (2026-11-27)
 
